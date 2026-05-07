@@ -6,10 +6,8 @@ from langchain_classic.chains.combine_documents import create_stuff_documents_ch
 from langchain_core.prompts import ChatPromptTemplate
 from app.core.config import settings
 
-# 1. Setup Embeddings
 embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
 
-# 2. Connect to the existing Qdrant Cloud collection
 vectorstore = QdrantVectorStore.from_existing_collection(
     embedding=embeddings,
     collection_name="tickets",
@@ -25,11 +23,13 @@ llm = ChatGroq(
 )
 
 # 4. Define the Prompt
+# 4. Define the Prompt (UPDATED)
 system_prompt = (
     "You are a professional IT help desk assistant. Follow these exact rules:\n\n"
     "1. GREETINGS: If the user is just greeting you (e.g., 'hello', 'hi', 'hey'), IGNORE the context entirely. Just respond politely and ask how you can help with their IT issues today.\n"
-    "2. QUESTIONS: For all actual questions, answer ONLY using the information in the provided Context.\n"
-    "3. MISSING INFO: If the Context does not contain the answer to their question, do NOT make one up. Simply state: 'I cannot find the answer to that in my support tickets.'\n\n"
+    "2. INSTRUCTIONS: If the user asks how to do something, DO NOT simply refer them to a page number. You MUST extract the actual step-by-step instructions from the provided context and write them out fully for the user.\n"
+    "3. QUESTIONS: For all actual questions, answer ONLY using the information in the provided Context.\n"
+    "4. MISSING INFO: If the Context does not contain the answer to their question, do NOT make one up. Simply state: 'I cannot find the answer to that in my support knowledge base.'\n\n"
     "Context:\n{context}"
 )
 
@@ -38,9 +38,14 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}"),
 ])
 
-# 5. Create the RAG Chain
+# 5. Create the RAG Chain (UPDATED: Added k=6)
 question_answer_chain = create_stuff_documents_chain(llm, prompt)
-rag_chain = create_retrieval_chain(vectorstore.as_retriever(), question_answer_chain)
+
+# We tell Qdrant to grab the top 6 most relevant chunks instead of the default 4
+rag_chain = create_retrieval_chain(
+    vectorstore.as_retriever(search_kwargs={"k": 6}), 
+    question_answer_chain
+)
 
 def get_chat_response(user_query: str):
     response = rag_chain.invoke({"input": user_query})
