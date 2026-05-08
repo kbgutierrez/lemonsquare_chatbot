@@ -1,33 +1,289 @@
-import { useState } from 'react'
-import ChatBubble from './components/ChatBubble.jsx'
-import ChatWindow from './components/ChatWindow.jsx'
-import ChatHistoryModal from './modals/ChatHistoryModal.jsx'
-import ClearConversationModal from './modals/ClearConversationModal.jsx'
-import SubmitTicketModal from './modals/SubmitTicketModal.jsx'
-import CallAgentModal from './modals/CallAgentModal.jsx'
-import ResolveConversationModal from './modals/ResolveConversationModal.jsx'
-import AboutHelpDeskModal from './modals/AboutHelpDeskModal.jsx'
+import { useEffect, useState } from "react"
+
+import ChatBubble from "./components/ChatBubble.jsx"
+import ChatWindow from "./components/ChatWindow.jsx"
+
+import ChatHistoryModal from "./modals/ChatHistoryModal.jsx"
+import ClearConversationModal from "./modals/ClearConversationModal.jsx"
+import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
+import CallAgentModal from "./modals/CallAgentModal.jsx"
+import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
+import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
+
+import { useBubbleDrag } from "./hooks/useBubbleDrag"
+import { useChatMessages } from "./hooks/useChatMessages"
+
+import { CHAT_CONFIG } from "./constants/chatConfig"
 
 const BubbleChat = () => {
-  const [open, setOpen] = useState(false)
-  const [activeModal, setActiveModal] = useState(null)
+  const [open, setOpen] =
+    useState(false)
+
+  const [activeModal, setActiveModal] =
+    useState(null)
+
+  /* DRAG */
+  const {
+    position,
+    dragging,
+    isLeftSide,
+    isTopSide,
+    startDrag,
+    stopDrag,
+    repositionForWindow,
+  } = useBubbleDrag()
+
+  /* MESSAGES */
+  const {
+    messages,
+    sendMessage,
+    loadConversation,
+    clearConversation,
+  } = useChatMessages()
+
+  /* SMART OPEN */
+  useEffect(() => {
+    if (open) {
+      repositionForWindow()
+    }
+  }, [open])
+
+  /* CLOSE MODAL */
+  const closeModal = () =>
+    setActiveModal(null)
+
+  /* MODALS */
+  const modals = {
+    history: (
+      <ChatHistoryModal
+        onClose={closeModal}
+        onLoadConversation={
+          loadConversation
+        }
+      />
+    ),
+
+    clear: (
+      <ClearConversationModal
+        onClose={closeModal}
+        onClearConversation={
+          clearConversation
+        }
+      />
+    ),
+
+    ticket: (
+      <SubmitTicketModal
+        onClose={closeModal}
+      />
+    ),
+
+    call: (
+      <CallAgentModal
+        onClose={closeModal}
+      />
+    ),
+
+    resolve: (
+      <ResolveConversationModal
+        onClose={closeModal}
+      />
+    ),
+
+    about: (
+      <AboutHelpDeskModal
+        onClose={closeModal}
+      />
+    ),
+  }
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4">
-      {open && (
-        <div className="w-[360px] rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200">
-          <ChatWindow onClose={() => setOpen(false)} onOpenModal={setActiveModal} />
+    <div className="pointer-events-none fixed inset-0 z-50">
+      {/* FLOATING WRAPPER */}
+      <div
+        className={`
+          pointer-events-auto
+          absolute
+          will-change-transform
+          touch-none
+
+          ${
+            dragging
+              ? "transition-none"
+              : `
+                transition-transform
+                duration-300
+                ease-out
+              `
+          }
+        `}
+        style={{
+          transform: `
+            translate3d(
+              ${position.x}px,
+              ${position.y}px,
+              0
+            )
+          `,
+        }}
+      >
+        {/* CHAT WINDOW */}
+        <div
+          className="
+            absolute
+            z-10
+
+            w-[min(94vw,380px)]
+
+            overflow-hidden
+
+            rounded-[30px]
+
+            border
+            border-violet-200/70
+
+            bg-white/95
+            backdrop-blur-xl
+
+            shadow-[0_20px_60px_rgba(139,92,246,0.25)]
+
+            transition-all
+            duration-300
+            ease-out
+
+            sm:w-[380px]
+          "
+          style={{
+            /* LEFT / RIGHT */
+            left: isLeftSide
+              ? "18px"
+              : "auto",
+
+            right: !isLeftSide
+              ? "18px"
+              : "auto",
+
+            /* TOP / BOTTOM */
+            top: isTopSide
+              ? "72px"
+              : "auto",
+
+            bottom: !isTopSide
+              ? "72px"
+              : "auto",
+
+            /* RESPONSIVE */
+            width: `
+              min(
+                94vw,
+                380px
+              )
+            `,
+
+            maxWidth: `
+              calc(100vw - 40px)
+            `,
+
+            height: `
+              min(
+                520px,
+                calc(100vh - 120px)
+              )
+            `,
+
+            maxHeight: `
+              calc(100vh - 120px)
+            `,
+
+            /* OPEN */
+            opacity: open ? 1 : 0,
+
+            transform: open
+              ? `
+                translateY(0)
+                scale(1)
+              `
+              : `
+                translateY(12px)
+                scale(0.96)
+              `,
+
+            pointerEvents:
+              open
+                ? "auto"
+                : "none",
+          }}
+        >
+          <ChatWindow
+            messages={messages}
+            onSendMessage={
+              sendMessage
+            }
+            onClose={() =>
+              setOpen(false)
+            }
+            onOpenModal={
+              setActiveModal
+            }
+          />
         </div>
-      )}
 
-      <ChatBubble isOpen={open} onToggle={() => setOpen((value) => !value)} />
+        {/* CHAT BUBBLE */}
+        <div
+          className="
+            relative
+            z-20
+            h-16
+            touch-none
+          "
+          style={{
+            width: open
+              ? `${CHAT_CONFIG.BUBBLE_EXPANDED}px`
+              : `${CHAT_CONFIG.BUBBLE_SIZE}px`,
 
-      {activeModal === 'history' && <ChatHistoryModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'clear' && <ClearConversationModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'ticket' && <SubmitTicketModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'call' && <CallAgentModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'resolve' && <ResolveConversationModal onClose={() => setActiveModal(null)} />}
-      {activeModal === 'about' && <AboutHelpDeskModal onClose={() => setActiveModal(null)} />}
+            marginLeft:
+              !isLeftSide &&
+              open
+                ? `-${
+                    CHAT_CONFIG.BUBBLE_EXPANDED -
+                    CHAT_CONFIG.BUBBLE_SIZE
+                  }px`
+                : 0,
+          }}
+          onMouseDown={
+            startDrag
+          }
+          onMouseUp={stopDrag}
+          onMouseLeave={
+            stopDrag
+          }
+          onTouchStart={
+            startDrag
+          }
+          onTouchEnd={stopDrag}
+          onClick={() => {
+            if (!dragging) {
+              setOpen(
+                (prev) => !prev
+              )
+            }
+          }}
+        >
+          <ChatBubble
+            isOpen={open}
+            expandDirection={
+              isLeftSide
+                ? "right"
+                : "left"
+            }
+          />
+        </div>
+      </div>
+
+      {/* ACTIVE MODAL */}
+      <div className="pointer-events-auto">
+        {modals[activeModal]}
+      </div>
     </div>
   )
 }

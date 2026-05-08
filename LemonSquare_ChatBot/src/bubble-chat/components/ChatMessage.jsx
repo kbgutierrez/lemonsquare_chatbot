@@ -1,12 +1,166 @@
-const ChatMessage = ({ message }) => {
-  const isAgent = message.sender === 'agent'
+import {
+  Bot,
+  User,
+} from "lucide-react"
+
+const ChatMessage = ({
+  message,
+}) => {
+  const isAgent =
+    message.sender === "agent"
+
+  const config = isAgent
+    ? {
+        wrapper:
+          "justify-start",
+
+        bubble: `
+          rounded-bl-lg
+
+          border
+          border-violet-100
+
+          bg-white
+
+          text-slate-800
+        `,
+
+        time:
+          "text-slate-400",
+
+        avatar: `
+          bg-violet-100
+          text-violet-700
+        `,
+
+        Icon: Bot,
+      }
+    : {
+        wrapper:
+          "justify-end",
+
+        bubble: `
+          rounded-br-lg
+
+          bg-gradient-to-r
+          from-violet-600
+          to-purple-500
+
+          text-white
+        `,
+
+        time:
+          "text-violet-100",
+
+        avatar: `
+          bg-violet-600
+          text-white
+        `,
+
+        Icon: User,
+      }
+
+  const {
+    wrapper,
+    bubble,
+    time,
+    avatar,
+    Icon,
+  } = config
 
   return (
-    <div className={`flex ${isAgent ? 'justify-start' : 'justify-end'}`}>
-      <div className={`max-w-[80%] rounded-3xl px-4 py-3 text-sm ${isAgent ? 'bg-slate-800 text-white' : 'bg-slate-200 text-slate-900'}`}>
-        <p>{message.text}</p>
-        <p className="mt-2 text-right text-xs text-slate-400">{message.time}</p>
+    <div
+      className={`
+        flex
+        items-end
+        gap-2
+
+        ${wrapper}
+      `}
+    >
+      {/* AGENT AVATAR */}
+      {isAgent && (
+        <div
+          className={`
+            flex
+            h-8
+            w-8
+            shrink-0
+            items-center
+            justify-center
+
+            rounded-full
+
+            ${avatar}
+          `}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+      )}
+
+      {/* MESSAGE */}
+      <div
+        className={`
+          max-w-[82%]
+
+          rounded-3xl
+
+          px-4
+          py-3
+
+          shadow-sm
+
+          transition-all
+          duration-200
+
+          ${bubble}
+        `}
+      >
+        {/* TEXT */}
+        <p
+          className="
+            text-sm
+            leading-relaxed
+            break-words
+          "
+        >
+          {message.text}
+        </p>
+
+        {/* TIME */}
+        <p
+          className={`
+            mt-2
+
+            text-right
+            text-[11px]
+
+            ${time}
+          `}
+        >
+          {message.time}
+        </p>
       </div>
+
+      {/* USER AVATAR */}
+      {!isAgent && (
+        <div
+          className={`
+            flex
+            h-8
+            w-8
+            shrink-0
+            items-center
+            justify-center
+
+            rounded-full
+
+            ${avatar}
+          `}
+        >
+          <Icon className="h-4 w-4" />
+        </div>
+      )}
     </div>
   )
 }
