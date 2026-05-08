@@ -1,49 +1,53 @@
 import os
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import QdrantVectorStore  # <--- UPDATED IMPORT
-from langchain_core.documents import Document
 from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from langchain_core.documents import Document
+from app.core.models import SessionHelpdesk, TicketEvaluation
+from app.core.config import settings  # <-- Added config import
 
-# override=True forces it to reload variables just in case
 load_dotenv(override=True)
 
 def run_ingestion():
-    print("Downloading/Loading Embedding Model...")
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-
-    sample_data = [
-        {"text": "Password reset issues can be solved by using the forgot password page.", "metadata": {"source": "manual"}},
-        {"text": "VPN connection problems are usually caused by expired credentials.", "metadata": {"source": "manual"}},
-        {"text": "Blue screen errors may happen because of outdated graphics drivers.", "metadata": {"source": "manual"}},
-        {"text": "Email login issues can be fixed by clearing browser cache and cookies.", "metadata": {"source": "manual"}},
-        {"text": "SI jzar ay pogi at mabait", "metadata": {"source": "internal_memo"}},
-        {"text": "Maraming salapi ang isang jzar", "metadata": {"source": "internal_memo"}}
-    ]
-
-    docs = [Document(page_content=item["text"], metadata=item["metadata"]) for item in sample_data]
-
-    url = os.getenv("QDRANT_URL")
-    api_key = os.getenv("QDRANT_API_KEY")
+    print("Connecting to BigEHelpDeskDev...")
+    db = SessionHelpdesk()
     
-    # SAFETY CHECK: Stop immediately if the .env file is missing
-    if not url:
-        print("❌ FATAL ERROR: QDRANT_URL is missing. Please check your .env file!")
-        return
+    try:
+        tickets = db.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None)).all()
+        print(f"Extracting {len(tickets)} resolved tickets...")
         
-    print(f"Connecting to Qdrant at: {url}")
-    print("Uploading vectors...")
+        docs = []
+        for t in tickets:
+            # Dual-Embedding Format
+            content = (
+                f"TICKET NUMBER: {t.ticket_number}\n"
+                f"ISSUE REPORTED: {t.issue_reported or 'None'}\n"
+                f"ACTUAL ISSUE FOUND: {t.issue_found or 'None'}\n"
+                f"ROOT CAUSE: {t.issue_cause or 'None'}\n"
+                f"RESOLUTION (WORK DONE): {t.work_done or 'None'}\n"
+                f"ADVANCED RESOLUTION: {t.advanced_work_done or 'None'}"
+            )
+            metadata = {"evaluation_id": t.id, "ticket_number": t.ticket_number}
+            docs.append(Document(page_content=content, metadata=metadata))
 
-    # Upload using the new QdrantVectorStore class
-    vectorstore = QdrantVectorStore.from_documents(
-        docs,
-        embeddings,
-        url=url,
-        api_key=api_key,
-        collection_name="tickets",
-        force_recreate=True
-    )
+        # --- UPDATED: Read model name from Config ---
+        print(f"Downloading {settings.EMBEDDING_MODEL} (Warning: This may take a minute!)...")
+        embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+        
+        # --- UPDATED: Read collection name from Config ---
+        print(f"Uploading to Qdrant Collection: {settings.QDRANT_COLLECTION}...")
+        QdrantVectorStore.from_documents(
+            docs, 
+            embeddings,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.QDRANT_COLLECTION,
+            force_recreate=True 
+        )
+        print("✅ Qdrant Sync Complete.")
 
-    print("Success! Data is now in the Qdrant Cloud.")
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     run_ingestion()

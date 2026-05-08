@@ -1,0 +1,522 @@
+================================================
+PROJECT DIRECTORY TREE
+================================================
+backend/
+├── .envsample
+├── app
+│   ├── api
+│   │   ├── chat.py
+│   │   └── deps.py
+│   ├── core
+│   │   ├── config.py
+│   │   └── models.py
+│   ├── main.py
+│   └── services
+│       ├── ingest.py
+│       └── langchain_agent.py
+└── project_summary.txt
+
+================================================
+FILE CONTENTS
+================================================
+
+--- FILE: app\main.py ---
+import os
+import sys
+import uvicorn
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
+
+from app.api import chat
+from app.core.config import settings
+
+# Load environment variables
+load_dotenv()
+
+# ==========================================
+# 🛑 THE PRE-FLIGHT CHECK (NEW)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("\n🔍 Running Pre-Flight Database Check...")
+    try:
+        # Connect directly to Qdrant to check the status
+        qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+        
+        # Check if the collection named in config.py actually exists
+        if not qdrant.collection_exists(settings.QDRANT_COLLECTION):
+            print("\n" + "="*70)
+            print("❌ CRITICAL ERROR: Vector Database Collection Missing!")
+            print(f"The collection '{settings.QDRANT_COLLECTION}' does not exist in Qdrant.")
+            print("This usually happens because the Embedding Model was changed in config.py.")
+            print("\n🛠️  HOW TO FIX THIS:")
+            print("1. Server startup has been ABORTED to prevent crashes.")
+            print("2. Open your terminal and run: python -m app.services.ingest")
+            print("3. Once ingestion is complete, restart this server.")
+            print("="*70 + "\n")
+            
+            # Instantly kill the Uvicorn server
+            sys.exit(1) 
+            
+        print(f"✅ Vector Database verified (Collection: {settings.QDRANT_COLLECTION})")
+        
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"❌ Qdrant Connection Failed: {e}")
+        sys.exit(1)
+        
+    # Yield control back to FastAPI to actually start the server
+    yield 
+
+# ==========================================
+# FASTAPI INITIALIZATION
+# ==========================================
+# Notice we attached the lifespan function here!
+app = FastAPI(title="IT Support AI Enterprise", lifespan=lifespan)
+
+# Essential for AWS/Frontend communication
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 1. Mount the Chat Router
+app.include_router(chat.router, prefix="/api")
+
+# 2. Initialize Embeddings for the Document Upload
+embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+
+# 3. Document Upload Route 
+@app.post("/api/upload", tags=["Documents"])
+async def upload_document(
+    file: UploadFile = File(...), 
+    category: str = Form("General IT")
+):
+    temp_file_path = f"temp_{file.filename}"
+    with open(temp_file_path, "wb") as buffer:
+        buffer.write(await file.read())
+        
+    try:
+        if file.filename.endswith(".docx"):
+            loader = Docx2txtLoader(temp_file_path)
+            docs = loader.load()
+        elif file.filename.endswith(".pdf"):
+            loader = PyPDFLoader(temp_file_path)
+            docs = loader.load()
+        else:
+            os.remove(temp_file_path)
+            return {"error": "Unsupported file format. Please upload DOCX or PDF."}
+            
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+        chunks = text_splitter.split_documents(docs)
+        
+        for chunk in chunks:
+            chunk.metadata["category"] = category
+            chunk.metadata["source_file"] = file.filename
+            
+        QdrantVectorStore.from_documents(
+            documents=chunks,
+            embedding=embeddings,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.QDRANT_COLLECTION 
+        )
+        
+        os.remove(temp_file_path)
+        return {
+            "status": "success", 
+            "message": f"Successfully processed {len(chunks)} chunks into Qdrant!",
+            "category_applied": category
+        }
+        
+    except Exception as e:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        return {"error": f"An error occurred: {str(e)}"}
+
+# 4. Server Execution
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
+
+--- FILE: app\api\chat.py ---
+import uuid
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from pydantic import BaseModel, Field
+from app.api.deps import get_chatbot_db
+from app.core.models import ChatSession, ChatMessage
+from app.services.langchain_agent import orchestrator
+
+router = APIRouter()
+
+class ChatRequest(BaseModel):
+    session_id: str | None = None
+    message: str
+
+class ChatResponse(BaseModel):
+    session_id: str
+    response: str
+    ticket_ids_used: list[int] = Field(default_factory=list)
+
+@router.post("/chat", response_model=ChatResponse)
+def handle_chat(request: ChatRequest, db: Session = Depends(get_chatbot_db)):
+    # FIX: Catch the literal string "null" or empty strings from the frontend
+    if not request.session_id or request.session_id.lower() == "null" or request.session_id == "":
+        # Generate a proper GUID
+        session_id = str(uuid.uuid4())
+        # Create the new session in the database
+        db.add(ChatSession(SessionID=session_id, RequesterUserID=1))
+        db.commit()
+    else:
+        # Use the provided session ID
+        session_id = request.session_id
+        
+        # Optional: Verify the session actually exists in SQL before proceeding
+        existing_session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+        if not existing_session:
+             raise HTTPException(status_code=404, detail="Chat session not found in database.")
+
+    # Save the User's Message
+    db.add(ChatMessage(SessionID=session_id, SenderRole="user", MessageContent=request.message))
+    db.commit()
+
+    # Retrieve History
+    history = db.query(ChatMessage).filter(ChatMessage.SessionID == session_id).order_by(ChatMessage.CreatedAt.desc()).limit(6).all()
+    history.reverse()
+    history_text = "\n".join([f"{msg.SenderRole}: {msg.MessageContent}" for msg in history[:-1]])
+
+    # Call AI
+    # Call AI (Now passing the 'db' session so it can read AIChatbot_Settings)
+    try:
+        ai_response, ticket_ids = orchestrator.orchestrate(
+            user_query=request.message, 
+            chat_history=history_text,
+            db=db  
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
+
+    # Save AI Response
+    db.add(ChatMessage(SessionID=session_id, SenderRole="ai", MessageContent=ai_response))
+    db.commit()
+
+    return ChatResponse(session_id=session_id, response=ai_response, ticket_ids_used=ticket_ids)
+
+--- FILE: app\api\deps.py ---
+from app.core.models import SessionHelpdesk, SessionChatbot
+
+def get_helpdesk_db():
+    db = SessionHelpdesk()
+    try:
+        yield db
+    finally:
+        db.close()
+
+def get_chatbot_db():
+    db = SessionChatbot()
+    try:
+        yield db
+    finally:
+        db.close()
+
+--- FILE: app\core\config.py ---
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    GROQ_API_KEY: str
+    QDRANT_URL: str
+    QDRANT_API_KEY: str
+    HELPDESK_DB_CONN: str
+    CHATBOT_DB_CONN: str
+    
+    # --- NEW: Future-Proofing Embeddings ---
+    # Put the model name here so both ingest.py and the agent always match
+    EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"
+    
+    # Change the collection name! This forces Qdrant to make a fresh 
+    # 1024-dimension database without breaking your old 384-dimension one.
+    QDRANT_COLLECTION: str = "helpdesk_multilingual_v1"
+
+    class Config:
+        env_file = ".env"
+        extra = "ignore"
+
+settings = Settings()
+
+--- FILE: app\core\models.py ---
+import uuid
+from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, BigInteger, Numeric
+from sqlalchemy.orm import declarative_base, sessionmaker, relationship
+from app.core.config import settings
+
+# Engines
+engine_helpdesk = create_engine(settings.HELPDESK_DB_CONN)
+SessionHelpdesk = sessionmaker(autocommit=False, autoflush=False, bind=engine_helpdesk)
+BaseHelpdesk = declarative_base()
+
+engine_chatbot = create_engine(settings.CHATBOT_DB_CONN)
+SessionChatbot = sessionmaker(autocommit=False, autoflush=False, bind=engine_chatbot)
+BaseChatbot = declarative_base()
+
+# Helpdesk Models (Read-Only)
+class TicketEvaluation(BaseHelpdesk):
+    __tablename__ = "tbl_ticket_evaluation" 
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_number = Column(String(15), index=True)
+    issue_reported = Column(Text)
+    issue_found = Column(Text)
+    issue_cause = Column(Text)
+    work_done = Column(Text)
+    advanced_work_done = Column(Text)
+
+# Chatbot Models (Read/Write)
+class ChatSession(BaseChatbot):
+    __tablename__ = "ChatSession" 
+    SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    RequesterUserID = Column(BigInteger, nullable=False, default=1)
+    messages = relationship("ChatMessage", back_populates="session", cascade="all, delete-orphan")
+
+class ChatMessage(BaseChatbot):
+    __tablename__ = "ChatMessage" 
+    MessageID = Column(BigInteger, primary_key=True, autoincrement=True)
+    SessionID = Column(String(36), ForeignKey("ChatSession.SessionID", ondelete="CASCADE"), nullable=False)
+    SenderRole = Column(String(10), nullable=False) 
+    MessageContent = Column(Text, nullable=False)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    session = relationship("ChatSession", back_populates="messages")
+
+class AIChatbotSetting(BaseChatbot):
+    __tablename__ = "AIChatbot_Settings" 
+    
+    SettingID = Column(Integer, primary_key=True, autoincrement=True)
+    ActiveModel = Column(String(100), nullable=False)
+    ReformulatorModel = Column(String(100))
+    SystemPrompt = Column(Text, nullable=False)
+    ReformulatorPrompt = Column(Text)
+    Temperature = Column(Numeric(3, 2))
+    ConfidenceThreshold = Column(Numeric(4, 2))
+
+    EmbeddingModel = Column(String(100)) 
+    RerankerModel = Column(String(100)) 
+    
+    IsActive = Column(Boolean, default=True)
+    CreatedDate = Column(DateTime, default=datetime.utcnow)
+    UpdatedBy = Column(BigInteger)
+
+--- FILE: app\services\ingest.py ---
+import os
+from dotenv import load_dotenv
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_qdrant import QdrantVectorStore
+from langchain_core.documents import Document
+from app.core.models import SessionHelpdesk, TicketEvaluation
+from app.core.config import settings  # <-- Added config import
+
+load_dotenv(override=True)
+
+def run_ingestion():
+    print("Connecting to BigEHelpDeskDev...")
+    db = SessionHelpdesk()
+    
+    try:
+        tickets = db.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None)).all()
+        print(f"Extracting {len(tickets)} resolved tickets...")
+        
+        docs = []
+        for t in tickets:
+            # Dual-Embedding Format
+            content = (
+                f"TICKET NUMBER: {t.ticket_number}\n"
+                f"ISSUE REPORTED: {t.issue_reported or 'None'}\n"
+                f"ACTUAL ISSUE FOUND: {t.issue_found or 'None'}\n"
+                f"ROOT CAUSE: {t.issue_cause or 'None'}\n"
+                f"RESOLUTION (WORK DONE): {t.work_done or 'None'}\n"
+                f"ADVANCED RESOLUTION: {t.advanced_work_done or 'None'}"
+            )
+            metadata = {"evaluation_id": t.id, "ticket_number": t.ticket_number}
+            docs.append(Document(page_content=content, metadata=metadata))
+
+        # --- UPDATED: Read model name from Config ---
+        print(f"Downloading {settings.EMBEDDING_MODEL} (Warning: This may take a minute!)...")
+        embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+        
+        # --- UPDATED: Read collection name from Config ---
+        print(f"Uploading to Qdrant Collection: {settings.QDRANT_COLLECTION}...")
+        QdrantVectorStore.from_documents(
+            docs, 
+            embeddings,
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.QDRANT_COLLECTION,
+            force_recreate=True 
+        )
+        print("✅ Qdrant Sync Complete.")
+
+    finally:
+        db.close()
+
+if __name__ == "__main__":
+    run_ingestion()
+
+--- FILE: app\services\langchain_agent.py ---
+import os
+from sqlalchemy.orm import Session
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from qdrant_client import QdrantClient
+from sentence_transformers import CrossEncoder
+from app.core.config import settings
+from app.core.models import AIChatbotSetting
+
+# IMPORTANT: Import your database session maker here. 
+# Adjust "app.core.database" if your DB connection file is named differently.
+from app.core.database import SessionLocal 
+
+class SupportOrchestrator:
+    def __init__(self):
+        print("\n⚙️  Booting AI Orchestrator & Fetching Core Models from SQL...")
+        
+        # 1. Open a temporary database session just for startup
+        db = SessionLocal()
+        try:
+            active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+            
+            # Read the heavy models from SQL, with safety fallbacks
+            embed_model = active_config.EmbeddingModel if active_config and getattr(active_config, 'EmbeddingModel', None) else "intfloat/multilingual-e5-large"
+            rerank_model = active_config.RerankerModel if active_config and getattr(active_config, 'RerankerModel', None) else "BAAI/bge-reranker-v2-m3"
+            
+            print(f"   - Embedding Model : {embed_model}")
+            print(f"   - Reranker Model  : {rerank_model}")
+            
+        finally:
+            db.close() # Close it immediately
+
+        # 2. Initialize the heavy infrastructure using the SQL values
+        self.qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+        self.collection_name = settings.QDRANT_COLLECTION
+        
+        self.embeddings = HuggingFaceEmbeddings(model_name=embed_model)
+        self.reranker = CrossEncoder(rerank_model)
+        print("✅ Core Infrastructure Initialized.")
+
+    def orchestrate(self, user_query: str, chat_history: str, db: Session) -> tuple[str, list]:
+        # ---------------------------------------------------------
+        # 1. FETCH DYNAMIC SETTINGS FROM SQL
+        # ---------------------------------------------------------
+        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+        
+        main_model_name = active_config.ActiveModel if active_config else "llama-3.3-70b-versatile"
+        reformulator_model_name = active_config.ReformulatorModel if active_config and getattr(active_config, 'ReformulatorModel', None) else "llama-3.1-8b-instant"
+        
+        temperature = float(active_config.Temperature) if active_config else 0.2
+        system_prompt = active_config.SystemPrompt if active_config else "You are an IT Support Agent."
+        top_k = active_config.TopK_Tickets if active_config else 8
+        
+        # Pull threshold from SQL if it exists, otherwise default to -1.0
+        confidence_threshold = float(active_config.ConfidenceThreshold) if active_config and getattr(active_config, 'ConfidenceThreshold', None) is not None else -1.0
+
+        reformulator_prompt_template = active_config.ReformulatorPrompt if active_config and getattr(active_config, 'ReformulatorPrompt', None) else """You are a technical search assistant. Read the chat history and the user's latest message. 
+If the latest message is vague, rewrite it into a specific IT search query based on the history. Otherwise, return it exactly as written.
+DO NOT answer the user. ONLY output the rewritten search string.
+History: {chat_history}
+Latest Message: {user_query}
+Rewritten Search Query:"""
+
+        reformulator_llm = ChatGroq(model=reformulator_model_name, temperature=0.0, api_key=settings.GROQ_API_KEY)
+        dynamic_llm = ChatGroq(model=main_model_name, temperature=temperature, api_key=settings.GROQ_API_KEY)
+
+        # ---------------------------------------------------------
+        # 2. QUERY REFORMULATION 
+        # ---------------------------------------------------------
+        search_query = user_query
+        
+        if chat_history.strip():
+            rewrite_prompt = reformulator_prompt_template.format(
+                chat_history=chat_history, 
+                user_query=user_query
+            )
+            search_query = reformulator_llm.invoke(rewrite_prompt).content.strip()
+
+        # ---------------------------------------------------------
+        # 3. VECTOR SEARCH & RERANKING
+        # ---------------------------------------------------------
+        query_vector = self.embeddings.embed_query(search_query)
+        
+        search_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            limit=top_k  
+        )
+        search_result = search_response.points
+        
+        if not search_result:
+            return "I couldn't find any related tickets in the knowledge base.", []
+
+        docs_to_rerank = [[search_query, hit.payload.get('page_content', '')] for hit in search_result]
+        scores = self.reranker.predict(docs_to_rerank)
+        
+        scored_results = sorted(zip(scores, search_result), key=lambda x: x[0], reverse=True)
+        
+        # ---------------------------------------------------------
+        # 4. OBSERVABILITY: TERMINAL TRACE LOGGING
+        # ---------------------------------------------------------
+        print("\n" + "="*60)
+        print("🔍 AI SEARCH TRACE")
+        print(f"Original Query  : {user_query}")
+        print(f"Rewritten Query : {search_query}")
+        print(f"Threshold       : {confidence_threshold}")
+        print("-" * 60)
+        print("📥 RETRIEVED TICKETS & SCORES:")
+        
+        for score, hit in scored_results:
+            # Safely grab the ticket number from metadata
+            ticket_num = hit.payload.get('metadata', {}).get('ticket_number', 'UNKNOWN')
+            
+            # Visually indicate if the Reranker passed or blocked this ticket
+            status = "✅ PASSED " if score > confidence_threshold else "❌ BLOCKED"
+            print(f" {status} | Score: {score:>7.3f} | Ticket: {ticket_num}")
+            
+        print("="*60 + "\n")
+
+        # ---------------------------------------------------------
+        # 5. FILTERING (The "BS Detector")
+        # ---------------------------------------------------------
+        valid_hits = [hit for score, hit in scored_results if score > confidence_threshold]
+        
+        if not valid_hits:
+            return "I'm sorry, but that doesn't match any IT issues or solutions in my knowledge base. Could you provide more details about the technical problem?", []
+
+        top_hits = valid_hits[:3] 
+        ticket_ids = [hit.payload.get('metadata', {}).get('evaluation_id') for hit in top_hits]
+        
+        # ---------------------------------------------------------
+        # 6. GENERATION 
+        # ---------------------------------------------------------
+        context = "\n\n---\n\n".join([hit.payload.get('page_content', '') for hit in top_hits])
+        
+        final_prompt = f"""{system_prompt}
+        
+        History: {chat_history}
+        
+        Retrieved Tickets: 
+        {context}
+        
+        User Query: {user_query}"""
+        
+        final_answer = dynamic_llm.invoke(final_prompt).content
+        return final_answer, ticket_ids
+
+orchestrator = SupportOrchestrator()
+

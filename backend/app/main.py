@@ -1,5 +1,7 @@
 import os
+import sys
 import uvicorn
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -8,14 +10,55 @@ from langchain_community.document_loaders import Docx2txtLoader, PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_qdrant import QdrantVectorStore
+from qdrant_client import QdrantClient
 
 from app.api import chat
+from app.core.config import settings
 
-# Load environment variables (Qdrant URLs, API keys, etc.)
+# Load environment variables
 load_dotenv()
 
-# Initialize FastAPI
-app = FastAPI(title="IT Support AI")
+# ==========================================
+# 🛑 THE PRE-FLIGHT CHECK (NEW)
+# ==========================================
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    print("\n🔍 Running Pre-Flight Database Check...")
+    try:
+        # Connect directly to Qdrant to check the status
+        qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+        
+        # Check if the collection named in config.py actually exists
+        if not qdrant.collection_exists(settings.QDRANT_COLLECTION):
+            print("\n" + "="*70)
+            print("❌ CRITICAL ERROR: Vector Database Collection Missing!")
+            print(f"The collection '{settings.QDRANT_COLLECTION}' does not exist in Qdrant.")
+            print("This usually happens because the Embedding Model was changed in config.py.")
+            print("\n🛠️  HOW TO FIX THIS:")
+            print("1. Server startup has been ABORTED to prevent crashes.")
+            print("2. Open your terminal and run: python -m app.services.ingest")
+            print("3. Once ingestion is complete, restart this server.")
+            print("="*70 + "\n")
+            
+            # Instantly kill the Uvicorn server
+            sys.exit(1) 
+            
+        print(f"✅ Vector Database verified (Collection: {settings.QDRANT_COLLECTION})")
+        
+    except SystemExit:
+        raise
+    except Exception as e:
+        print(f"❌ Qdrant Connection Failed: {e}")
+        sys.exit(1)
+        
+    # Yield control back to FastAPI to actually start the server
+    yield 
+
+# ==========================================
+# FASTAPI INITIALIZATION
+# ==========================================
+# Notice we attached the lifespan function here!
+app = FastAPI(title="IT Support AI Enterprise", lifespan=lifespan)
 
 # Essential for AWS/Frontend communication
 app.add_middleware(
@@ -25,25 +68,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 1. Include your existing Chat Routes
+# 1. Mount the Chat Router
 app.include_router(chat.router, prefix="/api")
 
-# 2. Initialize Embeddings (Loaded once on startup to save memory and time)
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
+# 2. Initialize Embeddings for the Document Upload
+embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-# 3. The New Document Upload Route
+# 3. Document Upload Route 
 @app.post("/api/upload", tags=["Documents"])
 async def upload_document(
     file: UploadFile = File(...), 
-    category: str = Form("General IT") # Defaults to 'General IT' but can be changed in the UI
+    category: str = Form("General IT")
 ):
-    # Save the uploaded file temporarily so Python can read it
     temp_file_path = f"temp_{file.filename}"
     with open(temp_file_path, "wb") as buffer:
         buffer.write(await file.read())
         
     try:
-        # Read the text based on the file type
         if file.filename.endswith(".docx"):
             loader = Docx2txtLoader(temp_file_path)
             docs = loader.load()
@@ -54,38 +95,29 @@ async def upload_document(
             os.remove(temp_file_path)
             return {"error": "Unsupported file format. Please upload DOCX or PDF."}
             
-        # Chop the document into readable chunks (paragraphs)
-        text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=1000,  # Characters per chunk
-            chunk_overlap=100 # Overlap slightly so sentences don't get cut in half
-        )
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
         chunks = text_splitter.split_documents(docs)
         
-        # Attach Metadata (Categorization) to each chunk
         for chunk in chunks:
             chunk.metadata["category"] = category
             chunk.metadata["source_file"] = file.filename
             
-        # Upload everything to Qdrant Cloud
         QdrantVectorStore.from_documents(
             documents=chunks,
             embedding=embeddings,
-            url=os.getenv("QDRANT_URL"),
-            api_key=os.getenv("QDRANT_API_KEY"),
-            collection_name="tickets"
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            collection_name=settings.QDRANT_COLLECTION 
         )
         
-        # Clean up the temporary file
         os.remove(temp_file_path)
-        
         return {
             "status": "success", 
-            "message": f"Successfully processed {len(chunks)} chunks from {file.filename} into Qdrant Cloud!",
+            "message": f"Successfully processed {len(chunks)} chunks into Qdrant!",
             "category_applied": category
         }
         
     except Exception as e:
-        # Ensure the temp file is deleted even if the code crashes
         if os.path.exists(temp_file_path):
             os.remove(temp_file_path)
         return {"error": f"An error occurred: {str(e)}"}
