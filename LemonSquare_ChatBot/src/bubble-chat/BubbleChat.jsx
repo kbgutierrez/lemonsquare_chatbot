@@ -22,7 +22,7 @@ const BubbleChat = () => {
   const [activeModal, setActiveModal] =
     useState(null)
 
-  /* Drag */
+  /* DRAG */
   const {
     position,
     dragging,
@@ -33,7 +33,7 @@ const BubbleChat = () => {
     repositionForWindow,
   } = useBubbleDrag()
 
-  /* Messages */
+  /* MESSAGES */
   const {
     messages,
     sendMessage,
@@ -48,11 +48,11 @@ const BubbleChat = () => {
     }
   }, [open])
 
-  /* Shared Close */
+  /* CLOSE MODAL */
   const closeModal = () =>
     setActiveModal(null)
 
-  /* Modal Map */
+  /* MODALS */
   const modals = {
     history: (
       <ChatHistoryModal
@@ -98,10 +98,11 @@ const BubbleChat = () => {
   }
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      {/* Floating Wrapper */}
+    <div className="pointer-events-none fixed inset-0 z-50">
+      {/* FLOATING WRAPPER */}
       <div
         className={`
+          pointer-events-auto
           absolute
           will-change-transform
           touch-none
@@ -126,7 +127,7 @@ const BubbleChat = () => {
           `,
         }}
       >
-        {/* Chat Window */}
+        {/* CHAT WINDOW */}
         <div
           className="
             absolute
@@ -171,7 +172,7 @@ const BubbleChat = () => {
               ? "72px"
               : "auto",
 
-            /* RESPONSIVE SIZE */
+            /* RESPONSIVE */
             width: `
               min(
                 94vw,
@@ -227,7 +228,7 @@ const BubbleChat = () => {
           />
         </div>
 
-        {/* Bubble */}
+        {/* CHAT BUBBLE */}
         <div
           className="
             relative
@@ -279,8 +280,10 @@ const BubbleChat = () => {
         </div>
       </div>
 
-      {/* Active Modal */}
-      {modals[activeModal]}
+      {/* ACTIVE MODAL */}
+      <div className="pointer-events-auto">
+        {modals[activeModal]}
+      </div>
     </div>
   )
 }

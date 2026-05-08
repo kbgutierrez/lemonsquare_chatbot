@@ -1,18 +1,21 @@
-import { useMemo, useState } from "react"
+import { useState } from "react"
 
 import {
   Ticket,
   X,
-  ChevronDown,
-  SendHorizonal,
   CheckCircle2,
   Flag,
   FolderKanban,
+  User,
+  FileText,
+  SendHorizonal,
 } from "lucide-react"
 
-const MAX_TITLE = 36
-const MAX_WORDS = 150
-const LONGEST_WORD_LIMIT = 189
+import TicketField from "../components/TicketField"
+import TicketTextarea from "../components/TicketTextarea"
+import TicketDropdown from "../components/TicketDropdown"
+
+import { useTicketForm } from "../hooks/useTicketForm"
 
 const priorities = [
   "Low",
@@ -28,282 +31,31 @@ const categories = [
   "Billing",
 ]
 
-const field = `
-  w-full
-
-  rounded-2xl
-
-  border
-  border-violet-200
-
-  bg-violet-50/50
-
-  px-4
-  py-3
-
-  text-sm
-  text-slate-700
-
-  outline-none
-
-  transition-all
-  duration-200
-
-  focus:border-violet-400
-  focus:bg-white
-`
-
-/* MINI DROPDOWN */
-const Dropdown = ({
-  icon: Icon,
-  value,
-  items,
-  onChange,
-}) => {
-  const [open, setOpen] =
-    useState(false)
-
-  return (
-    <div className="relative z-[80]">
-      <button
-        type="button"
-        onClick={() =>
-          setOpen((prev) => !prev)
-        }
-        className="
-          flex
-          items-center
-          gap-2
-
-          rounded-2xl
-
-          border
-          border-violet-200
-
-          bg-white/80
-
-          px-4
-          py-2.5
-
-          text-sm
-          font-medium
-          text-slate-700
-
-          shadow-sm
-
-          transition-all
-          duration-200
-
-          hover:bg-violet-50
-        "
-      >
-        <Icon className="h-4 w-4 text-violet-500" />
-
-        {value}
-
-        <ChevronDown
-          className={`
-            h-4
-            w-4
-
-            transition-transform
-            duration-200
-
-            ${
-              open
-                ? "rotate-180"
-                : ""
-            }
-          `}
-        />
-      </button>
-
-      {/* MENU */}
-      <div
-        className={`
-          absolute
-          right-0
-          top-[calc(100%+10px)]
-          z-[90]
-
-          min-w-[180px]
-
-          overflow-hidden
-
-          rounded-2xl
-
-          border
-          border-violet-100
-
-          bg-white
-
-          shadow-[0_20px_40px_rgba(0,0,0,0.12)]
-
-          transition-all
-          duration-200
-
-          ${
-            open
-              ? `
-                pointer-events-auto
-                translate-y-0
-                opacity-100
-              `
-              : `
-                pointer-events-none
-                -translate-y-2
-                opacity-0
-              `
-          }
-        `}
-      >
-        {items.map((item) => (
-          <button
-            key={item}
-            type="button"
-            onClick={() => {
-              onChange(item)
-              setOpen(false)
-            }}
-            className="
-              w-full
-
-              px-4
-              py-3
-
-              text-left
-              text-sm
-              text-slate-700
-
-              transition-colors
-              duration-150
-
-              hover:bg-violet-50
-            "
-          >
-            {item}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 const SubmitTicketModal = ({
   onClose,
 }) => {
+
   const [closing, setClosing] =
     useState(false)
 
-  const [loading, setLoading] =
-    useState(false)
-
-  const [success, setSuccess] =
-    useState(false)
-
-  const [form, setForm] =
-    useState({
-      title: "",
-      description: "",
-      priority: "Medium",
-      category: "General",
-    })
-
-  /* WORD COUNT */
-  const words = useMemo(
-    () =>
-      (
-        form.description.match(
-          /\b\S+\b/g
-        ) || []
-      ).length,
-
-    [form.description]
-  )
-
-  /* UPDATE */
-  const update = (
-    name,
-    value
-  ) => {
-    if (
-      name === "title" &&
-      value.length > MAX_TITLE
-    ) {
-      return
-    }
-
-    if (
-      name === "description"
-    ) {
-      const extracted =
-        value.match(
-          /\b\S+\b/g
-        ) || []
-
-      if (
-        extracted.length >
-        MAX_WORDS
-      ) {
-        return
-      }
-
-      if (
-        extracted.some(
-          (word) =>
-            word.length >
-            LONGEST_WORD_LIMIT
-        )
-      ) {
-        return
-      }
-    }
-
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-  }
-
-  /* CLOSE */
   const close = () => {
     setClosing(true)
 
     setTimeout(onClose, 200)
   }
 
-  /* SUBMIT */
-  const submit = async () => {
-    if (
-      !form.title ||
-      !form.description
-    ) {
-      return
-    }
-
-    setLoading(true)
-
-    console.log(
-      "SUBMIT TICKET",
-      {
-        USER_ID:
-          "USER_ID_PLACEHOLDER",
-
-        API:
-          "SUBMIT_TICKET_API_PLACEHOLDER",
-
-        form,
-      }
-    )
-
-    setTimeout(() => {
-      setLoading(false)
-
-      setSuccess(true)
-
-      setTimeout(close, 1200)
-    }, 1200)
-  }
+  const {
+    form,
+    loading,
+    success,
+    words,
+    update,
+    submit,
+    MAX_TITLE,
+    MAX_WORDS,
+  } = useTicketForm(() => {
+    setTimeout(close, 1200)
+  })
 
   return (
     <div
@@ -331,17 +83,20 @@ const SubmitTicketModal = ({
         }
       `}
     >
-      {/* CARD */}
+      {/* MODAL */}
       <div
         className={`
           relative
 
+          flex
+          min-w-0
           w-full
-          max-w-[760px]
+          max-w-[95vw]
+          flex-col
 
-          overflow-visible
+          overflow-hidden
 
-          rounded-[32px]
+          rounded-[28px]
 
           border
           border-violet-100
@@ -353,6 +108,10 @@ const SubmitTicketModal = ({
 
           transition-all
           duration-300
+
+          sm:max-w-[720px]
+
+          max-h-[92vh]
 
           ${
             closing
@@ -385,17 +144,20 @@ const SubmitTicketModal = ({
             from-violet-50
             to-purple-50
 
-            px-6
-            py-5
+            px-4
+            py-4
+
+            sm:px-6
           "
         >
-          {/* LEFT */}
-          <div className="flex items-center gap-4">
+          {/* TITLE */}
+          <div className="flex min-w-0 items-center gap-4">
             <div
               className="
                 flex
                 h-12
                 w-12
+                shrink-0
                 items-center
                 justify-center
 
@@ -407,7 +169,7 @@ const SubmitTicketModal = ({
               <Ticket className="h-5 w-5 text-violet-700" />
             </div>
 
-            <div>
+            <div className="min-w-0">
               <p
                 className="
                   text-[10px]
@@ -422,10 +184,13 @@ const SubmitTicketModal = ({
 
               <h2
                 className="
-                  mt-1
-                  text-xl
+                  truncate
+
+                  text-lg
                   font-semibold
                   text-slate-900
+
+                  sm:text-xl
                 "
               >
                 Submit Ticket
@@ -433,27 +198,31 @@ const SubmitTicketModal = ({
             </div>
           </div>
 
-          {/* RIGHT NAV */}
-          <div className="flex items-center gap-3">
-            <Dropdown
+          {/* ACTIONS */}
+          <div className="flex flex-wrap items-center gap-2">
+            <TicketDropdown
               icon={Flag}
-              value={form.priority}
+              value={
+                form.PriorityLevel
+              }
               items={priorities}
               onChange={(value) =>
                 update(
-                  "priority",
+                  "PriorityLevel",
                   value
                 )
               }
             />
 
-            <Dropdown
+            <TicketDropdown
               icon={FolderKanban}
-              value={form.category}
+              value={
+                form.CategoryName
+              }
               items={categories}
               onChange={(value) =>
                 update(
-                  "category",
+                  "CategoryName",
                   value
                 )
               }
@@ -488,7 +257,23 @@ const SubmitTicketModal = ({
         </div>
 
         {/* BODY */}
-        <div className="px-6 py-6">
+        <div
+          className="
+            min-w-0
+
+            overflow-y-auto
+            overflow-x-hidden
+
+            px-4
+            py-4
+
+            sm:px-6
+            sm:py-5
+
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+          "
+        >
           {/* SUCCESS */}
           {success && (
             <div
@@ -523,77 +308,101 @@ const SubmitTicketModal = ({
             </div>
           )}
 
+          {/* SESSION */}
+          <div
+            className="
+              mb-5
+
+              grid
+              gap-4
+
+              sm:grid-cols-2
+            "
+          >
+            <TicketField
+              label="Requester User ID"
+              icon={User}
+              value={
+                form.RequesterUserID
+              }
+              disabled
+            />
+
+            <TicketField
+              label="Session ID"
+              icon={FileText}
+              value={form.SessionID}
+              disabled
+            />
+          </div>
+
           {/* TITLE */}
           <div className="mb-5">
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">
-                Ticket Title
-              </label>
-
-              <span className="text-xs text-slate-400">
-                {form.title.length}/{MAX_TITLE}
-              </span>
-            </div>
-
-            <input
-              type="text"
-              value={form.title}
-              onChange={(e) =>
+            <TicketField
+              label="Chat Title"
+              value={form.ChatTitle}
+              max={MAX_TITLE}
+              placeholder="Enter ticket title..."
+              onChange={(value) =>
                 update(
-                  "title",
-                  e.target.value
+                  "ChatTitle",
+                  value
                 )
               }
-              placeholder="Enter ticket title..."
-              className={field}
+            />
+          </div>
+
+          {/* SUMMARY */}
+          <div className="mb-5">
+            <TicketField
+              label="Issue Summary"
+              value={
+                form.IssueSummary
+              }
+              placeholder="Short issue summary..."
+              onChange={(value) =>
+                update(
+                  "IssueSummary",
+                  value
+                )
+              }
             />
           </div>
 
           {/* DESCRIPTION */}
-          <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-sm font-medium text-slate-700">
-                Description
-              </label>
+          <TicketTextarea
+            label="Description"
+            value={form.Description}
+            words={words}
+            maxWords={MAX_WORDS}
+            placeholder="Describe your issue..."
+            onChange={(value) =>
+              update(
+                "Description",
+                value
+              )
+            }
+          />
 
-              <span
-                className={`
-                  text-xs
+          {/* FOOTER */}
+          <div
+            className="
+              mt-6
 
-                  ${
-                    words >= MAX_WORDS
-                      ? "text-red-500"
-                      : "text-slate-400"
-                  }
-                `}
-              >
-                {words}/{MAX_WORDS}
-              </span>
-            </div>
+              flex
+              flex-col-reverse
+              gap-3
 
-            <textarea
-              rows={6}
-              value={form.description}
-              onChange={(e) =>
-                update(
-                  "description",
-                  e.target.value
-                )
-              }
-              placeholder="Describe your issue..."
-              className={`
-                ${field}
-                resize-none
-              `}
-            />
-          </div>
-
-          {/* ACTIONS */}
-          <div className="mt-6 flex justify-end gap-3">
+              sm:flex-row
+              sm:justify-end
+            "
+          >
             <button
               type="button"
               onClick={close}
               className="
+                w-full
+
                 rounded-2xl
 
                 border
@@ -602,7 +411,7 @@ const SubmitTicketModal = ({
                 bg-white
 
                 px-5
-                py-2.5
+                py-3
 
                 text-sm
                 font-medium
@@ -612,6 +421,8 @@ const SubmitTicketModal = ({
                 duration-200
 
                 hover:bg-slate-50
+
+                sm:w-auto
               "
             >
               Cancel
@@ -622,12 +433,14 @@ const SubmitTicketModal = ({
               onClick={submit}
               disabled={
                 loading ||
-                !form.title ||
-                !form.description
+                !form.ChatTitle ||
+                !form.Description
               }
               className="
                 flex
+                w-full
                 items-center
+                justify-center
                 gap-2
 
                 rounded-2xl
@@ -637,7 +450,7 @@ const SubmitTicketModal = ({
                 to-purple-500
 
                 px-6
-                py-2.5
+                py-3
 
                 text-sm
                 font-medium
@@ -652,6 +465,8 @@ const SubmitTicketModal = ({
 
                 disabled:cursor-not-allowed
                 disabled:opacity-50
+
+                sm:w-auto
               "
             >
               {loading ? (
