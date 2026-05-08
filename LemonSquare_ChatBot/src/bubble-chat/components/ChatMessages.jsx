@@ -1,11 +1,66 @@
+import {
+  useEffect,
+  useRef
+} from 'react'
+
 import ChatMessage from './ChatMessage.jsx'
 
-const ChatMessages = ({ messages }) => {
+const ChatMessages = ({
+  messages
+}) => {
+
+  const messagesEndRef =
+    useRef(null)
+
+  /* AUTO SCROLL */
+  useEffect(() => {
+
+    messagesEndRef.current?.scrollIntoView({
+      behavior: 'smooth'
+    })
+
+  }, [messages])
+
   return (
-    <div className="space-y-4">
+    <div
+      className="
+        flex
+        h-full
+        flex-col
+        gap-4
+
+        overflow-y-auto
+
+        px-4
+        py-5
+      "
+
+      style={{
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none'
+      }}
+    >
+
+      {/* HIDE ALL SCROLLBARS */}
+      <style>
+        {`
+          div::-webkit-scrollbar {
+            display: none;
+            width: 0;
+            height: 0;
+          }
+        `}
+      </style>
+
       {messages.map((message) => (
-        <ChatMessage key={message.id} message={message} />
+        <ChatMessage
+          key={message.id}
+          message={message}
+        />
       ))}
+
+      {/* AUTO SCROLL TARGET */}
+      <div ref={messagesEndRef} />
     </div>
   )
 }
