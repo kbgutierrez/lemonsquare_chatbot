@@ -1,19 +1,28 @@
-import { useState } from 'react'
+import { useState } from "react"
 
-import ChatHeader from './ChatHeader.jsx'
-import ChatMessages from './ChatMessages.jsx'
-import ChatFooter from './ChatFooter.jsx'
+import ChatHeader from "./ChatHeader.jsx"
+import ChatMessages from "./ChatMessages.jsx"
+import ChatFooter from "./ChatFooter.jsx"
 
-import { mockMessages } from '../data/mockMessages.js'
+import { mockMessages } from "../data/mockMessages.js"
 
 const ChatWindow = ({
   onClose,
-  onOpenModal
+  onOpenModal,
 }) => {
-
-  /* LIVE CHAT STATE */
+  /* CHAT STATE */
   const [messages, setMessages] =
     useState(mockMessages)
+
+  /* TIME */
+  const getTime = () =>
+    new Date().toLocaleTimeString(
+      [],
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+    )
 
   /* SEND MESSAGE */
   const handleSendMessage = (
@@ -21,29 +30,30 @@ const ChatWindow = ({
     isAgent = false
   ) => {
 
-    const newMessage = {
-      id: Date.now(),
-
-      sender:
-        isAgent
-          ? 'agent'
-          : 'user',
-
-      text,
-
-      time:
-        new Date().toLocaleTimeString(
-          [],
-          {
-            hour: '2-digit',
-            minute: '2-digit'
-          }
-        )
-    }
+    /*
+      FUTURE SAFE:
+      - AI streaming
+      - SQL logging
+      - Groq/OpenAI
+      - RAG pipeline
+      - websocket support
+      - typing indicators
+    */
 
     setMessages((prev) => [
       ...prev,
-      newMessage
+
+      {
+        id: Date.now(),
+
+        sender: isAgent
+          ? "agent"
+          : "user",
+
+        text,
+
+        time: getTime(),
+      },
     ])
   }
 
@@ -61,11 +71,12 @@ const ChatWindow = ({
         bg-white
       "
     >
-
       {/* HEADER */}
       <ChatHeader
         onClose={onClose}
-        onOpenModal={onOpenModal}
+        onOpenModal={
+          onOpenModal
+        }
       />
 
       {/* CHAT AREA */}
@@ -81,7 +92,6 @@ const ChatWindow = ({
           to-white
         "
       >
-
         {/* BACKGROUND GLOW */}
         <div
           className="

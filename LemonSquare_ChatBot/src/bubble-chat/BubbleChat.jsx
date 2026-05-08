@@ -1,342 +1,138 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState
-} from 'react'
+import { useEffect, useState } from "react"
 
-import ChatBubble from './components/ChatBubble.jsx'
-import ChatWindow from './components/ChatWindow.jsx'
+import ChatBubble from "./components/ChatBubble.jsx"
+import ChatWindow from "./components/ChatWindow.jsx"
 
-import ChatHistoryModal from './modals/ChatHistoryModal.jsx'
-import ClearConversationModal from './modals/ClearConversationModal.jsx'
-import SubmitTicketModal from './modals/SubmitTicketModal.jsx'
-import CallAgentModal from './modals/CallAgentModal.jsx'
-import ResolveConversationModal from './modals/ResolveConversationModal.jsx'
-import AboutHelpDeskModal from './modals/AboutHelpDeskModal.jsx'
+import ChatHistoryModal from "./modals/ChatHistoryModal.jsx"
+import ClearConversationModal from "./modals/ClearConversationModal.jsx"
+import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
+import CallAgentModal from "./modals/CallAgentModal.jsx"
+import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
+import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
 
-import {
-  mockMessages
-} from './data/mockMessages.js'
+import { useBubbleDrag } from "./hooks/useBubbleDrag"
+import { useChatMessages } from "./hooks/useChatMessages"
 
-const SIZE = 64
-const PADDING = 20
-const CHAT_WIDTH = 380
-const EXPANDED = 224
+import { CHAT_CONFIG } from "./constants/chatConfig"
 
 const BubbleChat = () => {
-
   const [open, setOpen] =
     useState(false)
 
   const [activeModal, setActiveModal] =
     useState(null)
 
-  const [dragging, setDragging] =
-    useState(false)
+  /* Drag */
+  const {
+    position,
+    dragging,
+    isLeftSide,
+    isTopSide,
+    startDrag,
+    stopDrag,
+    repositionForWindow,
+  } = useBubbleDrag()
 
-  const [messages, setMessages] =
-    useState(mockMessages)
+  /* Messages */
+  const {
+    messages,
+    sendMessage,
+    loadConversation,
+    clearConversation,
+  } = useChatMessages()
 
-  const [position, setPosition] =
-    useState({
-      x:
-        window.innerWidth - 100,
-
-      y:
-        window.innerHeight - 100
-    })
-
-  const dragOffset =
-    useRef({
-      x: 0,
-      y: 0
-    })
-
-  const dragTimer =
-    useRef(null)
-
-  /* SIDE */
-  const isLeftSide =
-    useMemo(
-      () =>
-        position.x <
-        window.innerWidth / 2,
-
-      [position.x]
-    )
-
-  const isTopSide =
-    useMemo(
-      () =>
-        position.y <
-        window.innerHeight / 2,
-
-      [position.y]
-    )
-
-  /* SNAP */
-  const getSnapPosition =
-    (x, y) => {
-
-      const left =
-        x <
-        window.innerWidth / 2
-
-      const top =
-        y <
-        window.innerHeight / 2
-
-      return {
-        x:
-          left
-            ? PADDING
-            : window.innerWidth -
-              SIZE -
-              PADDING,
-
-        y:
-          top
-            ? PADDING
-            : window.innerHeight -
-              SIZE -
-              PADDING
-      }
-    }
-
-  /* DRAG */
+  /* SMART OPEN */
   useEffect(() => {
-
-    const move =
-      (event) => {
-
-        if (!dragging) return
-
-        setPosition({
-          x: Math.min(
-            Math.max(
-              0,
-              event.clientX -
-              dragOffset.current.x
-            ),
-            window.innerWidth -
-            SIZE
-          ),
-
-          y: Math.min(
-            Math.max(
-              0,
-              event.clientY -
-              dragOffset.current.y
-            ),
-            window.innerHeight -
-            SIZE
-          )
-        })
-      }
-
-    const up = () => {
-
-      if (!dragging) return
-
-      setPosition(
-        getSnapPosition(
-          position.x,
-          position.y
-        )
-      )
-
-      setDragging(false)
+    if (open) {
+      repositionForWindow()
     }
+  }, [open])
 
-    const resize = () => {
-      setPosition(
-        getSnapPosition(
-          position.x,
-          position.y
-        )
-      )
-    }
+  /* Shared Close */
+  const closeModal = () =>
+    setActiveModal(null)
 
-    window.addEventListener(
-      'mousemove',
-      move
-    )
+  /* Modal Map */
+  const modals = {
+    history: (
+      <ChatHistoryModal
+        onClose={closeModal}
+        onLoadConversation={
+          loadConversation
+        }
+      />
+    ),
 
-    window.addEventListener(
-      'mouseup',
-      up
-    )
+    clear: (
+      <ClearConversationModal
+        onClose={closeModal}
+        onClearConversation={
+          clearConversation
+        }
+      />
+    ),
 
-    window.addEventListener(
-      'resize',
-      resize
-    )
+    ticket: (
+      <SubmitTicketModal
+        onClose={closeModal}
+      />
+    ),
 
-    return () => {
+    call: (
+      <CallAgentModal
+        onClose={closeModal}
+      />
+    ),
 
-      window.removeEventListener(
-        'mousemove',
-        move
-      )
+    resolve: (
+      <ResolveConversationModal
+        onClose={closeModal}
+      />
+    ),
 
-      window.removeEventListener(
-        'mouseup',
-        up
-      )
-
-      window.removeEventListener(
-        'resize',
-        resize
-      )
-    }
-
-  }, [dragging, position])
-
-  /* START DRAG */
-  const startDrag =
-    (event) => {
-
-      dragOffset.current = {
-        x:
-          event.clientX -
-          position.x,
-
-        y:
-          event.clientY -
-          position.y
-      }
-
-      dragTimer.current =
-        setTimeout(() => {
-          setDragging(true)
-        }, 150)
-    }
-
-  const stopDrag = () => {
-    clearTimeout(
-      dragTimer.current
-    )
+    about: (
+      <AboutHelpDeskModal
+        onClose={closeModal}
+      />
+    ),
   }
 
-  /* TOGGLE */
-  const handleToggle =
-    () => {
-
-      if (!dragging) {
-        setOpen(
-          (prev) => !prev
-        )
-      }
-    }
-
-  /* LOAD CHAT */
-  const handleLoadConversation =
-    (
-      conversationMessages
-    ) => {
-
-      const loaded =
-        conversationMessages.map(
-          (
-            message,
-            index
-          ) => ({
-            id:
-              `loaded-${index}`,
-
-            sender:
-              message.sender,
-
-            text:
-              message.text,
-
-            time:
-              new Date()
-                .toLocaleTimeString(
-                  [],
-                  {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }
-                )
-          })
-        )
-
-      setMessages(loaded)
-
-      setOpen(true)
-
-      setActiveModal(null)
-    }
-
-  /* SEND */
-  const handleSendMessage =
-    (
-      text,
-      isAgent = false
-    ) => {
-
-      const message = {
-        id:
-          Date.now().toString(),
-
-        sender:
-          isAgent
-            ? 'agent'
-            : 'user',
-
-        text,
-
-        time:
-          new Date()
-            .toLocaleTimeString(
-              [],
-              {
-                hour: '2-digit',
-                minute: '2-digit'
-              }
-            )
-      }
-
-      setMessages(
-        (prev) => [
-          ...prev,
-          message
-        ]
-      )
-    }
-
   return (
-    <div
-      className="
-        fixed
-        inset-0
-        z-50
-        overflow-hidden
-      "
-    >
-
-      {/* CHAT */}
+    <div className="fixed inset-0 z-50 overflow-hidden">
+      {/* Floating Wrapper */}
       <div
-        className="
+        className={`
           absolute
-          pointer-events-auto
-        "
+          will-change-transform
+          touch-none
 
+          ${
+            dragging
+              ? "transition-none"
+              : `
+                transition-transform
+                duration-300
+                ease-out
+              `
+          }
+        `}
         style={{
-          left:
-            `${position.x}px`,
-
-          top:
-            `${position.y}px`
+          transform: `
+            translate3d(
+              ${position.x}px,
+              ${position.y}px,
+              0
+            )
+          `,
         }}
       >
-
-        {/* WINDOW */}
+        {/* Chat Window */}
         <div
           className="
             absolute
+            z-10
+
+            w-[min(94vw,380px)]
 
             overflow-hidden
 
@@ -345,7 +141,7 @@ const BubbleChat = () => {
             border
             border-violet-200/70
 
-            bg-white/90
+            bg-white/95
             backdrop-blur-xl
 
             shadow-[0_20px_60px_rgba(139,92,246,0.25)]
@@ -354,172 +150,137 @@ const BubbleChat = () => {
             duration-300
             ease-out
 
-            w-[min(92vw,380px)]
-            h-[min(72vh,520px)]
-
             sm:w-[380px]
-            sm:h-[520px]
           "
-
           style={{
-            left:
-              isLeftSide
-                ? '18px'
-                : `-${CHAT_WIDTH - 40}px`,
+            /* LEFT / RIGHT */
+            left: isLeftSide
+              ? "18px"
+              : "auto",
 
-            top:
-              isTopSide
-                ? 'clamp(12px, 5vh, 80px)'
-                : 'auto',
+            right: !isLeftSide
+              ? "18px"
+              : "auto",
 
-            bottom:
-              !isTopSide
-                ? 'clamp(12px, 5vh, 80px)'
-                : 'auto',
+            /* TOP / BOTTOM */
+            top: isTopSide
+              ? "72px"
+              : "auto",
 
-            opacity:
-              open ? 1 : 0,
+            bottom: !isTopSide
+              ? "72px"
+              : "auto",
 
-            transform:
-              open
-                ? `
-                  translateY(0)
-                  scale(1)
-                `
-                : `
-                  translateY(18px)
-                  scale(0.92)
-                `,
+            /* RESPONSIVE SIZE */
+            width: `
+              min(
+                94vw,
+                380px
+              )
+            `,
+
+            maxWidth: `
+              calc(100vw - 40px)
+            `,
+
+            height: `
+              min(
+                520px,
+                calc(100vh - 120px)
+              )
+            `,
+
+            maxHeight: `
+              calc(100vh - 120px)
+            `,
+
+            /* OPEN */
+            opacity: open ? 1 : 0,
+
+            transform: open
+              ? `
+                translateY(0)
+                scale(1)
+              `
+              : `
+                translateY(12px)
+                scale(0.96)
+              `,
 
             pointerEvents:
               open
-                ? 'auto'
-                : 'none'
+                ? "auto"
+                : "none",
           }}
         >
           <ChatWindow
             messages={messages}
-
             onSendMessage={
-              handleSendMessage
+              sendMessage
             }
-
             onClose={() =>
               setOpen(false)
             }
-
             onOpenModal={
               setActiveModal
             }
           />
         </div>
 
-        {/* BUBBLE */}
+        {/* Bubble */}
         <div
           className="
             relative
+            z-20
             h-16
+            touch-none
           "
-
           style={{
-            width:
-              open
-                ? `${EXPANDED}px`
-                : `${SIZE}px`,
+            width: open
+              ? `${CHAT_CONFIG.BUBBLE_EXPANDED}px`
+              : `${CHAT_CONFIG.BUBBLE_SIZE}px`,
 
             marginLeft:
               !isLeftSide &&
               open
-                ? `-${EXPANDED - SIZE}px`
-                : 0
+                ? `-${
+                    CHAT_CONFIG.BUBBLE_EXPANDED -
+                    CHAT_CONFIG.BUBBLE_SIZE
+                  }px`
+                : 0,
           }}
-
           onMouseDown={
             startDrag
           }
-
-          onMouseUp={
-            stopDrag
-          }
-
+          onMouseUp={stopDrag}
           onMouseLeave={
             stopDrag
           }
-
-          onClick={
-            handleToggle
+          onTouchStart={
+            startDrag
           }
+          onTouchEnd={stopDrag}
+          onClick={() => {
+            if (!dragging) {
+              setOpen(
+                (prev) => !prev
+              )
+            }
+          }}
         >
           <ChatBubble
             isOpen={open}
-
             expandDirection={
               isLeftSide
-                ? 'right'
-                : 'left'
+                ? "right"
+                : "left"
             }
           />
         </div>
       </div>
 
-      {/* MODALS */}
-      {activeModal ===
-        'history' && (
-        <ChatHistoryModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-
-          onLoadConversation={
-            handleLoadConversation
-          }
-        />
-      )}
-
-      {activeModal ===
-        'clear' && (
-        <ClearConversationModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-        />
-      )}
-
-      {activeModal ===
-        'ticket' && (
-        <SubmitTicketModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-        />
-      )}
-
-      {activeModal ===
-        'call' && (
-        <CallAgentModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-        />
-      )}
-
-      {activeModal ===
-        'resolve' && (
-        <ResolveConversationModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-        />
-      )}
-
-      {activeModal ===
-        'about' && (
-        <AboutHelpDeskModal
-          onClose={() =>
-            setActiveModal(null)
-          }
-        />
-      )}
+      {/* Active Modal */}
+      {modals[activeModal]}
     </div>
   )
 }

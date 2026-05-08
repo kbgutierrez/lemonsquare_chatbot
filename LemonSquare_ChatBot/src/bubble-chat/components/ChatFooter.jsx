@@ -1,68 +1,98 @@
+import { useState } from "react"
+
 import {
   SendHorizonal,
   Sparkles,
-  ChevronDown
-} from 'lucide-react'
-
-import { useState } from 'react'
+  ChevronDown,
+  LoaderCircle,
+} from "lucide-react"
 
 const quickQuestions = [
-  'How do I reset my account?',
-  'Where can I find guides?',
-  'How do I submit a ticket?',
-  'Talk to an agent'
+  "How do I reset my account?",
+  "Where can I find guides?",
+  "How do I submit a ticket?",
+  "Talk to an agent",
 ]
 
-const ChatFooter = ({
-  onSendMessage
-}) => {
+const chip = `
+  shrink-0
 
+  rounded-full
+
+  border
+  border-violet-200
+
+  bg-violet-50
+
+  transition-all
+  duration-200
+
+  hover:bg-violet-100
+`
+
+const ChatFooter = ({
+  onSendMessage,
+}) => {
   const [message, setMessage] =
-    useState('')
+    useState("")
 
   const [showQuestions, setShowQuestions] =
     useState(true)
 
-  /* SEND */
-  const handleSend = () => {
+  /* NEW */
+  const [isTyping, setIsTyping] =
+    useState(false)
 
+  /* SEND */
+  const handleSend = async () => {
     const trimmed =
       message.trim()
 
-    if (!trimmed) return
-
-    /* PLACEHOLDER BACKEND */
-    const backendPayload = {
-      userMessage: trimmed,
-
-      endpoint:
-        'SQL_SERVER_CHAT_ENDPOINT_PLACEHOLDER'
+    /* BLOCK */
+    if (
+      !trimmed ||
+      isTyping
+    ) {
+      return
     }
 
+    /*
+      FUTURE SAFE:
+      - AI streaming
+      - OpenAI/Groq
+      - RAG
+      - SQL logging
+      - endpoint routing
+    */
+
     console.log(
-      'SEND TO BACKEND:',
-      backendPayload
+      "SEND TO BACKEND:",
+      {
+        userMessage: trimmed,
+
+        endpoint:
+          "SQL_SERVER_CHAT_ENDPOINT_PLACEHOLDER",
+      }
     )
 
-    /* USER MESSAGE */
+    /* USER */
     onSendMessage(trimmed)
 
-    /* PLACEHOLDER AI RESPONSE */
+    setMessage("")
+
+    /* LOCK CHAT */
+    setIsTyping(true)
+
+    /* PLACEHOLDER AI */
     setTimeout(() => {
-
-      const aiResponse = {
-        response:
-          'PLACEHOLDER_AI_RESPONSE_FROM_BACKEND'
-      }
-
       onSendMessage(
-        aiResponse.response,
+        "PLACEHOLDER_AI_RESPONSE_FROM_BACKEND",
         true
       )
 
+      /* UNLOCK CHAT */
+      setIsTyping(false)
     }, 1000)
-
-    setMessage('')
   }
 
   /* ENTER */
@@ -70,17 +100,12 @@ const ChatFooter = ({
     event
   ) => {
 
-    if (event.key === 'Enter') {
+    if (
+      event.key === "Enter" &&
+      !isTyping
+    ) {
       handleSend()
     }
-  }
-
-  /* QUICK QUESTION */
-  const handleQuickQuestion = (
-    question
-  ) => {
-
-    setMessage(question)
   }
 
   return (
@@ -95,40 +120,22 @@ const ChatFooter = ({
         py-3
       "
     >
-
-      {/* FAQ SECTION */}
+      {/* FAQ */}
       <div className="mb-3">
-
         {/* COLLAPSED */}
         {!showQuestions && (
-          <div
-            className="
-              flex
-              justify-end
-
-              animate-in
-              fade-in
-              duration-300
-            "
-          >
+          <div className="flex justify-end">
             <button
               type="button"
-
               onClick={() =>
                 setShowQuestions(true)
               }
+              className={`
+                ${chip}
 
-              className="
                 flex
                 items-center
                 gap-1.5
-
-                rounded-full
-
-                border
-                border-violet-200
-
-                bg-violet-50
 
                 px-2.5
                 py-1
@@ -140,13 +147,7 @@ const ChatFooter = ({
                 tracking-[0.12em]
 
                 text-violet-600
-
-                transition-all
-                duration-200
-
-                hover:bg-violet-100
-                hover:scale-[1.02]
-              "
+              `}
             >
               <Sparkles className="h-3 w-3" />
 
@@ -168,29 +169,28 @@ const ChatFooter = ({
 
             ${
               showQuestions
-                ? 'max-h-40 opacity-100'
-                : 'max-h-0 opacity-0'
+                ? "max-h-40 opacity-100"
+                : "max-h-0 opacity-0"
             }
           `}
         >
-
-          {/* TOP BAR */}
+          {/* TOP */}
           <div
             className="
               mb-2
+
               flex
               items-center
               gap-3
             "
           >
-
-            {/* LEFT */}
+            {/* TITLE */}
             <div
               className="
                 flex
+                shrink-0
                 items-center
                 gap-2
-                shrink-0
               "
             >
               <Sparkles className="h-3.5 w-3.5 text-violet-500" />
@@ -213,6 +213,7 @@ const ChatFooter = ({
               className="
                 h-px
                 flex-1
+
                 bg-gradient-to-r
                 from-violet-200
                 to-transparent
@@ -222,32 +223,20 @@ const ChatFooter = ({
             {/* COLLAPSE */}
             <button
               type="button"
-
               onClick={() =>
                 setShowQuestions(false)
               }
+              className={`
+                ${chip}
 
-              className="
                 flex
                 h-6
                 w-6
                 items-center
                 justify-center
 
-                rounded-full
-
-                border
-                border-violet-200
-
-                bg-violet-50
-
                 text-violet-500
-
-                transition-all
-                duration-200
-
-                hover:bg-violet-100
-              "
+              `}
             >
               <ChevronDown className="h-3.5 w-3.5" />
             </button>
@@ -258,61 +247,42 @@ const ChatFooter = ({
             className="
               flex
               gap-2
+
               overflow-x-auto
+
               pb-1
+
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
             "
-
-            style={{
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none'
-            }}
           >
+            {quickQuestions.map(
+              (question) => (
+                <button
+                  key={question}
+                  type="button"
+                  disabled={isTyping}
+                  onClick={() =>
+                    setMessage(question)
+                  }
+                  className={`
+                    ${chip}
 
-            <style>
-              {`
-                div::-webkit-scrollbar {
-                  display: none;
-                }
-              `}
-            </style>
+                    px-3
+                    py-1.5
 
-            {quickQuestions.map((question) => (
-              <button
-                key={question}
-                type="button"
+                    text-[11px]
+                    font-medium
+                    text-violet-700
 
-                onClick={() =>
-                  handleQuickQuestion(
-                    question
-                  )
-                }
-
-                className="
-                  shrink-0
-
-                  rounded-full
-
-                  border
-                  border-violet-200
-
-                  bg-violet-50
-
-                  px-3
-                  py-1.5
-
-                  text-[11px]
-                  font-medium
-                  text-violet-700
-
-                  transition-all
-                  duration-200
-
-                  hover:bg-violet-100
-                "
-              >
-                {question}
-              </button>
-            ))}
+                    disabled:cursor-not-allowed
+                    disabled:opacity-50
+                  `}
+                >
+                  {question}
+                </button>
+              )
+            )}
           </div>
         </div>
       </div>
@@ -337,21 +307,21 @@ const ChatFooter = ({
       >
         <input
           type="text"
-
           value={message}
-
+          disabled={isTyping}
           onChange={(event) =>
             setMessage(
               event.target.value
             )
           }
-
           onKeyDown={
             handleKeyDown
           }
-
-          placeholder="Ask something..."
-
+          placeholder={
+            isTyping
+              ? "AI is replying..."
+              : "Ask something..."
+          }
           className="
             w-full
 
@@ -363,14 +333,15 @@ const ChatFooter = ({
             outline-none
 
             placeholder:text-slate-400
+
+            disabled:cursor-not-allowed
           "
         />
 
         <button
           type="button"
-
+          disabled={isTyping}
           onClick={handleSend}
-
           className="
             flex
             h-9
@@ -390,9 +361,16 @@ const ChatFooter = ({
             duration-200
 
             hover:scale-[1.03]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-70
           "
         >
-          <SendHorizonal className="h-4 w-4" />
+          {isTyping ? (
+            <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : (
+            <SendHorizonal className="h-4 w-4" />
+          )}
         </button>
       </div>
 
@@ -400,13 +378,16 @@ const ChatFooter = ({
       <div
         className="
           mt-2
+
           flex
           items-center
           justify-between
         "
       >
         <p className="text-[10px] text-slate-400">
-          AI assistance enabled
+          {isTyping
+            ? "AI is generating a response..."
+            : "AI assistance enabled"}
         </p>
 
         <div
@@ -417,16 +398,24 @@ const ChatFooter = ({
           "
         >
           <div
-            className="
+            className={`
               h-2
               w-2
+
               rounded-full
-              bg-emerald-400
-            "
+
+              ${
+                isTyping
+                  ? "bg-yellow-400"
+                  : "bg-emerald-400"
+              }
+            `}
           />
 
           <span className="text-[10px] text-slate-400">
-            Online
+            {isTyping
+              ? "Typing..."
+              : "Online"}
           </span>
         </div>
       </div>

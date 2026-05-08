@@ -1,24 +1,23 @@
 import {
   useEffect,
-  useRef
-} from 'react'
+  useRef,
+} from "react"
 
-import ChatMessage from './ChatMessage.jsx'
+import ChatMessage from "./ChatMessage.jsx"
 
 const ChatMessages = ({
-  messages
+  messages,
 }) => {
-
   const messagesEndRef =
     useRef(null)
 
   /* AUTO SCROLL */
   useEffect(() => {
-
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth'
-    })
-
+    messagesEndRef.current?.scrollIntoView(
+      {
+        behavior: "smooth",
+      }
+    )
   }, [messages])
 
   return (
@@ -33,25 +32,12 @@ const ChatMessages = ({
 
         px-4
         py-5
+
+        [scrollbar-width:none]
+        [&::-webkit-scrollbar]:hidden
       "
-
-      style={{
-        scrollbarWidth: 'none',
-        msOverflowStyle: 'none'
-      }}
     >
-
-      {/* HIDE ALL SCROLLBARS */}
-      <style>
-        {`
-          div::-webkit-scrollbar {
-            display: none;
-            width: 0;
-            height: 0;
-          }
-        `}
-      </style>
-
+      {/* MESSAGES */}
       {messages.map((message) => (
         <ChatMessage
           key={message.id}
@@ -60,7 +46,9 @@ const ChatMessages = ({
       ))}
 
       {/* AUTO SCROLL TARGET */}
-      <div ref={messagesEndRef} />
+      <div
+        ref={messagesEndRef}
+      />
     </div>
   )
 }

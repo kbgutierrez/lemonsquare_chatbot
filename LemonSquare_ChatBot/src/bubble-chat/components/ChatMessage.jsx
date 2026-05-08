@@ -1,29 +1,100 @@
-import { Bot, User } from 'lucide-react'
+import {
+  Bot,
+  User,
+} from "lucide-react"
 
-const ChatMessage = ({ message }) => {
-  const isAgent = message.sender === 'agent'
+const ChatMessage = ({
+  message,
+}) => {
+  const isAgent =
+    message.sender === "agent"
+
+  const config = isAgent
+    ? {
+        wrapper:
+          "justify-start",
+
+        bubble: `
+          rounded-bl-lg
+
+          border
+          border-violet-100
+
+          bg-white
+
+          text-slate-800
+        `,
+
+        time:
+          "text-slate-400",
+
+        avatar: `
+          bg-violet-100
+          text-violet-700
+        `,
+
+        Icon: Bot,
+      }
+    : {
+        wrapper:
+          "justify-end",
+
+        bubble: `
+          rounded-br-lg
+
+          bg-gradient-to-r
+          from-violet-600
+          to-purple-500
+
+          text-white
+        `,
+
+        time:
+          "text-violet-100",
+
+        avatar: `
+          bg-violet-600
+          text-white
+        `,
+
+        Icon: User,
+      }
+
+  const {
+    wrapper,
+    bubble,
+    time,
+    avatar,
+    Icon,
+  } = config
 
   return (
     <div
-      className={`flex items-end gap-2 ${
-        isAgent
-          ? 'justify-start'
-          : 'justify-end'
-      }`}
+      className={`
+        flex
+        items-end
+        gap-2
+
+        ${wrapper}
+      `}
     >
-      {/* AGENT ICON */}
+      {/* AGENT AVATAR */}
       {isAgent && (
-        <div className="
-          flex
-          h-8
-          w-8
-          shrink-0
-          items-center
-          justify-center
-          rounded-full
-          bg-violet-100
-        ">
-          <Bot className="h-4 w-4 text-violet-700" />
+        <div
+          className={`
+            flex
+            h-8
+            w-8
+            shrink-0
+            items-center
+            justify-center
+
+            rounded-full
+
+            ${avatar}
+          `}
+        >
+          <Icon className="h-4 w-4" />
         </div>
       )}
 
@@ -31,52 +102,63 @@ const ChatMessage = ({ message }) => {
       <div
         className={`
           max-w-[82%]
+
           rounded-3xl
+
           px-4
           py-3
+
           shadow-sm
 
-          ${
-            isAgent
-              ? 'rounded-bl-lg bg-white border border-violet-100 text-slate-800'
-              : 'rounded-br-lg bg-gradient-to-r from-violet-600 to-purple-500 text-white'
-          }
+          transition-all
+          duration-200
+
+          ${bubble}
         `}
       >
-        <p className="text-sm leading-relaxed">
+        {/* TEXT */}
+        <p
+          className="
+            text-sm
+            leading-relaxed
+            break-words
+          "
+        >
           {message.text}
         </p>
 
+        {/* TIME */}
         <p
           className={`
             mt-2
+
             text-right
             text-[11px]
 
-            ${
-              isAgent
-                ? 'text-slate-400'
-                : 'text-violet-100'
-            }
+            ${time}
           `}
         >
           {message.time}
         </p>
       </div>
 
-      {/* USER ICON */}
+      {/* USER AVATAR */}
       {!isAgent && (
-        <div className="
-          flex
-          h-8
-          w-8
-          shrink-0
-          items-center
-          justify-center
-          rounded-full
-          bg-violet-600
-        ">
-          <User className="h-4 w-4 text-white" />
+        <div
+          className={`
+            flex
+            h-8
+            w-8
+            shrink-0
+            items-center
+            justify-center
+
+            rounded-full
+
+            ${avatar}
+          `}
+        >
+          <Icon className="h-4 w-4" />
         </div>
       )}
     </div>

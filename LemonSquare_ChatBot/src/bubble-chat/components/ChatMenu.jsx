@@ -1,8 +1,8 @@
 import {
   useEffect,
   useRef,
-  useState
-} from 'react'
+  useState,
+} from "react"
 
 import {
   EllipsisVertical,
@@ -11,46 +11,50 @@ import {
   Ticket,
   Phone,
   CheckCheck,
-  Info
-} from 'lucide-react'
+  Info,
+} from "lucide-react"
 
 const options = [
   {
-    id: 'history',
-    label: 'Chat History',
-    icon: History
+    id: "history",
+    label: "Chat History",
+    icon: History,
   },
+
   {
-    id: 'clear',
-    label: 'Clear Conversation',
-    icon: Trash2
+    id: "clear",
+    label: "Clear Conversation",
+    icon: Trash2,
   },
+
   {
-    id: 'ticket',
-    label: 'Submit Ticket',
-    icon: Ticket
+    id: "ticket",
+    label: "Submit Ticket",
+    icon: Ticket,
   },
+
   {
-    id: 'call',
-    label: 'Call Agent',
-    icon: Phone
+    id: "call",
+    label: "Call Agent",
+    icon: Phone,
   },
+
   {
-    id: 'resolve',
-    label: 'Resolve Conversation',
-    icon: CheckCheck
+    id: "resolve",
+    label: "Resolve Conversation",
+    icon: CheckCheck,
   },
+
   {
-    id: 'about',
-    label: 'About Help Desk AI',
-    icon: Info
-  }
+    id: "about",
+    label: "About Help Desk AI",
+    icon: Info,
+  },
 ]
 
 const ChatMenu = ({
-  onSelect
+  onSelect,
 }) => {
-
   const [open, setOpen] =
     useState(false)
 
@@ -59,49 +63,60 @@ const ChatMenu = ({
 
   /* OUTSIDE CLICK */
   useEffect(() => {
+    const handleOutsideClick =
+      (event) => {
 
-    const handleOutsideClick = (
-      event
-    ) => {
-
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(
-          event.target
-        )
-      ) {
-        setOpen(false)
+        if (
+          menuRef.current &&
+          !menuRef.current.contains(
+            event.target
+          )
+        ) {
+          setOpen(false)
+        }
       }
-    }
 
     window.addEventListener(
-      'mousedown',
+      "mousedown",
       handleOutsideClick
     )
 
-    return () => {
+    return () =>
       window.removeEventListener(
-        'mousedown',
+        "mousedown",
         handleOutsideClick
       )
-    }
-
   }, [])
+
+  /* SELECT */
+  const handleSelect = (
+    id
+  ) => {
+
+    /*
+      FUTURE SAFE:
+      - AI actions
+      - analytics
+      - API calls
+      - endpoint mapping
+    */
+
+    onSelect(id)
+
+    setOpen(false)
+  }
 
   return (
     <div
       ref={menuRef}
       className="relative"
     >
-
       {/* BUTTON */}
       <button
         type="button"
-
         onClick={() =>
           setOpen((prev) => !prev)
         }
-
         className={`
           flex
           h-10
@@ -109,28 +124,17 @@ const ChatMenu = ({
           items-center
           justify-center
 
-          rounded-xl
-
-          border
-          border-violet-200
-
-          bg-white/90
-          backdrop-blur-md
-
           text-violet-700
-
-          shadow-sm
 
           transition-all
           duration-300
 
-          hover:bg-violet-50
-          hover:scale-[1.03]
+          hover:scale-110
 
           ${
             open
-              ? 'rotate-90 bg-violet-50'
-              : ''
+              ? "rotate-90"
+              : ""
           }
         `}
       >
@@ -182,7 +186,6 @@ const ChatMenu = ({
           }
         `}
       >
-
         {/* HEADER */}
         <div
           className="
@@ -212,96 +215,84 @@ const ChatMenu = ({
 
         {/* OPTIONS */}
         <div className="p-2">
-
           {options.map(
-            (option, index) => {
+            (
+              {
+                id,
+                label,
+                icon: Icon,
+              },
+              index
+            ) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() =>
+                  handleSelect(id)
+                }
+                className="
+                  group
 
-              const Icon =
-                option.icon
+                  flex
+                  w-full
+                  items-center
+                  gap-3
 
-              return (
-                <button
-                  key={option.id}
+                  rounded-xl
 
-                  type="button"
+                  px-3
+                  py-3
 
-                  onClick={() => {
-                    onSelect(
-                      option.id
-                    )
+                  text-left
+                  text-sm
+                  text-slate-700
 
-                    setOpen(false)
-                  }}
+                  transition-all
+                  duration-200
 
+                  hover:bg-violet-50
+                  hover:translate-x-1
+                "
+                style={{
+                  animationDelay: `
+                    ${index * 40}ms
+                  `,
+                }}
+              >
+                {/* ICON */}
+                <div
                   className="
-                    group
-
                     flex
-                    w-full
+                    h-9
+                    w-9
                     items-center
-                    gap-3
+                    justify-center
 
                     rounded-xl
 
-                    px-3
-                    py-3
-
-                    text-left
-                    text-sm
-                    text-slate-700
+                    bg-violet-100
 
                     transition-all
                     duration-200
 
-                    hover:bg-violet-50
-                    hover:translate-x-1
+                    group-hover:bg-violet-200
                   "
-
-                  style={{
-                    animationDelay:
-                      `${index * 40}ms`
-                  }}
                 >
-
-                  {/* ICON */}
-                  <div
+                  <Icon
                     className="
-                      flex
-                      h-9
-                      w-9
-                      items-center
-                      justify-center
-
-                      rounded-xl
-
-                      bg-violet-100
-
-                      transition-all
-                      duration-200
-
-                      group-hover:bg-violet-200
+                      h-4
+                      w-4
+                      text-violet-700
                     "
-                  >
-                    <Icon
-                      className="
-                        h-4
-                        w-4
-                        text-violet-700
-                      "
-                    />
-                  </div>
+                  />
+                </div>
 
-                  {/* LABEL */}
-                  <span
-                    className="
-                      font-medium
-                    "
-                  >
-                    {option.label}
-                  </span>
-                </button>
-              )
-            }
+                {/* LABEL */}
+                <span className="font-medium">
+                  {label}
+                </span>
+              </button>
+            )
           )}
         </div>
       </div>
