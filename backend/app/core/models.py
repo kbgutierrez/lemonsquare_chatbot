@@ -55,10 +55,24 @@ class AIChatbotSetting(BaseChatbot):
     RerankerModel = Column(String(100))  
     TopK_Tickets = Column(Integer) 
     
-    # ---> NEW: A/B Testing Toggles <---
     UseReformulator = Column(Boolean, default=True)
     UseReranker = Column(Boolean, default=True)
+    
+    # ---> NEW: Admin Configuration <---
+    AllowedCategories = Column(String(500), default="Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT")
     
     IsActive = Column(Boolean, default=True)
     CreatedDate = Column(DateTime, default=datetime.utcnow)
     UpdatedBy = Column(BigInteger)
+
+# ---> NEW: Admin Tracking for Uploaded Documents <---
+class UploadedDocument(BaseChatbot):
+    __tablename__ = "tbl_uploaded_documents"
+    
+    DocumentID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    FileName = Column(String(255), nullable=False)
+    Category = Column(String(100), nullable=False)
+    ChunkCount = Column(Integer, nullable=False)
+    UploadedAt = Column(DateTime, default=datetime.utcnow)
+    UploadedBy = Column(BigInteger, default=1) 
+    IsActive = Column(Boolean, default=True)

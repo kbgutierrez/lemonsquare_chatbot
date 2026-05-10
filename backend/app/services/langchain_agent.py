@@ -117,17 +117,27 @@ Rewritten Search Query:"""
         print(f"Search Query    : {search_query}")
         print(f"Threshold       : {confidence_threshold}")
         print("-" * 80)
-        print("📥 RETRIEVED TICKETS & CONTENT SNIPPETS:")
+        print("📥 RETRIEVED KNOWLEDGE & CONTENT SNIPPETS:")
         
         for score, hit in scored_results:
-            ticket_num = hit.payload.get('metadata', {}).get('ticket_number', 'UNKNOWN')
             status = "✅ PASSED " if score > confidence_threshold else "❌ BLOCKED"
             
-            # Clean and truncate text for the terminal view
-            raw_text = hit.payload.get('page_content', '').replace('\n', ' | ')
-            snippet = (raw_text[:60] + '...') if len(raw_text) > 60 else raw_text
+            # Smart Source Detection (Ticket vs. Manual)
+            doc_type = hit.payload.get('metadata', {}).get('doc_type', 'ticket')
             
-            print(f" {status} | Score: {score:>7.3f} | Ticket: {ticket_num:<12} | {snippet}")
+            if doc_type == 'uploaded_manual':
+                source_name = hit.payload.get('metadata', {}).get('source', 'Manual')
+                category = hit.payload.get('metadata', {}).get('category', 'General_IT')
+                display_id = f"📄 {source_name} [{category}]"
+            else:
+                ticket_num = hit.payload.get('metadata', {}).get('ticket_number', 'UNKNOWN')
+                display_id = f"🎫 Ticket: {ticket_num}"
+            
+            # Print the full, untruncated content for accurate debugging
+            raw_text = hit.payload.get('page_content', '').replace('\n', ' | ')
+            
+            print(f" {status} | Score: {score:>7.3f} | Source: {display_id}")
+            print(f"      ↳ CONTENT: {raw_text}\n")
             
         print("="*80 + "\n")
 
