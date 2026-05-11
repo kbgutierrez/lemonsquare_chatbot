@@ -211,14 +211,14 @@ elif page == "Settings":
             "Temperature",
             min_value=0.0,
             max_value=2.0,
-            value=float(current_settings.get("Temperature", 0.7)),
+            value=max(0.0, min(2.0, float(current_settings.get("Temperature", 0.7)) if current_settings.get("Temperature") is not None else 0.7)),
             step=0.05,
         )
         confidence_threshold = st.number_input(
             "Confidence Threshold",
             min_value=0.0,
             max_value=1.0,
-            value=float(current_settings.get("ConfidenceThreshold", 0.5)),
+            value=max(0.0, min(1.0, float(current_settings.get("ConfidenceThreshold", 0.5)) if current_settings.get("ConfidenceThreshold") is not None else 0.5)),
             step=0.01,
         )
         embedding_model = st.text_input("Embedding Model", value=current_settings.get("EmbeddingModel", ""))
@@ -227,7 +227,7 @@ elif page == "Settings":
             "Top K Tickets",
             min_value=1,
             max_value=50,
-            value=int(current_settings.get("TopK_Tickets", 5)),
+            value=max(1, min(50, int(current_settings.get("TopK_Tickets", 5)) if current_settings.get("TopK_Tickets") is not None else 5)),
             step=1,
         )
         use_reformulator = st.checkbox(
