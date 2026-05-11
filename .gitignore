@@ -1,2 +1,42 @@
 /venv
 backend/.env
+
+# Python bytecode cache
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Python environment and tooling
+.python-version
+pip-wheel-metadata/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+__pypackages__/
+
+# Local environment files
+.env
+.env.*
+
+# Node.js / frontend
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# IDE/editor directories
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
