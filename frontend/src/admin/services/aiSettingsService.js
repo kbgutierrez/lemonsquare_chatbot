@@ -5,6 +5,10 @@ import {
 const BASE =
   API_CONFIG.BASE_URL
 
+/* ========================================
+   GET SETTINGS
+======================================== */
+
 const getSettings =
   async () => {
 
@@ -15,6 +19,14 @@ const getSettings =
 
     if (!response.ok) {
 
+      const error =
+        await response.text()
+
+      console.error(
+        "GET_SETTINGS_ERROR",
+        error
+      )
+
       throw new Error(
         "Failed to load AI settings"
       )
@@ -23,8 +35,17 @@ const getSettings =
     return response.json()
   }
 
+/* ========================================
+   UPDATE SETTINGS
+======================================== */
+
 const updateSettings =
   async (payload) => {
+
+    console.log(
+      "UPDATE_SETTINGS_REQUEST",
+      payload
+    )
 
     const response =
       await fetch(
@@ -46,8 +67,16 @@ const updateSettings =
 
     if (!response.ok) {
 
+      const error =
+        await response.text()
+
+      console.error(
+        "UPDATE_SETTINGS_ERROR",
+        error
+      )
+
       throw new Error(
-        "Failed to save AI settings"
+        error
       )
     }
 

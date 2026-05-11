@@ -66,7 +66,10 @@ export const useAISettings =
         AllowedCategories: "",
       })
 
-    /* LOAD */
+    /* ========================================
+       LOAD SETTINGS
+    ======================================== */
+
     const loadSettings =
       async () => {
 
@@ -77,10 +80,63 @@ export const useAISettings =
           const data =
             await aiSettingsService.getSettings()
 
-          setSettings((prev) => ({
-            ...prev,
-            ...data,
-          }))
+          /* CLEAN PAYLOAD */
+          const cleaned = {
+            ActiveModel:
+              data.ActiveModel ||
+              AI_DEFAULTS.ActiveModel,
+
+            ReformulatorModel:
+              data.ReformulatorModel ||
+              AI_DEFAULTS.ReformulatorModel,
+
+            EmbeddingModel:
+              data.EmbeddingModel ||
+              AI_DEFAULTS.EmbeddingModel,
+
+            RerankerModel:
+              data.RerankerModel ||
+              AI_DEFAULTS.RerankerModel,
+
+            Temperature:
+              Number(
+                data.Temperature ??
+                AI_DEFAULTS.Temperature
+              ),
+
+            TopK_Tickets:
+              Number(
+                data.TopK_Tickets ??
+                AI_DEFAULTS.TopK_Tickets
+              ),
+
+            ConfidenceThreshold:
+              Number(
+                data.ConfidenceThreshold ??
+                AI_DEFAULTS.ConfidenceThreshold
+              ),
+
+            UseReformulator:
+              Boolean(
+                data.UseReformulator
+              ),
+
+            UseReranker:
+              Boolean(
+                data.UseReranker
+              ),
+
+            SystemPrompt:
+              data.SystemPrompt || "",
+
+            ReformulatorPrompt:
+              data.ReformulatorPrompt || "",
+
+            AllowedCategories:
+              data.AllowedCategories || "",
+          }
+
+          setSettings(cleaned)
 
         } catch (err) {
 
@@ -105,7 +161,10 @@ export const useAISettings =
 
     }, [])
 
-    /* UPDATE */
+    /* ========================================
+       UPDATE FIELD
+    ======================================== */
+
     const update =
       (
         key,
@@ -118,17 +177,37 @@ export const useAISettings =
         }))
       }
 
-    /* SELECT MODEL */
+    /* ========================================
+       SELECT MODEL
+    ======================================== */
+
     const selectModel =
       (model) => {
 
-        update(
-          "ActiveModel",
-          model.name
-        )
+        setSettings((prev) => ({
+          ...prev,
+
+          ActiveModel:
+            model.ActiveModel,
+
+          ReformulatorModel:
+            model.ReformulatorModel,
+
+          EmbeddingModel:
+            model.EmbeddingModel,
+
+          RerankerModel:
+            model.RerankerModel,
+
+          Temperature:
+            model.RecommendedTemperature,
+        }))
       }
 
-    /* ACTIVE MODEL */
+    /* ========================================
+       ACTIVE MODEL
+    ======================================== */
+
     const activeModel =
       useMemo(() => {
 
@@ -142,7 +221,10 @@ export const useAISettings =
         settings.ActiveModel,
       ])
 
-    /* SAVE */
+    /* ========================================
+       SAVE SETTINGS
+    ======================================== */
+
     const saveSettings =
       async () => {
 
@@ -154,8 +236,62 @@ export const useAISettings =
 
           setError("")
 
+          /* STRICT PAYLOAD */
+          const payload = {
+            ActiveModel:
+              settings.ActiveModel,
+
+            ReformulatorModel:
+              settings.ReformulatorModel,
+
+            EmbeddingModel:
+              settings.EmbeddingModel,
+
+            RerankerModel:
+              settings.RerankerModel,
+
+            Temperature:
+              Number(
+                settings.Temperature
+              ),
+
+            TopK_Tickets:
+              Number(
+                settings.TopK_Tickets
+              ),
+
+            ConfidenceThreshold:
+              Number(
+                settings.ConfidenceThreshold
+              ),
+
+            UseReformulator:
+              Boolean(
+                settings.UseReformulator
+              ),
+
+            UseReranker:
+              Boolean(
+                settings.UseReranker
+              ),
+
+            SystemPrompt:
+              settings.SystemPrompt || "",
+
+            ReformulatorPrompt:
+              settings.ReformulatorPrompt || "",
+
+            AllowedCategories:
+              settings.AllowedCategories || "",
+          }
+
+          console.log(
+            "SAVE_SETTINGS_PAYLOAD",
+            payload
+          )
+
           await aiSettingsService.updateSettings(
-            settings
+            payload
           )
 
           setSuccess(

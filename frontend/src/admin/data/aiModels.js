@@ -1,58 +1,45 @@
 /*
   AI MODEL CONFIGURATION
 
-  SQL READY:
-  - ActiveModel
-  - EmbeddingModel
-  - ReformulatorModel
-  - RerankerModel
-
-  FUTURE SAFE:
-  - OpenAI
+  SAFE FOR:
+  - SQL
   - Groq
-  - Ollama
-  - RAG
-  - reranking
-  - reformulation
-  - streaming
-  - analytics
+  - HuggingFace
+  - Qdrant
+  - LangChain
+  - RAG Pipelines
 */
+
+/* ========================================
+   MAIN AI MODELS
+======================================== */
 
 export const aiModels = [
   {
-    /* UI */
-    id: "openai-gpt-oss-120b",
+    id:
+      "llama-3-3-70b-versatile",
 
     name:
-      "openai/gpt-oss-120b",
+      "llama-3.3-70b-versatile",
 
     description:
-      "Open-weight flagship reasoning model with strong coding, tool use, and advanced reasoning capabilities.",
+      "Meta Llama 3.3 70B versatile reasoning model with strong all-around performance.",
 
-    /*
-      SQL READY
-    */
+    Provider:
+      "Groq",
+
     ActiveModel:
-      "openai/gpt-oss-120b",
+      "llama-3.3-70b-versatile",
 
     EmbeddingModel:
-      "text-embedding-3-large",
+      "intfloat/multilingual-e5-large",
 
     ReformulatorModel:
-      "openai/gpt-oss-20b",
+      "llama-3.1-8b-instant",
 
     RerankerModel:
-      "bge-reranker-large",
+      "BAAI/bge-reranker-v2-m3",
 
-    /*
-      PROVIDER
-    */
-    Provider:
-      "OpenAI",
-
-    /*
-      FEATURES
-    */
     SupportsRAG: true,
 
     SupportsTools: true,
@@ -61,9 +48,6 @@ export const aiModels = [
 
     SupportsVision: false,
 
-    /*
-      PERFORMANCE
-    */
     ContextWindow:
       128000,
 
@@ -72,65 +56,29 @@ export const aiModels = [
   },
 
   {
-    id: "llama-3-3-70b-versatile",
+    id:
+      "llama-3-1-8b-instant",
 
     name:
-      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
 
     description:
-      "Versatile 70B model from Meta Llama 3.3 with strong all-around performance across diverse tasks.",
+      "Fast lightweight Groq model optimized for quick inference and reformulation tasks.",
+
+    Provider:
+      "Groq",
 
     ActiveModel:
-      "llama-3.3-70b-versatile",
+      "llama-3.1-8b-instant",
 
     EmbeddingModel:
-      "bge-large-en-v1.5",
+      "intfloat/multilingual-e5-large",
 
     ReformulatorModel:
-      "llama-3.1-8b-instruct",
+      "llama-3.1-8b-instant",
 
     RerankerModel:
-      "bge-reranker-large",
-
-    Provider: "Groq",
-
-    SupportsRAG: true,
-
-    SupportsTools: true,
-
-    SupportsStreaming: true,
-
-    SupportsVision: false,
-
-    ContextWindow:
-      128000,
-
-    RecommendedTemperature:
-      0.4,
-  },
-
-  {
-    id: "deepseek-r1-distill-qwen-32b",
-
-    name:
-      "deepseek-r1-distill-qwen-32b",
-
-    description:
-      "DeepSeek R1 reasoning model distilled for Qwen architecture with 32B parameters.",
-
-    ActiveModel:
-      "deepseek-r1-distill-qwen-32b",
-
-    EmbeddingModel:
-      "multilingual-e5-large",
-
-    ReformulatorModel:
-      "qwen/qwen3-32b",
-
-    RerankerModel:
-      "bge-reranker-large",
-
-    Provider: "Groq",
+      "BAAI/bge-reranker-v2-m3",
 
     SupportsRAG: true,
 
@@ -148,27 +96,29 @@ export const aiModels = [
   },
 
   {
-    id: "qwen-qwen3-32b",
+    id:
+      "mixtral-8x7b-32768",
 
     name:
-      "qwen/qwen3-32b",
+      "mixtral-8x7b-32768",
 
     description:
-      "Alibaba Qwen3 32B model with multilingual support and strong reasoning capabilities.",
+      "Mixture-of-experts model with long context support and balanced reasoning.",
+
+    Provider:
+      "Groq",
 
     ActiveModel:
-      "qwen/qwen3-32b",
+      "mixtral-8x7b-32768",
 
     EmbeddingModel:
-      "multilingual-e5-large",
+      "intfloat/multilingual-e5-large",
 
     ReformulatorModel:
-      "qwen/qwen3-32b",
+      "llama-3.1-8b-instant",
 
     RerankerModel:
-      "bge-reranker-large",
-
-    Provider: "Alibaba",
+      "BAAI/bge-reranker-v2-m3",
 
     SupportsRAG: true,
 
@@ -179,34 +129,36 @@ export const aiModels = [
     SupportsVision: false,
 
     ContextWindow:
-      128000,
+      32768,
 
     RecommendedTemperature:
       0.4,
   },
 
   {
-    id: "gemma2-9b-it",
+    id:
+      "gemma2-9b-it",
 
     name:
       "gemma2-9b-it",
 
     description:
-      "Google Gemma 2 9B model with instruction-tuning for improved instruction-following capabilities.",
+      "Google Gemma 2 instruction-tuned model optimized for lightweight assistant tasks.",
+
+    Provider:
+      "Google",
 
     ActiveModel:
       "gemma2-9b-it",
 
     EmbeddingModel:
-      "bge-small-en-v1.5",
+      "intfloat/multilingual-e5-large",
 
     ReformulatorModel:
       "gemma2-9b-it",
 
     RerankerModel:
-      "bge-reranker-base",
-
-    Provider: "Google",
+      "BAAI/bge-reranker-v2-m3",
 
     SupportsRAG: true,
 
@@ -224,12 +176,82 @@ export const aiModels = [
   },
 ]
 
-/*
-  ADMIN SETTINGS PLACEHOLDER
+/* ========================================
+   DROPDOWN OPTIONS
+======================================== */
 
-  Mirrors SQL:
-  AIChatbotSettings
-*/
+export const llmOptions =
+  aiModels.map((model) => ({
+    label:
+      model.name,
+
+    value:
+      model.name,
+  }))
+
+/* ========================================
+   EMBEDDING MODELS
+======================================== */
+
+export const embeddingModels = [
+  {
+    label:
+      "intfloat/multilingual-e5-large",
+
+    value:
+      "intfloat/multilingual-e5-large",
+  },
+
+  {
+    label:
+      "BAAI/bge-large-en-v1.5",
+
+    value:
+      "BAAI/bge-large-en-v1.5",
+  },
+
+  {
+    label:
+      "BAAI/bge-small-en-v1.5",
+
+    value:
+      "BAAI/bge-small-en-v1.5",
+  },
+]
+
+/* ========================================
+   RERANKER MODELS
+======================================== */
+
+export const rerankerModels = [
+  {
+    label:
+      "BAAI/bge-reranker-v2-m3",
+
+    value:
+      "BAAI/bge-reranker-v2-m3",
+  },
+
+  {
+    label:
+      "BAAI/bge-reranker-large",
+
+    value:
+      "BAAI/bge-reranker-large",
+  },
+
+  {
+    label:
+      "BAAI/bge-reranker-base",
+
+    value:
+      "BAAI/bge-reranker-base",
+  },
+]
+
+/* ========================================
+   DEFAULT SETTINGS
+======================================== */
 
 export const defaultAISettings =
   {
@@ -239,7 +261,7 @@ export const defaultAISettings =
     SystemPrompt:
       "You are a helpful AI support assistant.",
 
-    Temperature: 0.4,
+    Temperature: 0.3,
 
     IsActive: true,
 
@@ -247,15 +269,15 @@ export const defaultAISettings =
       new Date().toISOString(),
 
     UpdatedBy:
-      "ADMIN_PLACEHOLDER",
+      "ADMIN",
 
     EmbeddingModel:
-      "multilingual-e5-large",
+      "intfloat/multilingual-e5-large",
 
     TopK_Tickets: 5,
 
     ReformulatorModel:
-      "llama-3.1-8b-instruct",
+      "llama-3.1-8b-instant",
 
     ReformulatorPrompt:
       "Rewrite the user's question for retrieval accuracy.",
@@ -264,9 +286,12 @@ export const defaultAISettings =
       0.72,
 
     RerankerModel:
-      "bge-reranker-large",
+      "BAAI/bge-reranker-v2-m3",
 
     UseReformulator: true,
 
     UseReranker: true,
+
+    AllowedCategories:
+      "",
   }
