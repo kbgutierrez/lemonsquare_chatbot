@@ -58,87 +58,87 @@ def handle_chat(
     ),
 ):
 
-    # CREATE SESSION
-    if (
-        not request.session_id
-        or request.session_id.lower()
-        == "null"
-        or request.session_id == ""
-    ):
+    try:
 
-        session_id = str(
-            uuid.uuid4()
-        )
-
-        db.add(
-            ChatSession(
-                SessionID=session_id,
-                RequesterUserID=1,
-            )
-        )
-
-        db.commit()
-
-    else:
+        # ================================
+        # CREATE / REUSE SESSION
+        # ================================
 
         session_id = (
             request.session_id
         )
 
-        existing_session = (
-            db.query(
-                ChatSession
-            )
-            .filter(
-                ChatSession.SessionID
-                == session_id
-            )
-            .first()
-        )
+        if (
+            not session_id
+            or session_id == ""
+            or str(session_id).lower()
+            == "null"
+        ):
 
-        if not existing_session:
-
-            raise HTTPException(
-                status_code=404,
-                detail="Chat session not found in database.",
+            session_id = str(
+                uuid.uuid4()
             )
 
-    # SAVE USER MESSAGE
-    db.add(
-        ChatMessage(
+            new_session = ChatSession(
+                SessionID=session_id,
+                RequesterUserID=1,
+            )
+
+            db.add(
+                new_session
+            )
+
+            db.commit()
+
+            print(
+                f"✅ Created session: {session_id}"
+            )
+
+        # ================================
+        # SAVE USER MESSAGE
+        # ================================
+
+        user_message = ChatMessage(
             SessionID=session_id,
             SenderRole="user",
             MessageContent=request.message,
         )
-    )
 
-    db.commit()
-
-    # GET HISTORY
-    history = (
-        db.query(
-            ChatMessage
+        db.add(
+            user_message
         )
-        .filter(
-            ChatMessage.SessionID
-            == session_id
+
+        db.commit()
+
+        # ================================
+        # GET HISTORY
+        # ================================
+
+        history = (
+            db.query(
+                ChatMessage
+            )
+            .filter(
+                ChatMessage.SessionID
+                == session_id
+            )
+            .order_by(
+                ChatMessage.CreatedAt.desc()
+            )
+            .limit(6)
+            .all()
         )
-        .order_by(
-            ChatMessage.CreatedAt.desc()
-        )
-        .limit(6)
-        .all()
-    )
 
-    history.reverse()
+        history.reverse()
 
-    history_text = "\n".join([
-        f"{msg.SenderRole}: {msg.MessageContent}"
-        for msg in history[:-1]
-    ])
+        history_text = "\n".join([
+            f"{msg.SenderRole}: {msg.MessageContent}"
+            for msg in history[:-1]
+        ])
 
-    # AI
-    try:
+        # ================================
+        # AI RESPONSE
+        # ================================
 
         ai_response, ticket_ids = (
             orchestrator.orchestrate(
@@ -148,29 +148,38 @@ def handle_chat(
             )
         )
 
-    except Exception as e:
+        # ================================
+        # SAVE AI MESSAGE
+        # ================================
 
-        raise HTTPException(
-            status_code=500,
-            detail=f"AI Error: {str(e)}",
-        )
-
-    # SAVE AI MESSAGE
-    db.add(
-        ChatMessage(
+        ai_message = ChatMessage(
             SessionID=session_id,
             SenderRole="ai",
             MessageContent=ai_response,
         )
-    )
 
-    db.commit()
+        db.add(
+            ai_message
+        )
 
-    return ChatResponse(
-        session_id=session_id,
-        response=ai_response,
-        ticket_ids_used=ticket_ids,
-    )
+        db.commit()
+
+        return ChatResponse(
+            session_id=session_id,
+            response=ai_response,
+            ticket_ids_used=ticket_ids,
+        )
+
+    except Exception as e:
+
+        print(
+            f"❌ CHAT ERROR: {str(e)}"
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e),
+        )
 
 
 # =========================================
@@ -187,59 +196,50 @@ def get_chat_history(
     ),
 ):
 
-    session = (
-        db.query(
-            ChatSession
-        )
-        .filter(
-            ChatSession.SessionID
-            == session_id
-        )
-        .first()
-    )
+    try:
 
-    if not session:
+        messages = (
+            db.query(
+                ChatMessage
+            )
+            .filter(
+                ChatMessage.SessionID
+                == session_id
+            )
+            .order_by(
+                ChatMessage.CreatedAt.asc()
+            )
+            .all()
+        )
+
+        return {
+            "session_id":
+                session_id,
+
+            "messages": [
+                {
+                    "MessageID":
+                        msg.MessageID,
+
+                    "SessionID":
+                        msg.SessionID,
+
+                    "SenderRole":
+                        msg.SenderRole,
+
+                    "MessageContent":
+                        msg.MessageContent,
+
+                    "CreatedAt":
+                        msg.CreatedAt,
+                }
+                for msg in messages
+            ],
+        }
+
+    except Exception as e:
 
         raise HTTPException(
-            status_code=404,
-            detail="Chat session not found.",
+            status_code=500,
+            detail=str(e),
         )
-
-    messages = (
-        db.query(
-            ChatMessage
-        )
-        .filter(
-            ChatMessage.SessionID
-            == session_id
-        )
-        .order_by(
-            ChatMessage.CreatedAt.asc()
-        )
-        .all()
-    )
-
-    return {
-        "session_id":
-            session_id,
-
-        "messages": [
-            {
-                "MessageID":
-                    msg.MessageID,
-
-                "SessionID":
-                    msg.SessionID,
-
-                "SenderRole":
-                    msg.SenderRole,
-
-                "MessageContent":
-                    msg.MessageContent,
-
-                "CreatedAt":
-                    msg.CreatedAt,
-            }
-            for msg in messages
-        ],
-    }

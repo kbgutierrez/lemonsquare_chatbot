@@ -1,4 +1,7 @@
-import { useState } from "react"
+import {
+  useEffect,
+  useState,
+} from "react"
 
 import {
   SlidersHorizontal,
@@ -8,13 +11,13 @@ import {
   Sparkles,
   FileSearch,
   Save,
+  LoaderCircle,
 } from "lucide-react"
 
 import {
+  API_CONFIG,
   AI_DEFAULTS,
 } from "../../config/sqlVariables"
-
-import AIModelDropdown from "./AIModelDropdown.jsx"
 
 const Toggle = ({
   value,
@@ -73,19 +76,15 @@ const Row = ({
   <div
     className="
       rounded-2xl
-
       border
       border-violet-100
-
       bg-violet-50/40
-
       p-4
     "
   >
     <div
       className="
         mb-4
-
         flex
         items-start
         gap-3
@@ -99,9 +98,7 @@ const Row = ({
           shrink-0
           items-center
           justify-center
-
           rounded-2xl
-
           bg-violet-100
         "
       >
@@ -122,7 +119,6 @@ const Row = ({
         <p
           className="
             mt-1
-
             text-xs
             leading-relaxed
             text-slate-500
@@ -139,8 +135,17 @@ const Row = ({
 
 const AISettingsPanel = () => {
 
+  const [loading, setLoading] =
+    useState(true)
+
+  const [saving, setSaving] =
+    useState(false)
+
   const [settings, setSettings] =
     useState({
+      ActiveModel:
+        AI_DEFAULTS.ActiveModel,
+
       Temperature:
         AI_DEFAULTS.Temperature,
 
@@ -160,6 +165,81 @@ const AISettingsPanel = () => {
         "You are a helpful AI support assistant.",
     })
 
+  /* LOAD SETTINGS */
+  useEffect(() => {
+
+    const loadSettings =
+      async () => {
+
+        try {
+
+          const response =
+            await fetch(
+              `${API_CONFIG.BASE_URL}/settings/ai`
+            )
+
+          if (!response.ok)
+            return
+
+          const data =
+            await response.json()
+
+          setSettings({
+            ActiveModel:
+              data.ActiveModel ??
+              AI_DEFAULTS.ActiveModel,
+
+            Temperature:
+              Number(
+                data.Temperature ??
+                AI_DEFAULTS.Temperature
+              ),
+
+            TopK_Tickets:
+              Number(
+                data.TopK_Tickets ??
+                AI_DEFAULTS.TopK_Tickets
+              ),
+
+            ConfidenceThreshold:
+              Number(
+                data.ConfidenceThreshold ??
+                AI_DEFAULTS.ConfidenceThreshold
+              ),
+
+            UseReformulator:
+              Boolean(
+                data.UseReformulator
+              ),
+
+            UseReranker:
+              Boolean(
+                data.UseReranker
+              ),
+
+            SystemPrompt:
+              data.SystemPrompt ??
+              "You are a helpful AI support assistant.",
+          })
+
+        } catch (error) {
+
+          console.error(
+            "LOAD_AI_SETTINGS_ERROR",
+            error
+          )
+
+        } finally {
+
+          setLoading(false)
+        }
+      }
+
+    loadSettings()
+
+  }, [])
+
+  /* UPDATE */
   const update = (
     key,
     value
@@ -171,11 +251,80 @@ const AISettingsPanel = () => {
     }))
   }
 
-  const saveSettings = () => {
+  /* SAVE */
+  const saveSettings =
+    async () => {
 
-    console.log(
-      "AI_SETTINGS_PAYLOAD",
-      settings
+      try {
+
+        setSaving(true)
+
+        const response =
+          await fetch(
+            `${API_CONFIG.BASE_URL}/settings/ai`,
+            {
+              method: "POST",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body: JSON.stringify(
+                settings
+              ),
+            }
+          )
+
+        if (!response.ok) {
+
+          throw new Error(
+            "Failed to save settings"
+          )
+        }
+
+        console.log(
+          "AI_SETTINGS_SAVED",
+          settings
+        )
+
+      } catch (error) {
+
+        console.error(
+          "SAVE_AI_SETTINGS_ERROR",
+          error
+        )
+
+      } finally {
+
+        setSaving(false)
+      }
+    }
+
+  if (loading) {
+
+    return (
+      <div
+        className="
+          flex
+          items-center
+          justify-center
+          rounded-3xl
+          border
+          border-violet-100
+          bg-white
+          p-10
+        "
+      >
+        <LoaderCircle
+          className="
+            h-8
+            w-8
+            animate-spin
+            text-violet-600
+          "
+        />
+      </div>
     )
   }
 
@@ -191,14 +340,10 @@ const AISettingsPanel = () => {
       <div
         className="
           rounded-3xl
-
           border
           border-violet-100
-
           bg-white
-
           p-5
-
           shadow-sm
         "
       >
@@ -210,9 +355,7 @@ const AISettingsPanel = () => {
               w-14
               items-center
               justify-center
-
               rounded-2xl
-
               bg-violet-100
             "
           >
@@ -235,7 +378,6 @@ const AISettingsPanel = () => {
             <h2
               className="
                 mt-1
-
                 text-xl
                 font-bold
                 text-slate-900
@@ -246,9 +388,6 @@ const AISettingsPanel = () => {
           </div>
         </div>
       </div>
-
-      {/* MODEL */}
-      <AIModelDropdown />
 
       {/* SETTINGS */}
       <div className="grid gap-4 xl:grid-cols-2">
@@ -281,7 +420,6 @@ const AISettingsPanel = () => {
           <p
             className="
               mt-2
-
               text-right
               text-sm
               font-medium
@@ -314,21 +452,14 @@ const AISettingsPanel = () => {
             }
             className="
               w-full
-
               rounded-2xl
-
               border
               border-violet-200
-
               bg-violet-50
-
               px-4
               py-3
-
               text-sm
-
               outline-none
-
               focus:border-violet-400
             "
           />
@@ -362,7 +493,6 @@ const AISettingsPanel = () => {
           <p
             className="
               mt-2
-
               text-right
               text-sm
               font-medium
@@ -416,14 +546,10 @@ const AISettingsPanel = () => {
       <div
         className="
           rounded-3xl
-
           border
           border-violet-100
-
           bg-white
-
           p-5
-
           shadow-sm
         "
       >
@@ -441,7 +567,6 @@ const AISettingsPanel = () => {
           className="
             mt-1
             mb-3
-
             text-xs
             text-slate-500
           "
@@ -462,27 +587,18 @@ const AISettingsPanel = () => {
           }
           className="
             w-full
-
             resize-none
-
             rounded-2xl
-
             border
             border-violet-200
-
             bg-violet-50/50
-
             px-4
             py-3
-
             text-sm
             leading-relaxed
-
             outline-none
-
             transition-all
             duration-200
-
             focus:border-violet-400
             focus:bg-white
           "
@@ -492,6 +608,7 @@ const AISettingsPanel = () => {
       {/* SAVE */}
       <button
         type="button"
+        disabled={saving}
         onClick={saveSettings}
         className="
           flex
@@ -518,11 +635,21 @@ const AISettingsPanel = () => {
           duration-200
 
           hover:scale-[1.01]
+
+          disabled:opacity-70
         "
       >
-        <Save className="h-4 w-4" />
+        {saving ? (
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+        ) : (
+          <Save className="h-4 w-4" />
+        )}
 
-        Save AI Settings
+        {
+          saving
+            ? "Saving..."
+            : "Save AI Settings"
+        }
       </button>
     </div>
   )

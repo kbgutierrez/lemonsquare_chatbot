@@ -63,11 +63,6 @@ const ChatFooter = ({
 
         setIsSending(true)
 
-        console.log(
-          "SEND TO BACKEND:",
-          trimmed
-        )
-
         await onSendMessage(
           trimmed
         )
@@ -117,7 +112,6 @@ const ChatFooter = ({
       {/* FAQ */}
       <div className="mb-3">
 
-        {/* COLLAPSED */}
         {!showQuestions && (
           <div className="flex justify-end">
             <button
@@ -153,7 +147,6 @@ const ChatFooter = ({
           </div>
         )}
 
-        {/* EXPANDED */}
         <div
           className={`
             overflow-hidden
@@ -252,11 +245,15 @@ const ChatFooter = ({
               (question) => (
                 <button
                   key={question}
+
                   type="button"
+
                   disabled={isSending}
+
                   onClick={() =>
                     setMessage(question)
                   }
+
                   className={`
                     ${chip}
 
