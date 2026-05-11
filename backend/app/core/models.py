@@ -3,6 +3,7 @@ from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, BigInteger, Numeric
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from app.core.config import settings
+from app.services.user_service import fetch_user_details
 
 # Engines
 engine_helpdesk = create_engine(settings.HELPDESK_DB_CONN)

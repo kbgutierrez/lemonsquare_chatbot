@@ -33,7 +33,7 @@ class SupportOrchestrator:
         self.reranker = CrossEncoder(rerank_model)
         print("✅ Core Infrastructure Initialized.")
 
-    def orchestrate(self, user_query: str, chat_history: str, db: Session) -> tuple[str, list]:
+    def orchestrate(self, user_query: str, chat_history: str, user_name: str, db: Session) -> tuple[str, list]:
         # ---------------------------------------------------------
         # 1. FETCH DYNAMIC SETTINGS FROM SQL
         # ---------------------------------------------------------
@@ -191,6 +191,7 @@ Rewritten Search Query:"""
         context = "\n\n---\n\n".join(formatted_chunks)
         
         final_prompt = f"""{system_prompt}
+        The user you are speaking to is named: {user_name}
         
         History: {chat_history}
         
