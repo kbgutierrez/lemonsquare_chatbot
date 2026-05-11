@@ -1,4 +1,6 @@
-import { useState } from "react"
+import {
+  useState,
+} from "react"
 
 import {
   SendHorizonal,
@@ -33,80 +35,72 @@ const chip = `
 const ChatFooter = ({
   onSendMessage,
 }) => {
+
   const [message, setMessage] =
     useState("")
 
   const [showQuestions, setShowQuestions] =
     useState(true)
 
-  /* NEW */
-  const [isTyping, setIsTyping] =
+  const [isSending, setIsSending] =
     useState(false)
 
   /* SEND */
-  const handleSend = async () => {
-    const trimmed =
-      message.trim()
+  const handleSend =
+    async () => {
 
-    /* BLOCK */
-    if (
-      !trimmed ||
-      isTyping
-    ) {
-      return
-    }
+      const trimmed =
+        message.trim()
 
-    /*
-      FUTURE SAFE:
-      - AI streaming
-      - OpenAI/Groq
-      - RAG
-      - SQL logging
-      - endpoint routing
-    */
-
-    console.log(
-      "SEND TO BACKEND:",
-      {
-        userMessage: trimmed,
-
-        endpoint:
-          "SQL_SERVER_CHAT_ENDPOINT_PLACEHOLDER",
+      if (
+        !trimmed ||
+        isSending
+      ) {
+        return
       }
-    )
 
-    /* USER */
-    onSendMessage(trimmed)
+      try {
 
-    setMessage("")
+        setIsSending(true)
 
-    /* LOCK CHAT */
-    setIsTyping(true)
+        console.log(
+          "SEND TO BACKEND:",
+          trimmed
+        )
 
-    /* PLACEHOLDER AI */
-    setTimeout(() => {
-      onSendMessage(
-        "PLACEHOLDER_AI_RESPONSE_FROM_BACKEND",
-        true
-      )
+        await onSendMessage(
+          trimmed
+        )
 
-      /* UNLOCK CHAT */
-      setIsTyping(false)
-    }, 1000)
-  }
+        setMessage("")
+
+      } catch (error) {
+
+        console.error(
+          "CHAT_SEND_ERROR",
+          error
+        )
+
+      } finally {
+
+        setIsSending(false)
+      }
+    }
 
   /* ENTER */
-  const handleKeyDown = (
-    event
-  ) => {
+  const handleKeyDown =
+    async (event) => {
 
-    if (
-      event.key === "Enter" &&
-      !isTyping
-    ) {
-      handleSend()
+      if (
+        event.key === "Enter" &&
+        !event.shiftKey
+      ) {
+
+        event.preventDefault()
+
+        await handleSend()
+      }
     }
-  }
 
   return (
     <div
@@ -122,6 +116,7 @@ const ChatFooter = ({
     >
       {/* FAQ */}
       <div className="mb-3">
+
         {/* COLLAPSED */}
         {!showQuestions && (
           <div className="flex justify-end">
@@ -184,7 +179,6 @@ const ChatFooter = ({
               gap-3
             "
           >
-            {/* TITLE */}
             <div
               className="
                 flex
@@ -208,7 +202,6 @@ const ChatFooter = ({
               </p>
             </div>
 
-            {/* LINE */}
             <div
               className="
                 h-px
@@ -220,7 +213,6 @@ const ChatFooter = ({
               "
             />
 
-            {/* COLLAPSE */}
             <button
               type="button"
               onClick={() =>
@@ -261,7 +253,7 @@ const ChatFooter = ({
                 <button
                   key={question}
                   type="button"
-                  disabled={isTyping}
+                  disabled={isSending}
                   onClick={() =>
                     setMessage(question)
                   }
@@ -307,21 +299,27 @@ const ChatFooter = ({
       >
         <input
           type="text"
+
           value={message}
-          disabled={isTyping}
+
+          disabled={isSending}
+
           onChange={(event) =>
             setMessage(
               event.target.value
             )
           }
+
           onKeyDown={
             handleKeyDown
           }
+
           placeholder={
-            isTyping
+            isSending
               ? "AI is replying..."
               : "Ask something..."
           }
+
           className="
             w-full
 
@@ -340,8 +338,16 @@ const ChatFooter = ({
 
         <button
           type="button"
-          disabled={isTyping}
-          onClick={handleSend}
+
+          disabled={
+            isSending ||
+            !message.trim()
+          }
+
+          onClick={
+            handleSend
+          }
+
           className="
             flex
             h-9
@@ -366,7 +372,7 @@ const ChatFooter = ({
             disabled:opacity-70
           "
         >
-          {isTyping ? (
+          {isSending ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
           ) : (
             <SendHorizonal className="h-4 w-4" />
@@ -385,7 +391,7 @@ const ChatFooter = ({
         "
       >
         <p className="text-[10px] text-slate-400">
-          {isTyping
+          {isSending
             ? "AI is generating a response..."
             : "AI assistance enabled"}
         </p>
@@ -405,7 +411,7 @@ const ChatFooter = ({
               rounded-full
 
               ${
-                isTyping
+                isSending
                   ? "bg-yellow-400"
                   : "bg-emerald-400"
               }
@@ -413,7 +419,7 @@ const ChatFooter = ({
           />
 
           <span className="text-[10px] text-slate-400">
-            {isTyping
+            {isSending
               ? "Typing..."
               : "Online"}
           </span>

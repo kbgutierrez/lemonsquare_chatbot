@@ -7,18 +7,25 @@ import ChatMessage from "./ChatMessage.jsx"
 
 const ChatMessages = ({
   messages,
+  loading,
 }) => {
+
   const messagesEndRef =
     useRef(null)
 
   /* AUTO SCROLL */
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView(
-      {
-        behavior: "smooth",
-      }
-    )
-  }, [messages])
+
+    messagesEndRef.current
+      ?.scrollIntoView({
+        behavior:
+          "smooth",
+      })
+
+  }, [
+    messages,
+    loading,
+  ])
 
   return (
     <div
@@ -38,12 +45,32 @@ const ChatMessages = ({
       "
     >
       {/* MESSAGES */}
-      {messages.map((message) => (
+      {messages.map(
+        (message) => (
+          <ChatMessage
+            key={message.id}
+            message={message}
+          />
+        )
+      )}
+
+      {/* TYPING */}
+      {loading && (
         <ChatMessage
-          key={message.id}
-          message={message}
+          message={{
+            id:
+              "typing",
+
+            sender:
+              "agent",
+
+            text:
+              "Typing...",
+
+            time: "",
+          }}
         />
-      ))}
+      )}
 
       {/* AUTO SCROLL TARGET */}
       <div

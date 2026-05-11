@@ -6,8 +6,14 @@ import {
 const ChatMessage = ({
   message,
 }) => {
+
   const isAgent =
-    message.sender === "agent"
+    message.sender ===
+    "agent"
+
+  const isTyping =
+    message.id ===
+    "typing"
 
   const config = isAgent
     ? {
@@ -75,6 +81,10 @@ const ChatMessage = ({
         items-end
         gap-2
 
+        animate-in
+        fade-in
+        duration-200
+
         ${wrapper}
       `}
     >
@@ -118,28 +128,36 @@ const ChatMessage = ({
       >
         {/* TEXT */}
         <p
-          className="
+          className={`
             text-sm
             leading-relaxed
             break-words
-          "
+
+            ${
+              isTyping
+                ? "animate-pulse"
+                : ""
+            }
+          `}
         >
           {message.text}
         </p>
 
         {/* TIME */}
-        <p
-          className={`
-            mt-2
+        {!!message.time && (
+          <p
+            className={`
+              mt-2
 
-            text-right
-            text-[11px]
+              text-right
+              text-[11px]
 
-            ${time}
-          `}
-        >
-          {message.time}
-        </p>
+              ${time}
+            `}
+          >
+            {message.time}
+          </p>
+        )}
       </div>
 
       {/* USER AVATAR */}

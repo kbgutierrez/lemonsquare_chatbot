@@ -12,7 +12,7 @@
 /* API */
 export const API_CONFIG = {
   BASE_URL:
-    "http://localhost:5000/api",
+    "http://localhost:8000/api",
 
   TIMEOUT: 30000,
 }
@@ -46,9 +46,9 @@ export const API_ENDPOINTS = {
   CATEGORY_DELETE:
     "/categories/:id/delete",
 
-  /* Chat */
+  /* CHAT */
   CHAT_SEND:
-    "/chat/send",
+    "/chat",
 
   CHAT_HISTORY:
     "/chat/history/:sessionId",
