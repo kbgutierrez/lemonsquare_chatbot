@@ -1,82 +1,479 @@
-import { useState } from 'react'
-import { categories } from '../data/categories.js'
-import { mockFiles } from '../data/mockFiles.js'
-import CategoryList from './CategoryList.jsx'
-import FileTable from './FileTable.jsx'
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
 
-const KnowledgeFilesSection = () => {
-  const [selectedCategory, setSelectedCategory] = useState('sales')
+import {
+  Search,
+} from "lucide-react"
 
-  const activeCategory = categories.find(
-    (item) => item.id === selectedCategory
-  )
+import {
+  categories,
+} from "../data/categories.js"
 
-  return (
-    <div className="flex h-full flex-col gap-4">
+import CategoryList from "./CategoryList.jsx"
+import FileTable from "./FileTable.jsx"
 
-      {/* HEADER */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-violet-500">
-          Knowledge Files
-        </p>
+const API_URL =
+  "http://localhost:8000/api/documents"
 
-        <h2 className="mt-1 text-xl font-bold text-violet-900">
-          {activeCategory?.name}
-        </h2>
-      </div>
+const KnowledgeFilesSection =
+  () => {
 
-      {/* MAIN */}
-      <div className="grid flex-1 gap-4 overflow-hidden lg:grid-cols-[220px_1fr]">
+    const [
+      selectedCategory,
+      setSelectedCategory,
+    ] = useState("all")
 
-        {/* CATEGORIES */}
-        <div className="overflow-hidden rounded-2xl border border-violet-100 bg-white">
-          <CategoryList
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={setSelectedCategory}
-          />
+    const [files, setFiles] =
+      useState([])
+
+    const [loading, setLoading] =
+      useState(true)
+
+    const [search, setSearch] =
+      useState("")
+
+    /* LOAD FILES */
+    useEffect(() => {
+
+      const loadFiles =
+        async () => {
+
+          try {
+
+            setLoading(true)
+
+            const response =
+              await fetch(
+                API_URL
+              )
+
+            if (
+              !response.ok
+            ) {
+
+              throw new Error(
+                "Failed to load documents"
+              )
+            }
+
+            const data =
+              await response.json()
+
+            console.log(
+              "DOCUMENTS",
+              data
+            )
+
+            setFiles(data)
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_DOCUMENTS_ERROR",
+              error
+            )
+
+          } finally {
+
+            setLoading(false)
+          }
+        }
+
+      loadFiles()
+
+    }, [])
+
+    /* TOGGLE ACTIVE */
+    const toggleFile =
+      async (
+        documentId,
+        currentState
+      ) => {
+
+        try {
+
+          await fetch(
+            `${API_URL}/${documentId}`,
+            {
+              method:
+                "PATCH",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify(
+                  {
+                    is_active:
+                      !currentState,
+                  }
+                ),
+            }
+          )
+
+          setFiles(
+            (prev) =>
+              prev.map(
+                (file) =>
+                  file.document_id ===
+                  documentId
+                    ? {
+                        ...file,
+                        is_active:
+                          !currentState,
+                      }
+                    : file
+              )
+          )
+
+        } catch (error) {
+
+          console.error(
+            "TOGGLE_FILE_ERROR",
+            error
+          )
+        }
+      }
+
+    /* DELETE */
+    const deleteFile =
+      async (
+        documentId
+      ) => {
+
+        const confirmed =
+          window.confirm(
+            "Delete this document?"
+          )
+
+        if (!confirmed)
+          return
+
+        try {
+
+          const response =
+            await fetch(
+              `${API_URL}/${documentId}`,
+              {
+                method:
+                  "DELETE",
+              }
+            )
+
+          if (
+            !response.ok
+          ) {
+
+            throw new Error(
+              "Failed to delete document"
+            )
+          }
+
+          /* REMOVE FROM UI */
+          setFiles(
+            (prev) =>
+              prev.filter(
+                (file) =>
+                  file.document_id !==
+                  documentId
+              )
+          )
+
+          console.log(
+            "DOCUMENT_DELETED",
+            documentId
+          )
+
+        } catch (error) {
+
+          console.error(
+            "DELETE_DOCUMENT_ERROR",
+            error
+          )
+        }
+      }
+
+    /* FILTER */
+    const filteredFiles =
+      useMemo(
+        () => {
+
+          return files.filter(
+            (file) => {
+
+              const matchesCategory =
+                selectedCategory ===
+                  "all" ||
+                file.category ===
+                  selectedCategory
+
+              const matchesSearch =
+                file.file_name
+                  ?.toLowerCase()
+                  .includes(
+                    search.toLowerCase()
+                  )
+
+              return (
+                matchesCategory &&
+                matchesSearch
+              )
+            }
+          )
+        },
+
+        [
+          files,
+          selectedCategory,
+          search,
+        ]
+      )
+
+    const activeCategory =
+      categories.find(
+        (item) =>
+          item.id ===
+          selectedCategory
+      )
+
+    return (
+      <div
+        className="
+          flex
+          h-full
+          flex-col
+          gap-4
+        "
+      >
+        {/* HEADER */}
+        <div>
+          <p
+            className="
+              text-xs
+              font-semibold
+              uppercase
+              tracking-[0.2em]
+              text-violet-500
+            "
+          >
+            Knowledge Files
+          </p>
+
+          <h2
+            className="
+              mt-1
+              text-xl
+              font-bold
+              text-violet-900
+            "
+          >
+            {activeCategory
+              ?.name ||
+              "All Files"}
+          </h2>
         </div>
 
-        {/* FILES */}
-        <div className="flex flex-col overflow-hidden rounded-2xl border border-violet-100 bg-white">
+        {/* MAIN */}
+        <div
+          className="
+            grid
+            flex-1
+            gap-4
+            overflow-hidden
 
-          <div className="flex items-center justify-between border-b border-violet-100 px-4 py-3">
-            <div>
-              <h3 className="text-sm font-semibold text-violet-900">
-                Files
-              </h3>
+            lg:grid-cols-[220px_1fr]
+          "
+        >
+          {/* SIDEBAR */}
+          <div
+            className="
+              overflow-hidden
 
-              <p className="text-xs text-violet-500">
-                {mockFiles.length} files available
-              </p>
+              rounded-2xl
+
+              border
+              border-violet-100
+
+              bg-white
+            "
+          >
+            <CategoryList
+              categories={[
+                {
+                  id: "all",
+                  name:
+                    "All Files",
+                },
+
+                ...categories,
+              ]}
+
+              selectedCategory={
+                selectedCategory
+              }
+
+              onSelectCategory={
+                setSelectedCategory
+              }
+            />
+          </div>
+
+          {/* TABLE */}
+          <div
+            className="
+              flex
+              flex-col
+              overflow-hidden
+
+              rounded-2xl
+
+              border
+              border-violet-100
+
+              bg-white
+            "
+          >
+            {/* TOP */}
+            <div
+              className="
+                flex
+                flex-wrap
+                items-center
+                justify-between
+                gap-3
+
+                border-b
+                border-violet-100
+
+                px-4
+                py-3
+              "
+            >
+              <div>
+                <h3
+                  className="
+                    text-sm
+                    font-semibold
+                    text-violet-900
+                  "
+                >
+                  Files
+                </h3>
+
+                <p
+                  className="
+                    text-xs
+                    text-violet-500
+                  "
+                >
+                  {
+                    filteredFiles.length
+                  }{" "}
+                  files
+                </p>
+              </div>
+
+              {/* SEARCH */}
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-2
+
+                  rounded-xl
+
+                  border
+                  border-violet-200
+
+                  bg-violet-50
+
+                  px-3
+                  py-2
+                "
+              >
+                <Search
+                  className="
+                    h-4
+                    w-4
+                    text-violet-400
+                  "
+                />
+
+                <input
+                  value={search}
+
+                  onChange={(
+                    event
+                  ) =>
+                    setSearch(
+                      event.target
+                        .value
+                    )
+                  }
+
+                  placeholder="Search files..."
+
+                  className="
+                    bg-transparent
+
+                    text-sm
+
+                    outline-none
+
+                    placeholder:text-violet-400
+                  "
+                />
+              </div>
             </div>
 
-            <button className="rounded-xl bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 transition-all hover:bg-red-100">
-              Delete Category
-            </button>
-          </div>
+            {/* CONTENT */}
+            <div
+              className="
+                flex-1
+                overflow-auto
 
-          <div className="flex-1 overflow-auto p-3">
-            <FileTable files={mockFiles} />
-          </div>
+                p-3
+              "
+            >
+              {loading ? (
+                <div
+                  className="
+                    flex
+                    h-full
+                    items-center
+                    justify-center
 
-          <div className="flex items-center justify-between border-t border-violet-100 px-4 py-3 text-xs text-violet-500">
-            <p>Showing 1-3 items</p>
+                    text-sm
+                    text-violet-500
+                  "
+                >
+                  Loading files...
+                </div>
+              ) : (
+                <FileTable
+                  files={
+                    filteredFiles
+                  }
 
-            <div className="flex gap-2">
-              <button className="rounded-lg border border-violet-200 px-2 py-1 hover:bg-violet-50">
-                Prev
-              </button>
+                  onToggleFile={
+                    toggleFile
+                  }
 
-              <button className="rounded-lg border border-violet-200 px-2 py-1 hover:bg-violet-50">
-                Next
-              </button>
+                  onDeleteFile={
+                    deleteFile
+                  }
+                />
+              )}
             </div>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
 export default KnowledgeFilesSection

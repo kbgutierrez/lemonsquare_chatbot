@@ -1,4 +1,6 @@
-import { useState } from "react"
+import {
+  useState,
+} from "react"
 
 import {
   ChevronDown,
@@ -6,14 +8,17 @@ import {
   CheckCircle2,
 } from "lucide-react"
 
-import { aiModels } from "../data/aiModels.js"
+import {
+  aiModels,
+} from "../data/aiModels"
 
-const AIModelDropdown = () => {
+const AIModelDropdown = ({
+  selectedModel,
+  onSelectModel,
+}) => {
+
   const [isOpen, setIsOpen] =
     useState(true)
-
-  const [selectedModel, setSelectedModel] =
-    useState(aiModels[0])
 
   const [hoveredModel, setHoveredModel] =
     useState(null)
@@ -22,7 +27,6 @@ const AIModelDropdown = () => {
     <div
       className="
         flex
-        flex-1
         flex-col
 
         overflow-hidden
@@ -39,9 +43,14 @@ const AIModelDropdown = () => {
     >
       {/* HEADER */}
       <button
+        type="button"
+
         onClick={() =>
-          setIsOpen((prev) => !prev)
+          setIsOpen(
+            (prev) => !prev
+          )
         }
+
         className="
           flex
           items-center
@@ -66,6 +75,7 @@ const AIModelDropdown = () => {
               font-semibold
               uppercase
               tracking-[0.2em]
+
               text-violet-500
             "
           >
@@ -75,12 +85,14 @@ const AIModelDropdown = () => {
           <p
             className="
               mt-1
+
               text-sm
               font-medium
+
               text-violet-900
             "
           >
-            Active Model Configuration
+            Select Active Model
           </p>
         </div>
 
@@ -103,7 +115,7 @@ const AIModelDropdown = () => {
         />
       </button>
 
-      {/* SELECTED MODEL */}
+      {/* ACTIVE MODEL */}
       <div
         className="
           flex
@@ -121,7 +133,9 @@ const AIModelDropdown = () => {
         <div
           className="
             rounded-xl
+
             bg-violet-100
+
             p-2
           "
         >
@@ -129,22 +143,39 @@ const AIModelDropdown = () => {
             className="
               h-5
               w-5
+
               text-violet-700
             "
           />
         </div>
 
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
+
           <p
             className="
               truncate
 
               text-sm
               font-semibold
+
               text-violet-900
             "
           >
-            {selectedModel.name}
+            {
+              selectedModel?.name
+            }
+          </p>
+
+          <p
+            className="
+              mt-1
+
+              text-xs
+
+              text-violet-500
+            "
+          >
+            Current active model
           </p>
         </div>
       </div>
@@ -168,6 +199,7 @@ const AIModelDropdown = () => {
         <div
           className="
             max-h-[420px]
+
             overflow-y-auto
 
             [scrollbar-width:none]
@@ -175,153 +207,177 @@ const AIModelDropdown = () => {
             [&::-webkit-scrollbar]:hidden
           "
         >
-          <div className="divide-y divide-violet-100">
-            {aiModels.map((model) => {
-              const isActive =
-                selectedModel.id ===
-                model.id
+          <div
+            className="
+              divide-y
+              divide-violet-100
+            "
+          >
+            {aiModels.map(
+              (model) => {
 
-              const isHovered =
-                hoveredModel ===
-                model.id
+                const isActive =
+                  selectedModel?.id ===
+                  model.id
 
-              return (
-                <button
-                  key={model.id}
-                  onClick={() =>
-                    setSelectedModel(
-                      model
-                    )
-                  }
-                  onMouseEnter={() =>
-                    setHoveredModel(
-                      model.id
-                    )
-                  }
-                  onMouseLeave={() =>
-                    setHoveredModel(
-                      null
-                    )
-                  }
-                  className={`
-                    w-full
+                const isHovered =
+                  hoveredModel ===
+                  model.id
 
-                    p-4
+                return (
+                  <button
+                    key={model.id}
 
-                    text-left
+                    type="button"
 
-                    transition-all
-                    duration-200
-
-                    hover:bg-violet-50
-
-                    ${
-                      isActive
-                        ? "bg-violet-100/70"
-                        : ""
+                    onClick={() =>
+                      onSelectModel(
+                        model
+                      )
                     }
-                  `}
-                >
-                  <div className="flex items-start gap-3">
-                    {/* ICON */}
+
+                    onMouseEnter={() =>
+                      setHoveredModel(
+                        model.id
+                      )
+                    }
+
+                    onMouseLeave={() =>
+                      setHoveredModel(
+                        null
+                      )
+                    }
+
+                    className={`
+                      w-full
+
+                      p-4
+
+                      text-left
+
+                      transition-all
+                      duration-200
+
+                      hover:bg-violet-50
+
+                      ${
+                        isActive
+                          ? "bg-violet-100/70"
+                          : ""
+                      }
+                    `}
+                  >
                     <div
-                      className={`
-                        rounded-lg
-                        p-2
-
-                        transition-all
-                        duration-200
-
-                        ${
-                          isActive
-                            ? "bg-violet-200"
-                            : "bg-violet-100"
-                        }
-                      `}
+                      className="
+                        flex
+                        items-start
+                        gap-3
+                      "
                     >
-                      <BrainCircuit
-                        className="
-                          h-4
-                          w-4
-                          text-violet-700
-                        "
-                      />
-                    </div>
-
-                    {/* CONTENT */}
-                    <div className="min-w-0 flex-1">
-                      {/* TITLE */}
-                      <div
-                        className="
-                          flex
-                          items-start
-                          justify-between
-                          gap-2
-                        "
-                      >
-                        <p
-                          className="
-                            break-words
-
-                            text-sm
-                            font-semibold
-                            text-violet-900
-                          "
-                        >
-                          {model.name}
-                        </p>
-
-                        {isActive && (
-                          <CheckCircle2
-                            className="
-                              mt-0.5
-                              h-4
-                              w-4
-                              shrink-0
-                              text-emerald-500
-                            "
-                          />
-                        )}
-                      </div>
-
-                      {/* HOVER DESCRIPTION */}
+                      {/* ICON */}
                       <div
                         className={`
-                          overflow-hidden
+                          rounded-lg
 
-                          transition-all
-                          duration-300
-                          ease-in-out
+                          p-2
 
                           ${
-                            isHovered
-                              ? `
-                                mt-2
-                                max-h-32
-                                opacity-100
-                              `
-                              : `
-                                max-h-0
-                                opacity-0
-                              `
+                            isActive
+                              ? "bg-violet-200"
+                              : "bg-violet-100"
                           }
                         `}
                       >
-                        <p
+                        <BrainCircuit
                           className="
-                            text-xs
-                            leading-relaxed
-                            text-violet-600
+                            h-4
+                            w-4
+
+                            text-violet-700
+                          "
+                        />
+                      </div>
+
+                      {/* CONTENT */}
+                      <div className="min-w-0 flex-1">
+
+                        <div
+                          className="
+                            flex
+                            items-start
+                            justify-between
+                            gap-2
                           "
                         >
-                          {model.description}
-                        </p>
+                          <p
+                            className="
+                              break-words
+
+                              text-sm
+                              font-semibold
+
+                              text-violet-900
+                            "
+                          >
+                            {model.name}
+                          </p>
+
+                          {isActive && (
+                            <CheckCircle2
+                              className="
+                                mt-0.5
+                                h-4
+                                w-4
+                                shrink-0
+
+                                text-emerald-500
+                              "
+                            />
+                          )}
+                        </div>
+
+                        {/* DESCRIPTION */}
+                        <div
+                          className={`
+                            overflow-hidden
+
+                            transition-all
+                            duration-300
+                            ease-in-out
+
+                            ${
+                              isHovered
+                                ? `
+                                  mt-2
+                                  max-h-32
+                                  opacity-100
+                                `
+                                : `
+                                  max-h-0
+                                  opacity-0
+                                `
+                            }
+                          `}
+                        >
+                          <p
+                            className="
+                              text-xs
+                              leading-relaxed
+
+                              text-violet-600
+                            "
+                          >
+                            {
+                              model.description
+                            }
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </button>
-              )
-            })}
+                  </button>
+                )
+              }
+            )}
           </div>
         </div>
       </div>

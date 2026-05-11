@@ -2,6 +2,7 @@ import {
   Upload,
   FolderOpen,
   BrainCircuit,
+  Ticket,
 } from "lucide-react"
 
 const menuItems = [
@@ -15,6 +16,12 @@ const menuItems = [
     id: "files",
     label: "Knowledge Files",
     icon: FolderOpen,
+  },
+
+  {
+    id: "tickets",
+    label: "Tickets",
+    icon: Ticket,
   },
 
   {

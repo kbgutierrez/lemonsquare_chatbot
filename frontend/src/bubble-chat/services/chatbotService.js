@@ -13,10 +13,23 @@ import {
   - Qdrant
 */
 
+/* ========================================
+   TEMP USER TOKEN
+   Replace later with real auth token
+======================================== */
+
+const USER_TOKEN =
+  localStorage.getItem(
+    "user_token"
+  ) || "TEST_USER_1"
+
+/* ========================================
+   SEND MESSAGE
+======================================== */
+
 const sendMessage =
   async ({
     SessionID,
-
     MessageContent,
   }) => {
 
@@ -26,6 +39,9 @@ const sendMessage =
 
       message:
         MessageContent,
+
+      user_token:
+        USER_TOKEN,
     }
 
     const endpoint =
@@ -61,21 +77,40 @@ const sendMessage =
         }
       )
 
+    /* ERROR */
     if (!response.ok) {
 
-      const error =
-        await response.json()
+      let errorMessage =
+        "Failed to send message"
+
+      try {
+
+        const error =
+          await response.json()
+
+        errorMessage =
+          error.detail ||
+          errorMessage
+
+      } catch {
+
+        console.error(
+          "FAILED_TO_PARSE_ERROR_RESPONSE"
+        )
+      }
 
       throw new Error(
-        error.detail ||
-        "Failed to send message"
+        errorMessage
       )
     }
 
     return response.json()
   }
 
-/* LOAD SESSION */
+/* ========================================
+   LOAD SESSION
+======================================== */
+
 const loadSession =
   async (
     SessionID
@@ -90,6 +125,9 @@ const loadSession =
         }
       )
 
+    const finalUrl =
+      `${endpoint}?user_token=${USER_TOKEN}`
+
     console.log(
       "LOAD_SESSION",
       {
@@ -99,25 +137,48 @@ const loadSession =
 
     console.log(
       "API_ENDPOINT",
-      endpoint
+      finalUrl
     )
 
     const response =
       await fetch(
-        endpoint
+        finalUrl
       )
 
+    /* ERROR */
     if (!response.ok) {
 
-      throw new Error(
+      let errorMessage =
         "Failed to load session"
+
+      try {
+
+        const error =
+          await response.json()
+
+        errorMessage =
+          error.detail ||
+          errorMessage
+
+      } catch {
+
+        console.error(
+          "FAILED_TO_PARSE_ERROR_RESPONSE"
+        )
+      }
+
+      throw new Error(
+        errorMessage
       )
     }
 
     return response.json()
   }
 
-/* CLEAR SESSION */
+/* ========================================
+   CLEAR SESSION
+======================================== */
+
 const clearSession =
   async (
     SessionID
@@ -135,7 +196,10 @@ const clearSession =
     }
   }
 
-/* LOAD AI SETTINGS */
+/* ========================================
+   LOAD AI SETTINGS
+======================================== */
+
 const loadAISettings =
   async () => {
 
@@ -143,6 +207,10 @@ const loadAISettings =
       success: true,
     }
   }
+
+/* ========================================
+   EXPORT
+======================================== */
 
 const chatbotService = {
   sendMessage,

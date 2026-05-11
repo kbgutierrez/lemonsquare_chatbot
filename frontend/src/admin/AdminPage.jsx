@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react"
+import {
+  useEffect,
+  useState,
+} from "react"
 
 import HeaderCard from "./components/HeaderCard.jsx"
 import SidebarMenu from "./components/SidebarMenu.jsx"
@@ -8,6 +11,32 @@ import AISettingsPanel from "./components/AISettingsPanel.jsx"
 
 import UploadSection from "./components/UploadSection.jsx"
 import KnowledgeFilesSection from "./components/KnowledgeFilesSection.jsx"
+import TicketsSection from "./components/TicketsSection.jsx"
+
+const sidebarItems = [
+  {
+    id: "upload",
+    label: "Upload",
+  },
+
+  {
+    id: "files",
+    label:
+      "Knowledge Files",
+  },
+
+  {
+    id: "tickets",
+    label:
+      "Tickets",
+  },
+
+  {
+    id: "ai",
+    label:
+      "AI Configuration",
+  },
+]
 
 const AdminPage = () => {
 
@@ -20,47 +49,55 @@ const AdminPage = () => {
   const [isResizing, setIsResizing] =
     useState(false)
 
-  /* RESIZE */
+  /* RESIZE SIDEBAR */
   useEffect(() => {
 
-    const move = (event) => {
+    const handleMove =
+      (event) => {
 
-      if (!isResizing) return
+        if (!isResizing)
+          return
 
-      const width =
-        event.clientX
+        const width =
+          event.clientX
 
-      if (
-        width >= 240 &&
-        width <= 500
-      ) {
-        setSidebarWidth(width)
+        if (
+          width >= 240 &&
+          width <= 500
+        ) {
+
+          setSidebarWidth(
+            width
+          )
+        }
       }
-    }
 
-    const up = () =>
-      setIsResizing(false)
+    const handleUp =
+      () =>
+        setIsResizing(
+          false
+        )
 
     window.addEventListener(
       "mousemove",
-      move
+      handleMove
     )
 
     window.addEventListener(
       "mouseup",
-      up
+      handleUp
     )
 
     return () => {
 
       window.removeEventListener(
         "mousemove",
-        move
+        handleMove
       )
 
       window.removeEventListener(
         "mouseup",
-        up
+        handleUp
       )
     }
 
@@ -84,7 +121,7 @@ const AdminPage = () => {
       {/* HEADER */}
       <HeaderCard />
 
-      {/* MAIN */}
+      {/* BODY */}
       <div
         className="
           flex
@@ -110,33 +147,26 @@ const AdminPage = () => {
           "
         >
           <SidebarMenu
-            activeView={activeView}
-            setActiveView={setActiveView}
-            items={[
-              {
-                id: "upload",
-                label: "Upload",
-              },
+            activeView={
+              activeView
+            }
 
-              {
-                id: "files",
-                label:
-                  "Knowledge Files",
-              },
+            setActiveView={
+              setActiveView
+            }
 
-              {
-                id: "ai",
-                label:
-                  "AI Configuration",
-              },
-            ]}
+            items={
+              sidebarItems
+            }
           />
         </aside>
 
         {/* RESIZER */}
         <div
           onMouseDown={() =>
-            setIsResizing(true)
+            setIsResizing(
+              true
+            )
           }
           className="
             group
@@ -213,13 +243,19 @@ const AdminPage = () => {
               <UploadSection />
             )}
 
-            {/* FILES */}
+            {/* KNOWLEDGE FILES */}
             {activeView ===
               "files" && (
               <KnowledgeFilesSection />
             )}
 
-            {/* AI CONFIG */}
+            {/* TICKETS */}
+            {activeView ===
+              "tickets" && (
+              <TicketsSection />
+            )}
+
+            {/* AI */}
             {activeView ===
               "ai" && (
               <>
