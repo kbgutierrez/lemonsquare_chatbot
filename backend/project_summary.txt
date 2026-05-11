@@ -2,7 +2,6 @@
 PROJECT DIRECTORY TREE
 ================================================
 backend/
-├── .envsample
 ├── app
 │   ├── api
 │   │   ├── chat.py
@@ -307,9 +306,14 @@ class AIChatbotSetting(BaseChatbot):
     ReformulatorPrompt = Column(Text)
     Temperature = Column(Numeric(3, 2))
     ConfidenceThreshold = Column(Numeric(4, 2))
-
+    
     EmbeddingModel = Column(String(100)) 
-    RerankerModel = Column(String(100)) 
+    RerankerModel = Column(String(100))  
+    TopK_Tickets = Column(Integer) 
+    
+    # ---> NEW: A/B Testing Toggles <---
+    UseReformulator = Column(Boolean, default=True)
+    UseReranker = Column(Boolean, default=True)
     
     IsActive = Column(Boolean, default=True)
     CreatedDate = Column(DateTime, default=datetime.utcnow)
@@ -379,10 +383,7 @@ from qdrant_client import QdrantClient
 from sentence_transformers import CrossEncoder
 from app.core.config import settings
 from app.core.models import AIChatbotSetting
-
-# IMPORTANT: Import your database session maker here. 
-# Adjust "app.core.database" if your DB connection file is named differently.
-from app.core.database import SessionLocal 
+from app.core.models import SessionChatbot as SessionLocal 
 
 class SupportOrchestrator:
     def __init__(self):
@@ -417,6 +418,10 @@ class SupportOrchestrator:
         # ---------------------------------------------------------
         active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
         
+        # --- NEW: A/B Testing Toggles ---
+        use_reformulator = bool(active_config.UseReformulator) if active_config and getattr(active_config, 'UseReformulator', None) is not None else True
+        use_reranker = bool(active_config.UseReranker) if active_config and getattr(active_config, 'UseReranker', None) is not None else True
+        
         main_model_name = active_config.ActiveModel if active_config else "llama-3.3-70b-versatile"
         reformulator_model_name = active_config.ReformulatorModel if active_config and getattr(active_config, 'ReformulatorModel', None) else "llama-3.1-8b-instant"
         
@@ -434,29 +439,34 @@ History: {chat_history}
 Latest Message: {user_query}
 Rewritten Search Query:"""
 
-        reformulator_llm = ChatGroq(model=reformulator_model_name, temperature=0.0, api_key=settings.GROQ_API_KEY)
         dynamic_llm = ChatGroq(model=main_model_name, temperature=temperature, api_key=settings.GROQ_API_KEY)
 
         # ---------------------------------------------------------
-        # 2. QUERY REFORMULATION 
+        # 2. QUERY REFORMULATION & TRANSLATION (TOGGLEABLE)
         # ---------------------------------------------------------
         search_query = user_query
         
-        if chat_history.strip():
+        if use_reformulator:
+            reformulator_llm = ChatGroq(model=reformulator_model_name, temperature=0.0, api_key=settings.GROQ_API_KEY)
+            safe_history = chat_history if chat_history.strip() else "No previous history. This is the first message."
+            
             rewrite_prompt = reformulator_prompt_template.format(
-                chat_history=chat_history, 
+                chat_history=safe_history, 
                 user_query=user_query
             )
-            search_query = reformulator_llm.invoke(rewrite_prompt).content.strip()
+            
+            raw_output = reformulator_llm.invoke(rewrite_prompt).content
+            search_query = raw_output.strip(' "\'\n')
 
         # ---------------------------------------------------------
-        # 3. VECTOR SEARCH & RERANKING
+        # 3. VECTOR SEARCH & RERANKING (TOGGLEABLE)
         # ---------------------------------------------------------
         query_vector = self.embeddings.embed_query(search_query)
         
         search_response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
+            with_payload=True,
             limit=top_k  
         )
         search_result = search_response.points
@@ -464,31 +474,39 @@ Rewritten Search Query:"""
         if not search_result:
             return "I couldn't find any related tickets in the knowledge base.", []
 
-        docs_to_rerank = [[search_query, hit.payload.get('page_content', '')] for hit in search_result]
-        scores = self.reranker.predict(docs_to_rerank)
-        
-        scored_results = sorted(zip(scores, search_result), key=lambda x: x[0], reverse=True)
-        
+        if use_reranker:
+            # Score using the heavy CrossEncoder model
+            docs_to_rerank = [[search_query, hit.payload.get('page_content', '')] for hit in search_result]
+            scores = self.reranker.predict(docs_to_rerank)
+            scored_results = sorted(zip(scores, search_result), key=lambda x: x[0], reverse=True)
+        else:
+            # Score using Qdrant's raw native Cosine Similarity
+            scored_results = [(hit.score, hit) for hit in search_result]
+
         # ---------------------------------------------------------
-        # 4. OBSERVABILITY: TERMINAL TRACE LOGGING
+        # 4. OBSERVABILITY: ENHANCED TERMINAL TRACE LOGGING
         # ---------------------------------------------------------
-        print("\n" + "="*60)
+        print("\n" + "="*80)
         print("🔍 AI SEARCH TRACE")
+        print(f"Reformulator    : {'🟢 ON' if use_reformulator else '🔴 OFF'}")
+        print(f"Reranker        : {'🟢 ON' if use_reranker else '🔴 OFF'}")
         print(f"Original Query  : {user_query}")
-        print(f"Rewritten Query : {search_query}")
+        print(f"Search Query    : {search_query}")
         print(f"Threshold       : {confidence_threshold}")
-        print("-" * 60)
-        print("📥 RETRIEVED TICKETS & SCORES:")
+        print("-" * 80)
+        print("📥 RETRIEVED TICKETS & CONTENT SNIPPETS:")
         
         for score, hit in scored_results:
-            # Safely grab the ticket number from metadata
             ticket_num = hit.payload.get('metadata', {}).get('ticket_number', 'UNKNOWN')
-            
-            # Visually indicate if the Reranker passed or blocked this ticket
             status = "✅ PASSED " if score > confidence_threshold else "❌ BLOCKED"
-            print(f" {status} | Score: {score:>7.3f} | Ticket: {ticket_num}")
             
-        print("="*60 + "\n")
+            # Clean and truncate text for the terminal view
+            raw_text = hit.payload.get('page_content', '').replace('\n', ' | ')
+            snippet = (raw_text[:60] + '...') if len(raw_text) > 60 else raw_text
+            
+            print(f" {status} | Score: {score:>7.3f} | Ticket: {ticket_num:<12} | {snippet}")
+            
+        print("="*80 + "\n")
 
         # ---------------------------------------------------------
         # 5. FILTERING (The "BS Detector")

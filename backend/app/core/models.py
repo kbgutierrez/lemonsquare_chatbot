@@ -58,14 +58,12 @@ class AIChatbotSetting(BaseChatbot):
     UseReformulator = Column(Boolean, default=True)
     UseReranker = Column(Boolean, default=True)
     
-    # ---> NEW: Admin Configuration <---
     AllowedCategories = Column(String(500), default="Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT")
     
     IsActive = Column(Boolean, default=True)
     CreatedDate = Column(DateTime, default=datetime.utcnow)
     UpdatedBy = Column(BigInteger)
 
-# ---> NEW: Admin Tracking for Uploaded Documents <---
 class UploadedDocument(BaseChatbot):
     __tablename__ = "tbl_uploaded_documents"
     
@@ -76,3 +74,9 @@ class UploadedDocument(BaseChatbot):
     UploadedAt = Column(DateTime, default=datetime.utcnow)
     UploadedBy = Column(BigInteger, default=1) 
     IsActive = Column(Boolean, default=True)
+
+class BlacklistedTicket(BaseChatbot):
+    __tablename__ = "tbl_blacklisted_tickets"
+    TicketNumber = Column(String(15), primary_key=True)
+    BlacklistedAt = Column(DateTime, default=datetime.utcnow)
+    BlacklistedBy = Column(BigInteger, default=1)

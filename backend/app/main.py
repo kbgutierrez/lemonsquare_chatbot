@@ -2,23 +2,29 @@ import os
 import sys
 import uvicorn
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
 
 from app.api import chat
+from app.api.deps import get_helpdesk_db, get_chatbot_db
+from app.core.models import TicketEvaluation, BlacklistedTicket, UploadedDocument
 from app.core.config import settings
 from app.services.ingestion import ingestion_service 
 
 load_dotenv()
 
+# Global Qdrant Client for the APIs
+qdrant_api_client = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("\n🔍 Running Pre-Flight Database Check...")
     try:
-        qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
-        if not qdrant.collection_exists(settings.QDRANT_COLLECTION):
+        if not qdrant_api_client.collection_exists(settings.QDRANT_COLLECTION):
             print("\n" + "="*70)
             print("❌ CRITICAL ERROR: Vector Database Collection Missing!")
             sys.exit(1) 
@@ -41,6 +47,9 @@ app.add_middleware(
 
 app.include_router(chat.router, prefix="/api")
 
+# ---------------------------------------------------------
+# DOCUMENT UPLOAD APIs
+# ---------------------------------------------------------
 @app.post("/api/upload-document", tags=["Documents"])
 async def upload_document(file: UploadFile = File(...)):
     """Uploads a PDF manual, auto-categorizes it, and saves it to Qdrant & SQL."""
@@ -48,6 +57,109 @@ async def upload_document(file: UploadFile = File(...)):
         return {"error": "Currently, only PDF files are supported."}
         
     return await ingestion_service.process_pdf_upload(file)
+
+@app.delete("/api/documents/{document_id}", tags=["Documents"])
+async def delete_knowledge_document(document_id: str):
+    """Safely removes a document from Qdrant and soft-deletes it from SQL."""
+    return await ingestion_service.delete_document(document_id)
+
+
+@app.get("/api/documents", tags=["Documents"])
+def get_documents(
+    category: str = None,
+    limit: int = 50,
+    db: Session = Depends(get_chatbot_db)
+):
+    """Fetches the list of active uploaded documents for the Admin UI."""
+    query = db.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+    
+    if category:
+        query = query.filter(UploadedDocument.Category == category)
+        
+    documents = query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all()
+    
+    result = []
+    for doc in documents:
+        result.append({
+            "document_id": doc.DocumentID,
+            "file_name": doc.FileName,
+            "category": doc.Category,
+            "chunk_count": doc.ChunkCount,
+            "uploaded_at": doc.UploadedAt
+        })
+        
+    return result
+
+# ---------------------------------------------------------
+# TICKET BLACKLIST APIs
+# ---------------------------------------------------------
+@app.get("/api/tickets", tags=["Tickets"])
+def get_tickets(
+    search: str = None, 
+    limit: int = 50, 
+    db_helpdesk: Session = Depends(get_helpdesk_db),
+    db_chatbot: Session = Depends(get_chatbot_db)
+):
+    """Fetches resolved tickets, and flags if they are blacklisted."""
+    # Fast lookup for blacklisted tickets
+    blacklisted = {b.TicketNumber for b in db_chatbot.query(BlacklistedTicket.TicketNumber).all()}
+    
+    query = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None))
+    
+    if search:
+        query = query.filter(TicketEvaluation.ticket_number.contains(search))
+        
+    tickets = query.order_by(TicketEvaluation.id.desc()).limit(limit).all()
+    
+    result = []
+    for t in tickets:
+        result.append({
+            "id": t.id,
+            "ticket_number": t.ticket_number,
+            "issue_reported": t.issue_reported,
+            "work_done": t.work_done,
+            "is_blacklisted": t.ticket_number in blacklisted
+        })
+    return result
+
+@app.delete("/api/tickets/{ticket_number}", tags=["Tickets"])
+def delete_ticket_from_ai(
+    ticket_number: str, 
+    db_chatbot: Session = Depends(get_chatbot_db)
+):
+    """Removes a ticket from Qdrant and adds it to the SQL Blacklist."""
+    print(f"\n🗑️ Purging Ticket {ticket_number} from AI Knowledge Base...")
+    
+    # 1. HARD DELETE from Qdrant
+    try:
+        qdrant_api_client.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=qdrant_models.Filter(
+                must=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.ticket_number",
+                        match=qdrant_models.MatchValue(value=ticket_number)
+                    )
+                ]
+            )
+        )
+        print(f"✅ Ticket {ticket_number} vectors deleted from Qdrant.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Qdrant deletion failed: {e}")
+
+    # 2. Add to SQL Blacklist
+    try:
+        existing = db_chatbot.query(BlacklistedTicket).filter(BlacklistedTicket.TicketNumber == ticket_number).first()
+        if not existing:
+            blacklist_entry = BlacklistedTicket(TicketNumber=ticket_number)
+            db_chatbot.add(blacklist_entry)
+            db_chatbot.commit()
+            print(f"✅ Ticket {ticket_number} added to Blacklist.")
+    except Exception as e:
+        db_chatbot.rollback()
+        raise HTTPException(status_code=500, detail=f"SQL Blacklist failed: {e}")
+
+    return {"status": "success", "message": f"Ticket {ticket_number} permanently removed."}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
