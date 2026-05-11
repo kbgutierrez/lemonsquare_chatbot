@@ -1,4 +1,7 @@
 import uuid
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
+from app.services.user_service import fetch_user_details
 
 from fastapi import (
     APIRouter,
@@ -6,7 +9,7 @@ from fastapi import (
     HTTPException,
 )
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session  
 
 from pydantic import (
     BaseModel,
@@ -35,6 +38,8 @@ class ChatRequest(BaseModel):
 
     message: str
 
+    user_token: str
+
 
 class ChatResponse(BaseModel):
 
@@ -47,98 +52,114 @@ class ChatResponse(BaseModel):
     )
 
 
-@router.post(
-    "/chat",
-    response_model=ChatResponse,
-)
-def handle_chat(
+from pydantic import BaseModel
+
+class SettingsUpdate(BaseModel):
+    ActiveModel: str
+    ReformulatorModel: str
+    SystemPrompt: str
+    ReformulatorPrompt: str
+    Temperature: float
+    ConfidenceThreshold: float
+    EmbeddingModel: str
+    RerankerModel: str
+    TopK_Tickets: int
+    UseReformulator: bool
+    UseReranker: bool
+    AllowedCategories: str
+
+
+@router.post("/chat", response_model=ChatResponse)
+async def handle_chat(
     request: ChatRequest,
-    db: Session = Depends(
-        get_chatbot_db
-    ),
+    db: Session = Depends(get_chatbot_db),
 ):
+    # 1. AUTHENTICATE EXTERNAL USER
+    user_data = await fetch_user_details(request.user_token)
+    current_user_id = user_data.get("id")
+    user_name = f"{user_data.get('firstname')} {user_data.get('lastname')}"
 
-    try:
+    # CREATE SESSION
+    if (
+        not request.session_id
+        or request.session_id.lower()
+        == "null"
+        or request.session_id == ""
+    ):
 
-        # ================================
-        # CREATE / REUSE SESSION
-        # ================================
+        session_id = str(
+            uuid.uuid4()
+        )
+
+        db.add(
+            ChatSession(
+                SessionID=session_id,
+                RequesterUserID=current_user_id,
+            )
+        )
+
+        db.commit()
+
+    else:
 
         session_id = (
             request.session_id
         )
 
-        if (
-            not session_id
-            or session_id == ""
-            or str(session_id).lower()
-            == "null"
-        ):
+        existing_session = (
+            db.query(
+                ChatSession
+            )
+            .filter(
+                ChatSession.SessionID
+                == session_id
+            )
+            .first()
+        )
 
-            session_id = str(
-                uuid.uuid4()
+        if not existing_session:
+
+            raise HTTPException(
+                status_code=404,
+                detail="Chat session not found in database.",
             )
 
-            new_session = ChatSession(
-                SessionID=session_id,
-                RequesterUserID=1,
-            )
-
-            db.add(
-                new_session
-            )
-
-            db.commit()
-
-            print(
-                f"✅ Created session: {session_id}"
-            )
-
-        # ================================
-        # SAVE USER MESSAGE
-        # ================================
-
-        user_message = ChatMessage(
+    # SAVE USER MESSAGE
+    db.add(
+        ChatMessage(
             SessionID=session_id,
             SenderRole="user",
             MessageContent=request.message,
         )
+    )
 
-        db.add(
-            user_message
+    db.commit()
+
+    # GET HISTORY
+    history = (
+        db.query(
+            ChatMessage
         )
-
-        db.commit()
-
-        # ================================
-        # GET HISTORY
-        # ================================
-
-        history = (
-            db.query(
-                ChatMessage
-            )
-            .filter(
-                ChatMessage.SessionID
-                == session_id
-            )
-            .order_by(
-                ChatMessage.CreatedAt.desc()
-            )
-            .limit(6)
-            .all()
+        .filter(
+            ChatMessage.SessionID
+            == session_id
         )
+        .order_by(
+            ChatMessage.CreatedAt.desc()
+        )
+        .limit(6)
+        .all()
+    )
 
-        history.reverse()
+    history.reverse()
 
-        history_text = "\n".join([
-            f"{msg.SenderRole}: {msg.MessageContent}"
-            for msg in history[:-1]
-        ])
+    history_text = "\n".join([
+        f"{msg.SenderRole}: {msg.MessageContent}"
+        for msg in history[:-1]
+    ])
 
-        # ================================
-        # AI RESPONSE
-        # ================================
+    # AI
+    try:
 
         ai_response, ticket_ids = (
             orchestrator.orchestrate(
@@ -148,27 +169,29 @@ def handle_chat(
             )
         )
 
-        # ================================
-        # SAVE AI MESSAGE
-        # ================================
+    except Exception as e:
 
-        ai_message = ChatMessage(
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI Error: {str(e)}",
+        )
+
+    # SAVE AI MESSAGE
+    db.add(
+        ChatMessage(
             SessionID=session_id,
             SenderRole="ai",
             MessageContent=ai_response,
         )
+    )
 
-        db.add(
-            ai_message
-        )
+    db.commit()
 
-        db.commit()
-
-        return ChatResponse(
-            session_id=session_id,
-            response=ai_response,
-            ticket_ids_used=ticket_ids,
-        )
+    return ChatResponse(
+        session_id=session_id,
+        response=ai_response,
+        ticket_ids_used=ticket_ids,
+    )
 
     except Exception as e:
 
@@ -185,61 +208,69 @@ def handle_chat(
 # =========================================
 # GET CHAT HISTORY
 # =========================================
-
-@router.get(
-    "/chat/history/{session_id}"
-)
-def get_chat_history(
-    session_id: str,
-    db: Session = Depends(
-        get_chatbot_db
-    ),
+@router.get("/chat/history/{session_id}", tags=["Chat"])
+async def get_chat_history(
+    session_id: str, 
+    user_token: str, 
+    db: Session = Depends(get_chatbot_db)
 ):
+    # 1. Verify who is asking using the BizPortal API
+    user_data = await fetch_user_details(user_token)
+    current_user_id = user_data.get("id")
 
-    try:
-
-        messages = (
-            db.query(
-                ChatMessage
-            )
-            .filter(
-                ChatMessage.SessionID
-                == session_id
-            )
-            .order_by(
-                ChatMessage.CreatedAt.asc()
-            )
-            .all()
+    session = (
+        db.query(
+            ChatSession
         )
+        .filter(
+            ChatSession.SessionID
+            == session_id
+        )
+        .first()
+    )
 
-        return {
-            "session_id":
-                session_id,
-
-            "messages": [
-                {
-                    "MessageID":
-                        msg.MessageID,
-
-                    "SessionID":
-                        msg.SessionID,
-
-                    "SenderRole":
-                        msg.SenderRole,
-
-                    "MessageContent":
-                        msg.MessageContent,
-
-                    "CreatedAt":
-                        msg.CreatedAt,
-                }
-                for msg in messages
-            ],
-        }
-
-    except Exception as e:
+    if not session:
 
         raise HTTPException(
-            status_code=500,
-            detail=str(e),
+            status_code=404,
+            detail="Chat session not found.",
         )
+
+    messages = (
+        db.query(
+            ChatMessage
+        )
+        .filter(
+            ChatMessage.SessionID
+            == session_id
+        )
+        .order_by(
+            ChatMessage.CreatedAt.asc()
+        )
+        .all()
+    )
+
+    return {
+        "session_id":
+            session_id,
+
+        "messages": [
+            {
+                "MessageID":
+                    msg.MessageID,
+
+                "SessionID":
+                    msg.SessionID,
+
+                "SenderRole":
+                    msg.SenderRole,
+
+                "MessageContent":
+                    msg.MessageContent,
+
+                "CreatedAt":
+                    msg.CreatedAt,
+            }
+            for msg in messages
+        ],
+    }

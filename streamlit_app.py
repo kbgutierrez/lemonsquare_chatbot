@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
-import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api"
@@ -11,7 +10,11 @@ st.set_page_config(page_title="IT Support AI Dashboard", layout="wide")
 st.title("IT Support AI Enterprise Dashboard")
 
 # Sidebar for navigation
-page = st.sidebar.selectbox("Choose a section", ["Chat", "Documents", "Tickets"])
+page = st.sidebar.selectbox(
+    "Choose a section",
+    ["Chat", "Documents", "Tickets", "Settings"]
+)
+
 
 def make_request(method: str, endpoint: str, data: Dict = None, files: Dict = None) -> Dict:
     """Helper function to make API requests"""
@@ -25,16 +28,29 @@ def make_request(method: str, endpoint: str, data: Dict = None, files: Dict = No
             else:
                 response = requests.post(url, json=data)
         elif method == "DELETE":
-            response = requests.delete(url)
+            response = requests.delete(url, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
 
-        if response.status_code == 200:
-            return response.json()
+        if 200 <= response.status_code < 300:
+            try:
+                return response.json()
+            except ValueError:
+                return {"message": response.text}
         else:
             st.error(f"Error {response.status_code}: {response.text}")
             return {}
     except Exception as e:
         st.error(f"Request failed: {str(e)}")
         return {}
+
+
+def load_ai_settings() -> Dict[str, Any]:
+    settings = make_request("GET", "/settings/ai")
+    if settings:
+        st.session_state.ai_settings = settings
+    return settings
+
 
 # Chat Section
 if page == "Chat":
@@ -44,6 +60,15 @@ if page == "Chat":
         st.session_state.session_id = None
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "user_token" not in st.session_state:
+        st.session_state.user_token = "TEST_USER_1"
+
+    with st.expander("Chat configuration", expanded=True):
+        st.session_state.user_token = st.text_input(
+            "User Token",
+            value=st.session_state.user_token,
+            help="Use TEST_USER_1 for local development or provide a valid auth token."
+        )
 
     # Display chat history
     for message in st.session_state.messages:
@@ -52,29 +77,31 @@ if page == "Chat":
 
     # Chat input
     if prompt := st.chat_input("Ask me anything about IT support..."):
-        # Add user message to history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
+        if not st.session_state.user_token:
+            st.error("Please provide a user token before sending a chat message.")
+        else:
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.write(prompt)
 
-        # Make API call
-        chat_data = {
-            "session_id": st.session_state.session_id,
-            "message": prompt
-        }
-        response = make_request("POST", "/chat", chat_data)
+            chat_data = {
+                "session_id": st.session_state.session_id,
+                "message": prompt,
+                "user_token": st.session_state.user_token,
+            }
+            response = make_request("POST", "/chat", chat_data)
 
-        if response:
-            st.session_state.session_id = response.get("session_id")
-            ai_response = response.get("response", "No response")
-            ticket_ids = response.get("ticket_ids_used", [])
+            if response:
+                st.session_state.session_id = response.get("session_id")
+                ai_response = response.get("response", "No response")
+                ticket_ids = response.get("ticket_ids_used", [])
 
-            # Add AI response to history
-            st.session_state.messages.append({"role": "assistant", "content": ai_response})
-            with st.chat_message("assistant"):
-                st.write(ai_response)
-                if ticket_ids:
-                    st.write(f"Referenced tickets: {', '.join(map(str, ticket_ids))}")
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                with st.chat_message("assistant"):
+                    st.write(ai_response)
+                    if ticket_ids:
+                        st.write(f"Referenced tickets: {', '.join(map(str, ticket_ids))}")
+
 
 # Documents Section
 elif page == "Documents":
@@ -115,6 +142,7 @@ elif page == "Documents":
             else:
                 st.error("Please enter a Document ID")
 
+
 # Tickets Section
 elif page == "Tickets":
     st.header("Ticket Management")
@@ -128,7 +156,6 @@ elif page == "Tickets":
             params = {"search": search} if search else {}
             tickets = make_request("GET", "/tickets", params)
             if tickets:
-                # Convert to dataframe-friendly format
                 df_data = []
                 for ticket in tickets:
                     df_data.append({
@@ -151,6 +178,101 @@ elif page == "Tickets":
                     st.json(response)
             else:
                 st.error("Please enter a Ticket Number")
+
+
+# Settings Section
+elif page == "Settings":
+    st.header("AI Settings")
+
+    if "ai_settings" not in st.session_state:
+        st.session_state.ai_settings = None
+
+    if st.button("Load Current AI Settings") or st.session_state.ai_settings is None:
+        load_ai_settings()
+
+    current_settings = st.session_state.ai_settings or {}
+
+    if current_settings:
+        with st.expander("Current Active Settings", expanded=True):
+            st.json(current_settings)
+
+    st.markdown("---")
+    st.subheader("Update AI Settings")
+    with st.form("settings_form"):
+        active_model = st.text_input("Active Model", value=current_settings.get("ActiveModel", ""))
+        reformulator_model = st.text_input("Reformulator Model", value=current_settings.get("ReformulatorModel", ""))
+        system_prompt = st.text_area("System Prompt", value=current_settings.get("SystemPrompt", ""), height=120)
+        reformulator_prompt = st.text_area(
+            "Reformulator Prompt",
+            value=current_settings.get("ReformulatorPrompt", ""),
+            height=100,
+        )
+        temperature = st.number_input(
+            "Temperature",
+            min_value=0.0,
+            max_value=2.0,
+            value=float(current_settings.get("Temperature", 0.7)),
+            step=0.05,
+        )
+        confidence_threshold = st.number_input(
+            "Confidence Threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=float(current_settings.get("ConfidenceThreshold", 0.5)),
+            step=0.01,
+        )
+        embedding_model = st.text_input("Embedding Model", value=current_settings.get("EmbeddingModel", ""))
+        reranker_model = st.text_input("Reranker Model", value=current_settings.get("RerankerModel", ""))
+        top_k_tickets = st.number_input(
+            "Top K Tickets",
+            min_value=1,
+            max_value=50,
+            value=int(current_settings.get("TopK_Tickets", 5)),
+            step=1,
+        )
+        use_reformulator = st.checkbox(
+            "Use Reformulator",
+            value=current_settings.get("UseReformulator", True),
+        )
+        use_reranker = st.checkbox(
+            "Use Reranker",
+            value=current_settings.get("UseReranker", True),
+        )
+        allowed_categories = st.text_area(
+            "Allowed Categories",
+            value=current_settings.get(
+                "AllowedCategories",
+                "Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT",
+            ),
+            help="Comma-separated list of categories to include in AI responses.",
+            height=100,
+        )
+
+        submit_update = st.form_submit_button("Save AI Settings")
+
+    if submit_update:
+        if not active_model or not system_prompt:
+            st.error("Active Model and System Prompt are required.")
+        else:
+            settings_payload = {
+                "ActiveModel": active_model,
+                "ReformulatorModel": reformulator_model,
+                "SystemPrompt": system_prompt,
+                "ReformulatorPrompt": reformulator_prompt,
+                "Temperature": temperature,
+                "ConfidenceThreshold": confidence_threshold,
+                "EmbeddingModel": embedding_model,
+                "RerankerModel": reranker_model,
+                "TopK_Tickets": top_k_tickets,
+                "UseReformulator": use_reformulator,
+                "UseReranker": use_reranker,
+                "AllowedCategories": allowed_categories,
+            }
+            response = make_request("POST", "/settings/ai/update", settings_payload)
+            if response:
+                st.success("AI settings updated successfully.")
+                st.json(response)
+                st.session_state.ai_settings = response.get("data") or settings_payload
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Note:** Make sure the backend API is running on localhost:8000")

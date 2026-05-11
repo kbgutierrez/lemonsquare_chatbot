@@ -11,9 +11,12 @@ from qdrant_client.http import models as qdrant_models
 
 from app.api import chat
 from app.api.deps import get_helpdesk_db, get_chatbot_db
-from app.core.models import TicketEvaluation, BlacklistedTicket, UploadedDocument
+from app.core.models import TicketEvaluation, BlacklistedTicket, UploadedDocument,AIChatbotSetting
 from app.core.config import settings
 from app.services.ingestion import ingestion_service 
+from app.api.chat import SettingsUpdate
+
+
 
 load_dotenv()
 
@@ -161,5 +164,119 @@ def delete_ticket_from_ai(
 
     return {"status": "success", "message": f"Ticket {ticket_number} permanently removed."}
 
+
+
+# ---------------------------------------------------------
+# AI SETTINGS APIs
+# ---------------------------------------------------------
+
+@app.get("/api/settings", tags=["Settings"])
+def get_current_settings(db: Session = Depends(get_chatbot_db)):
+    """Fetches the currently active AI configuration."""
+    active_config = (
+        db.query(AIChatbotSetting)
+        .filter(AIChatbotSetting.IsActive == True)
+        .order_by(AIChatbotSetting.SettingID.desc())
+        .first()
+    )
+    
+    if not active_config:
+        raise HTTPException(status_code=404, detail="No active settings found.")
+        
+    return active_config
+
+
+@app.post("/api/settings", tags=["Settings"])
+def update_settings(
+    new_settings: SettingsUpdate, # <--- Uses the Pydantic schema we just made
+    user_token: str = "DEV_MODE", # You can secure this with your User API later!
+    db: Session = Depends(get_chatbot_db)
+):
+    """Saves a new AI configuration and archives the old one."""
+    
+    # 1. DEACTIVATE the currently active settings (Archive them)
+    db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).update({"IsActive": False})
+    
+    # 2. INSERT the brand new settings row
+    new_config = AIChatbotSetting(
+        ActiveModel=new_settings.ActiveModel,
+        ReformulatorModel=new_settings.ReformulatorModel,
+        SystemPrompt=new_settings.SystemPrompt,
+        ReformulatorPrompt=new_settings.ReformulatorPrompt,
+        Temperature=new_settings.Temperature,
+        ConfidenceThreshold=new_settings.ConfidenceThreshold,
+        EmbeddingModel=new_settings.EmbeddingModel,
+        RerankerModel=new_settings.RerankerModel,
+        TopK_Tickets=new_settings.TopK_Tickets,
+        UseReformulator=new_settings.UseReformulator,
+        UseReranker=new_settings.UseReranker,
+        AllowedCategories=new_settings.AllowedCategories,
+        IsActive=True, # Make this the new active config!
+        UpdatedBy=1 # You can grab the actual admin ID using the token here later
+    )
+    
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+    
+    return {"status": "success", "message": "Settings updated successfully!", "data": new_config}
+
+
+
+
+
+@app.get("/api/settings/ai", tags=["Settings"])
+def get_ai_settings(db: Session = Depends(get_chatbot_db)):
+    """Fetches the currently active AI configuration for the Admin Dashboard."""
+    active_config = (
+        db.query(AIChatbotSetting)
+        .filter(AIChatbotSetting.IsActive == True)
+        .order_by(AIChatbotSetting.SettingID.desc())
+        .first()
+    )
+    
+    if not active_config:
+        raise HTTPException(status_code=404, detail="No active settings found.")
+        
+    return active_config
+
+
+@app.post("/api/settings/ai/update", tags=["Settings"])
+def update_ai_settings(
+    new_settings: SettingsUpdate, 
+    db: Session = Depends(get_chatbot_db)
+):
+    """Saves a new AI configuration and archives the old one."""
+    
+    # 1. DEACTIVATE the currently active settings (Archive them)
+    db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).update({"IsActive": False})
+    
+    # 2. INSERT the brand new settings row
+    new_config = AIChatbotSetting(
+        ActiveModel=new_settings.ActiveModel,
+        ReformulatorModel=new_settings.ReformulatorModel,
+        SystemPrompt=new_settings.SystemPrompt,
+        ReformulatorPrompt=new_settings.ReformulatorPrompt,
+        Temperature=new_settings.Temperature,
+        ConfidenceThreshold=new_settings.ConfidenceThreshold,
+        EmbeddingModel=new_settings.EmbeddingModel,
+        RerankerModel=new_settings.RerankerModel,
+        TopK_Tickets=new_settings.TopK_Tickets,
+        UseReformulator=new_settings.UseReformulator,
+        UseReranker=new_settings.UseReranker,
+        AllowedCategories=new_settings.AllowedCategories,
+        IsActive=True, 
+        UpdatedBy=1 
+    )
+    
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+    
+    return {"status": "success", "message": "AI Settings updated successfully!", "data": new_config}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+
