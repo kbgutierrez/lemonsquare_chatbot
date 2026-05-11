@@ -1,4 +1,7 @@
-import { useEffect, useState } from "react"
+import {
+  useEffect,
+  useState,
+} from "react"
 
 import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
@@ -10,12 +13,20 @@ import CallAgentModal from "./modals/CallAgentModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
 
-import { useBubbleDrag } from "./hooks/useBubbleDrag"
-import { useChatMessages } from "./hooks/useChatMessages"
+import {
+  useBubbleDrag,
+} from "./hooks/useBubbleDrag"
 
-import { CHAT_CONFIG } from "./constants/chatConfig"
+import {
+  useChatMessages,
+} from "./hooks/useChatMessages"
+
+import {
+  CHAT_CONFIG,
+} from "./constants/chatConfig"
 
 const BubbleChat = () => {
+
   const [open, setOpen] =
     useState(false)
 
@@ -29,37 +40,48 @@ const BubbleChat = () => {
     isLeftSide,
     isTopSide,
     startDrag,
-    stopDrag,
+    wasDragged,
     repositionForWindow,
   } = useBubbleDrag()
 
-  /* MESSAGES */
+  /* CHAT */
   const {
     messages,
+    loading,
     sendMessage,
-    loadConversation,
     clearConversation,
   } = useChatMessages()
 
-  /* SMART OPEN */
+  /* SMART REPOSITION */
   useEffect(() => {
+
     if (open) {
       repositionForWindow()
     }
+
   }, [open])
 
   /* CLOSE MODAL */
-  const closeModal = () =>
-    setActiveModal(null)
+  const closeModal =
+    () => setActiveModal(null)
+
+  /* CLICK / DRAG */
+  const handlePointerUp =
+    () => {
+
+      if (!wasDragged()) {
+
+        setOpen(
+          (prev) => !prev
+        )
+      }
+    }
 
   /* MODALS */
   const modals = {
     history: (
       <ChatHistoryModal
         onClose={closeModal}
-        onLoadConversation={
-          loadConversation
-        }
       />
     ),
 
@@ -98,8 +120,15 @@ const BubbleChat = () => {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-50">
-      {/* FLOATING WRAPPER */}
+    <div
+      className="
+        pointer-events-none
+        fixed
+        inset-0
+        z-50
+      "
+    >
+      {/* FLOATING */}
       <div
         className={`
           pointer-events-auto
@@ -132,11 +161,7 @@ const BubbleChat = () => {
           className="
             absolute
             z-10
-
-            w-[min(94vw,380px)]
-
             overflow-hidden
-
             rounded-[30px]
 
             border
@@ -150,63 +175,53 @@ const BubbleChat = () => {
             transition-all
             duration-300
             ease-out
-
-            sm:w-[380px]
           "
           style={{
-            /* LEFT / RIGHT */
-            left: isLeftSide
-              ? "18px"
-              : "auto",
+            left:
+              isLeftSide
+                ? "18px"
+                : "auto",
 
-            right: !isLeftSide
-              ? "18px"
-              : "auto",
+            right:
+              !isLeftSide
+                ? "18px"
+                : "auto",
 
-            /* TOP / BOTTOM */
-            top: isTopSide
-              ? "72px"
-              : "auto",
+            top:
+              isTopSide
+                ? "72px"
+                : "auto",
 
-            bottom: !isTopSide
-              ? "72px"
-              : "auto",
+            bottom:
+              !isTopSide
+                ? "72px"
+                : "auto",
 
-            /* RESPONSIVE */
-            width: `
-              min(
-                94vw,
-                380px
-              )
-            `,
+            width:
+              "min(94vw,380px)",
 
-            maxWidth: `
-              calc(100vw - 40px)
-            `,
+            maxWidth:
+              "calc(100vw - 40px)",
 
-            height: `
-              min(
-                520px,
-                calc(100vh - 120px)
-              )
-            `,
+            height:
+              "min(520px,calc(100vh - 120px))",
 
-            maxHeight: `
-              calc(100vh - 120px)
-            `,
+            maxHeight:
+              "calc(100vh - 120px)",
 
-            /* OPEN */
-            opacity: open ? 1 : 0,
+            opacity:
+              open ? 1 : 0,
 
-            transform: open
-              ? `
-                translateY(0)
-                scale(1)
-              `
-              : `
-                translateY(12px)
-                scale(0.96)
-              `,
+            transform:
+              open
+                ? `
+                  translateY(0)
+                  scale(1)
+                `
+                : `
+                  translateY(12px)
+                  scale(0.96)
+                `,
 
             pointerEvents:
               open
@@ -216,6 +231,7 @@ const BubbleChat = () => {
         >
           <ChatWindow
             messages={messages}
+            loading={loading}
             onSendMessage={
               sendMessage
             }
@@ -228,13 +244,14 @@ const BubbleChat = () => {
           />
         </div>
 
-        {/* CHAT BUBBLE */}
+        {/* BUBBLE */}
         <div
           className="
             relative
             z-20
             h-16
             touch-none
+            select-none
           "
           style={{
             width: open
@@ -253,21 +270,15 @@ const BubbleChat = () => {
           onMouseDown={
             startDrag
           }
-          onMouseUp={stopDrag}
-          onMouseLeave={
-            stopDrag
+          onMouseUp={
+            handlePointerUp
           }
           onTouchStart={
             startDrag
           }
-          onTouchEnd={stopDrag}
-          onClick={() => {
-            if (!dragging) {
-              setOpen(
-                (prev) => !prev
-              )
-            }
-          }}
+          onTouchEnd={
+            handlePointerUp
+          }
         >
           <ChatBubble
             isOpen={open}
@@ -280,7 +291,7 @@ const BubbleChat = () => {
         </div>
       </div>
 
-      {/* ACTIVE MODAL */}
+      {/* MODALS */}
       <div className="pointer-events-auto">
         {modals[activeModal]}
       </div>

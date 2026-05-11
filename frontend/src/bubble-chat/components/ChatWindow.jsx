@@ -1,61 +1,14 @@
-import { useState } from "react"
-
 import ChatHeader from "./ChatHeader.jsx"
 import ChatMessages from "./ChatMessages.jsx"
 import ChatFooter from "./ChatFooter.jsx"
 
-import { mockMessages } from "../data/mockMessages.js"
-
 const ChatWindow = ({
+  messages,
+  loading,
+  onSendMessage,
   onClose,
   onOpenModal,
 }) => {
-  /* CHAT STATE */
-  const [messages, setMessages] =
-    useState(mockMessages)
-
-  /* TIME */
-  const getTime = () =>
-    new Date().toLocaleTimeString(
-      [],
-      {
-        hour: "2-digit",
-        minute: "2-digit",
-      }
-    )
-
-  /* SEND MESSAGE */
-  const handleSendMessage = (
-    text,
-    isAgent = false
-  ) => {
-
-    /*
-      FUTURE SAFE:
-      - AI streaming
-      - SQL logging
-      - Groq/OpenAI
-      - RAG pipeline
-      - websocket support
-      - typing indicators
-    */
-
-    setMessages((prev) => [
-      ...prev,
-
-      {
-        id: Date.now(),
-
-        sender: isAgent
-          ? "agent"
-          : "user",
-
-        text,
-
-        time: getTime(),
-      },
-    ])
-  }
 
   return (
     <div
@@ -108,6 +61,7 @@ const ChatWindow = ({
         <div className="relative z-10 h-full">
           <ChatMessages
             messages={messages}
+            loading={loading}
           />
         </div>
       </div>
@@ -115,7 +69,7 @@ const ChatWindow = ({
       {/* FOOTER */}
       <ChatFooter
         onSendMessage={
-          handleSendMessage
+          onSendMessage
         }
       />
     </div>
