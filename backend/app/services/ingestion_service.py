@@ -52,6 +52,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import ValidationError, VectorStoreError
 from app.models.chatbot import AIChatbotSetting, UploadedDocument
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -361,76 +362,129 @@ class DocumentIngestionService:
 
 
     async def process_resolved_chat(self, session_id: str, db: Session) -> dict:
-            """
-            Reads a successful chat session, extracts the problem and solution via LLM, 
-            and pushes the new knowledge to Qdrant.
-            """
-            from app.models.chatbot import ChatMessage
-            
-            logger.info("Processing resolved chat session: %s", session_id)
+        """
+        Reads a successful chat session, extracts the problem and solution via a 
+        database-configured LLM and custom Prompt as strict JSON, 
+        formats it for search, and pushes it to Qdrant.
+        """
+        from app.models.chatbot import ChatMessage, AIChatbotSetting
+        import json
+        
+        logger.info("Processing resolved chat session: %s", session_id)
 
-            # 1. Fetch the entire chat history from SQL
-            messages = (
-                db.query(ChatMessage)
-                .filter(ChatMessage.SessionID == session_id)
-                .order_by(ChatMessage.CreatedAt.asc())
-                .all()
-            )
-            
-            if len(messages) < 2:
-                return {"status": "skipped", "message": "Chat is too short to summarize."}
+        # 1. Fetch the entire chat history from SQL
+        messages = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.SessionID == session_id)
+            .order_by(ChatMessage.CreatedAt.asc())
+            .all()
+        )
+        
+        if len(messages) < 2:
+            return {"status": "skipped", "message": "Chat is too short to summarize."}
 
-            # 2. Format the transcript for the LLM
-            transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
+        transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
 
-            # 3. The "Car Wash" (LLM Extraction)
-            cleaner_llm = ChatGroq(
-                model=self.classifier_model, # Your 8B model
-                temperature=0.1,
-                api_key=settings.GROQ_API_KEY,
-            )
-            
-            prompt = (
-                "You are an IT Documentation Expert. Read the following chat transcript between a user "
-                "and an AI IT Support Agent. Extract the core issue the user had and the exact steps "
-                "the AI provided to resolve it. Format this into a professional, concise Knowledge Base entry.\n"
-                "If no clear resolution was reached, state 'No resolution found.'\n\n"
-                f"Transcript:\n{transcript}\n\n"
-                "Professional KB Summary:"
-            )
-            
-            logger.info("Extracting KB article from session %s...", session_id)
-            result = await cleaner_llm.ainvoke(prompt)
-            clean_summary = result.content.strip()
-            print (clean_summary)
+        # ---------------------------------------------------------
+        # DYNAMIC CONFIGURATION (Model & Prompt)
+        # ---------------------------------------------------------
+        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
 
-            # Abort if the AI couldn't find a solution
-            if "no resolution found" in clean_summary.lower():
-                return {"status": "skipped", "message": "No clear resolution found in transcript."}
+        # DYNAMIC MODEL: Get from DB, fallback to 8b-instant if empty
+        extraction_model = getattr(active_config, 'ReformulatorModel', None)
+        if not extraction_model or extraction_model.strip() == "":
+            extraction_model = "llama-3.1-8b-instant" 
 
-            # 4. Embed the summary
-            logger.info("Vectorizing new KB article...")
-            vector = await asyncio.to_thread(self.embeddings.embed_query, clean_summary)
+        # DYNAMIC PROMPT: Define fallback, use DB if available
+        default_prompt = (
+            "You are a strict IT Data Extraction API. Read the chat transcript below and extract the details.\n"
+            "You MUST output EXACTLY a valid JSON object with these four keys: "
+            "'issue_reported', 'issue_found', 'issue_cause', and 'work_done'.\n"
+            "Keep the values concise and professional. Do NOT use first-person.\n"
+            "If no clear resolution was reached, output exactly: {\"error\": \"no resolution\"}\n\n"
+            "Do NOT include markdown formatting (like ```json). Output raw JSON only.\n\n"
+            "Transcript:\n{transcript}\n\n"
+            "JSON Output:"
+        )
 
-            # 5. Deterministic UUID based on the Session ID
-            ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+        raw_prompt_template = getattr(active_config, 'ChatExtractionPrompt', None)
+        if not raw_prompt_template or raw_prompt_template.strip() == "":
+            raw_prompt_template = default_prompt
 
-            payload = {
-                "page_content": clean_summary,
-                "metadata": {
-                    "source_session": session_id,
-                    "doc_type": "resolved_chat"
-                }
+        # Safely inject the transcript without triggering JSON bracket errors
+        if "{transcript}" in raw_prompt_template:
+            prompt = raw_prompt_template.replace("{transcript}", transcript)
+        else:
+            logger.error("Missing {transcript} tag in custom ChatExtractionPrompt. Falling back to default.")
+            prompt = default_prompt.replace("{transcript}", transcript)
+        # ---------------------------------------------------------
+
+        # 2. Call the LLM with the DYNAMIC model
+        logger.info("Extracting structured JSON using model [%s]...", extraction_model)
+        cleaner_llm = ChatGroq(
+            model=extraction_model, 
+            temperature=0.0,
+            api_key=settings.GROQ_API_KEY,
+        )
+        
+        result = await cleaner_llm.ainvoke(prompt)
+        raw_output = result.content.strip()
+
+        # Clean up markdown if the LLM hallucinated it
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+
+        # 3. Parse the JSON
+        try:
+            extracted_data = json.loads(raw_output)
+        except json.JSONDecodeError as exc:
+            logger.error("Failed to parse LLM JSON: %s", raw_output)
+            return {"status": "error", "message": "AI failed to output valid JSON."}
+
+        if "error" in extracted_data:
+            return {"status": "skipped", "message": "No clear resolution found in transcript."}
+
+        # 4. Format the text block for Qdrant's semantic search
+        searchable_text = (
+            f"ISSUE REPORTED: {extracted_data.get('issue_reported', 'None')}\n"
+            f"ACTUAL ISSUE FOUND: {extracted_data.get('issue_found', 'None')}\n"
+            f"ROOT CAUSE: {extracted_data.get('issue_cause', 'None')}\n"
+            f"RESOLUTION (WORK DONE): {extracted_data.get('work_done', 'None')}"
+        )
+
+        # 5. Embed the formatted text
+        logger.info("Vectorizing structured knowledge...")
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+
+        # 6. Deterministic UUID
+        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+
+        # 7. Payload: Searchable Text + SQL-Ready JSON Data
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "source_session": session_id,
+                "doc_type": "resolved_chat",
+                "sql_ready_data": extracted_data 
             }
+        }
 
-            # 6. Push to Qdrant
-            try:
-                self.qdrant.upsert(
-                    collection_name=self.collection_name,
-                    points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
-                )
-                logger.info("Session %s successfully added to AI Brain.", session_id)
-            except Exception as exc:
-                raise VectorStoreError(f"Failed to upsert chat to Qdrant: {exc}") from exc
+        # 8. Push to Qdrant
+        try:
+            self.qdrant.upsert(
+                collection_name=self.collection_name,
+                points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
+            )
+            logger.info("Session %s successfully added to AI Brain as structured data.", session_id)
+            
+            print("\n" + "="*50)
+            print("NEW STRUCTURED AI KNOWLEDGE CREATED:")
+            print(json.dumps(extracted_data, indent=2))
+            print("="*50 + "\n")
 
-            return {"status": "success", "session_id": session_id, "message": "Conversation summarized and learned!"}
+        except Exception as exc:
+            raise Exception(f"Failed to upsert chat to Qdrant: {exc}") from exc
+
+        return {"status": "success", "session_id": session_id, "message": "Conversation extracted and learned!"}

@@ -36,7 +36,8 @@ Earl/
 │   ├── createtablecbot.sql
 │   ├── helpdeskdev.sql
 │   └── helpdeskdevaluation.sql
-└── streamlit_app.py
+├── streamlit_app.py
+└── webhook.txt
 
 ================================================
 FILE CONTENTS
@@ -575,6 +576,9 @@ elif page == "Settings":
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Note:** Make sure the backend API is running on localhost:8000")
+
+
+--- FILE: webhook.txt ---
 
 
 --- FILE: oldbackend\fix_index.py ---

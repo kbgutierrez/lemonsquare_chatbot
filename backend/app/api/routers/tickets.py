@@ -38,6 +38,7 @@ _qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
 )
 def get_tickets(
     search: str | None = None,
+    skip: int = 0,
     limit: int = 50,
     db_helpdesk: Session = Depends(get_helpdesk_db),
     db_chatbot: Session = Depends(get_chatbot_db),
@@ -58,7 +59,12 @@ def get_tickets(
     if search:
         query = query.filter(TicketEvaluation.ticket_number.contains(search))
 
-    tickets = query.order_by(TicketEvaluation.id.desc()).limit(limit).all()
+    tickets = (
+        query.order_by(TicketEvaluation.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     return [
         TicketResponse(

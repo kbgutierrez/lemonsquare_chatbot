@@ -141,6 +141,106 @@ class SupportOrchestrator:
             logger.error("Orchestrator pipeline failed: %s", exc, exc_info=True)
             raise AIProcessingError(f"AI pipeline error: {exc}") from exc
 
+    async def debug_orchestrate(
+        self,
+        user_query: str,
+        chat_history: str,
+        user_name: str,
+        db: Session,
+    ) -> dict:
+        """
+        Debug version that returns detailed pipeline information.
+        """
+        # Run the normal pipeline but capture all intermediate data
+        final_answer, ticket_ids = await self.orchestrate(user_query, chat_history, user_name, db)
+        
+        # For debug, we need to re-run the pipeline to capture intermediates
+        # This is a simplified version - in production you'd modify orchestrate to return debug data
+        
+        # Get settings
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+        
+        use_reformulator = bool(
+            active_config.UseReformulator
+            if active_config and active_config.UseReformulator is not None
+            else True
+        )
+        
+        # Reformulate query if enabled
+        search_query = user_query
+        if use_reformulator:
+            reformulator_llm = ChatGroq(
+                model=active_config.ReformulatorModel if active_config and active_config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL,
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+            safe_history = chat_history.strip() or "No previous history. This is the first message."
+            rewrite_prompt = (active_config.ReformulatorPrompt if active_config and active_config.ReformulatorPrompt else _DEFAULT_REFORMULATOR_PROMPT).format(
+                chat_history=safe_history,
+                user_query=user_query,
+            )
+            raw_output = await reformulator_llm.ainvoke(rewrite_prompt)
+            search_query = raw_output.content.strip(' "\'\n')
+        
+        # Vector search
+        query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
+        
+        ticket_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must_not=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+        doc_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+        
+        # Format retrieval results
+        retrieval_results = []
+        for hit in ticket_response.points + doc_response.points:
+            retrieval_results.append({
+                "score": hit.score,
+                "type": hit.payload.get("metadata", {}).get("doc_type", "unknown"),
+                "source": (
+                    hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
+                    if hit.payload.get("metadata", {}).get("doc_type") != "uploaded_manual"
+                    else hit.payload.get("metadata", {}).get("source", "Manual")
+                ),
+                "content": hit.payload.get("page_content", ""),
+            })
+        
+        return {
+            "original_query": user_query,
+            "reformulated_query": search_query,
+            "retrieval_results": retrieval_results,
+            "final_answer": final_answer,
+            "ticket_ids_used": ticket_ids,
+        }
+
     async def _run_pipeline(
         self,
         user_query: str,
