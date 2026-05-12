@@ -4,6 +4,7 @@ import {
   ChevronUp,
   ShieldCheck,
   Trash2,
+  MessageSquareText,
 } from "lucide-react"
 
 import {
@@ -17,35 +18,83 @@ const DetailBlock = ({
   value,
 }) => {
 
-  if (!value) return null
+  if (!value)
+    return null
 
   return (
     <div
       className="
-        rounded-2xl
+        rounded-3xl
 
         border
-        border-violet-100
+        border-[#293731]
 
-        bg-violet-50/50
+        bg-[#141d1a]
 
-        p-4
+        p-5
       "
     >
-      <p
+      <div
         className="
-          mb-2
+          mb-4
 
-          text-[10px]
-          font-bold
-          uppercase
-          tracking-wide
-
-          text-violet-500
+          flex
+          items-center
+          gap-3
         "
       >
-        Work Done
-      </p>
+        <div
+          className="
+            flex
+            h-10
+            w-10
+            items-center
+            justify-center
+
+            rounded-2xl
+
+            bg-[#f5d547]/10
+          "
+        >
+          <MessageSquareText
+            className="
+              h-5
+              w-5
+
+              text-[#f5d547]
+            "
+          />
+        </div>
+
+        <div>
+          <p
+            className="
+              text-[11px]
+              font-semibold
+              uppercase
+
+              tracking-[0.18em]
+
+              text-[#74877f]
+            "
+          >
+            Ticket Details
+          </p>
+
+          <p
+            className="
+              mt-1
+
+              text-sm
+              font-medium
+
+              text-white
+            "
+          >
+            Work Done
+          </p>
+        </div>
+      </div>
 
       <p
         className="
@@ -55,7 +104,7 @@ const DetailBlock = ({
           text-sm
           leading-relaxed
 
-          text-slate-700
+          text-[#d4dfdb]
         "
       >
         {value}
@@ -76,10 +125,10 @@ const ActionButton = ({
       items-center
       gap-2
 
-      rounded-xl
+      rounded-2xl
 
-      px-3
-      py-2
+      px-4
+      py-2.5
 
       text-sm
       font-medium
@@ -107,17 +156,25 @@ const TicketRow = ({
     <>
       <tr
         className="
-          border-b
-          border-violet-100
+          group
 
-          transition-colors
+          border-b
+          border-[#202b27]
+
+          transition-all
           duration-200
 
-          hover:bg-violet-50/60
+          hover:bg-[#18211f]/70
         "
       >
         {/* TICKET */}
-        <td className="px-4 py-4 align-top">
+        <td
+          className="
+            px-6
+            py-5
+            align-top
+          "
+        >
           <button
             onClick={() =>
               setExpanded(
@@ -127,39 +184,98 @@ const TicketRow = ({
             className="
               flex
               items-center
-              gap-2
+              gap-3
 
-              font-semibold
-              text-violet-700
+              transition-all
+              duration-200
+
+              hover:opacity-80
             "
           >
-            {expanded ? (
-              <ChevronUp className="h-4 w-4" />
-            ) : (
-              <ChevronDown className="h-4 w-4" />
-            )}
+            <div
+              className="
+                flex
+                h-9
+                w-9
+                items-center
+                justify-center
 
-            {
-              ticket.ticket_number
-            }
+                rounded-xl
+
+                border
+                border-[#2d3b35]
+
+                bg-[#141d1a]
+              "
+            >
+              {expanded ? (
+                <ChevronUp
+                  className="
+                    h-4
+                    w-4
+
+                    text-[#f5d547]
+                  "
+                />
+              ) : (
+                <ChevronDown
+                  className="
+                    h-4
+                    w-4
+
+                    text-[#74877f]
+                  "
+                />
+              )}
+            </div>
+
+            <div className="text-left">
+              <p
+                className="
+                  text-sm
+                  font-semibold
+
+                  text-white
+                "
+              >
+                {
+                  ticket.ticket_number
+                }
+              </p>
+
+              <p
+                className="
+                  mt-1
+
+                  text-xs
+
+                  text-[#74877f]
+                "
+              >
+                Support Ticket
+              </p>
+            </div>
           </button>
         </td>
 
         {/* ISSUE */}
         <td
           className="
-            max-w-[500px]
+            max-w-[560px]
 
-            px-4
-            py-4
-
-            text-slate-700
+            px-6
+            py-5
           "
         >
           <p
             className="
               line-clamp-2
               break-words
+
+              text-sm
+              leading-relaxed
+
+              text-[#d4dfdb]
             "
           >
             {
@@ -169,7 +285,12 @@ const TicketRow = ({
         </td>
 
         {/* STATUS */}
-        <td className="px-4 py-4">
+        <td
+          className="
+            px-6
+            py-5
+          "
+        >
           <TicketStatusBadge
             blacklisted={
               ticket.is_blacklisted
@@ -178,12 +299,17 @@ const TicketRow = ({
         </td>
 
         {/* ACTIONS */}
-        <td className="px-4 py-4">
+        <td
+          className="
+            px-6
+            py-5
+          "
+        >
           <div
             className="
               flex
               justify-end
-              gap-2
+              gap-3
             "
           >
             {/* BLOCK */}
@@ -196,28 +322,42 @@ const TicketRow = ({
               className={
                 ticket.is_blacklisted
                   ? `
-                    bg-emerald-50
-                    text-emerald-700
+                    border
+                    border-emerald-500/20
 
-                    hover:bg-emerald-100
+                    bg-emerald-500/10
+
+                    text-emerald-400
+
+                    hover:bg-emerald-500/20
                   `
                   : `
-                    bg-amber-50
-                    text-amber-700
+                    border
+                    border-amber-500/20
 
-                    hover:bg-amber-100
+                    bg-amber-500/10
+
+                    text-amber-300
+
+                    hover:bg-amber-500/20
                   `
               }
             >
               {ticket.is_blacklisted ? (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-                  Unblock
+
+                  <span className="hidden xl:inline">
+                    Unblock
+                  </span>
                 </>
               ) : (
                 <>
                   <Ban className="h-4 w-4" />
-                  Block
+
+                  <span className="hidden xl:inline">
+                    Block
+                  </span>
                 </>
               )}
             </ActionButton>
@@ -230,14 +370,21 @@ const TicketRow = ({
                 )
               }
               className="
-                bg-red-50
-                text-red-600
+                border
+                border-red-500/20
 
-                hover:bg-red-100
+                bg-red-500/10
+
+                text-red-400
+
+                hover:bg-red-500/20
               "
             >
               <Trash2 className="h-4 w-4" />
-              Delete
+
+              <span className="hidden xl:inline">
+                Delete
+              </span>
             </ActionButton>
           </div>
         </td>
@@ -248,16 +395,16 @@ const TicketRow = ({
         <tr
           className="
             border-b
-            border-violet-100
+            border-[#202b27]
 
-            bg-violet-50/30
+            bg-[#141d1a]/70
           "
         >
           <td
             colSpan={4}
             className="
-              px-4
-              pb-5
+              px-6
+              pb-6
             "
           >
             <DetailBlock
@@ -284,48 +431,60 @@ const TicketTable = ({
       className="
         h-full
         overflow-auto
+
+        [scrollbar-width:none]
+        [&::-webkit-scrollbar]:hidden
       "
     >
       <table
         className="
           min-w-full
-          text-sm
+
+          border-separate
+          border-spacing-0
         "
       >
+        {/* HEADER */}
         <thead
           className="
             sticky
             top-0
             z-10
 
-            border-b
-            border-violet-200
+            bg-[#101715]/95
 
-            bg-violet-50
+            backdrop-blur-xl
           "
         >
           <tr>
+
             {[
               "Ticket",
               "Issue",
               "Status",
               "Actions",
             ].map((label) => (
+
               <th
                 key={label}
                 className={`
-                  px-4
-                  py-3
+                  border-b
+                  border-[#24312b]
 
-                  text-xs
+                  px-6
+                  py-4
+
+                  text-[11px]
                   font-semibold
                   uppercase
-                  tracking-wide
 
-                  text-violet-700
+                  tracking-[0.18em]
+
+                  text-[#74877f]
 
                   ${
-                    label === "Actions"
+                    label ===
+                    "Actions"
                       ? "text-right"
                       : "text-left"
                   }
@@ -337,7 +496,88 @@ const TicketTable = ({
           </tr>
         </thead>
 
+        {/* BODY */}
         <tbody>
+          {tickets.length ===
+            0 && (
+            <tr>
+              <td
+                colSpan={4}
+                className="
+                  px-6
+                  py-24
+
+                  text-center
+                "
+              >
+                <div
+                  className="
+                    flex
+                    flex-col
+                    items-center
+                    justify-center
+                  "
+                >
+                  <div
+                    className="
+                      mb-5
+
+                      flex
+                      h-20
+                      w-20
+                      items-center
+                      justify-center
+
+                      rounded-3xl
+
+                      border
+                      border-[#2a3732]
+
+                      bg-[#141d1a]
+                    "
+                  >
+                    <MessageSquareText
+                      className="
+                        h-8
+                        w-8
+
+                        text-[#f5d547]
+                      "
+                    />
+                  </div>
+
+                  <h3
+                    className="
+                      text-lg
+                      font-semibold
+
+                      text-white
+                    "
+                  >
+                    No tickets found
+                  </h3>
+
+                  <p
+                    className="
+                      mt-2
+
+                      max-w-sm
+
+                      text-sm
+                      leading-relaxed
+
+                      text-[#80958b]
+                    "
+                  >
+                    Support tickets will
+                    appear here once users
+                    submit requests.
+                  </p>
+                </div>
+              </td>
+            </tr>
+          )}
+
           {tickets.map(
             (ticket) => (
               <TicketRow

@@ -25,7 +25,10 @@ export const useFileUpload =
     const [hasPendingUploads, setHasPendingUploads] =
       useState(false)
 
-    /* FORMAT */
+    /* =========================================
+       FORMAT SIZE
+    ========================================= */
+
     const formatSize =
       (size) =>
         `${(
@@ -34,7 +37,10 @@ export const useFileUpload =
           1024
         ).toFixed(2)} MB`
 
-    /* UPDATE FILE */
+    /* =========================================
+       UPDATE FILE
+    ========================================= */
+
     const updateFile =
       (
         id,
@@ -55,7 +61,49 @@ export const useFileUpload =
         )
       }
 
-    /* UPLOAD SINGLE */
+    /* =========================================
+       CLEAR FILES
+    ========================================= */
+
+    const clearFiles =
+      () => {
+
+        setUploadedFiles(
+          []
+        )
+
+        setHasPendingUploads(
+          false
+        )
+
+        setCurrentPage(
+          1
+        )
+      }
+
+    /* =========================================
+       CHECK PENDING
+    ========================================= */
+
+    const checkPendingFiles =
+      (files) => {
+
+        const hasPending =
+          files.some(
+            (file) =>
+              file.statusType ===
+              "pending"
+          )
+
+        setHasPendingUploads(
+          hasPending
+        )
+      }
+
+    /* =========================================
+       UPLOAD SINGLE
+    ========================================= */
+
     const uploadFile =
       async (
         localId,
@@ -103,13 +151,12 @@ export const useFileUpload =
         }
       }
 
-    /* CONFIRM UPLOAD */
+    /* =========================================
+       CONFIRM UPLOAD
+    ========================================= */
+
     const confirmUpload =
       async () => {
-
-        setHasPendingUploads(
-          false
-        )
 
         const pending =
           uploadedFiles.filter(
@@ -117,6 +164,16 @@ export const useFileUpload =
               file.statusType ===
               "pending"
           )
+
+        if (
+          pending.length === 0
+        ) {
+          return
+        }
+
+        setHasPendingUploads(
+          false
+        )
 
         for (const file of pending) {
 
@@ -136,9 +193,26 @@ export const useFileUpload =
             file.raw
           )
         }
+
+        setUploadedFiles(
+          (prev) => {
+
+            const updated =
+              [...prev]
+
+            checkPendingFiles(
+              updated
+            )
+
+            return updated
+          }
+        )
       }
 
-    /* HANDLE FILES */
+    /* =========================================
+       HANDLE FILES
+    ========================================= */
+
     const handleFiles =
       (files) => {
 
@@ -186,6 +260,9 @@ export const useFileUpload =
                   .pop()
                   ?.toUpperCase(),
 
+              category:
+                "General",
+
               status:
                 "Pending",
 
@@ -199,18 +276,27 @@ export const useFileUpload =
           )
 
         setUploadedFiles(
-          (prev) => [
-            ...mapped,
-            ...prev,
-          ]
-        )
+          (prev) => {
 
-        setHasPendingUploads(
-          true
+            const updated =
+              [
+                ...mapped,
+                ...prev,
+              ]
+
+            checkPendingFiles(
+              updated
+            )
+
+            return updated
+          }
         )
       }
 
-    /* INPUT */
+    /* =========================================
+       INPUT CHANGE
+    ========================================= */
+
     const handleInputChange =
       (event) => {
 
@@ -222,7 +308,10 @@ export const useFileUpload =
           ""
       }
 
-    /* DROP */
+    /* =========================================
+       DROP
+    ========================================= */
+
     const handleDrop =
       (event) => {
 
@@ -234,20 +323,42 @@ export const useFileUpload =
         )
       }
 
-    /* REMOVE */
+    /* =========================================
+       REMOVE FILE
+    ========================================= */
+
     const removeFile =
       (id) => {
 
         setUploadedFiles(
-          (prev) =>
-            prev.filter(
-              (file) =>
-                file.id !== id
+          (prev) => {
+
+            const updated =
+              prev.filter(
+                (file) =>
+                  file.id !== id
+              )
+
+            checkPendingFiles(
+              updated
             )
+
+            return updated
+          }
         )
       }
 
-    /* PAGINATION */
+    /* =========================================
+       TABLE VISIBILITY
+    ========================================= */
+
+    const showTable =
+      uploadedFiles.length > 0
+
+    /* =========================================
+       PAGINATION
+    ========================================= */
+
     const totalPages =
       Math.ceil(
         uploadedFiles.length /
@@ -284,14 +395,17 @@ export const useFileUpload =
       paginatedFiles,
 
       hasPendingUploads,
+      showTable,
 
       handleInputChange,
       handleDrop,
 
       removeFile,
+      clearFiles,
 
       confirmUpload,
 
       setCurrentPage,
     }
+
   }

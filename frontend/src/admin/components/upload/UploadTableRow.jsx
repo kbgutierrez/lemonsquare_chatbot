@@ -14,76 +14,169 @@ const UploadTableRow = ({
     <tr
       className="
         border-t
-        border-violet-100
+        border-[#24312b]
 
-        transition-colors
+        transition-all
+        duration-200
 
-        hover:bg-violet-50/50
+        hover:bg-[#171f1d]
       "
     >
-      <td className="px-4 py-3">
+      {/* FILE */}
+      <td className="px-5 py-4">
         <div className="flex items-center gap-3">
 
+          {/* FILE ICON */}
           <div
             className="
-              rounded-xl
-              bg-violet-100
-              p-2
+              flex
+              h-11
+              w-11
+              shrink-0
+              items-center
+              justify-center
+
+              rounded-2xl
+
+              border
+              border-[#2d3934]
+
+              bg-[#1b2422]
             "
           >
-            <FileText className="h-4 w-4 text-violet-700" />
+            <FileText
+              className="
+                h-4.5
+                w-4.5
+
+                text-[#f5d547]
+              "
+            />
           </div>
 
-          <div>
+          {/* FILE INFO */}
+          <div className="min-w-0">
             <p
               className="
-                max-w-[220px]
+                max-w-[240px]
                 truncate
 
                 text-sm
-                font-medium
-                text-violet-900
+                font-semibold
+
+                text-white
               "
             >
               {file.name}
             </p>
 
-            <p className="text-xs text-violet-500">
+            <p
+              className="
+                mt-1
+
+                text-xs
+
+                text-[#7f948b]
+              "
+            >
               {file.type}
             </p>
           </div>
         </div>
       </td>
 
-      <td className="px-4 py-3 text-sm text-violet-700">
+      {/* SIZE */}
+      <td
+        className="
+          px-5
+          py-4
+
+          text-sm
+          font-medium
+
+          text-[#c4d1cb]
+        "
+      >
         {file.size}
       </td>
 
-      <td className="px-4 py-3">
+      {/* CATEGORY */}
+      <td className="px-5 py-4">
+        <div
+          className="
+            inline-flex
+            items-center
+
+            rounded-xl
+
+            border
+            border-[#32403a]
+
+            bg-[#1a2320]
+
+            px-3
+            py-1.5
+
+            text-xs
+            font-medium
+
+            text-[#d7e2dd]
+          "
+        >
+          {file.category ||
+            "General"}
+        </div>
+      </td>
+
+      {/* STATUS */}
+      <td className="px-5 py-4">
         <UploadStatusBadge
           status={file.status}
           statusType={file.statusType}
         />
       </td>
 
-      <td className="px-4 py-3 text-xs text-violet-600">
+      {/* UPLOADED */}
+      <td
+        className="
+          px-5
+          py-4
+
+          text-xs
+          font-medium
+
+          text-[#81958c]
+        "
+      >
         {file.uploadedAt}
       </td>
 
-      <td className="px-4 py-3">
+      {/* ACTION */}
+      <td className="px-5 py-4">
         <button
           onClick={() =>
             removeFile(file.id)
           }
           className="
-            rounded-lg
-            p-2
+            flex
+            h-10
+            w-10
+            items-center
+            justify-center
 
-            text-red-500
+            rounded-xl
+
+            border
+            border-transparent
+
+            text-[#9caf a7]
 
             transition-all
+            duration-200
 
-            hover:bg-red-50
+            hover:border-red-500/20
+            hover:bg-red-500/10
+            hover:text-red-400
           "
         >
           <X className="h-4 w-4" />

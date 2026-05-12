@@ -9,6 +9,7 @@ const UploadStatusBadge = ({
   statusType,
 }) => {
 
+  /* LOADING */
   if (
     statusType ===
     "loading"
@@ -19,28 +20,39 @@ const UploadStatusBadge = ({
         className="
           inline-flex
           items-center
-          gap-1
+          gap-2
 
-          rounded-full
+          rounded-xl
 
-          bg-amber-100
+          border
+          border-[#5a4a1c]
 
-          px-2
-          py-1
+          bg-[#2b2414]
+
+          px-3
+          py-1.5
 
           text-xs
           font-semibold
 
-          text-amber-700
+          text-[#f5d547]
         "
       >
-        <LoaderCircle className="h-3 w-3 animate-spin" />
+        <LoaderCircle
+          className="
+            h-3.5
+            w-3.5
+
+            animate-spin
+          "
+        />
 
         {status}
       </span>
     )
   }
 
+  /* SUCCESS */
   if (
     statusType ===
     "success"
@@ -51,49 +63,66 @@ const UploadStatusBadge = ({
         className="
           inline-flex
           items-center
-          gap-1
+          gap-2
 
-          rounded-full
+          rounded-xl
 
-          bg-emerald-100
+          border
+          border-[#294137]
 
-          px-2
-          py-1
+          bg-[#17231f]
+
+          px-3
+          py-1.5
 
           text-xs
           font-semibold
 
-          text-emerald-700
+          text-[#8dd9a7]
         "
       >
-        <CheckCircle2 className="h-3 w-3" />
+        <CheckCircle2
+          className="
+            h-3.5
+            w-3.5
+          "
+        />
 
         {status}
       </span>
     )
   }
 
+  /* ERROR */
   return (
     <span
       className="
         inline-flex
         items-center
-        gap-1
+        gap-2
 
-        rounded-full
+        rounded-xl
 
-        bg-red-100
+        border
+        border-[#4c2626]
 
-        px-2
-        py-1
+        bg-[#2a1818]
+
+        px-3
+        py-1.5
 
         text-xs
         font-semibold
 
-        text-red-700
+        text-[#ff8d8d]
       "
     >
-      <AlertCircle className="h-3 w-3" />
+      <AlertCircle
+        className="
+          h-3.5
+          w-3.5
+        "
+      />
 
       {status}
     </span>

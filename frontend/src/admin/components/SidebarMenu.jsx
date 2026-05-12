@@ -37,40 +37,124 @@ const SidebarMenu = ({
 }) => {
 
   return (
-    <div
+    <aside
       className="
-        rounded-3xl
+        flex
+        h-full
+        flex-col
+
+        overflow-hidden
+
+        rounded-[28px]
 
         border
-        border-violet-100
+        border-[#2a3a33]
 
-        bg-white/80
+        bg-[#111917]
 
-        p-3
+        p-4
 
-        shadow-sm
-        backdrop-blur-sm
+        shadow-[0_10px_40px_rgba(0,0,0,0.35)]
       "
     >
-      {/* TITLE */}
-      <p
+      {/* LOGO */}
+      <div
         className="
-          mb-3
+          mb-8
 
-          px-2
+          flex
+          items-center
+          gap-3
 
-          text-xs
-          font-bold
-          uppercase
-          tracking-[0.2em]
-          text-violet-500
+          rounded-2xl
+
+          border
+          border-[#27342e]
+
+          bg-[#161f1d]
+
+          px-4
+          py-4
         "
       >
-        Navigation
-      </p>
+        {/* LOGO BOX */}
+        <div
+          className="
+            flex
+            h-11
+            w-11
+            shrink-0
+            items-center
+            justify-center
 
-      {/* ITEMS */}
-      <div className="space-y-2">
+            rounded-2xl
+
+            bg-[#f5d547]
+          "
+        >
+          <span
+            className="
+              text-sm
+              font-black
+              tracking-wide
+
+              text-[#111917]
+            "
+          >
+            LS
+          </span>
+        </div>
+
+        {/* TEXT */}
+        <div className="min-w-0">
+          <h2
+            className="
+              truncate
+
+              text-sm
+              font-bold
+
+              tracking-wide
+
+              text-white
+            "
+          >
+            Lemon Square
+          </h2>
+
+          <p
+            className="
+              mt-0.5
+
+              text-xs
+
+              text-[#8ea59b]
+            "
+          >
+            Admin Panel
+          </p>
+        </div>
+      </div>
+
+      {/* NAVIGATION */}
+      <div className="mb-3 px-2">
+        <p
+          className="
+            text-[11px]
+            font-semibold
+            uppercase
+
+            tracking-[0.22em]
+
+            text-[#718379]
+          "
+        >
+          Navigation
+        </p>
+      </div>
+
+      {/* MENU */}
+      <div className="flex flex-col gap-2">
         {menuItems.map(
           ({
             id,
@@ -98,12 +182,10 @@ const SidebarMenu = ({
 
                   rounded-2xl
 
-                  px-3
+                  px-3.5
                   py-3
 
                   text-left
-                  text-sm
-                  font-medium
 
                   transition-all
                   duration-200
@@ -111,18 +193,21 @@ const SidebarMenu = ({
                   ${
                     active
                       ? `
-                        bg-gradient-to-r
-                        from-violet-600
-                        to-purple-500
+                        border
+                        border-[#46544d]
+
+                        bg-[#1c2723]
 
                         text-white
-
-                        shadow-lg
                       `
                       : `
-                        text-violet-700
+                        border
+                        border-transparent
 
-                        hover:bg-violet-50
+                        text-[#b6c3bd]
+
+                        hover:bg-[#171f1d]
+                        hover:text-white
                       `
                   }
                 `}
@@ -131,8 +216,8 @@ const SidebarMenu = ({
                 <div
                   className={`
                     flex
-                    h-9
-                    w-9
+                    h-10
+                    w-10
                     shrink-0
                     items-center
                     justify-center
@@ -145,32 +230,33 @@ const SidebarMenu = ({
                     ${
                       active
                         ? `
-                          bg-white/20
+                          bg-[#f5d547]
+
+                          text-[#111917]
                         `
                         : `
-                          bg-violet-100
+                          bg-[#202a27]
 
-                          group-hover:bg-violet-200
+                          text-[#b6c3bd]
+
+                          group-hover:bg-[#2a3632]
+                          group-hover:text-white
                         `
                     }
                   `}
                 >
-                  <Icon
-                    className={`
-                      h-4
-                      w-4
-
-                      ${
-                        active
-                          ? "text-white"
-                          : "text-violet-700"
-                      }
-                    `}
-                  />
+                  <Icon className="h-4.5 w-4.5" />
                 </div>
 
                 {/* LABEL */}
-                <span className="truncate">
+                <span
+                  className="
+                    truncate
+
+                    text-sm
+                    font-medium
+                  "
+                >
                   {label}
                 </span>
               </button>
@@ -178,7 +264,7 @@ const SidebarMenu = ({
           }
         )}
       </div>
-    </div>
+    </aside>
   )
 }
 
