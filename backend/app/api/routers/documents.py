@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_chatbot_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
 from app.models.chatbot import UploadedDocument
 from app.schemas.documents import (
     DocumentDeleteResponse,
@@ -24,6 +24,7 @@ from app.schemas.documents import (
     DocumentUploadResponse,
 )
 from app.services.ingestion_service import DocumentIngestionService
+from app.services.orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -75,16 +76,46 @@ async def test_vector_search(
         limit=request.limit,
     )
 
+@router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
+async def debug_full_rag_pipeline(
+    request: VectorSearchRequest,
+    orchestrator: SupportOrchestrator = Depends(get_orchestrator),
+    db: Session = Depends(get_chatbot_db),
+):
+    """
+    Debug the complete RAG pipeline: Query → Reformulation → Retrieval → Answer
+    Returns detailed debug info without saving anything.
+    """
+    # Use empty chat history for debug
+    chat_history = ""
+    user_name = "Debug User"
+    
+    debug_result = await orchestrator.debug_orchestrate(
+        user_query=request.query,
+        chat_history=chat_history,
+        user_name=user_name,
+        db=db,
+    )
+    
+    # Format the response for the frontend
     return {
-        "query": request.query,
-        "results": [
-            {
-                "score": hit.score,
-                "type": hit.payload.get("metadata", {}).get("doc_type", "unknown"),
-                "content": hit.payload.get("page_content", ""),
-            }
-            for hit in results.points
-        ],
+        "original_query": debug_result["original_query"],
+        "reformulated_query": debug_result["reformulated_query"],
+        "retrieval_results": {
+            "tickets": [
+                r for r in debug_result["retrieval_results"] 
+                if r["type"] != "uploaded_manual"
+            ],
+            "documents": [
+                r for r in debug_result["retrieval_results"] 
+                if r["type"] == "uploaded_manual"
+            ]
+        },
+        "final_answer": debug_result["final_answer"],
+        "raw_debug": {
+            "ticket_ids_used": debug_result.get("ticket_ids_used", []),
+            "total_retrieval_count": len(debug_result["retrieval_results"])
+        }
     }
 
 
