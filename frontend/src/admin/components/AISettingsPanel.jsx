@@ -9,11 +9,20 @@ import {
   useAISettings,
 } from "../hooks/useAISettings"
 
+import {
+  llmOptions,
+  embeddingModels,
+  rerankerModels,
+} from "../data/aiModels"
+
 import SettingsHeader
   from "./settings/SettingsHeader"
 
 import SettingsInput
   from "./settings/SettingsInput"
+
+import SettingsSelect
+  from "./settings/SettingsSelect"
 
 import SettingsToggle
   from "./settings/SettingsToggle"
@@ -85,16 +94,6 @@ const AISettingsPanel = () => {
   return (
     <div className="space-y-5">
 
-      {/* MODEL DROPDOWN */}
-      <AIModelDropdown
-        selectedModel={
-          activeModel
-        }
-
-        onSelectModel={
-          selectModel
-        }
-      />
 
       {/* HEADER */}
       <SettingsHeader
@@ -123,46 +122,65 @@ const AISettingsPanel = () => {
           xl:grid-cols-2
         "
       >
-        <SettingsInput
+        {/* REFORMULATOR */}
+        <SettingsSelect
           label="Reformulator Model"
-          value={settings.ReformulatorModel}
+          value={
+            settings.ReformulatorModel
+          }
           onChange={(e) =>
             update(
               "ReformulatorModel",
               e.target.value
             )
           }
+          options={llmOptions}
         />
 
-        <SettingsInput
+        {/* EMBEDDING */}
+        <SettingsSelect
           label="Embedding Model"
-          value={settings.EmbeddingModel}
+          value={
+            settings.EmbeddingModel
+          }
           onChange={(e) =>
             update(
               "EmbeddingModel",
               e.target.value
             )
           }
+          options={
+            embeddingModels
+          }
         />
 
-        <SettingsInput
+        {/* RERANKER */}
+        <SettingsSelect
           label="Reranker Model"
-          value={settings.RerankerModel}
+          value={
+            settings.RerankerModel
+          }
           onChange={(e) =>
             update(
               "RerankerModel",
               e.target.value
             )
           }
+          options={
+            rerankerModels
+          }
         />
 
+        {/* TEMPERATURE */}
         <SettingsInput
           type="number"
           step="0.1"
           min="0"
           max="2"
           label="Temperature"
-          value={settings.Temperature}
+          value={
+            settings.Temperature
+          }
           onChange={(e) =>
             update(
               "Temperature",
@@ -173,12 +191,15 @@ const AISettingsPanel = () => {
           }
         />
 
+        {/* TOP K */}
         <SettingsInput
           type="number"
           min="1"
           max="50"
           label="Top K Tickets"
-          value={settings.TopK_Tickets}
+          value={
+            settings.TopK_Tickets
+          }
           onChange={(e) =>
             update(
               "TopK_Tickets",
@@ -189,13 +210,16 @@ const AISettingsPanel = () => {
           }
         />
 
+        {/* CONFIDENCE */}
         <SettingsInput
           type="number"
           step="0.01"
           min="0"
           max="1"
           label="Confidence Threshold"
-          value={settings.ConfidenceThreshold}
+          value={
+            settings.ConfidenceThreshold
+          }
           onChange={(e) =>
             update(
               "ConfidenceThreshold",
@@ -206,7 +230,7 @@ const AISettingsPanel = () => {
           }
         />
 
-        {/* TOGGLES */}
+        {/* REFORMULATOR TOGGLE */}
         <div
           className="
             flex
@@ -234,7 +258,9 @@ const AISettingsPanel = () => {
           </div>
 
           <SettingsToggle
-            value={settings.UseReformulator}
+            value={
+              settings.UseReformulator
+            }
             onChange={(value) =>
               update(
                 "UseReformulator",
@@ -244,6 +270,7 @@ const AISettingsPanel = () => {
           />
         </div>
 
+        {/* RERANKER TOGGLE */}
         <div
           className="
             flex
@@ -271,7 +298,9 @@ const AISettingsPanel = () => {
           </div>
 
           <SettingsToggle
-            value={settings.UseReranker}
+            value={
+              settings.UseReranker
+            }
             onChange={(value) =>
               update(
                 "UseReranker",
@@ -302,7 +331,9 @@ const AISettingsPanel = () => {
         <SettingsTextarea
           rows={6}
           label="System Prompt"
-          value={settings.SystemPrompt}
+          value={
+            settings.SystemPrompt
+          }
           onChange={(e) =>
             update(
               "SystemPrompt",
@@ -314,7 +345,9 @@ const AISettingsPanel = () => {
         <SettingsTextarea
           rows={5}
           label="Reformulator Prompt"
-          value={settings.ReformulatorPrompt}
+          value={
+            settings.ReformulatorPrompt
+          }
           onChange={(e) =>
             update(
               "ReformulatorPrompt",
@@ -326,7 +359,9 @@ const AISettingsPanel = () => {
         <SettingsTextarea
           rows={4}
           label="Allowed Categories"
-          value={settings.AllowedCategories}
+          value={
+            settings.AllowedCategories
+          }
           onChange={(e) =>
             update(
               "AllowedCategories",
