@@ -4,14 +4,13 @@ PROJECT DIRECTORY TREE
 Earl/
 ├── .env.example
 ├── .gitignore
-├── ADMIN_DASHBOARD_AI_MODEL_DROPDOWN.md
-├── ADMIN_DASHBOARD_RESTRUCTURE.md
-├── backend
+├── ch.py
+├── erd.png
+├── oldbackend
 │   ├── app
 │   │   ├── api
 │   │   │   ├── chat.py
-│   │   │   ├── deps.py
-│   │   │   └── oldchat.py
+│   │   │   └── deps.py
 │   │   ├── core
 │   │   │   ├── config.py
 │   │   │   └── models.py
@@ -20,545 +19,28 @@ Earl/
 │   │       ├── ingest.py
 │   │       ├── ingestion.py
 │   │       ├── langchain_agent.py
+│   │       ├── oldingestion.py
 │   │       └── user_service.py
 │   ├── fix_index.py
 │   ├── project_summary.txt
 │   └── requirements.txt
-├── ch.py
-├── chatbot.sql
-├── chatbot_gantt_chart.xlsx
-├── chatbotmessage.sql
-├── chatbotsession.sql
-├── chatbotsettings.sql
-├── createtablecbot.sql
-├── erd.png
-├── helpdeskdev.sql
-├── helpdeskdevaluation.sql
 ├── project_summary.txt
 ├── requirements.txt
 ├── sample.py
+├── sql
+│   ├── chatbot.sql
+│   ├── chatbot_gantt_chart.xlsx
+│   ├── chatbotmessage.sql
+│   ├── chatbotsession.sql
+│   ├── chatbotsettings.sql
+│   ├── createtablecbot.sql
+│   ├── helpdeskdev.sql
+│   └── helpdeskdevaluation.sql
 └── streamlit_app.py
 
 ================================================
 FILE CONTENTS
 ================================================
-
---- FILE: ADMIN_DASHBOARD_AI_MODEL_DROPDOWN.md ---
-# Admin Dashboard Enhancement - AI Model Dropdown Integration
-
-## ✅ Implementation Status: COMPLETE
-
-Successfully fixed the duplicate header issue and integrated a professional AI Model Dropdown selector with expandable hover descriptions into the admin dashboard.
-
----
-
-## 🔧 Changes Made
-
-### 1. **Fixed Duplicate Header Issue**
-   - **Removed:** `KnowledgeInfoCard.jsx` from AdminPage (was causing redundant header display)
-   - **Result:** Now displays ONLY ONE unified header at the top
-   - **Header:** Uses `HeaderCard.jsx` with full-width purple gradient design
-
-### 2. **Created AI Model Dropdown Component**
-   - **File:** `src/admin/components/AIModelDropdown.jsx`
-   - **Features:**
-     - 19 AI models with complete descriptions
-     - Expandable descriptions on hover
-     - Smooth animations and transitions
-     - Professional enterprise styling
-     - "Active" badge for selected model
-     - Scrollable dropdown list
-
-### 3. **Updated AI Models Data Structure**
-   - **File:** `src/admin/data/aiModels.js`
-   - **Models Added (19 total):**
-     ```
-     • openai/gpt-oss-120b
-     • openai/gpt-oss-20b
-     • openai/gpt-oss-safeguard-20b
-     • llama-3.3-70b-versatile
-     • llama-3.1-70b-instruct
-     • llama-3.1-8b-instruct
-     • meta-llama/llama-4-scout-17b-16e-instruct
-     • meta-llama/llama-4-maverick-17b-128e-instruct
-     • qwen/qwen3-32b
-     • mixtral-8x7b-instruct
-     • gemma2-9b-it
-     • gemma-7b-it
-     • deepseek-r1-distill-llama-70b
-     • deepseek-r1-distill-qwen-32b
-     • whisper-large-v3
-     • whisper-large-v3-turbo
-     • playai-tts
-     • moonshotai/kimi-k2-instruct
-     • allam-2-7b
-     ```
-
-### 4. **Enhanced SQL Variables Configuration**
-   - **File:** `src/config/sqlVariables.js`
-   - **Added:**
-     - `AI_SETTINGS_ENDPOINT: "/settings/ai"`
-     - `AI_SETTINGS_UPDATE_ENDPOINT: "/settings/ai/update"`
-     - `AI_SETTINGS_TABLE: "AIChatbot_Settings"`
-
-### 5. **Restructured AdminPage Layout**
-   - **File:** `src/admin/AdminPage.jsx`
-   - **New Structure:**
-     ```
-     Single Header (HeaderCard)
-           ↓
-     [Left Sidebar]      [Main Content]
-     • Navigation Menu   • Upload/Files
-     • AI Dropdown       • Dynamic Content
-     ```
-   - **Changes:**
-     - Removed duplicate KnowledgeInfoCard
-     - Added AIModelDropdown below SidebarMenu
-     - Proper 2-column responsive layout
-     - Left sidebar now 240px wide
-
-### 6. **Cleaned Up SidebarMenu Component**
-   - **File:** `src/admin/components/SidebarMenu.jsx`
-   - **Changes:**
-     - Removed footer section
-     - Improved responsive width handling
-     - Cleaner component structure
-
----
-
-## 🎯 Final Layout Structure
-
-```
-┌─────────────────────────────────────────┐
-│      LEMONSQUARE ADMIN DASHBOARD        │
-│      Knowledge Management System        │
-└─────────────────────────────────────────┘
-
-┌──────────────────┬─────────────────────┐
-│   LEFT SIDEBAR   │   MAIN CONTENT      │
-│                  │                     │
-│ Navigation:      │  Upload/Files View  │
-│ • Upload         │  Dynamic based on   │
-│ • Knowledge      │  navigation select  │
-│   Files          │                     │
-│                  │                     │
-│ AI Model:        │                     │
-│ [Dropdown ▼]     │                     │
-│ 19 models        │                     │
-│ Expandable hover │                     │
-│                  │                     │
-└──────────────────┴─────────────────────┘
-```
-
----
-
-## 🎨 Design Features
-
-### Dropdown Behavior
-- **Collapsed:** Shows selected model name with icon
-- **Expanded:** Lists all 19 models in scrollable container
-- **Hover:** Description expands smoothly on hover with animation
-- **Selection:** Click to select, closes dropdown automatically
-
-### Color Theme
-- Primary Purple: `#8B5CF6`
-- Light Purple: `#A78BFA`
-- Background: Gradient from `#F5F3FF` to white
-- Accents: Purple-600, Purple-200 border
-
-### Animations
-- `transition-all duration-200` for smooth effects
-- `max-h` and `opacity` for description expansion
-- `transform rotate-180` for chevron animation
-- Hover background color transitions
-
----
-
-## ✨ Key Features
-
-1. **No Duplicate Headers**
-   - ✅ Single unified header at top
-   - ✅ Full-width purple gradient design
-   - ✅ Clean, professional appearance
-
-2. **AI Model Dropdown**
-   - ✅ All 19 models available
-   - ✅ Rich descriptions for each model
-   - ✅ Expandable hover descriptions
-   - ✅ Active model indicator
-   - ✅ Smooth animations
-
-3. **Left Sidebar Organization**
-   - ✅ Navigation menu (Upload/Files)
-   - ✅ AI Model selector below menu
-   - ✅ Compact, responsive design
-   - ✅ Professional styling
-
-4. **Content Area**
-   - ✅ Dynamic view switching
-   - ✅ Upload section with drag-drop
-   - ✅ Knowledge Files with categories/table
-   - ✅ Responsive layout
-
-5. **SQL/Backend Ready**
-   - ✅ Centralized `sqlVariables.js`
-   - ✅ AI settings endpoints configured
-   - ✅ No hardcoded values
-   - ✅ Easy migration path
-
----
-
-## 📊 Implementation Statistics
-
-| Metric | Value |
-|--------|-------|
-| New Components | 1 (AIModelDropdown) |
-| Modified Components | 3 (AdminPage, SidebarMenu, aiModels.js) |
-| AI Models | 19 total |
-| Build Status | ✅ Success |
-| Compilation Errors | 0 |
-| Browser Errors | 0 |
-| Build Size | 219.27 kB (66.66 kB gzipped) |
-
----
-
-## 🧪 Testing Results
-
-✅ **Dropdown Functionality**
-- Opens/closes smoothly
-- All 19 models display correctly
-- Descriptions appear on hover
-- Model selection works
-- Closes after selection
-
-✅ **Navigation**
-- Upload button switches to upload view
-- Knowledge Files button switches to files view
-- Active state highlighting works
-- Animation transitions smooth
-
-✅ **Layout**
-- Header displays correctly (no duplication)
-- Sidebar positioned correctly
-- Dropdown appears below menu
-- Content area responsive
-- No overflow issues
-
-✅ **Build Process**
-- Production build succeeds
-- No TypeScript errors
-- No ESLint warnings
-- Proper module bundling
-
----
-
-## 🚀 Responsive Behavior
-
-The dashboard adapts to different screen sizes:
-
-- **Mobile (< 768px):** Stacked layout with dropdown wrapping
-- **Tablet (768px - 1024px):** Single column with responsive sidebar
-- **Desktop (> 1024px):** Full 2-column layout with proper spacing
-- **Large Screens (> 1280px):** Optimal layout with max-width container
-
----
-
-## 📝 Code Quality
-
-- ✅ No duplicate code
-- ✅ Clean component structure
-- ✅ Proper separation of concerns
-- ✅ Reusable, modular components
-- ✅ Well-commented code
-- ✅ Consistent styling approach
-
----
-
-## 🔌 Backend Integration Ready
-
-All future backend connections should use:
-
-```javascript
-import { SQL_VARIABLES, buildApiUrl } from '@/config/sqlVariables'
-
-// Example usage
-const apiUrl = buildApiUrl(SQL_VARIABLES.AI_SETTINGS_ENDPOINT)
-// Results in: http://localhost:5000/api/settings/ai
-```
-
----
-
-## 📋 Checklist
-
-- ✅ Removed duplicate header
-- ✅ Created AI Model Dropdown component
-- ✅ Updated aiModels.js with 19 models
-- ✅ Enhanced sqlVariables.js
-- ✅ Restructured AdminPage layout
-- ✅ Cleaned SidebarMenu
-- ✅ Zero build errors
-- ✅ All animations working
-- ✅ Responsive design verified
-- ✅ Navigation tested
-- ✅ Model selection tested
-- ✅ Hover descriptions tested
-
----
-
-## 🎯 Result
-
-A professional, enterprise-grade admin dashboard with:
-- Clean, unified header design
-- Intuitive AI model selection
-- Smooth, responsive interactions
-- Modular, maintainable code
-- Production-ready build
-- Backend integration prepared
-
-
-
---- FILE: ADMIN_DASHBOARD_RESTRUCTURE.md ---
-# Admin Dashboard Restructure - Implementation Summary
-
-## ✅ Project Status: COMPLETE
-
-A modern, enterprise-style admin dashboard has been successfully restructured with a responsive layout, soft purple theme, and modular component architecture.
-
----
-
-## 📦 New Files Created
-
-### 1. Configuration
-- **`src/config/sqlVariables.js`** - Centralized API configuration for future backend integration
-  - Contains all API endpoints
-  - Database table name constants
-  - Helper function for building API URLs
-
-### 2. New Components
-- **`src/admin/components/HeaderCard.jsx`** - Full-width header with gradient purple theme
-- **`src/admin/components/KnowledgeInfoCard.jsx`** - Compact info card with database icon
-- **`src/admin/components/SidebarMenu.jsx`** - Left navigation with Upload/Knowledge Files options
-- **`src/admin/components/KnowledgeFilesSection.jsx`** - Main content area for knowledge files view
-- **`src/admin/components/CategoryList.jsx`** - Categories selector component
-
----
-
-## 🔄 Modified Files
-
-### 1. `src/admin/AdminPage.jsx`
-**Changes:**
-- Completely restructured layout from old navigation tabs system
-- New 2-column responsive grid: Sidebar (left) + Main Content (right)
-- Now uses: HeaderCard, KnowledgeInfoCard, SidebarMenu, UploadSection, KnowledgeFilesSection
-- Added background gradient (purple-25 to white)
-- Improved spacing and padding for enterprise look
-
-### 2. `src/admin/components/UploadSection.jsx`
-**Changes:**
-- Redesigned from compact to full-featured upload interface
-- Added enhanced drag-and-drop area with hover animations
-- Integrated file list display with status indicators
-- Added tips/information messages
-- Updated to soft purple theme
-- Improved responsive design with better mobile support
-
-### 3. `src/admin/components/FileTable.jsx`
-**Changes:**
-- Changed from slate gray theme to soft purple enterprise theme
-- Enhanced table header styling with uppercase labels
-- Improved status badges with borders and better colors
-- Better hover effects on rows
-- Improved delete button styling and responsiveness
-- Updated spacing and typography
-
-### 4. `tailwind.config.js`
-**Changes:**
-- Extended theme with custom purple color (`purple-25`)
-- Added fade-in animation (`fadeIn`)
-- Added slide-in animation (`slideIn`)
-- Configured keyframes for smooth animations
-
----
-
-## 🎨 Design Features
-
-### Color Scheme
-- **Soft Purple Enterprise Theme:**
-  - Primary: `#8B5CF6` (purple-600)
-  - Light: `#A78BFA` (purple-400)
-  - Very Light: `#F5F3FF` (purple-25 - custom)
-  - Gradient backgrounds for premium feel
-
-### Layout Structure
-```
-┌─────────────────────────────────────┐
-│          HEADER CARD                │
-│  LEMONSQUARE ADMIN DASHBOARD        │
-│  Knowledge Management System        │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│   KNOWLEDGE INFO CARD               │
-│  Database icon + Status indicator   │
-└─────────────────────────────────────┘
-
-┌──────────────┬─────────────────────┐
-│ LEFT MENU    │  MAIN CONTENT AREA  │
-│              │                     │
-│ • Upload     │ Dynamic Content     │
-│ • Knowledge  │ Based on Selection  │
-│   Files      │                     │
-└──────────────┴─────────────────────┘
-```
-
-### Responsive Breakpoints
-- **Mobile:** Full-width stacked layout
-- **Tablet:** Sidebar may wrap
-- **Desktop/Laptop:** Optimal 2-column layout
-- **Large Screens:** Max-width container (7xl) centered
-
-### Animations
-- **Fade-in:** Header and info cards
-- **Slide-in:** Success messages
-- **Hover transitions:** All interactive elements
-- **Duration:** 200-300ms for smooth feel
-- **Easing:** ease-in-out for natural motion
-
----
-
-## 🧩 Component Architecture
-
-### AdminPage (Main Container)
-- Manages active view state (upload/files)
-- Renders header, info card, sidebar, and content area
-- Uses responsive grid layout
-
-### SidebarMenu
-- Toggles between Upload and Knowledge Files views
-- Modern vertical selector with active states
-- Smooth animations and hover effects
-
-### HeaderCard
-- Full-width gradient background
-- Displays dashboard title and subtitle
-- Accent line decoration
-
-### KnowledgeInfoCard
-- Compact information display
-- Database icon + system name
-- Green active status indicator
-
-### UploadSection
-- Drag-and-drop upload area
-- Recent files display
-- Status indicators
-- Upload tips/help text
-
-### KnowledgeFilesSection
-- Dynamic category selector
-- Files table display
-- Pagination controls
-- Category information display
-
-### CategoryList
-- Vertical list of categories
-- Active state highlighting
-- Category descriptions
-- Modern styling
-
-### FileTable
-- Responsive table display
-- File information columns
-- Status badges
-- Delete actions
-- Hover effects
-
----
-
-## 🔌 Backend Integration Ready
-
-All future backend references should use `src/config/sqlVariables.js`:
-
-```javascript
-import { SQL_VARIABLES, buildApiUrl } from '@/config/sqlVariables'
-
-// Future API calls will use:
-const uploadEndpoint = buildApiUrl(SQL_VARIABLES.UPLOAD_ENDPOINT)
-const filesEndpoint = buildApiUrl(SQL_VARIABLES.FILES_ENDPOINT)
-```
-
----
-
-## ✨ Key Features
-
-1. **Enterprise Design**
-   - Professional gradient backgrounds
-   - Soft purple color scheme
-   - Clean typography
-   - Proper spacing and alignment
-
-2. **Responsive Design**
-   - Mobile-first approach
-   - Flexible grid layouts
-   - Responsive typography
-   - Proper breakpoints
-
-3. **Animations**
-   - Subtle fade-ins
-   - Smooth transitions
-   - Hover effects
-   - No heavy libraries
-
-4. **Modular Architecture**
-   - Self-contained components
-   - Single responsibility principle
-   - Easy to maintain and extend
-   - Clean file organization
-
-5. **Future-Ready**
-   - Centralized API configuration
-   - Mock data structure ready for API integration
-   - No hardcoded endpoints
-   - Scalable component structure
-
----
-
-## 📊 File Statistics
-
-- **New Components:** 5
-- **Modified Components:** 3
-- **New Configuration Files:** 1
-- **Config Updates:** 1
-- **Total Files Changed:** 10
-- **Lines of Code Added:** ~800+
-- **Build Status:** ✅ Successful
-
----
-
-## 🚀 Next Steps
-
-When ready for backend integration:
-
-1. Replace mock data with API calls using `SQL_VARIABLES`
-2. Implement authentication logic
-3. Add form validation for uploads
-4. Connect to database tables
-5. Add error handling and loading states
-6. Implement pagination functionality
-7. Add search/filter capabilities
-
----
-
-## 📝 Notes
-
-- All changes are frontend-only
-- Mock data remains in place for testing
-- No backend logic implemented
-- Tailwind CSS only (no external UI libraries)
-- Fully responsive and accessible
-- Clean, maintainable code structure
-
-
 
 --- FILE: ch.py ---
 import os
@@ -742,7 +224,7 @@ from pathlib import Path
 
 # --- Configuration ---
 OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend'}
+EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'backend'}
 EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
 
 # Add a set of allowed extensions for text/code files
@@ -817,8 +299,7 @@ if __name__ == "__main__":
 --- FILE: streamlit_app.py ---
 import streamlit as st
 import requests
-import json
-from typing import List, Dict, Any
+from typing import Dict, Any
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api"
@@ -828,7 +309,11 @@ st.set_page_config(page_title="IT Support AI Dashboard", layout="wide")
 st.title("IT Support AI Enterprise Dashboard")
 
 # Sidebar for navigation
-page = st.sidebar.selectbox("Choose a section", ["Chat", "Documents", "Tickets"])
+page = st.sidebar.selectbox(
+    "Choose a section",
+    ["Chat", "Documents", "Tickets", "Settings"]
+)
+
 
 def make_request(method: str, endpoint: str, data: Dict = None, files: Dict = None) -> Dict:
     """Helper function to make API requests"""
@@ -842,16 +327,29 @@ def make_request(method: str, endpoint: str, data: Dict = None, files: Dict = No
             else:
                 response = requests.post(url, json=data)
         elif method == "DELETE":
-            response = requests.delete(url)
+            response = requests.delete(url, json=data)
+        else:
+            raise ValueError(f"Unsupported method: {method}")
 
-        if response.status_code == 200:
-            return response.json()
+        if 200 <= response.status_code < 300:
+            try:
+                return response.json()
+            except ValueError:
+                return {"message": response.text}
         else:
             st.error(f"Error {response.status_code}: {response.text}")
             return {}
     except Exception as e:
         st.error(f"Request failed: {str(e)}")
         return {}
+
+
+def load_ai_settings() -> Dict[str, Any]:
+    settings = make_request("GET", "/settings/ai")
+    if settings:
+        st.session_state.ai_settings = settings
+    return settings
+
 
 # Chat Section
 if page == "Chat":
@@ -861,6 +359,15 @@ if page == "Chat":
         st.session_state.session_id = None
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "user_token" not in st.session_state:
+        st.session_state.user_token = "TEST_USER_1"
+
+    with st.expander("Chat configuration", expanded=True):
+        st.session_state.user_token = st.text_input(
+            "User Token",
+            value=st.session_state.user_token,
+            help="Use TEST_USER_1 for local development or provide a valid auth token."
+        )
 
     # Display chat history
     for message in st.session_state.messages:
@@ -869,29 +376,31 @@ if page == "Chat":
 
     # Chat input
     if prompt := st.chat_input("Ask me anything about IT support..."):
-        # Add user message to history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        with st.chat_message("user"):
-            st.write(prompt)
+        if not st.session_state.user_token:
+            st.error("Please provide a user token before sending a chat message.")
+        else:
+            st.session_state.messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.write(prompt)
 
-        # Make API call
-        chat_data = {
-            "session_id": st.session_state.session_id,
-            "message": prompt
-        }
-        response = make_request("POST", "/chat", chat_data)
+            chat_data = {
+                "session_id": st.session_state.session_id,
+                "message": prompt,
+                "user_token": st.session_state.user_token,
+            }
+            response = make_request("POST", "/chat", chat_data)
 
-        if response:
-            st.session_state.session_id = response.get("session_id")
-            ai_response = response.get("response", "No response")
-            ticket_ids = response.get("ticket_ids_used", [])
+            if response:
+                st.session_state.session_id = response.get("session_id")
+                ai_response = response.get("response", "No response")
+                ticket_ids = response.get("ticket_ids_used", [])
 
-            # Add AI response to history
-            st.session_state.messages.append({"role": "assistant", "content": ai_response})
-            with st.chat_message("assistant"):
-                st.write(ai_response)
-                if ticket_ids:
-                    st.write(f"Referenced tickets: {', '.join(map(str, ticket_ids))}")
+                st.session_state.messages.append({"role": "assistant", "content": ai_response})
+                with st.chat_message("assistant"):
+                    st.write(ai_response)
+                    if ticket_ids:
+                        st.write(f"Referenced tickets: {', '.join(map(str, ticket_ids))}")
+
 
 # Documents Section
 elif page == "Documents":
@@ -932,6 +441,7 @@ elif page == "Documents":
             else:
                 st.error("Please enter a Document ID")
 
+
 # Tickets Section
 elif page == "Tickets":
     st.header("Ticket Management")
@@ -945,7 +455,6 @@ elif page == "Tickets":
             params = {"search": search} if search else {}
             tickets = make_request("GET", "/tickets", params)
             if tickets:
-                # Convert to dataframe-friendly format
                 df_data = []
                 for ticket in tickets:
                     df_data.append({
@@ -969,10 +478,106 @@ elif page == "Tickets":
             else:
                 st.error("Please enter a Ticket Number")
 
+
+# Settings Section
+elif page == "Settings":
+    st.header("AI Settings")
+
+    if "ai_settings" not in st.session_state:
+        st.session_state.ai_settings = None
+
+    if st.button("Load Current AI Settings") or st.session_state.ai_settings is None:
+        load_ai_settings()
+
+    current_settings = st.session_state.ai_settings or {}
+
+    if current_settings:
+        with st.expander("Current Active Settings", expanded=True):
+            st.json(current_settings)
+
+    st.markdown("---")
+    st.subheader("Update AI Settings")
+    with st.form("settings_form"):
+        active_model = st.text_input("Active Model", value=current_settings.get("ActiveModel", ""))
+        reformulator_model = st.text_input("Reformulator Model", value=current_settings.get("ReformulatorModel", ""))
+        system_prompt = st.text_area("System Prompt", value=current_settings.get("SystemPrompt", ""), height=120)
+        reformulator_prompt = st.text_area(
+            "Reformulator Prompt",
+            value=current_settings.get("ReformulatorPrompt", ""),
+            height=100,
+        )
+        temperature = st.number_input(
+            "Temperature",
+            min_value=0.0,
+            max_value=2.0,
+            value=max(0.0, min(2.0, float(current_settings.get("Temperature", 0.7)) if current_settings.get("Temperature") is not None else 0.7)),
+            step=0.05,
+        )
+        confidence_threshold = st.number_input(
+            "Confidence Threshold",
+            min_value=0.0,
+            max_value=1.0,
+            value=max(0.0, min(1.0, float(current_settings.get("ConfidenceThreshold", 0.5)) if current_settings.get("ConfidenceThreshold") is not None else 0.5)),
+            step=0.01,
+        )
+        embedding_model = st.text_input("Embedding Model", value=current_settings.get("EmbeddingModel", ""))
+        reranker_model = st.text_input("Reranker Model", value=current_settings.get("RerankerModel", ""))
+        top_k_tickets = st.number_input(
+            "Top K Tickets",
+            min_value=1,
+            max_value=50,
+            value=max(1, min(50, int(current_settings.get("TopK_Tickets", 5)) if current_settings.get("TopK_Tickets") is not None else 5)),
+            step=1,
+        )
+        use_reformulator = st.checkbox(
+            "Use Reformulator",
+            value=current_settings.get("UseReformulator", True),
+        )
+        use_reranker = st.checkbox(
+            "Use Reranker",
+            value=current_settings.get("UseReranker", True),
+        )
+        allowed_categories = st.text_area(
+            "Allowed Categories",
+            value=current_settings.get(
+                "AllowedCategories",
+                "Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT",
+            ),
+            help="Comma-separated list of categories to include in AI responses.",
+            height=100,
+        )
+
+        submit_update = st.form_submit_button("Save AI Settings")
+
+    if submit_update:
+        if not active_model or not system_prompt:
+            st.error("Active Model and System Prompt are required.")
+        else:
+            settings_payload = {
+                "ActiveModel": active_model,
+                "ReformulatorModel": reformulator_model,
+                "SystemPrompt": system_prompt,
+                "ReformulatorPrompt": reformulator_prompt,
+                "Temperature": temperature,
+                "ConfidenceThreshold": confidence_threshold,
+                "EmbeddingModel": embedding_model,
+                "RerankerModel": reranker_model,
+                "TopK_Tickets": top_k_tickets,
+                "UseReformulator": use_reformulator,
+                "UseReranker": use_reranker,
+                "AllowedCategories": allowed_categories,
+            }
+            response = make_request("POST", "/settings/ai/update", settings_payload)
+            if response:
+                st.success("AI settings updated successfully.")
+                st.json(response)
+                st.session_state.ai_settings = response.get("data") or settings_payload
+
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Note:** Make sure the backend API is running on localhost:8000")
 
---- FILE: backend\fix_index.py ---
+
+--- FILE: oldbackend\fix_index.py ---
 import os
 from dotenv import load_dotenv
 from qdrant_client import QdrantClient
@@ -981,7 +586,7 @@ from qdrant_client.http import models
 # Load your .env variables
 load_dotenv()
 
-def build_qdrant_index():
+def build_qdrant_indexes():
     qdrant_url = os.getenv("QDRANT_URL")
     qdrant_api_key = os.getenv("QDRANT_API_KEY")
     collection_name = os.getenv("QDRANT_COLLECTION", "helpdesk_multilingual_v1")
@@ -989,21 +594,30 @@ def build_qdrant_index():
     print(f"🔌 Connecting to Qdrant at {qdrant_url}...")
     qdrant = QdrantClient(url=qdrant_url, api_key=qdrant_api_key)
 
-    print(f"🏗️ Building KEYWORD index on 'metadata.doc_type' for collection '{collection_name}'...")
-    try:
-        qdrant.create_payload_index(
-            collection_name=collection_name,
-            field_name="metadata.doc_type",
-            field_schema=models.PayloadSchemaType.KEYWORD,
-        )
-        print("✅ Index successfully created! Your filters will now work.")
-    except Exception as e:
-        print(f"❌ Failed to create index: {e}")
+    # The three metadata fields our Chatbot filters and deletes by
+    indexes_to_create = [
+        "metadata.doc_type",
+        "metadata.ticket_number",
+        "metadata.document_id"  # <--- The missing link for deleting PDFs!
+    ]
+
+    for field in indexes_to_create:
+        print(f"🏗️ Building KEYWORD index on '{field}'...")
+        try:
+            qdrant.create_payload_index(
+                collection_name=collection_name,
+                field_name=field,
+                field_schema=models.PayloadSchemaType.KEYWORD,
+            )
+            print(f"✅ Index successfully created for {field}!")
+        except Exception as e:
+            # If it already exists, Qdrant will throw a harmless error, we just catch and print it.
+            print(f"⚠️ Note on {field}: {e}")
 
 if __name__ == "__main__":
-    build_qdrant_index()
+    build_qdrant_indexes()
 
---- FILE: backend\requirements.txt ---
+--- FILE: oldbackend\requirements.txt ---
 ﻿aiohappyeyeballs==2.6.1
 aiohttp==3.13.5
 aiosignal==1.4.0
@@ -1031,27 +645,23 @@ hpack==4.1.0
 httpcore==1.0.9
 httpx==0.28.1
 httpx-sse==0.4.3
-huggingface_hub==1.13.0
+huggingface_hub==0.35.3
 hyperframe==6.1.0
 idna==3.13
 Jinja2==3.1.6
 joblib==1.5.3
 jsonpatch==1.33
 jsonpointer==3.1.1
-langchain==1.2.17
-langchain-classic==1.0.6
-langchain-community==0.4.1
-langchain-core==1.3.3
-langchain-groq==1.1.2
-langchain-huggingface==1.2.2
-langchain-protocol==0.0.15
-langchain-qdrant==1.1.0
-langchain-text-splitters==1.1.2
-langgraph==1.1.10
-langgraph-checkpoint==4.0.3
-langgraph-prebuilt==1.0.13
-langgraph-sdk==0.3.14
-langsmith==0.8.2
+
+langchain==0.3.27
+langchain-community==0.3.27
+langchain-core==0.3.86
+langchain-groq==0.2.0
+langchain-huggingface==0.1.2
+langchain-qdrant==0.2.1
+langchain-text-splitters==0.3.9
+langsmith==0.4.37
+
 lxml==6.1.0
 markdown-it-py==4.0.0
 MarkupSafe==3.0.3
@@ -1063,14 +673,15 @@ mypy_extensions==1.1.0
 networkx==3.6.1
 numpy==2.4.4
 orjson==3.11.9
-ormsgpack==1.12.2
-packaging==26.2
+packaging==25.0
 portalocker==3.2.0
 propcache==0.4.1
 protobuf==7.34.1
+
 pydantic==2.13.3
 pydantic-settings==2.14.0
 pydantic_core==2.46.3
+
 Pygments==2.20.0
 pyodbc==5.3.0
 pypdf==6.10.2
@@ -1079,7 +690,9 @@ python-dotenv==1.2.2
 python-multipart==0.0.27
 pywin32==311
 PyYAML==6.0.3
+
 qdrant-client==1.17.1
+
 regex==2026.4.4
 requests==2.33.1
 requests-toolbelt==1.0.0
@@ -1091,15 +704,15 @@ sentence-transformers==5.4.1
 shellingham==1.5.4
 sniffio==1.3.1
 SQLAlchemy==2.0.49
-starlette==1.0.0
+starlette==0.47.3
 sympy==1.14.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
 tokenizers==0.22.2
-torch==2.11.0
+torch==2.8.0
 tqdm==4.67.3
-transformers==5.8.0
-typer==0.25.1
+transformers==4.57.1
+typer==0.19.2
 typing-inspect==0.9.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
@@ -1110,8 +723,7 @@ xxhash==3.7.0
 yarl==1.23.0
 zstandard==0.25.0
 
-
---- FILE: backend\app\main.py ---
+--- FILE: oldbackend\app\main.py ---
 import os
 import sys
 import uvicorn
@@ -1125,11 +737,12 @@ from qdrant_client.http import models as qdrant_models
 
 from app.api import chat
 from app.api.deps import get_helpdesk_db, get_chatbot_db
-from app.core.models import TicketEvaluation, BlacklistedTicket, UploadedDocument
+from app.core.models import TicketEvaluation, BlacklistedTicket, UploadedDocument,AIChatbotSetting
 from app.core.config import settings
 from app.services.ingestion import ingestion_service 
+from app.api.chat import SettingsUpdate
 
-from app.core.models import AIChatbotSetting
+
 
 load_dotenv()
 
@@ -1277,14 +890,126 @@ def delete_ticket_from_ai(
 
     return {"status": "success", "message": f"Ticket {ticket_number} permanently removed."}
 
+
+
+# ---------------------------------------------------------
+# AI SETTINGS APIs
+# ---------------------------------------------------------
+
+@app.get("/api/settings", tags=["Settings"])
+def get_current_settings(db: Session = Depends(get_chatbot_db)):
+    """Fetches the currently active AI configuration."""
+    active_config = (
+        db.query(AIChatbotSetting)
+        .filter(AIChatbotSetting.IsActive == True)
+        .order_by(AIChatbotSetting.SettingID.desc())
+        .first()
+    )
+    
+    if not active_config:
+        raise HTTPException(status_code=404, detail="No active settings found.")
+        
+    return active_config
+
+
+@app.post("/api/settings", tags=["Settings"])
+def update_settings(
+    new_settings: SettingsUpdate, # <--- Uses the Pydantic schema we just made
+    user_token: str = "DEV_MODE", # You can secure this with your User API later!
+    db: Session = Depends(get_chatbot_db)
+):
+    """Saves a new AI configuration and archives the old one."""
+    
+    # 1. DEACTIVATE the currently active settings (Archive them)
+    db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).update({"IsActive": False})
+    
+    # 2. INSERT the brand new settings row
+    new_config = AIChatbotSetting(
+        ActiveModel=new_settings.ActiveModel,
+        ReformulatorModel=new_settings.ReformulatorModel,
+        SystemPrompt=new_settings.SystemPrompt,
+        ReformulatorPrompt=new_settings.ReformulatorPrompt,
+        Temperature=new_settings.Temperature,
+        ConfidenceThreshold=new_settings.ConfidenceThreshold,
+        EmbeddingModel=new_settings.EmbeddingModel,
+        RerankerModel=new_settings.RerankerModel,
+        TopK_Tickets=new_settings.TopK_Tickets,
+        UseReformulator=new_settings.UseReformulator,
+        UseReranker=new_settings.UseReranker,
+        AllowedCategories=new_settings.AllowedCategories,
+        IsActive=True, # Make this the new active config!
+        UpdatedBy=1 # You can grab the actual admin ID using the token here later
+    )
+    
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+    
+    return {"status": "success", "message": "Settings updated successfully!", "data": new_config}
+
+
+
+
+
+@app.get("/api/settings/ai", tags=["Settings"])
+def get_ai_settings(db: Session = Depends(get_chatbot_db)):
+    """Fetches the currently active AI configuration for the Admin Dashboard."""
+    active_config = (
+        db.query(AIChatbotSetting)
+        .filter(AIChatbotSetting.IsActive == True)
+        .order_by(AIChatbotSetting.SettingID.desc())
+        .first()
+    )
+    
+    if not active_config:
+        raise HTTPException(status_code=404, detail="No active settings found.")
+        
+    return active_config
+
+
+@app.post("/api/settings/ai/update", tags=["Settings"])
+def update_ai_settings(
+    new_settings: SettingsUpdate, 
+    db: Session = Depends(get_chatbot_db)
+):
+    """Saves a new AI configuration and archives the old one."""
+    
+    # 1. DEACTIVATE the currently active settings (Archive them)
+    db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).update({"IsActive": False})
+    
+    # 2. INSERT the brand new settings row
+    new_config = AIChatbotSetting(
+        ActiveModel=new_settings.ActiveModel,
+        ReformulatorModel=new_settings.ReformulatorModel,
+        SystemPrompt=new_settings.SystemPrompt,
+        ReformulatorPrompt=new_settings.ReformulatorPrompt,
+        Temperature=new_settings.Temperature,
+        ConfidenceThreshold=new_settings.ConfidenceThreshold,
+        EmbeddingModel=new_settings.EmbeddingModel,
+        RerankerModel=new_settings.RerankerModel,
+        TopK_Tickets=new_settings.TopK_Tickets,
+        UseReformulator=new_settings.UseReformulator,
+        UseReranker=new_settings.UseReranker,
+        AllowedCategories=new_settings.AllowedCategories,
+        IsActive=True, 
+        UpdatedBy=1 
+    )
+    
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+    
+    return {"status": "success", "message": "AI Settings updated successfully!", "data": new_config}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
---- FILE: backend\app\api\chat.py ---
+
+
+
+
+--- FILE: oldbackend\app\api\chat.py ---
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
-from app.services.user_service import fetch_user_details
 
 from fastapi import (
     APIRouter,
@@ -1292,12 +1017,12 @@ from fastapi import (
     HTTPException,
 )
 
-from sqlalchemy.orm import Session  
-
 from pydantic import (
     BaseModel,
     Field,
 )
+
+from sqlalchemy.orm import Session
 
 from app.api.deps import (
     get_chatbot_db,
@@ -1308,12 +1033,23 @@ from app.core.models import (
     ChatMessage,
 )
 
+from app.services.user_service import (
+    fetch_user_details,
+)
+
 from app.services.langchain_agent import (
     orchestrator,
 )
 
+# =========================================
+# ROUTER
+# =========================================
+
 router = APIRouter()
 
+# =========================================
+# REQUEST MODEL
+# =========================================
 
 class ChatRequest(BaseModel):
 
@@ -1323,6 +1059,10 @@ class ChatRequest(BaseModel):
 
     user_token: str
 
+
+# =========================================
+# RESPONSE MODEL
+# =========================================
 
 class ChatResponse(BaseModel):
 
@@ -1335,110 +1075,302 @@ class ChatResponse(BaseModel):
     )
 
 
-from pydantic import BaseModel
+# =========================================
+# SETTINGS MODEL
+# =========================================
 
 class SettingsUpdate(BaseModel):
+
     ActiveModel: str
+
     ReformulatorModel: str
+
     SystemPrompt: str
+
     ReformulatorPrompt: str
+
     Temperature: float
+
     ConfidenceThreshold: float
+
     EmbeddingModel: str
+
     RerankerModel: str
+
     TopK_Tickets: int
+
     UseReformulator: bool
+
     UseReranker: bool
+
     AllowedCategories: str
 
 
-@router.post("/chat", response_model=ChatResponse)
+# =========================================
+# CHAT ENDPOINT
+# =========================================
+
+@router.post(
+    "/chat",
+    response_model=ChatResponse,
+)
 async def handle_chat(
     request: ChatRequest,
     db: Session = Depends(get_chatbot_db),
 ):
-    # 1. AUTHENTICATE EXTERNAL USER
-    user_data = await fetch_user_details(request.user_token)
-    current_user_id = user_data.get("id")
-    user_name = f"{user_data.get('firstname')} {user_data.get('lastname')}"
 
-    # 2. CREATE OR VALIDATE SESSION
-    if (
-        not request.session_id
-        or request.session_id.lower() == "null"
-        or request.session_id == ""
-    ):
-        session_id = str(uuid.uuid4())
-        db.add(
-            ChatSession(
-                SessionID=session_id,
-                RequesterUserID=current_user_id,
-            )
-        )
-        db.commit()
-    else:
-        session_id = request.session_id
-        existing_session = (
-            db.query(ChatSession)
-            .filter(ChatSession.SessionID == session_id)
-            .first()
-        )
-        if not existing_session:
-            raise HTTPException(
-                status_code=404,
-                detail="Chat session not found in database.",
-            )
+    print("\n" + "=" * 80)
+    print("💬 CHAT REQUEST RECEIVED")
+    print(f"Message: {request.message}")
+    print(f"Session: {request.session_id}")
+    print("=" * 80)
 
-    # 3. SAVE USER MESSAGE
-    db.add(
-        ChatMessage(
-            SessionID=session_id,
-            SenderRole="user",
-            MessageContent=request.message,
-        )
-    )
-    db.commit()
+    # =====================================
+    # AUTH USER
+    # =====================================
 
-    # 4. GET HISTORY
-    history = (
-        db.query(ChatMessage)
-        .filter(ChatMessage.SessionID == session_id)
-        .order_by(ChatMessage.CreatedAt.desc())
-        .limit(6)
-        .all()
-    )
-    history.reverse()
-    
-    history_text = "\n".join([
-        f"{msg.SenderRole}: {msg.MessageContent}"
-        for msg in history[:-1]
-    ])
-
-    # 5. CALL AI ORCHESTRATOR
     try:
-        ai_response, ticket_ids = orchestrator.orchestrate(
-            user_query=request.message,
-            chat_history=history_text,
-            user_name=user_name,
-            db=db,
+
+        user_data = await fetch_user_details(
+            request.user_token
         )
-    except Exception as e:
+
+        if not user_data:
+
+            raise Exception(
+                "User service returned empty response."
+            )
+
+        current_user_id = (
+            user_data.get("id")
+            or 1
+        )
+
+        first_name = (
+            user_data.get("firstname")
+            or "Guest"
+        )
+
+        last_name = (
+            user_data.get("lastname")
+            or "User"
+        )
+
+        user_name = (
+            f"{first_name} {last_name}"
+        )
+
+        print(
+            f"✅ AUTHENTICATED USER: {user_name}"
+        )
+
+    except Exception as error:
+
+        print(
+            "\n❌ USER AUTH ERROR"
+        )
+
+        print(str(error))
+
+        # TEMP FALLBACK
+        current_user_id = 1
+
+        user_name = "Guest User"
+
+    # =====================================
+    # CREATE / VALIDATE SESSION
+    # =====================================
+
+    try:
+
+        if (
+            not request.session_id
+            or request.session_id.lower() == "null"
+            or request.session_id == ""
+        ):
+
+            session_id = str(
+                uuid.uuid4()
+            )
+
+            db.add(
+                ChatSession(
+                    SessionID=session_id,
+                    RequesterUserID=current_user_id,
+                )
+            )
+
+            db.commit()
+
+            print(
+                f"✅ CREATED SESSION: {session_id}"
+            )
+
+        else:
+
+            session_id = (
+                request.session_id
+            )
+
+            existing_session = (
+                db.query(ChatSession)
+                .filter(
+                    ChatSession.SessionID
+                    == session_id
+                )
+                .first()
+            )
+
+            if not existing_session:
+
+                raise HTTPException(
+                    status_code=404,
+                    detail=(
+                        "Chat session not found "
+                        "in database."
+                    ),
+                )
+
+    except Exception as error:
+
+        print(
+            "\n❌ SESSION ERROR"
+        )
+
+        print(str(error))
+
         raise HTTPException(
             status_code=500,
-            detail=f"AI Error: {str(e)}",
+            detail=f"Session Error: {str(error)}",
         )
 
-    # 6. SAVE AI MESSAGE
-    db.add(
-        ChatMessage(
-            SessionID=session_id,
-            SenderRole="ai",
-            MessageContent=ai_response,
-        )
-    )
-    db.commit()
+    # =====================================
+    # SAVE USER MESSAGE
+    # =====================================
 
-    # 7. RETURN FINAL RESPONSE (Make sure this is perfectly aligned here!)
+    try:
+
+        db.add(
+            ChatMessage(
+                SessionID=session_id,
+                SenderRole="user",
+                MessageContent=request.message,
+            )
+        )
+
+        db.commit()
+
+    except Exception as error:
+
+        print(
+            "\n❌ SAVE USER MESSAGE ERROR"
+        )
+
+        print(str(error))
+
+    # =====================================
+    # GET CHAT HISTORY
+    # =====================================
+
+    try:
+
+        history = (
+            db.query(ChatMessage)
+            .filter(
+                ChatMessage.SessionID
+                == session_id
+            )
+            .order_by(
+                ChatMessage.CreatedAt.desc()
+            )
+            .limit(6)
+            .all()
+        )
+
+        history.reverse()
+
+        history_text = "\n".join(
+            [
+                f"{msg.SenderRole}: "
+                f"{msg.MessageContent}"
+                for msg in history[:-1]
+            ]
+        )
+
+    except Exception as error:
+
+        print(
+            "\n❌ HISTORY ERROR"
+        )
+
+        print(str(error))
+
+        history_text = ""
+
+    # =====================================
+    # AI ORCHESTRATOR
+    # =====================================
+
+    try:
+
+        print(
+            "\n🤖 RUNNING ORCHESTRATOR..."
+        )
+
+        ai_response, ticket_ids = (
+            orchestrator.orchestrate(
+                user_query=request.message,
+                chat_history=history_text,
+                user_name=user_name,
+                db=db,
+            )
+        )
+
+        print(
+            "✅ AI RESPONSE GENERATED"
+        )
+
+    except Exception as error:
+
+        print(
+            "\n❌ AI ORCHESTRATOR ERROR"
+        )
+
+        print(str(error))
+
+        raise HTTPException(
+            status_code=500,
+            detail=f"AI Error: {str(error)}",
+        )
+
+    # =====================================
+    # SAVE AI MESSAGE
+    # =====================================
+
+    try:
+
+        db.add(
+            ChatMessage(
+                SessionID=session_id,
+                SenderRole="ai",
+                MessageContent=ai_response,
+            )
+        )
+
+        db.commit()
+
+    except Exception as error:
+
+        print(
+            "\n❌ SAVE AI MESSAGE ERROR"
+        )
+
+        print(str(error))
+
+    # =====================================
+    # RETURN RESPONSE
+    # =====================================
+
     return ChatResponse(
         session_id=session_id,
         response=ai_response,
@@ -1449,61 +1381,126 @@ async def handle_chat(
 # =========================================
 # GET CHAT HISTORY
 # =========================================
-@router.get("/chat/history/{session_id}", tags=["Chat"])
-async def get_chat_history(
-    session_id: str, 
-    user_token: str, 
-    db: Session = Depends(get_chatbot_db)
-):
-    # 1. Verify who is asking using the BizPortal API
-    user_data = await fetch_user_details(user_token)
-    current_user_id = user_data.get("id")
 
-    # 2. Check the database for the session
+@router.get(
+    "/chat/history/{session_id}",
+    tags=["Chat"],
+)
+async def get_chat_history(
+    session_id: str,
+    user_token: str,
+    db: Session = Depends(get_chatbot_db),
+):
+
+    # =====================================
+    # VERIFY USER
+    # =====================================
+
+    try:
+
+        user_data = await fetch_user_details(
+            user_token
+        )
+
+        current_user_id = (
+            user_data.get("id")
+            or 1
+        )
+
+    except Exception as error:
+
+        print(
+            "\n❌ HISTORY AUTH ERROR"
+        )
+
+        print(str(error))
+
+        current_user_id = 1
+
+    # =====================================
+    # FIND SESSION
+    # =====================================
+
     session = (
         db.query(ChatSession)
-        .filter(ChatSession.SessionID == session_id)
+        .filter(
+            ChatSession.SessionID
+            == session_id
+        )
         .first()
     )
 
     if not session:
+
         raise HTTPException(
-            status_code=404, 
-            detail="Chat session not found."
+            status_code=404,
+            detail="Chat session not found.",
         )
-        
-    # 3. THE SECURITY LOCK: Does this chat belong to this user?
-    # Make sure we compare the integer IDs
-    if str(session.RequesterUserID) != str(current_user_id):
+
+    # =====================================
+    # SECURITY CHECK
+    # =====================================
+
+    if (
+        str(session.RequesterUserID)
+        != str(current_user_id)
+    ):
+
         raise HTTPException(
-            status_code=403, 
-            detail="Unauthorized. This chat belongs to another user."
+            status_code=403,
+            detail=(
+                "Unauthorized. "
+                "This chat belongs "
+                "to another user."
+            ),
         )
-        
-    # 4. Fetch the messages
+
+    # =====================================
+    # LOAD MESSAGES
+    # =====================================
+
     messages = (
         db.query(ChatMessage)
-        .filter(ChatMessage.SessionID == session_id)
-        .order_by(ChatMessage.CreatedAt.asc())
+        .filter(
+            ChatMessage.SessionID
+            == session_id
+        )
+        .order_by(
+            ChatMessage.CreatedAt.asc()
+        )
         .all()
     )
 
-    # 5. Return the formatted data
+    # =====================================
+    # RETURN HISTORY
+    # =====================================
+
     return {
         "session_id": session_id,
+
         "messages": [
             {
-                "MessageID": msg.MessageID,
-                "SessionID": msg.SessionID,
-                "SenderRole": msg.SenderRole,
-                "MessageContent": msg.MessageContent,
-                "CreatedAt": msg.CreatedAt,
+                "MessageID":
+                    msg.MessageID,
+
+                "SessionID":
+                    msg.SessionID,
+
+                "SenderRole":
+                    msg.SenderRole,
+
+                "MessageContent":
+                    msg.MessageContent,
+
+                "CreatedAt":
+                    msg.CreatedAt,
             }
+
             for msg in messages
         ],
     }
 
---- FILE: backend\app\api\deps.py ---
+--- FILE: oldbackend\app\api\deps.py ---
 from app.core.models import SessionHelpdesk, SessionChatbot
 
 def get_helpdesk_db():
@@ -1520,71 +1517,7 @@ def get_chatbot_db():
     finally:
         db.close()
 
---- FILE: backend\app\api\oldchat.py ---
-import uuid
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from pydantic import BaseModel, Field
-from app.api.deps import get_chatbot_db
-from app.core.models import ChatSession, ChatMessage
-from app.services.langchain_agent import orchestrator
-
-router = APIRouter()
-
-class ChatRequest(BaseModel):
-    session_id: str | None = None
-    message: str
-
-class ChatResponse(BaseModel):
-    session_id: str
-    response: str
-    ticket_ids_used: list[int] = Field(default_factory=list)
-
-@router.post("/chat", response_model=ChatResponse)
-def handle_chat(request: ChatRequest, db: Session = Depends(get_chatbot_db)):
-    # FIX: Catch the literal string "null" or empty strings from the frontend
-    if not request.session_id or request.session_id.lower() == "null" or request.session_id == "":
-        # Generate a proper GUID
-        session_id = str(uuid.uuid4())
-        # Create the new session in the database
-        db.add(ChatSession(SessionID=session_id, RequesterUserID=1))
-        db.commit()
-    else:
-        # Use the provided session ID
-        session_id = request.session_id
-        
-        # Optional: Verify the session actually exists in SQL before proceeding
-        existing_session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
-        if not existing_session:
-             raise HTTPException(status_code=404, detail="Chat session not found in database.")
-
-    # Save the User's Message
-    db.add(ChatMessage(SessionID=session_id, SenderRole="user", MessageContent=request.message))
-    db.commit()
-
-    # Retrieve History
-    history = db.query(ChatMessage).filter(ChatMessage.SessionID == session_id).order_by(ChatMessage.CreatedAt.desc()).limit(6).all()
-    history.reverse()
-    history_text = "\n".join([f"{msg.SenderRole}: {msg.MessageContent}" for msg in history[:-1]])
-
-    # Call AI
-    # Call AI (Now passing the 'db' session so it can read AIChatbot_Settings)
-    try:
-        ai_response, ticket_ids = orchestrator.orchestrate(
-            user_query=request.message, 
-            chat_history=history_text,
-            db=db  
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"AI Error: {str(e)}")
-
-    # Save AI Response
-    db.add(ChatMessage(SessionID=session_id, SenderRole="ai", MessageContent=ai_response))
-    db.commit()
-
-    return ChatResponse(session_id=session_id, response=ai_response, ticket_ids_used=ticket_ids)
-
---- FILE: backend\app\core\config.py ---
+--- FILE: oldbackend\app\core\config.py ---
 from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
@@ -1605,7 +1538,7 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
---- FILE: backend\app\core\models.py ---
+--- FILE: oldbackend\app\core\models.py ---
 import uuid
 from datetime import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, Boolean, ForeignKey, BigInteger, Numeric
@@ -1690,7 +1623,7 @@ class BlacklistedTicket(BaseChatbot):
     BlacklistedAt = Column(DateTime, default=datetime.utcnow)
     BlacklistedBy = Column(BigInteger, default=1)
 
---- FILE: backend\app\services\ingest.py ---
+--- FILE: oldbackend\app\services\ingest.py ---
 import os
 import uuid
 from dotenv import load_dotenv
@@ -1763,99 +1696,267 @@ def run_ingestion():
 if __name__ == "__main__":
     run_ingestion()
 
---- FILE: backend\app\services\ingestion.py ---
+--- FILE: oldbackend\app\services\ingestion.py ---
 import os
 import uuid
 import tempfile
+
 from fastapi import UploadFile
+
 from PyPDF2 import PdfReader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain_text_splitters import (
+    RecursiveCharacterTextSplitter,
+)
+
+from langchain_huggingface import (
+    HuggingFaceEmbeddings,
+)
+
 from langchain_groq import ChatGroq
+
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import PointStruct
+
+from qdrant_client.http.models import (
+    PointStruct,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
+
 from app.core.config import settings
-from app.core.models import SessionChatbot, AIChatbotSetting, UploadedDocument
+
+from app.core.models import (
+    SessionChatbot,
+    AIChatbotSetting,
+    UploadedDocument,
+)
 
 class DocumentIngestionService:
+
     def __init__(self):
+
         print("\nStarting Ingestion")
+
         db = SessionChatbot()
+
         try:
-            active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
-            self.embed_model = active_config.EmbeddingModel if active_config and getattr(active_config, 'EmbeddingModel', None) else "intfloat/multilingual-e5-large"
-            self.classifier_model = active_config.ReformulatorModel if active_config and getattr(active_config, 'ReformulatorModel', None) else "llama-3.1-8b-instant"
-            
-            raw_categories = getattr(active_config, 'AllowedCategories', None)
+
+            active_config = (
+                db.query(
+                    AIChatbotSetting
+                )
+                .filter(
+                    AIChatbotSetting.IsActive == True
+                )
+                .order_by(
+                    AIChatbotSetting.SettingID.desc()
+                )
+                .first()
+            )
+
+            self.embed_model = (
+                active_config.EmbeddingModel
+                if active_config
+                and getattr(
+                    active_config,
+                    "EmbeddingModel",
+                    None
+                )
+                else "intfloat/multilingual-e5-large"
+            )
+
+            self.classifier_model = (
+                active_config.ReformulatorModel
+                if active_config
+                and getattr(
+                    active_config,
+                    "ReformulatorModel",
+                    None
+                )
+                else "llama-3.1-8b-instant"
+            )
+
+            raw_categories = getattr(
+                active_config,
+                "AllowedCategories",
+                None
+            )
+
             if raw_categories:
-                self.allowed_categories = [c.strip() for c in raw_categories.split(',')]
-            else:
+
                 self.allowed_categories = [
-                    "Network_Infrastructure", "Hardware_Guide", "Software_Documentation", 
-                    "HR_IT_Policy", "Troubleshooting_Manual", "General_IT"
+                    c.strip()
+                    for c in raw_categories.split(",")
                 ]
+
+            else:
+
+                self.allowed_categories = [
+                    "Network_Infrastructure",
+                    "Hardware_Guide",
+                    "Software_Documentation",
+                    "HR_IT_Policy",
+                    "Troubleshooting_Manual",
+                    "General_IT",
+                ]
+
         finally:
+
             db.close()
 
-        self.qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
-        self.collection_name = settings.QDRANT_COLLECTION
-        self.embeddings = HuggingFaceEmbeddings(model_name=self.embed_model)
-        
-        self.text_splitter = RecursiveCharacterTextSplitter(
-            chunk_size=500,
-            chunk_overlap=50,
-            length_function=len,
+        self.qdrant = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
         )
 
-    async def process_pdf_upload(self, file: UploadFile) -> dict:
-        # Secure Temporary File Handling
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
-            temp_file.write(await file.read())
-            temp_file_path = temp_file.name
-            
+        self.collection_name = (
+            settings.QDRANT_COLLECTION
+        )
+
+        self.embeddings = (
+            HuggingFaceEmbeddings(
+                model_name=self.embed_model
+            )
+        )
+
+        self.text_splitter = (
+            RecursiveCharacterTextSplitter(
+                chunk_size=500,
+                chunk_overlap=50,
+                length_function=len,
+            )
+        )
+
+    async def process_pdf_upload(
+        self,
+        file: UploadFile
+    ) -> dict:
+
+        with tempfile.NamedTemporaryFile(
+            delete=False,
+            suffix=".pdf"
+        ) as temp_file:
+
+            temp_file.write(
+                await file.read()
+            )
+
+            temp_file_path = (
+                temp_file.name
+            )
+
         try:
-            # 1. Parse PDF
-            pdf_reader = PdfReader(temp_file_path)
+
+            pdf_reader = PdfReader(
+                temp_file_path
+            )
+
             raw_text = ""
+
             for page in pdf_reader.pages:
-                text = page.extract_text()
+
+                text = (
+                    page.extract_text()
+                )
+
                 if text:
-                    raw_text += text + "\n"
-                    
+
+                    raw_text += (
+                        text + "\n"
+                    )
+
             if not raw_text.strip():
-                return {"status": "error", "message": "Could not extract text from PDF."}
 
-            # 2. AI Auto-Categorization with STRICT Validation
-            print(f"\n🧠 Auto-categorizing '{file.filename}'...")
-            classify_llm = ChatGroq(model=self.classifier_model, temperature=0.0, api_key=settings.GROQ_API_KEY)
-            
-            categories_string = ", ".join(self.allowed_categories)
-            prompt = f"""You are a strict document classifier API. Read the excerpt and categorize it into EXACTLY ONE of these tags:
+                return {
+                    "status": "error",
+                    "message": "Could not extract text from PDF.",
+                }
+
+            print(
+                f"\n🧠 Auto-categorizing '{file.filename}'..."
+            )
+
+            classify_llm = ChatGroq(
+                model=self.classifier_model,
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+
+            categories_string = ", ".join(
+                self.allowed_categories
+            )
+
+            prompt = f"""
+            You are a strict document classifier API.
+
+            Read the excerpt and categorize it into EXACTLY ONE of these tags:
+
             {categories_string}
-            
-            Output ONLY the exact tag name. Do not explain.
-            Excerpt: {raw_text[:1500]}
-            Category:"""
-            
-            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
-            
-            # Fallback Validation
-            if ai_category not in self.allowed_categories:
-                print(f"⚠️ Warning: AI hallucinated category '{ai_category}'. Falling back to 'General_IT'.")
-                ai_category = "General_IT"
-            else:
-                print(f"✅ Classified as: {ai_category}")
 
-            # 3. Chunking & Batch Embedding
-            chunks = self.text_splitter.split_text(raw_text)
-            document_id = str(uuid.uuid4())
+            Output ONLY the exact tag name.
+
+            Excerpt:
+            {raw_text[:1500]}
+
+            Category:
+            """
+
+            ai_category = (
+                classify_llm.invoke(prompt)
+                .content
+                .strip(' "\'\n')
+            )
+
+            if (
+                ai_category
+                not in self.allowed_categories
+            ):
+
+                print(
+                    f"⚠️ Invalid category '{ai_category}'"
+                )
+
+                ai_category = (
+                    "General_IT"
+                )
+
+            else:
+
+                print(
+                    f"✅ Classified as: {ai_category}"
+                )
+
+            chunks = (
+                self.text_splitter.split_text(
+                    raw_text
+                )
+            )
+
+            document_id = str(
+                uuid.uuid4()
+            )
+
             points = []
-            
-            print(f"🧮 Calculating Vector Embeddings (Batching {len(chunks)} chunks)...")
-            vectors = self.embeddings.embed_documents(chunks)
-            
-            for i, chunk in enumerate(chunks):
-                chunk_id = str(uuid.uuid4()) 
+
+            print(
+                f"🧮 Embedding {len(chunks)} chunks..."
+            )
+
+            vectors = (
+                self.embeddings.embed_documents(
+                    chunks
+                )
+            )
+
+            for i, chunk in enumerate(
+                chunks
+            ):
+
+                chunk_id = str(
+                    uuid.uuid4()
+                )
+
                 payload = {
                     "page_content": chunk,
                     "metadata": {
@@ -1863,42 +1964,141 @@ class DocumentIngestionService:
                         "source": file.filename,
                         "category": ai_category,
                         "chunk_index": i,
-                        "doc_type": "uploaded_manual"
-                    }
+                        "doc_type": "uploaded_manual",
+                    },
                 }
-                points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
 
-            # 4. Save to Qdrant
-            self.qdrant.upsert(collection_name=self.collection_name, points=points)
-            
-            # 5. Save to SQL Database (For Admin Panel)
+                points.append(
+                    PointStruct(
+                        id=chunk_id,
+                        vector=vectors[i],
+                        payload=payload,
+                    )
+                )
+
+            self.qdrant.upsert(
+                collection_name=self.collection_name,
+                points=points,
+            )
+
             db = SessionChatbot()
+
             try:
+
                 new_doc = UploadedDocument(
                     DocumentID=document_id,
                     FileName=file.filename,
                     Category=ai_category,
-                    ChunkCount=len(chunks)
+                    ChunkCount=len(chunks),
                 )
+
                 db.add(new_doc)
+
                 db.commit()
+
             finally:
+
                 db.close()
 
             return {
-                "status": "success", 
+                "status": "success",
                 "document_id": document_id,
                 "category": ai_category,
-                "chunks_processed": len(chunks)
+                "chunks_processed": len(chunks),
             }
-            
+
         finally:
-            if os.path.exists(temp_file_path):
-                os.remove(temp_file_path)
 
-ingestion_service = DocumentIngestionService()
+            if os.path.exists(
+                temp_file_path
+            ):
 
---- FILE: backend\app\services\langchain_agent.py ---
+                os.remove(
+                    temp_file_path
+                )
+
+    async def delete_document(
+        self,
+        document_id: str
+    ):
+
+        print(
+            f"\n🗑️ Deleting document: {document_id}"
+        )
+
+        # DELETE FROM SQL FIRST
+        db = SessionChatbot()
+
+        try:
+
+            document = (
+                db.query(
+                    UploadedDocument
+                )
+                .filter(
+                    UploadedDocument.DocumentID
+                    == document_id
+                )
+                .first()
+            )
+
+            if document:
+
+                db.delete(document)
+
+                db.commit()
+
+                print(
+                    "✅ SQL document deleted"
+                )
+
+        finally:
+
+            db.close()
+
+        # TRY DELETE FROM QDRANT
+        try:
+
+            self.qdrant.delete(
+                collection_name=self.collection_name,
+
+                points_selector=Filter(
+                    must=[
+                        FieldCondition(
+                            key="metadata.document_id",
+
+                            match=MatchValue(
+                                value=document_id
+                            ),
+                        )
+                    ]
+                ),
+            )
+
+            print(
+                "✅ Qdrant chunks deleted"
+            )
+
+        except Exception as error:
+
+            print(
+                f"⚠️ Qdrant delete skipped: {error}"
+            )
+
+        print(
+            "✅ Document delete completed"
+        )
+
+        return {
+            "status": "success",
+            "document_id": document_id,
+        }
+
+ingestion_service = (
+    DocumentIngestionService()
+)
+
+--- FILE: oldbackend\app\services\langchain_agent.py ---
 import os
 from sqlalchemy.orm import Session
 from langchain_groq import ChatGroq
@@ -2106,7 +2306,142 @@ Rewritten Search Query:"""
 
 orchestrator = SupportOrchestrator()
 
---- FILE: backend\app\services\user_service.py ---
+--- FILE: oldbackend\app\services\oldingestion.py ---
+import os
+import uuid
+import tempfile
+from fastapi import UploadFile
+from PyPDF2 import PdfReader
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_groq import ChatGroq
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import PointStruct
+from app.core.config import settings
+from app.core.models import SessionChatbot, AIChatbotSetting, UploadedDocument
+
+class DocumentIngestionService:
+    def __init__(self):
+        print("\nStarting Ingestion")
+        db = SessionChatbot()
+        try:
+            active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+            self.embed_model = active_config.EmbeddingModel if active_config and getattr(active_config, 'EmbeddingModel', None) else "intfloat/multilingual-e5-large"
+            self.classifier_model = active_config.ReformulatorModel if active_config and getattr(active_config, 'ReformulatorModel', None) else "llama-3.1-8b-instant"
+            
+            raw_categories = getattr(active_config, 'AllowedCategories', None)
+            if raw_categories:
+                self.allowed_categories = [c.strip() for c in raw_categories.split(',')]
+            else:
+                self.allowed_categories = [
+                    "Network_Infrastructure", "Hardware_Guide", "Software_Documentation", 
+                    "HR_IT_Policy", "Troubleshooting_Manual", "General_IT"
+                ]
+        finally:
+            db.close()
+
+        self.qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+        self.collection_name = settings.QDRANT_COLLECTION
+        self.embeddings = HuggingFaceEmbeddings(model_name=self.embed_model)
+        
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50,
+            length_function=len,
+        )
+
+    async def process_pdf_upload(self, file: UploadFile) -> dict:
+        # Secure Temporary File Handling
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+            temp_file.write(await file.read())
+            temp_file_path = temp_file.name
+            
+        try:
+            # 1. Parse PDF
+            pdf_reader = PdfReader(temp_file_path)
+            raw_text = ""
+            for page in pdf_reader.pages:
+                text = page.extract_text()
+                if text:
+                    raw_text += text + "\n"
+                    
+            if not raw_text.strip():
+                return {"status": "error", "message": "Could not extract text from PDF."}
+
+            # 2. AI Auto-Categorization with STRICT Validation
+            print(f"\n🧠 Auto-categorizing '{file.filename}'...")
+            classify_llm = ChatGroq(model=self.classifier_model, temperature=0.0, api_key=settings.GROQ_API_KEY)
+            
+            categories_string = ", ".join(self.allowed_categories)
+            prompt = f"""You are a strict document classifier API. Read the excerpt and categorize it into EXACTLY ONE of these tags:
+            {categories_string}
+            
+            Output ONLY the exact tag name. Do not explain.
+            Excerpt: {raw_text[:1500]}
+            Category:"""
+            
+            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
+            
+            # Fallback Validation
+            if ai_category not in self.allowed_categories:
+                print(f"⚠️ Warning: AI hallucinated category '{ai_category}'. Falling back to 'General_IT'.")
+                ai_category = "General_IT"
+            else:
+                print(f"✅ Classified as: {ai_category}")
+
+            # 3. Chunking & Batch Embedding
+            chunks = self.text_splitter.split_text(raw_text)
+            document_id = str(uuid.uuid4())
+            points = []
+            
+            print(f"🧮 Calculating Vector Embeddings (Batching {len(chunks)} chunks)...")
+            vectors = self.embeddings.embed_documents(chunks)
+            
+            for i, chunk in enumerate(chunks):
+                chunk_id = str(uuid.uuid4()) 
+                payload = {
+                    "page_content": chunk,
+                    "metadata": {
+                        "document_id": document_id,
+                        "source": file.filename,
+                        "category": ai_category,
+                        "chunk_index": i,
+                        "doc_type": "uploaded_manual"
+                    }
+                }
+                points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
+
+            # 4. Save to Qdrant
+            self.qdrant.upsert(collection_name=self.collection_name, points=points)
+            
+            # 5. Save to SQL Database (For Admin Panel)
+            db = SessionChatbot()
+            try:
+                new_doc = UploadedDocument(
+                    DocumentID=document_id,
+                    FileName=file.filename,
+                    Category=ai_category,
+                    ChunkCount=len(chunks)
+                )
+                db.add(new_doc)
+                db.commit()
+            finally:
+                db.close()
+
+            return {
+                "status": "success", 
+                "document_id": document_id,
+                "category": ai_category,
+                "chunks_processed": len(chunks)
+            }
+            
+        finally:
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+ingestion_service = DocumentIngestionService()
+
+--- FILE: oldbackend\app\services\user_service.py ---
 import httpx
 from fastapi import HTTPException
 
