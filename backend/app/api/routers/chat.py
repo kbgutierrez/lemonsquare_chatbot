@@ -58,10 +58,8 @@ async def handle_chat(
     except AuthenticationError:
         raise
     except Exception as exc:
-        # Unexpected auth failures fall back gracefully with a warning.
-        logger.warning("Auth service error; using guest fallback: %s", exc)
-        user_id = 1
-        user_name = "Guest User"
+        logger.error("Auth service error; rejecting request: %s", exc)
+        raise AuthenticationError("User authentication failed.") from exc
 
     logger.info("Chat request from user_id=%d | session=%s", user_id, request.session_id)
 

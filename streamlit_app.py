@@ -107,14 +107,14 @@ if page == "Chat":
 elif page == "Documents":
     st.header("Document Management")
 
-    tab1, tab2, tab3 = st.tabs(["Upload", "List", "Delete"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Upload", "List", "Delete", "RAG Debugger"])
 
     with tab1:
         st.subheader("Upload Document")
         uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
         if uploaded_file is not None and st.button("Upload"):
             files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
-            response = make_request("POST", "/upload-document", files=files)
+            response = make_request("POST", "/documents/upload", files=files)
             if response:
                 st.success("Document uploaded successfully!")
                 st.json(response)
@@ -141,6 +141,33 @@ elif page == "Documents":
                     st.json(response)
             else:
                 st.error("Please enter a Document ID")
+
+    with tab4:
+        st.subheader("RAG Debugger: Query Qdrant Directly")
+        query = st.text_input("Search query", help="Inspect the exact document chunks returned by Qdrant.")
+        limit = st.number_input("Result limit", min_value=1, max_value=20, value=5, step=1)
+
+        if st.button("Run Qdrant Test Search"):
+            if not query:
+                st.error("Please enter a search query to run the debug search.")
+            else:
+                response = make_request("POST", "/documents/test-search", {"query": query, "limit": limit})
+                if response:
+                    st.success("Qdrant results retrieved.")
+                    results = response.get("results", [])
+                    if results:
+                        st.write(f"Query: {response.get('query')}")
+                        st.table([
+                            {
+                                "score": hit.get("score"),
+                                "type": hit.get("type"),
+                                "content": hit.get("content"),
+                            }
+                            for hit in results
+                        ])
+                        st.json(response)
+                    else:
+                        st.info("No results returned from Qdrant.")
 
 
 # Tickets Section

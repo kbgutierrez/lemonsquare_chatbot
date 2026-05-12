@@ -8,9 +8,12 @@ endpoints. Extracting each feature into its own router module means:
   - Adding document features (e.g. re-categorise, preview) is self-contained.
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from pydantic import BaseModel
+from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service
@@ -46,6 +49,45 @@ async def upload_document(
     return DocumentUploadResponse(**result)
 
 
+class VectorSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+
+
+@router.post(
+    "/test-search",
+    tags=["Documents", "Admin"],
+    summary="Admin tool to inspect Qdrant search results",
+)
+async def test_vector_search(
+    request: VectorSearchRequest,
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+):
+    """Admin tool to see EXACTLY what Qdrant returns for a given search query."""
+    vector = await asyncio.to_thread(
+        ingestion_service.embeddings.embed_query, request.query
+    )
+
+    results = ingestion_service.qdrant.query_points(
+        collection_name=ingestion_service.collection_name,
+        query=vector,
+        with_payload=True,
+        limit=request.limit,
+    )
+
+    return {
+        "query": request.query,
+        "results": [
+            {
+                "score": hit.score,
+                "type": hit.payload.get("metadata", {}).get("doc_type", "unknown"),
+                "content": hit.payload.get("page_content", ""),
+            }
+            for hit in results.points
+        ],
+    }
+
+
 @router.get(
     "",
     response_model=list[DocumentResponse],
@@ -53,6 +95,7 @@ async def upload_document(
 )
 def get_documents(
     category: str | None = None,
+    skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_chatbot_db),
 ) -> list[DocumentResponse]:
@@ -63,7 +106,12 @@ def get_documents(
     if category:
         query = query.filter(UploadedDocument.Category == category)
 
-    documents = query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all()
+    documents = (
+        query.order_by(UploadedDocument.UploadedAt.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     return [
         DocumentResponse(
@@ -92,3 +140,6 @@ async def delete_document(
     """
     result = await ingestion_service.delete_document(document_id, db)
     return DocumentDeleteResponse(**result)
+
+
+
