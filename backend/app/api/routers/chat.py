@@ -50,12 +50,16 @@ async def handle_chat(
     """
     # 1. Authenticate.
     try:
+        logger.debug("Authenticating token: %s", request.user_token[:10] + "...")
         user_data = await fetch_user_details(request.user_token)
+        logger.debug("Auth returned user_data: %s", user_data)
         user_id = user_data.get("id") or 1
         user_name = (
             f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
         ).strip()
-    except AuthenticationError:
+        logger.info("Auth successful: user_id=%d, user_name=%s", user_id, user_name)
+    except AuthenticationError as exc:
+        logger.error("Authentication failed: %s", exc)
         raise
     except Exception as exc:
         logger.error("Auth service error; rejecting request: %s", exc)

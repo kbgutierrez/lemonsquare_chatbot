@@ -123,9 +123,15 @@ elif page == "Documents":
         st.subheader("List Documents")
         category = st.selectbox("Filter by category", ["All", "Hardware", "Software", "Network", "Other"])
         category_param = None if category == "All" else category
+        col1, col2 = st.columns(2)
+        with col1:
+            skip = st.number_input("Skip", min_value=0, value=0, step=10, key="doc_skip")
+        with col2:
+            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10, key="doc_limit")
 
         if st.button("Fetch Documents"):
             params = {"category": category_param} if category_param else {}
+            params.update({"skip": skip, "limit": limit})
             documents = make_request("GET", "/documents", params)
             if documents:
                 st.dataframe(documents)
@@ -179,8 +185,14 @@ elif page == "Tickets":
     with tab1:
         st.subheader("List Resolved Tickets")
         search = st.text_input("Search by ticket number")
+        col1, col2 = st.columns(2)
+        with col1:
+            skip = st.number_input("Skip", min_value=0, value=0, step=10)
+        with col2:
+            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10)
         if st.button("Fetch Tickets"):
             params = {"search": search} if search else {}
+            params.update({"skip": skip, "limit": limit})
             tickets = make_request("GET", "/tickets", params)
             if tickets:
                 df_data = []

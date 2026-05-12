@@ -50,6 +50,7 @@ async def fetch_user_details(auth_token: str) -> dict:
         "Authorization": f"Bearer {auth_token}",
         "Accept": "application/json",
     }
+    logger.debug("Attempting BizPortal auth call to: %s", settings.BIZPORTAL_API_URL)
 
     async with httpx.AsyncClient() as client:
         try:
@@ -58,15 +59,32 @@ async def fetch_user_details(auth_token: str) -> dict:
                 headers=headers,
                 timeout=settings.BIZPORTAL_TIMEOUT,
             )
+            logger.debug("BizPortal response status: %d", response.status_code)
+            logger.debug("BizPortal response body: %s", response.text[:200])
 
             if response.status_code in (401, 403):
+                logger.warning("BizPortal returned %d for token: %s", response.status_code, auth_token[:10])
                 raise AuthenticationError("Invalid or expired user token.")
 
             response.raise_for_status()
-            return response.json()
+            user_data = response.json()
+            logger.info("BizPortal raw response: %s", user_data)
+            
+            # Check if BizPortal returned an error in the response body
+            if user_data.get("status") == "error":
+                logger.warning("BizPortal error response: %s", user_data.get("response"))
+                raise AuthenticationError(f"BizPortal error: {user_data.get('response', 'Unknown error')}")
+            
+            logger.info("BizPortal auth successful, user_data: %s", user_data)
+            return user_data
 
         except httpx.RequestError as exc:
-            logger.error("BizPortal unreachable: %s", exc)
+            logger.error("BizPortal unreachable (RequestError): %s", exc)
             raise ExternalServiceError(
                 "User authentication service is temporarily unavailable."
+            )
+        except httpx.HTTPStatusError as exc:
+            logger.error("BizPortal HTTP error: %s", exc)
+            raise ExternalServiceError(
+                "User authentication service returned an error."
             )
