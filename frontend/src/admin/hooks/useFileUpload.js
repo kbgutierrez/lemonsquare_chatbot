@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useMemo,
   useRef,
   useState,
@@ -13,8 +14,19 @@ const ITEMS_PER_PAGE = 5
 export const useFileUpload =
   () => {
 
+    /* =========================================
+       REFS
+    ========================================= */
+
     const inputRef =
       useRef(null)
+
+    const uploadLockRef =
+      useRef(false)
+
+    /* =========================================
+       STATE
+    ========================================= */
 
     const [uploadedFiles, setUploadedFiles] =
       useState([])
@@ -30,323 +42,395 @@ export const useFileUpload =
     ========================================= */
 
     const formatSize =
-      (size) =>
-        `${(
-          size /
-          1024 /
-          1024
-        ).toFixed(2)} MB`
+      useCallback(
+        (size) =>
+          `${(
+            size /
+            1024 /
+            1024
+          ).toFixed(2)} MB`,
+        []
+      )
 
     /* =========================================
        UPDATE FILE
     ========================================= */
 
     const updateFile =
-      (
-        id,
-        updates
-      ) => {
+      useCallback(
+        (
+          id,
+          updates
+        ) => {
 
-        setUploadedFiles(
-          (prev) =>
-            prev.map(
+          setUploadedFiles(
+            (prev) =>
+              prev.map(
+                (file) =>
+                  file.id === id
+                    ? {
+                        ...file,
+                        ...updates,
+                      }
+                    : file
+              )
+          )
+        },
+        []
+      )
+
+    /* =========================================
+       CHECK PENDING
+    ========================================= */
+
+    const refreshPendingState =
+      useCallback(
+        (files) => {
+
+          const hasPending =
+            files.some(
               (file) =>
-                file.id === id
-                  ? {
-                      ...file,
-                      ...updates,
-                    }
-                  : file
+                file.statusType ===
+                "pending"
             )
-        )
-      }
+
+          setHasPendingUploads(
+            hasPending
+          )
+        },
+        []
+      )
 
     /* =========================================
        CLEAR FILES
     ========================================= */
 
     const clearFiles =
-      () => {
+      useCallback(
+        () => {
 
-        setUploadedFiles(
-          []
-        )
+          setUploadedFiles([])
 
-        setHasPendingUploads(
-          false
-        )
-
-        setCurrentPage(
-          1
-        )
-      }
-
-    /* =========================================
-       CHECK PENDING
-    ========================================= */
-
-    const checkPendingFiles =
-      (files) => {
-
-        const hasPending =
-          files.some(
-            (file) =>
-              file.statusType ===
-              "pending"
+          setHasPendingUploads(
+            false
           )
 
-        setHasPendingUploads(
-          hasPending
-        )
-      }
+          setCurrentPage(1)
+        },
+        []
+      )
 
     /* =========================================
        UPLOAD SINGLE
     ========================================= */
 
     const uploadFile =
-      async (
-        localId,
-        file
-      ) => {
+      useCallback(
+        async (
+          localId,
+          file
+        ) => {
 
-        try {
+          try {
 
-          const data =
-            await uploadDocument(
-              file
+            const data =
+              await uploadDocument(
+                file
+              )
+
+            updateFile(
+              localId,
+              {
+                status:
+                  "Uploaded",
+
+                statusType:
+                  "success",
+
+                response:
+                  data,
+              }
             )
 
-          updateFile(
-            localId,
-            {
-              status:
-                "Uploaded",
+          } catch (error) {
 
-              statusType:
-                "success",
+            console.error(
+              "UPLOAD_ERROR",
+              error
+            )
 
-              response:
-                data,
-            }
-          )
+            updateFile(
+              localId,
+              {
+                status:
+                  error.message ||
+                  "Upload Failed",
 
-        } catch (error) {
-
-          console.error(
-            "UPLOAD_ERROR",
-            error
-          )
-
-          updateFile(
-            localId,
-            {
-              status:
-                "Failed",
-
-              statusType:
-                "error",
-            }
-          )
-        }
-      }
+                statusType:
+                  "error",
+              }
+            )
+          }
+        },
+        [updateFile]
+      )
 
     /* =========================================
        CONFIRM UPLOAD
     ========================================= */
 
     const confirmUpload =
-      async () => {
+      useCallback(
+        async () => {
 
-        const pending =
-          uploadedFiles.filter(
-            (file) =>
-              file.statusType ===
-              "pending"
-          )
+          if (
+            uploadLockRef.current
+          ) {
+            return
+          }
 
-        if (
-          pending.length === 0
-        ) {
-          return
-        }
+          uploadLockRef.current =
+            true
 
-        setHasPendingUploads(
-          false
-        )
+          try {
 
-        for (const file of pending) {
+            const pending =
+              uploadedFiles.filter(
+                (file) =>
+                  file.statusType ===
+                  "pending"
+              )
 
-          updateFile(
-            file.id,
-            {
-              status:
-                "Uploading...",
-
-              statusType:
-                "loading",
+            if (
+              pending.length === 0
+            ) {
+              return
             }
-          )
 
-          await uploadFile(
-            file.id,
-            file.raw
-          )
-        }
-
-        setUploadedFiles(
-          (prev) => {
-
-            const updated =
-              [...prev]
-
-            checkPendingFiles(
-              updated
+            setHasPendingUploads(
+              false
             )
 
-            return updated
+            /* PARALLEL UPLOADS */
+
+            await Promise.all(
+              pending.map(
+                async (file) => {
+
+                  updateFile(
+                    file.id,
+                    {
+                      status:
+                        "Uploading...",
+
+                      statusType:
+                        "loading",
+                    }
+                  )
+
+                  await uploadFile(
+                    file.id,
+                    file.raw
+                  )
+                }
+              )
+            )
+
+          } finally {
+
+            uploadLockRef.current =
+              false
+
+            setUploadedFiles(
+              (prev) => {
+
+                refreshPendingState(
+                  prev
+                )
+
+                return [
+                  ...prev,
+                ]
+              }
+            )
           }
-        )
-      }
+        },
+        [
+          uploadedFiles,
+          uploadFile,
+          updateFile,
+          refreshPendingState,
+        ]
+      )
 
     /* =========================================
        HANDLE FILES
     ========================================= */
 
     const handleFiles =
-      (files) => {
+      useCallback(
+        (files) => {
 
-        const validFiles =
-          Array.from(
-            files
-          ).filter(
-            (file) =>
-              file.name
-                .toLowerCase()
-                .endsWith(
-                  ".pdf"
-                )
-          )
-
-        if (
-          validFiles.length ===
-          0
-        ) {
-          return
-        }
-
-        const mapped =
-          validFiles.map(
-            (
-              file
-            ) => ({
-              id:
-                crypto.randomUUID(),
-
-              raw:
-                file,
-
-              name:
-                file.name,
-
-              size:
-                formatSize(
-                  file.size
-                ),
-
-              type:
+          const validFiles =
+            Array.from(
+              files
+            ).filter(
+              (file) =>
                 file.name
-                  .split(".")
-                  .pop()
-                  ?.toUpperCase(),
-
-              category:
-                "General",
-
-              status:
-                "Pending",
-
-              statusType:
-                "pending",
-
-              uploadedAt:
-                new Date()
-                  .toLocaleString(),
-            })
-          )
-
-        setUploadedFiles(
-          (prev) => {
-
-            const updated =
-              [
-                ...mapped,
-                ...prev,
-              ]
-
-            checkPendingFiles(
-              updated
+                  .toLowerCase()
+                  .endsWith(
+                    ".pdf"
+                  )
             )
 
-            return updated
+          if (
+            validFiles.length === 0
+          ) {
+            return
           }
-        )
-      }
+
+          const mapped =
+            validFiles.map(
+              (
+                file
+              ) => ({
+                id:
+                  crypto.randomUUID(),
+
+                raw:
+                  file,
+
+                name:
+                  file.name,
+
+                size:
+                  formatSize(
+                    file.size
+                  ),
+
+                type:
+                  file.name
+                    .split(".")
+                    .pop()
+                    ?.toUpperCase(),
+
+                category:
+                  "General",
+
+                status:
+                  "Pending",
+
+                statusType:
+                  "pending",
+
+                uploadedAt:
+                  new Date()
+                    .toLocaleString(),
+              })
+            )
+
+          setUploadedFiles(
+            (prev) => {
+
+              const existingNames =
+                new Set(
+                  prev.map(
+                    (file) =>
+                      file.name
+                  )
+                )
+
+              const deduplicated =
+                mapped.filter(
+                  (file) =>
+                    !existingNames.has(
+                      file.name
+                    )
+                )
+
+              const updated =
+                [
+                  ...deduplicated,
+                  ...prev,
+                ]
+
+              refreshPendingState(
+                updated
+              )
+
+              return updated
+            }
+          )
+        },
+        [
+          formatSize,
+          refreshPendingState,
+        ]
+      )
 
     /* =========================================
        INPUT CHANGE
     ========================================= */
 
     const handleInputChange =
-      (event) => {
+      useCallback(
+        (event) => {
 
-        handleFiles(
-          event.target.files
-        )
+          handleFiles(
+            event.target.files
+          )
 
-        event.target.value =
-          ""
-      }
+          event.target.value =
+            ""
+        },
+        [handleFiles]
+      )
 
     /* =========================================
        DROP
     ========================================= */
 
     const handleDrop =
-      (event) => {
+      useCallback(
+        (event) => {
 
-        event.preventDefault()
+          event.preventDefault()
 
-        handleFiles(
-          event.dataTransfer
-            .files
-        )
-      }
+          handleFiles(
+            event.dataTransfer
+              .files
+          )
+        },
+        [handleFiles]
+      )
 
     /* =========================================
        REMOVE FILE
     ========================================= */
 
     const removeFile =
-      (id) => {
+      useCallback(
+        (id) => {
 
-        setUploadedFiles(
-          (prev) => {
+          setUploadedFiles(
+            (prev) => {
 
-            const updated =
-              prev.filter(
-                (file) =>
-                  file.id !== id
+              const updated =
+                prev.filter(
+                  (file) =>
+                    file.id !== id
+                )
+
+              refreshPendingState(
+                updated
               )
 
-            checkPendingFiles(
-              updated
-            )
-
-            return updated
-          }
-        )
-      }
+              return updated
+            }
+          )
+        },
+        [refreshPendingState]
+      )
 
     /* =========================================
        TABLE VISIBILITY
@@ -360,9 +444,12 @@ export const useFileUpload =
     ========================================= */
 
     const totalPages =
-      Math.ceil(
-        uploadedFiles.length /
-        ITEMS_PER_PAGE
+      Math.max(
+        1,
+        Math.ceil(
+          uploadedFiles.length /
+          ITEMS_PER_PAGE
+        )
       )
 
     const paginatedFiles =
