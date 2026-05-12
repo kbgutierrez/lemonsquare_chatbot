@@ -9,13 +9,17 @@ import {
 } from "lucide-react"
 
 import {
+  API_CONFIG,
+} from "../../../config/sqlVariables"
+
+import {
   categories,
 } from "../../data/categories.js"
 
 import FileTable from "./FileTable.jsx"
 
 const API_URL =
-  "http://localhost:8000/api/documents"
+  `${API_CONFIG.BASE_URL}/documents`
 
 const KnowledgeFilesSection =
   () => {

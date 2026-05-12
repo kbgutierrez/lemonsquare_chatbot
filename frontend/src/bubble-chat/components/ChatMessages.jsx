@@ -6,26 +6,39 @@ import {
 import ChatMessage from "./ChatMessage.jsx"
 
 const ChatMessages = ({
-  messages,
-  loading,
+  messages = [],
+  loading = false,
 }) => {
 
   const messagesEndRef =
     useRef(null)
 
-  /* AUTO SCROLL */
+  const previousLengthRef =
+    useRef(0)
+
+  /* ========================================
+     AUTO SCROLL
+  ======================================== */
+
   useEffect(() => {
 
-    messagesEndRef.current
-      ?.scrollIntoView({
-        behavior:
-          "smooth",
-      })
+    const hasNewMessage =
+      messages.length >
+      previousLengthRef.current
 
-  }, [
-    messages,
-    loading,
-  ])
+    if (hasNewMessage) {
+
+      messagesEndRef.current
+        ?.scrollIntoView({
+          behavior:
+            "auto",
+        })
+
+      previousLengthRef.current =
+        messages.length
+    }
+
+  }, [messages])
 
   return (
     <div
@@ -44,12 +57,37 @@ const ChatMessages = ({
         [&::-webkit-scrollbar]:hidden
       "
     >
+      {/* EMPTY STATE */}
+      {!loading &&
+        messages.length === 0 && (
+          <div
+            className="
+              flex
+              flex-1
+              items-center
+              justify-center
+
+              text-center
+              text-sm
+              text-zinc-400
+            "
+          >
+            Start a conversation.
+          </div>
+        )}
+
       {/* MESSAGES */}
       {messages.map(
-        (message) => (
+        (message, index) => (
           <ChatMessage
-            key={message.id}
-            message={message}
+            key={
+              message.id ||
+              `${message.sender}-${index}`
+            }
+
+            message={
+              message
+            }
           />
         )
       )}

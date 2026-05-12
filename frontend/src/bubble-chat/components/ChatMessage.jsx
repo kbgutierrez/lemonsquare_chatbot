@@ -4,15 +4,26 @@ import {
 } from "lucide-react"
 
 const ChatMessage = ({
-  message,
+  message = {},
 }) => {
 
+  const sender =
+    message?.sender || "agent"
+
+  const text =
+    typeof message?.text ===
+    "string"
+      ? message.text
+      : ""
+
+  const timestamp =
+    message?.time || ""
+
   const isAgent =
-    message.sender ===
-    "agent"
+    sender === "agent"
 
   const isTyping =
-    message.id ===
+    message?.id ===
     "typing"
 
   const config = isAgent
@@ -81,8 +92,7 @@ const ChatMessage = ({
         items-end
         gap-2
 
-        animate-in
-        fade-in
+        transition-opacity
         duration-200
 
         ${wrapper}
@@ -129,9 +139,11 @@ const ChatMessage = ({
         {/* TEXT */}
         <p
           className={`
+            whitespace-pre-wrap
+            break-words
+
             text-sm
             leading-relaxed
-            break-words
 
             ${
               isTyping
@@ -140,11 +152,11 @@ const ChatMessage = ({
             }
           `}
         >
-          {message.text}
+          {text}
         </p>
 
         {/* TIME */}
-        {!!message.time && (
+        {!!timestamp && (
           <p
             className={`
               mt-2
@@ -155,7 +167,7 @@ const ChatMessage = ({
               ${time}
             `}
           >
-            {message.time}
+            {timestamp}
           </p>
         )}
       </div>

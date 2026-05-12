@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useState,
 } from "react"
 
@@ -15,6 +16,8 @@ const quickQuestions = [
   "How do I submit a ticket?",
   "Talk to an agent",
 ]
+
+const MAX_MESSAGE_LENGTH = 4000
 
 const chip = `
   shrink-0
@@ -34,6 +37,7 @@ const chip = `
 
 const ChatFooter = ({
   onSendMessage,
+  loading = false,
 }) => {
 
   const [message, setMessage] =
@@ -42,59 +46,87 @@ const ChatFooter = ({
   const [showQuestions, setShowQuestions] =
     useState(true)
 
-  const [isSending, setIsSending] =
-    useState(false)
+  /* ========================================
+     SEND
+  ======================================== */
 
-  /* SEND */
   const handleSend =
-    async () => {
+    useCallback(
+      async (
+        customMessage
+      ) => {
 
-      const trimmed =
-        message.trim()
+        const finalMessage =
+          (
+            customMessage ??
+            message
+          ).trim()
 
-      if (
-        !trimmed ||
-        isSending
-      ) {
-        return
-      }
+        if (
+          !finalMessage ||
+          loading
+        ) {
+          return
+        }
 
-      try {
+        try {
 
-        setIsSending(true)
+          await onSendMessage(
+            finalMessage
+          )
 
-        await onSendMessage(
-          trimmed
-        )
+          setMessage("")
 
-        setMessage("")
+        } catch (error) {
 
-      } catch (error) {
+          console.error(
+            "CHAT_SEND_ERROR",
+            error
+          )
+        }
+      },
+      [
+        message,
+        loading,
+        onSendMessage,
+      ]
+    )
 
-        console.error(
-          "CHAT_SEND_ERROR",
-          error
-        )
+  /* ========================================
+     ENTER
+  ======================================== */
 
-      } finally {
-
-        setIsSending(false)
-      }
-    }
-
-  /* ENTER */
   const handleKeyDown =
-    async (event) => {
+    (
+      event
+    ) => {
 
       if (
-        event.key === "Enter" &&
+        event.key ===
+          "Enter" &&
         !event.shiftKey
       ) {
 
         event.preventDefault()
 
-        await handleSend()
+        handleSend()
       }
+    }
+
+  /* ========================================
+     QUICK QUESTION
+  ======================================== */
+
+  const handleQuickQuestion =
+    async (
+      question
+    ) => {
+
+      setMessage(question)
+
+      await handleSend(
+        question
+      )
     }
 
   return (
@@ -116,9 +148,15 @@ const ChatFooter = ({
           <div className="flex justify-end">
             <button
               type="button"
+
+              aria-label="Open FAQ"
+
               onClick={() =>
-                setShowQuestions(true)
+                setShowQuestions(
+                  true
+                )
               }
+
               className={`
                 ${chip}
 
@@ -208,9 +246,15 @@ const ChatFooter = ({
 
             <button
               type="button"
+
+              aria-label="Hide FAQ"
+
               onClick={() =>
-                setShowQuestions(false)
+                setShowQuestions(
+                  false
+                )
               }
+
               className={`
                 ${chip}
 
@@ -242,16 +286,24 @@ const ChatFooter = ({
             "
           >
             {quickQuestions.map(
-              (question) => (
+              (
+                question
+              ) => (
                 <button
-                  key={question}
+                  key={
+                    question
+                  }
 
                   type="button"
 
-                  disabled={isSending}
+                  disabled={
+                    loading
+                  }
 
                   onClick={() =>
-                    setMessage(question)
+                    handleQuickQuestion(
+                      question
+                    )
                   }
 
                   className={`
@@ -280,7 +332,7 @@ const ChatFooter = ({
       <div
         className="
           flex
-          items-center
+          items-end
           gap-2
 
           rounded-2xl
@@ -294,14 +346,24 @@ const ChatFooter = ({
           py-2
         "
       >
-        <input
-          type="text"
+        <textarea
+          rows={1}
 
           value={message}
 
-          disabled={isSending}
+          disabled={loading}
 
-          onChange={(event) =>
+          maxLength={
+            MAX_MESSAGE_LENGTH
+          }
+
+          enterKeyHint="send"
+
+          aria-label="Chat input"
+
+          onChange={(
+            event
+          ) =>
             setMessage(
               event.target.value
             )
@@ -312,13 +374,16 @@ const ChatFooter = ({
           }
 
           placeholder={
-            isSending
+            loading
               ? "AI is replying..."
               : "Ask something..."
           }
 
           className="
+            max-h-40
+            min-h-[24px]
             w-full
+            resize-none
 
             bg-transparent
 
@@ -336,8 +401,10 @@ const ChatFooter = ({
         <button
           type="button"
 
+          aria-label="Send message"
+
           disabled={
-            isSending ||
+            loading ||
             !message.trim()
           }
 
@@ -349,6 +416,7 @@ const ChatFooter = ({
             flex
             h-9
             w-9
+            shrink-0
             items-center
             justify-center
 
@@ -369,7 +437,7 @@ const ChatFooter = ({
             disabled:opacity-70
           "
         >
-          {isSending ? (
+          {loading ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
           ) : (
             <SendHorizonal className="h-4 w-4" />
@@ -388,7 +456,7 @@ const ChatFooter = ({
         "
       >
         <p className="text-[10px] text-slate-400">
-          {isSending
+          {loading
             ? "AI is generating a response..."
             : "AI assistance enabled"}
         </p>
@@ -408,7 +476,7 @@ const ChatFooter = ({
               rounded-full
 
               ${
-                isSending
+                loading
                   ? "bg-yellow-400"
                   : "bg-emerald-400"
               }
@@ -416,7 +484,7 @@ const ChatFooter = ({
           />
 
           <span className="text-[10px] text-slate-400">
-            {isSending
+            {loading
               ? "Typing..."
               : "Online"}
           </span>

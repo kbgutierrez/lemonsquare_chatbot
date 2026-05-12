@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useState,
 } from "react"
@@ -8,6 +9,10 @@ import chatbotService from "../services/chatbotService"
 export const useChatMessages =
   () => {
 
+    /* ========================================
+       STATE
+    ======================================== */
+
     const [messages, setMessages] =
       useState([])
 
@@ -15,13 +20,19 @@ export const useChatMessages =
       useState(false)
 
     const [sessionId, setSessionId] =
-      useState(
-        localStorage.getItem(
-          "chat_session_id"
-        ) || null
-      )
+      useState(null)
 
-    /* TIME FORMAT */
+    /* ========================================
+       REQUEST LOCK
+    ======================================== */
+
+    let requestLocked =
+      false
+
+    /* ========================================
+       TIME FORMAT
+    ======================================== */
+
     const getTime = (
       date = new Date()
     ) =>
@@ -34,14 +45,42 @@ export const useChatMessages =
           }
         )
 
-    /* LOAD HISTORY */
+    /* ========================================
+       INITIALIZE SESSION
+    ======================================== */
+
+    useEffect(() => {
+
+      const storedSession =
+        localStorage.getItem(
+          "chat_session_id"
+        )
+
+      if (
+        storedSession
+      ) {
+
+        setSessionId(
+          storedSession
+        )
+      }
+
+    }, [])
+
+    /* ========================================
+       LOAD HISTORY
+    ======================================== */
+
     useEffect(() => {
 
       const loadHistory =
         async () => {
 
-          if (!sessionId)
+          if (
+            !sessionId
+          ) {
             return
+          }
 
           try {
 
@@ -51,7 +90,9 @@ export const useChatMessages =
               )
 
             if (
-              data?.messages
+              Array.isArray(
+                data?.messages
+              )
             ) {
 
               const mapped =
@@ -90,6 +131,14 @@ export const useChatMessages =
               "LOAD_HISTORY_ERROR",
               error
             )
+
+            localStorage.removeItem(
+              "chat_session_id"
+            )
+
+            setSessionId(
+              null
+            )
           }
         }
 
@@ -97,132 +146,175 @@ export const useChatMessages =
 
     }, [sessionId])
 
-    /* SEND */
+    /* ========================================
+       SEND MESSAGE
+    ======================================== */
+
     const sendMessage =
-      async (
-        text
-      ) => {
+      useCallback(
+        async (
+          text
+        ) => {
 
-        if (
-          !text?.trim()
-        ) return
-
-        const userMessage = {
-          id:
-            Date.now().toString(),
-
-          sender:
-            "user",
-
-          text,
-
-          time:
-            getTime(),
-        }
-
-        /* ADD USER MESSAGE */
-        setMessages(
-          (prev) => [
-            ...prev,
-            userMessage,
-          ]
-        )
-
-        setLoading(true)
-
-        try {
-
-          const response =
-            await chatbotService.sendMessage(
-              {
-                SessionID:
-                  sessionId,
-
-                MessageContent:
-                  text,
-              }
-            )
-
-          /* SAVE SESSION */
           if (
-            response.session_id
+            !text?.trim()
           ) {
-
-            setSessionId(
-              response.session_id
-            )
-
-            localStorage.setItem(
-              "chat_session_id",
-              response.session_id
-            )
+            return
           }
 
-          /* AI MESSAGE */
-          const aiMessage = {
+          /* PREVENT DUPLICATE REQUESTS */
+
+          if (
+            requestLocked
+          ) {
+            return
+          }
+
+          requestLocked =
+            true
+
+          const userMessage = {
             id:
-              `${Date.now()}-ai`,
+              crypto.randomUUID(),
 
             sender:
-              "agent",
+              "user",
 
             text:
-              response.response,
+              text.trim(),
 
             time:
               getTime(),
           }
 
-          setMessages(
-            (prev) => [
-              ...prev,
-              aiMessage,
-            ]
-          )
-
-        } catch (error) {
-
-          console.error(
-            "SEND_MESSAGE_ERROR",
-            error
-          )
+          /* OPTIMISTIC UPDATE */
 
           setMessages(
             (prev) => [
               ...prev,
-
-              {
-                id:
-                  `${Date.now()}-error`,
-
-                sender:
-                  "agent",
-
-                text:
-                  "Something went wrong while contacting the AI.",
-
-                time:
-                  getTime(),
-              },
+              userMessage,
             ]
           )
-        }
 
-        setLoading(false)
-      }
+          setLoading(true)
 
-    /* CLEAR */
+          try {
+
+            const response =
+              await chatbotService.sendMessage(
+                {
+                  SessionID:
+                    sessionId,
+
+                  MessageContent:
+                    text.trim(),
+                }
+              )
+
+            console.log(
+              "CHAT_RESPONSE",
+              response
+            )
+
+            /* SAVE SESSION */
+
+            if (
+              response?.session_id
+            ) {
+
+              setSessionId(
+                response.session_id
+              )
+
+              localStorage.setItem(
+                "chat_session_id",
+                response.session_id
+              )
+            }
+
+            /* AI RESPONSE */
+
+            const aiMessage = {
+              id:
+                crypto.randomUUID(),
+
+              sender:
+                "agent",
+
+              text:
+                response?.response ||
+                "The AI returned an empty response.",
+
+              time:
+                getTime(),
+            }
+
+            setMessages(
+              (prev) => [
+                ...prev,
+                aiMessage,
+              ]
+            )
+
+          } catch (error) {
+
+            console.error(
+              "SEND_MESSAGE_ERROR",
+              error
+            )
+
+            setMessages(
+              (prev) => [
+                ...prev,
+
+                {
+                  id:
+                    crypto.randomUUID(),
+
+                  sender:
+                    "agent",
+
+                  text:
+                    error.message ||
+                    "Unable to contact AI service.",
+
+                  time:
+                    getTime(),
+                },
+              ]
+            )
+
+          } finally {
+
+            setLoading(false)
+
+            requestLocked =
+              false
+          }
+        },
+        [sessionId]
+      )
+
+    /* ========================================
+       CLEAR CONVERSATION
+    ======================================== */
+
     const clearConversation =
-      () => {
+      useCallback(
+        () => {
 
-        setMessages([])
+          setMessages([])
 
-        setSessionId(null)
+          setSessionId(
+            null
+          )
 
-        localStorage.removeItem(
-          "chat_session_id"
-        )
-      }
+          localStorage.removeItem(
+            "chat_session_id"
+          )
+        },
+        []
+      )
 
     return {
       messages,
