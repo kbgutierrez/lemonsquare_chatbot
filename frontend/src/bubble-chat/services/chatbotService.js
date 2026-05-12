@@ -14,14 +14,172 @@ import {
 */
 
 /* ========================================
-   TEMP USER TOKEN
-   Replace later with real auth token
+   CONFIG
 ======================================== */
 
-const USER_TOKEN =
-  localStorage.getItem(
-    "user_token"
-  ) || "TEST_USER_1"
+const REQUEST_TIMEOUT = 30000
+
+/* ========================================
+   GET USER TOKEN
+======================================== */
+
+const getUserToken = () => {
+
+  return (
+    localStorage.getItem(
+      "user_token"
+    ) || "TEST_USER_1"
+  )
+}
+
+/* ========================================
+   REQUEST HELPER
+======================================== */
+
+const apiRequest = async ({
+  endpoint,
+  method = "GET",
+  body = null,
+}) => {
+
+  const controller =
+    new AbortController()
+
+  const timeout =
+    setTimeout(() => {
+
+      controller.abort()
+
+    }, REQUEST_TIMEOUT)
+
+  try {
+
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method,
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body:
+            body
+              ? JSON.stringify(
+                  body
+                )
+              : null,
+
+          signal:
+            controller.signal,
+        }
+      )
+
+    console.log(
+      "RAW_RESPONSE_STATUS",
+      response.status
+    )
+
+    /* ========================================
+       READ RAW TEXT FIRST
+    ======================================== */
+
+    const rawText =
+      await response.text()
+
+    console.log(
+      "RAW_RESPONSE_TEXT",
+      rawText
+    )
+
+    let responseData =
+      null
+
+    /* ========================================
+       SAFE JSON PARSE
+    ======================================== */
+
+    try {
+
+      responseData =
+        rawText
+          ? JSON.parse(
+              rawText
+            )
+          : null
+
+    } catch (parseError) {
+
+      console.error(
+        "JSON_PARSE_ERROR",
+        parseError
+      )
+
+      throw new Error(
+        "Backend returned invalid JSON."
+      )
+    }
+
+    /* ========================================
+       HTTP ERROR
+    ======================================== */
+
+    if (!response.ok) {
+
+      const errorMessage =
+        responseData?.detail ||
+        responseData?.message ||
+        responseData?.error ||
+        `Request failed with status ${response.status}`
+
+      throw new Error(
+        errorMessage
+      )
+    }
+
+    return responseData
+
+  } catch (error) {
+
+    /* ========================================
+       TIMEOUT
+    ======================================== */
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
+      throw new Error(
+        "Request timeout. Backend took too long to respond."
+      )
+    }
+
+    /* ========================================
+       NETWORK ERROR
+    ======================================== */
+
+    if (
+      error instanceof
+      TypeError
+    ) {
+
+      throw new Error(
+        "Unable to connect to backend server."
+      )
+    }
+
+    throw error
+
+  } finally {
+
+    clearTimeout(
+      timeout
+    )
+  }
+}
 
 /* ========================================
    SEND MESSAGE
@@ -41,7 +199,7 @@ const sendMessage =
         MessageContent,
 
       user_token:
-        USER_TOKEN,
+        getUserToken(),
     }
 
     const endpoint =
@@ -59,52 +217,11 @@ const sendMessage =
       endpoint
     )
 
-    const response =
-      await fetch(
-        endpoint,
-        {
-          method: "POST",
-
-          headers: {
-            "Content-Type":
-              "application/json",
-          },
-
-          body:
-            JSON.stringify(
-              payload
-            ),
-        }
-      )
-
-    /* ERROR */
-    if (!response.ok) {
-
-      let errorMessage =
-        "Failed to send message"
-
-      try {
-
-        const error =
-          await response.json()
-
-        errorMessage =
-          error.detail ||
-          errorMessage
-
-      } catch {
-
-        console.error(
-          "FAILED_TO_PARSE_ERROR_RESPONSE"
-        )
-      }
-
-      throw new Error(
-        errorMessage
-      )
-    }
-
-    return response.json()
+    return apiRequest({
+      endpoint,
+      method: "POST",
+      body: payload,
+    })
   }
 
 /* ========================================
@@ -126,7 +243,9 @@ const loadSession =
       )
 
     const finalUrl =
-      `${endpoint}?user_token=${USER_TOKEN}`
+      `${endpoint}?user_token=${encodeURIComponent(
+        getUserToken()
+      )}`
 
     console.log(
       "LOAD_SESSION",
@@ -140,39 +259,10 @@ const loadSession =
       finalUrl
     )
 
-    const response =
-      await fetch(
-        finalUrl
-      )
-
-    /* ERROR */
-    if (!response.ok) {
-
-      let errorMessage =
-        "Failed to load session"
-
-      try {
-
-        const error =
-          await response.json()
-
-        errorMessage =
-          error.detail ||
-          errorMessage
-
-      } catch {
-
-        console.error(
-          "FAILED_TO_PARSE_ERROR_RESPONSE"
-        )
-      }
-
-      throw new Error(
-        errorMessage
-      )
-    }
-
-    return response.json()
+    return apiRequest({
+      endpoint:
+        finalUrl,
+    })
   }
 
 /* ========================================
@@ -193,6 +283,8 @@ const clearSession =
 
     return {
       success: true,
+      message:
+        "Clear session endpoint not yet connected.",
     }
   }
 
@@ -205,6 +297,8 @@ const loadAISettings =
 
     return {
       success: true,
+      message:
+        "AI settings endpoint not yet connected.",
     }
   }
 

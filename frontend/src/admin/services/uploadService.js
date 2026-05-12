@@ -1,5 +1,9 @@
+import {
+  API_CONFIG,
+} from "../../config/sqlVariables"
+
 const API_BASE_URL =
-  "http://localhost:8000/api"
+  API_CONFIG.BASE_URL
 
 /* UPLOAD DOCUMENT */
 export const uploadDocument =

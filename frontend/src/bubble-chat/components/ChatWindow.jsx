@@ -3,18 +3,20 @@ import ChatMessages from "./ChatMessages.jsx"
 import ChatFooter from "./ChatFooter.jsx"
 
 const ChatWindow = ({
-  messages,
-  loading,
+  messages = [],
+  loading = false,
   onSendMessage,
   onClose,
   onOpenModal,
 }) => {
 
   return (
-    <div
+    <section
+      aria-label="Chat Window"
       className="
         flex
         h-full
+        min-h-0
         flex-col
 
         overflow-hidden
@@ -22,6 +24,8 @@ const ChatWindow = ({
         rounded-[28px]
 
         bg-white
+
+        shadow-[0_10px_40px_rgba(0,0,0,0.08)]
       "
     >
       {/* HEADER */}
@@ -33,10 +37,11 @@ const ChatWindow = ({
       />
 
       {/* CHAT AREA */}
-      <div
+      <main
         className="
           relative
           flex-1
+          min-h-0
           overflow-hidden
 
           bg-gradient-to-b
@@ -57,22 +62,57 @@ const ChatWindow = ({
           "
         />
 
+        {/* SECONDARY DECORATION */}
+        <div
+          className="
+            pointer-events-none
+
+            absolute
+            bottom-0
+            right-0
+
+            h-48
+            w-48
+
+            rounded-full
+
+            bg-violet-100/30
+
+            blur-3xl
+          "
+        />
+
         {/* MESSAGES */}
-        <div className="relative z-10 h-full">
+        <div
+          className="
+            relative
+            z-10
+            h-full
+          "
+        >
           <ChatMessages
-            messages={messages}
-            loading={loading}
+            messages={
+              messages
+            }
+
+            loading={
+              loading
+            }
           />
         </div>
-      </div>
+      </main>
 
       {/* FOOTER */}
       <ChatFooter
+        loading={
+          loading
+        }
+
         onSendMessage={
           onSendMessage
         }
       />
-    </div>
+    </section>
   )
 }
 
