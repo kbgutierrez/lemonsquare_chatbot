@@ -107,14 +107,14 @@ if page == "Chat":
 elif page == "Documents":
     st.header("Document Management")
 
-    tab1, tab2, tab3 = st.tabs(["Upload", "List", "Delete"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Upload", "List", "Delete", "RAG Debugger", "Full Pipeline Debug"])
 
     with tab1:
         st.subheader("Upload Document")
         uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
         if uploaded_file is not None and st.button("Upload"):
             files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
-            response = make_request("POST", "/upload-document", files=files)
+            response = make_request("POST", "/documents/upload", files=files)
             if response:
                 st.success("Document uploaded successfully!")
                 st.json(response)
@@ -123,9 +123,15 @@ elif page == "Documents":
         st.subheader("List Documents")
         category = st.selectbox("Filter by category", ["All", "Hardware", "Software", "Network", "Other"])
         category_param = None if category == "All" else category
+        col1, col2 = st.columns(2)
+        with col1:
+            skip = st.number_input("Skip", min_value=0, value=0, step=10, key="doc_skip")
+        with col2:
+            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10, key="doc_limit")
 
         if st.button("Fetch Documents"):
             params = {"category": category_param} if category_param else {}
+            params.update({"skip": skip, "limit": limit})
             documents = make_request("GET", "/documents", params)
             if documents:
                 st.dataframe(documents)
@@ -142,6 +148,100 @@ elif page == "Documents":
             else:
                 st.error("Please enter a Document ID")
 
+    with tab4:
+        st.subheader("RAG Debugger: Query Qdrant Directly")
+        query = st.text_input("Search query", help="Inspect the exact document chunks returned by Qdrant.")
+        limit = st.number_input("Result limit", min_value=1, max_value=20, value=5, step=1)
+
+        if st.button("Run Qdrant Test Search"):
+            if not query:
+                st.error("Please enter a search query to run the debug search.")
+            else:
+                response = make_request("POST", "/documents/test-search", {"query": query, "limit": limit})
+                if response:
+                    st.success("Qdrant results retrieved.")
+                    results = response.get("results", [])
+                    if results:
+                        st.write(f"Query: {response.get('query')}")
+                        st.table([
+                            {
+                                "score": hit.get("score"),
+                                "type": hit.get("type"),
+                                "content": hit.get("content"),
+                            }
+                            for hit in results
+                        ])
+                        st.json(response)
+                    else:
+                        st.info("No results returned from Qdrant.")
+
+    with tab5:
+        st.subheader("Full Pipeline Debug")
+        st.write("See the complete RAG pipeline: Query → Reformulation → Retrieval → Answer")
+        query = st.text_input("Query", help="Test the full RAG pipeline end-to-end.")
+        user_token = st.text_input("User Token", value="TEST_USER_1", help="Token for auth (use TEST_USER_1 for testing)")
+
+        if st.button("Run Full Pipeline Debug", key="chat_debug_button"):
+            if not query:
+                st.error("Please enter a query to run the full pipeline debug.")
+            elif not user_token:
+                st.error("Please provide a user token.")
+            else:
+                response = make_request("POST", "/documents/debug/full-pipeline", {"query": query})
+                if response:
+                    st.success("Full pipeline debug completed.")
+                    
+                    # 1. Original Query
+                    st.subheader("1. Original Query")
+                    st.code(response.get("original_query", "N/A"))
+                    
+                    # 2. Reformulated Query
+                    st.subheader("2. Reformulated Query")
+                    reformulated = response.get("reformulated_query")
+                    st.code(reformulated or "No reformulation")
+                    if reformulated and reformulated != response.get("original_query"):
+                        st.write("✅ Reformulation applied.")
+                    else:
+                        st.write("❌ No reformulation applied.")
+                    
+                    # 3. Retrieval Results
+                    st.subheader("3. Retrieval Results")
+                    retrieval = response.get("retrieval_results", {})
+                    tickets = retrieval.get("tickets", [])
+                    documents = retrieval.get("documents", [])
+                    
+                    if tickets or documents:
+                        st.write(f"Found {len(tickets)} tickets and {len(documents)} documents:")
+                        
+                        # Tickets
+                        if tickets:
+                            st.write("**Tickets:**")
+                            for i, ticket in enumerate(tickets, 1):
+                                with st.expander(f"Ticket {i} (Score: {ticket['score']:.3f})"):
+                                    st.write(ticket["content"])
+                        
+                        # Documents
+                        if documents:
+                            st.write("**Documents:**")
+                            for i, doc in enumerate(documents, 1):
+                                with st.expander(f"Document {i} (Score: {doc['score']:.3f})"):
+                                    st.write(doc["content"])
+                    else:
+                        st.warning("No retrieval results found.")
+                    
+                    # 4. Final AI Answer
+                    st.subheader("4. Final AI Answer")
+                    answer = response.get("final_answer")
+                    if answer:
+                        st.write(answer)
+                    else:
+                        st.error("No answer generated.")
+                    
+                    # Raw Debug Data
+                    with st.expander("Raw Debug Data"):
+                        st.json(response.get("raw_debug", {}))
+                else:
+                    st.error("Failed to run full pipeline debug.")
 
 # Tickets Section
 elif page == "Tickets":
@@ -152,8 +252,14 @@ elif page == "Tickets":
     with tab1:
         st.subheader("List Resolved Tickets")
         search = st.text_input("Search by ticket number")
+        col1, col2 = st.columns(2)
+        with col1:
+            skip = st.number_input("Skip", min_value=0, value=0, step=10)
+        with col2:
+            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10)
         if st.button("Fetch Tickets"):
             params = {"search": search} if search else {}
+            params.update({"skip": skip, "limit": limit})
             tickets = make_request("GET", "/tickets", params)
             if tickets:
                 df_data = []

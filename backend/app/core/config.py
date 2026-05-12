@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     # Set ALLOW_TEST_AUTH=true in .env for local development only.
     # NEVER enable in production.
     ALLOW_TEST_AUTH: bool = False
+
+    # ─── Logging ──────────────────────────────────────────────────────────
+    # Set to DEBUG for detailed auth logging
+    LOG_LEVEL: str = "INFO"
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:8501"])
 
     # ─── BizPortal ────────────────────────────────────────────────────────

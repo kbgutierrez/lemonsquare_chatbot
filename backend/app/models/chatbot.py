@@ -87,6 +87,7 @@ class AIChatbotSetting(BaseChatbot):
     TopK_Tickets = Column(Integer)
     UseReformulator = Column(Boolean, default=True)
     UseReranker = Column(Boolean, default=True)
+    ChatExtractionPrompt = Column(Text)
     AllowedCategories = Column(
         String(500),
         default=(

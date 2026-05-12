@@ -8,12 +8,15 @@ endpoints. Extracting each feature into its own router module means:
   - Adding document features (e.g. re-categorise, preview) is self-contained.
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, UploadFile
+from pydantic import BaseModel
+from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_chatbot_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
 from app.models.chatbot import UploadedDocument
 from app.schemas.documents import (
     DocumentDeleteResponse,
@@ -21,6 +24,7 @@ from app.schemas.documents import (
     DocumentUploadResponse,
 )
 from app.services.ingestion_service import DocumentIngestionService
+from app.services.orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -46,6 +50,75 @@ async def upload_document(
     return DocumentUploadResponse(**result)
 
 
+class VectorSearchRequest(BaseModel):
+    query: str
+    limit: int = 5
+
+
+@router.post(
+    "/test-search",
+    tags=["Documents", "Admin"],
+    summary="Admin tool to inspect Qdrant search results",
+)
+async def test_vector_search(
+    request: VectorSearchRequest,
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+):
+    """Admin tool to see EXACTLY what Qdrant returns for a given search query."""
+    vector = await asyncio.to_thread(
+        ingestion_service.embeddings.embed_query, request.query
+    )
+
+    results = ingestion_service.qdrant.query_points(
+        collection_name=ingestion_service.collection_name,
+        query=vector,
+        with_payload=True,
+        limit=request.limit,
+    )
+
+@router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
+async def debug_full_rag_pipeline(
+    request: VectorSearchRequest,
+    orchestrator: SupportOrchestrator = Depends(get_orchestrator),
+    db: Session = Depends(get_chatbot_db),
+):
+    """
+    Debug the complete RAG pipeline: Query → Reformulation → Retrieval → Answer
+    Returns detailed debug info without saving anything.
+    """
+    # Use empty chat history for debug
+    chat_history = ""
+    user_name = "Debug User"
+    
+    debug_result = await orchestrator.debug_orchestrate(
+        user_query=request.query,
+        chat_history=chat_history,
+        user_name=user_name,
+        db=db,
+    )
+    
+    # Format the response for the frontend
+    return {
+        "original_query": debug_result["original_query"],
+        "reformulated_query": debug_result["reformulated_query"],
+        "retrieval_results": {
+            "tickets": [
+                r for r in debug_result["retrieval_results"] 
+                if r["type"] != "uploaded_manual"
+            ],
+            "documents": [
+                r for r in debug_result["retrieval_results"] 
+                if r["type"] == "uploaded_manual"
+            ]
+        },
+        "final_answer": debug_result["final_answer"],
+        "raw_debug": {
+            "ticket_ids_used": debug_result.get("ticket_ids_used", []),
+            "total_retrieval_count": len(debug_result["retrieval_results"])
+        }
+    }
+
+
 @router.get(
     "",
     response_model=list[DocumentResponse],
@@ -53,6 +126,7 @@ async def upload_document(
 )
 def get_documents(
     category: str | None = None,
+    skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_chatbot_db),
 ) -> list[DocumentResponse]:
@@ -63,7 +137,12 @@ def get_documents(
     if category:
         query = query.filter(UploadedDocument.Category == category)
 
-    documents = query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all()
+    documents = (
+        query.order_by(UploadedDocument.UploadedAt.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     return [
         DocumentResponse(
@@ -92,3 +171,6 @@ async def delete_document(
     """
     result = await ingestion_service.delete_document(document_id, db)
     return DocumentDeleteResponse(**result)
+
+
+
