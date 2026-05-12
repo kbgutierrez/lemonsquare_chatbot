@@ -14,75 +14,110 @@ const UploadPagination = ({
     <div
       className="
         flex
+        shrink-0
         items-center
-        justify-end
-        gap-2
+        justify-between
 
-        border-t
-        border-violet-100
-
-        px-4
-        py-3
+        px-5
+        py-4
       "
     >
-      <button
-        disabled={
-          currentPage === 1
-        }
-        onClick={() =>
-          setCurrentPage(
-            (prev) =>
-              prev - 1
-          )
-        }
+      {/* LEFT */}
+      <p
         className="
-          rounded-lg
-          border
-          border-violet-200
+          text-xs
 
-          px-3
-          py-1
+          tracking-wide
 
-          text-sm
-          text-violet-700
-
-          disabled:opacity-40
+          text-[#74877e]
         "
       >
-        Prev
-      </button>
+        Page {currentPage} of{" "}
+        {totalPages}
+      </p>
 
-      <span className="text-sm text-violet-700">
-        {currentPage} / {totalPages}
-      </span>
+      {/* RIGHT */}
+      <div className="flex items-center gap-2">
 
-      <button
-        disabled={
-          currentPage ===
-          totalPages
-        }
-        onClick={() =>
-          setCurrentPage(
-            (prev) =>
-              prev + 1
-          )
-        }
-        className="
-          rounded-lg
-          border
-          border-violet-200
+        {/* PREV */}
+        <button
+          disabled={
+            currentPage === 1
+          }
+          onClick={() =>
+            setCurrentPage(
+              (prev) =>
+                prev - 1
+            )
+          }
+          className="
+            rounded-xl
 
-          px-3
-          py-1
+            border
+            border-[#2d3b35]
 
-          text-sm
-          text-violet-700
+            bg-[#18211f]
 
-          disabled:opacity-40
-        "
-      >
-        Next
-      </button>
+            px-4
+            py-2
+
+            text-sm
+            font-medium
+
+            text-[#d5dfdb]
+
+            transition-all
+            duration-200
+
+            hover:bg-[#1f2a27]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-40
+          "
+        >
+          Prev
+        </button>
+
+        {/* NEXT */}
+        <button
+          disabled={
+            currentPage ===
+            totalPages
+          }
+          onClick={() =>
+            setCurrentPage(
+              (prev) =>
+                prev + 1
+            )
+          }
+          className="
+            rounded-xl
+
+            border
+            border-[#2d3b35]
+
+            bg-[#18211f]
+
+            px-4
+            py-2
+
+            text-sm
+            font-medium
+
+            text-[#d5dfdb]
+
+            transition-all
+            duration-200
+
+            hover:bg-[#1f2a27]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-40
+          "
+        >
+          Next
+        </button>
+      </div>
     </div>
   )
 }

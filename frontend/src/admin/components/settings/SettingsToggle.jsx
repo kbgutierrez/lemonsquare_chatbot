@@ -13,42 +13,80 @@ const SettingsToggle = ({
 
       className={`
         relative
-        h-7
-        w-12
+
+        flex
+        h-8
+        w-14
+        items-center
 
         rounded-full
+
+        border
 
         transition-all
         duration-300
 
         ${
           value
-            ? "bg-violet-600"
-            : "bg-slate-300"
+            ? `
+              border-[#f5d547]/30
+              bg-[#f5d547]
+            `
+            : `
+              border-[#2d3b35]
+              bg-[#1a2421]
+            `
         }
       `}
     >
+      {/* KNOB */}
       <div
         className={`
           absolute
-          top-1
 
-          h-5
-          w-5
+          flex
+          h-6
+          w-6
+          items-center
+          justify-center
 
           rounded-full
-          bg-white
+
+          shadow-lg
 
           transition-all
           duration-300
 
           ${
             value
-              ? "left-6"
-              : "left-1"
+              ? `
+                left-[30px]
+
+                bg-[#111917]
+              `
+              : `
+                left-1
+
+                bg-[#dce5e1]
+              `
           }
         `}
-      />
+      >
+        <div
+          className={`
+            h-2
+            w-2
+
+            rounded-full
+
+            ${
+              value
+                ? "bg-[#f5d547]"
+                : "bg-[#7f938a]"
+            }
+          `}
+        />
+      </div>
     </button>
   )
 }

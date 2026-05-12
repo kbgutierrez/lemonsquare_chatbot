@@ -3,15 +3,19 @@ import {
   useState,
 } from "react"
 
-import HeaderCard from "./components/HeaderCard.jsx"
 import SidebarMenu from "./components/SidebarMenu.jsx"
 
-import AIModelDropdown from "./components/AIModelDropdown.jsx"
-import AISettingsPanel from "./components/AISettingsPanel.jsx"
+import AISettingsPanel
+  from "./components/settings/AISettingsPanel.jsx"
 
-import UploadSection from "./components/UploadSection.jsx"
-import KnowledgeFilesSection from "./components/KnowledgeFilesSection.jsx"
-import TicketsSection from "./components/TicketsSection.jsx"
+import UploadSection
+  from "./components/upload/UploadSection.jsx"
+
+import KnowledgeFilesSection
+  from "./components/Knowledge FIles/KnowledgeFilesSection.jsx"
+
+import TicketsSection
+  from "./components/tickets/TicketsSection.jsx"
 
 const sidebarItems = [
   {
@@ -63,7 +67,7 @@ const AdminPage = () => {
 
         if (
           width >= 240 &&
-          width <= 500
+          width <= 420
         ) {
 
           setSidebarWidth(
@@ -106,28 +110,98 @@ const AdminPage = () => {
   return (
     <section
       className="
+        relative
+
         flex
         h-screen
-        flex-col
-
         overflow-hidden
 
-        bg-gradient-to-br
-        from-violet-50
-        via-purple-50
-        to-fuchsia-50
+        bg-[#0b1311]
       "
     >
-      {/* HEADER */}
-      <HeaderCard />
-
-      {/* BODY */}
+      {/* BACKGROUND */}
       <div
         className="
-          flex
-          flex-1
+          pointer-events-none
+
+          absolute
+          inset-0
 
           overflow-hidden
+        "
+      >
+        <div
+          className="
+            absolute
+            left-[-120px]
+            top-[-120px]
+
+            h-[420px]
+            w-[420px]
+
+            rounded-full
+
+            bg-[#f5d547]/[0.04]
+
+            blur-3xl
+          "
+        />
+
+        <div
+          className="
+            absolute
+            bottom-[-180px]
+            right-[-140px]
+
+            h-[420px]
+            w-[420px]
+
+            rounded-full
+
+            bg-[#95c11f]/[0.05]
+
+            blur-3xl
+          "
+        />
+
+        <div
+          className="
+            absolute
+            inset-0
+
+            opacity-[0.03]
+          "
+          style={{
+            backgroundImage:
+              `
+                linear-gradient(
+                  rgba(255,255,255,0.05) 1px,
+                  transparent 1px
+                ),
+                linear-gradient(
+                  90deg,
+                  rgba(255,255,255,0.05) 1px,
+                  transparent 1px
+                )
+              `,
+            backgroundSize:
+              "40px 40px",
+          }}
+        />
+      </div>
+
+      {/* MAIN LAYOUT */}
+      <div
+        className="
+          relative
+          z-10
+
+          flex
+          h-full
+          min-h-0
+          w-full
+
+          gap-4
 
           p-4
         "
@@ -139,11 +213,12 @@ const AdminPage = () => {
               `${sidebarWidth}px`,
           }}
           className="
-            flex
-            flex-col
-            gap-4
+            hidden
+            shrink-0
 
             overflow-hidden
+
+            lg:flex
           "
         >
           <SidebarMenu
@@ -171,8 +246,6 @@ const AdminPage = () => {
           className="
             group
 
-            mx-2
-
             hidden
             w-1
 
@@ -185,7 +258,7 @@ const AdminPage = () => {
             transition-all
             duration-200
 
-            hover:bg-violet-300
+            hover:bg-[#f5d547]/30
 
             lg:block
           "
@@ -197,7 +270,7 @@ const AdminPage = () => {
 
               rounded-full
 
-              group-hover:bg-violet-400
+              group-hover:bg-[#f5d547]/40
             "
           />
         </div>
@@ -205,65 +278,179 @@ const AdminPage = () => {
         {/* CONTENT */}
         <main
           className="
+            relative
+
+            flex
+            min-h-0
             flex-1
+            flex-col
 
             overflow-hidden
 
-            rounded-3xl
+            rounded-[32px]
 
             border
-            border-violet-100
+            border-[#25332d]
 
-            bg-white/80
+            bg-[#101816]/95
 
-            p-4
+            shadow-[0_20px_80px_rgba(0,0,0,0.45)]
 
-            shadow-sm
-            backdrop-blur-sm
+            backdrop-blur-xl
           "
         >
+          {/* INNER LIGHT */}
           <div
             className="
-              flex
-              h-full
-              flex-col
-              gap-4
+              pointer-events-none
 
-              overflow-auto
-
-              pr-1
-
-              [scrollbar-width:none]
-              [&::-webkit-scrollbar]:hidden
+              absolute
+              inset-0
             "
           >
-            {/* UPLOAD */}
-            {activeView ===
-              "upload" && (
-              <UploadSection />
-            )}
+            <div
+              className="
+                absolute
+                inset-x-0
+                top-0
 
-            {/* KNOWLEDGE FILES */}
-            {activeView ===
-              "files" && (
-              <KnowledgeFilesSection />
-            )}
+                h-px
 
-            {/* TICKETS */}
-            {activeView ===
-              "tickets" && (
-              <TicketsSection />
-            )}
+                bg-white/5
+              "
+            />
 
-            {/* AI */}
-            {activeView ===
-              "ai" && (
-              <>
-                <AIModelDropdown />
+            <div
+              className="
+                absolute
+                right-0
+                top-0
 
-                <AISettingsPanel />
-              </>
-            )}
+                h-72
+                w-72
+
+                rounded-full
+
+                bg-[#f5d547]/[0.03]
+
+                blur-3xl
+              "
+            />
+          </div>
+
+          {/* CONTENT SCROLL */}
+          <div
+            className="
+              relative
+              z-10
+
+              flex
+              min-h-0
+              flex-1
+              flex-col
+
+              overflow-hidden
+
+              p-5
+            "
+          >
+            {/* MOBILE TOPBAR */}
+            <div
+              className="
+                mb-5
+
+                flex
+                shrink-0
+                items-center
+                justify-between
+
+                lg:hidden
+              "
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="
+                    flex
+                    h-10
+                    w-10
+                    items-center
+                    justify-center
+
+                    rounded-2xl
+
+                    bg-[#f5d547]
+                  "
+                >
+                  <span
+                    className="
+                      text-sm
+                      font-black
+
+                      text-[#111917]
+                    "
+                  >
+                    LS
+                  </span>
+                </div>
+
+                <div>
+                  <h2
+                    className="
+                      text-sm
+                      font-bold
+                      text-white
+                    "
+                  >
+                    Lemon Square
+                  </h2>
+
+                  <p
+                    className="
+                      text-xs
+                      text-[#8ea59b]
+                    "
+                  >
+                    Admin Panel
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ACTIVE VIEW */}
+            <div
+              className="
+                min-h-0
+                flex-1
+                overflow-hidden
+              "
+            >
+              {activeView ===
+                "upload" && (
+                <UploadSection />
+              )}
+
+              {activeView ===
+                "files" && (
+                <KnowledgeFilesSection />
+              )}
+
+              {activeView ===
+                "tickets" && (
+                <TicketsSection />
+              )}
+
+              {activeView ===
+                "ai" && (
+                <div
+                  className="
+                    h-full
+                    overflow-auto
+                  "
+                >
+                  <AISettingsPanel />
+                </div>
+              )}
+            </div>
           </div>
         </main>
       </div>

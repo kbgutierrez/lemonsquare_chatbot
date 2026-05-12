@@ -4,55 +4,84 @@ const TicketPagination = ({
   setCurrentPage,
 }) => {
 
+  if (
+    totalPages <= 1
+  ) {
+    return null
+  }
+
   return (
     <div
       className="
         flex
+        shrink-0
         items-center
         justify-between
 
         border-t
-        border-violet-100
+        border-[#24312b]
 
-        px-4
-        py-3
+        px-5
+        py-4
       "
     >
+      {/* LEFT */}
       <p
         className="
           text-xs
-          text-violet-500
+
+          tracking-wide
+
+          text-[#74877f]
         "
       >
-        Page {currentPage} of {totalPages}
+        Page {currentPage} of{" "}
+        {totalPages}
       </p>
 
-      <div className="flex gap-2">
+      {/* RIGHT */}
+      <div className="flex items-center gap-2">
+
+        {/* PREV */}
         <button
           disabled={
             currentPage === 1
           }
           onClick={() =>
             setCurrentPage(
-              (prev) => prev - 1
+              (prev) =>
+                prev - 1
             )
           }
           className="
-            rounded-lg
-            border
-            border-violet-200
+            rounded-xl
 
-            px-3
-            py-1
+            border
+            border-[#2d3b35]
+
+            bg-[#18211f]
+
+            px-4
+            py-2
 
             text-sm
+            font-medium
 
+            text-[#d5dfdb]
+
+            transition-all
+            duration-200
+
+            hover:bg-[#1f2a27]
+
+            disabled:cursor-not-allowed
             disabled:opacity-40
           "
         >
           Prev
         </button>
 
+        {/* NEXT */}
         <button
           disabled={
             currentPage ===
@@ -60,19 +89,32 @@ const TicketPagination = ({
           }
           onClick={() =>
             setCurrentPage(
-              (prev) => prev + 1
+              (prev) =>
+                prev + 1
             )
           }
           className="
-            rounded-lg
-            border
-            border-violet-200
+            rounded-xl
 
-            px-3
-            py-1
+            border
+            border-[#2d3b35]
+
+            bg-[#18211f]
+
+            px-4
+            py-2
 
             text-sm
+            font-medium
 
+            text-[#d5dfdb]
+
+            transition-all
+            duration-200
+
+            hover:bg-[#1f2a27]
+
+            disabled:cursor-not-allowed
             disabled:opacity-40
           "
         >
