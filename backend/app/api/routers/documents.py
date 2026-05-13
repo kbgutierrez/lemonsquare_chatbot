@@ -184,6 +184,78 @@ async def delete_document(
     return DocumentDeleteResponse(**result)
 
 
+class DocTypeFilterRequest(BaseModel):
+    doc_type: str | None = None  # None = all, otherwise: "resolved_chat", "helpdesk_ticket", "official_document", "general_text"
+    limit: int = 100
+    skip: int = 0
+
+
+@router.post(
+    "/explore/by-type",
+    tags=["Documents", "Admin"],
+    summary="Filter knowledge base by doc_type for the Admin Explorer",
+)
+async def explore_by_doc_type(
+    request: DocTypeFilterRequest,
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+):
+    """
+    Enterprise Admin tool: Query the knowledge base by source/type.
+    Returns all chunks for a given doc_type with their metadata.
+    
+    doc_type values:
+    - "resolved_chat": AI-extracted from resolved chats
+    - "helpdesk_ticket": From IT helpdesk webhook sync
+    - "official_document": Uploaded PDF manuals
+    - "general_text": Manual KB entries typed into admin dashboard
+    - None: All knowledge base entries
+    """
+    
+    # Build the Qdrant filter
+    query_filter = None
+    if request.doc_type:
+        query_filter = qdrant_models.Filter(
+            must=[
+                qdrant_models.FieldCondition(
+                    key="metadata.doc_type",
+                    match=qdrant_models.MatchValue(value=request.doc_type)
+                )
+            ]
+        )
+    
+    # Query Qdrant with the filter
+    results = ingestion_service.qdrant.scroll(
+        collection_name=ingestion_service.collection_name,
+        limit=request.limit,
+        offset=request.skip,
+        query_filter=query_filter,
+        with_payload=True,
+    )
+    
+    # Format results for the frontend
+    points = results[0] if results else []
+    formatted_results = []
+    
+    for point in points:
+        payload = point.payload or {}
+        metadata = payload.get("metadata", {})
+        formatted_results.append({
+            "id": point.id,
+            "doc_type": metadata.get("doc_type", "unknown"),
+            "title": metadata.get("title", "Untitled"),
+            "content": metadata.get("content", ""),
+            "source": metadata.get("source", "unknown"),
+            "page": metadata.get("page", None),
+            "timestamp": metadata.get("timestamp", None),
+        })
+    
+    return {
+        "total_count": len(formatted_results),
+        "doc_type_filter": request.doc_type,
+        "results": formatted_results,
+    }
+
+
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,

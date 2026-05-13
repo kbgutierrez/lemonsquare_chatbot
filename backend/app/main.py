@@ -25,13 +25,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 
-from app.api.routers import chat, documents, settings, tickets
+from app.api.routers import chat, documents, settings, tickets, explorer
 from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
+from app.api.routers import self_knowledge
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -124,6 +125,8 @@ def create_app() -> FastAPI:
     app.include_router(documents.router, prefix=PREFIX)
     app.include_router(tickets.router, prefix=PREFIX)
     app.include_router(settings.router, prefix=PREFIX)
+    app.include_router(explorer.router, prefix=PREFIX)
+    app.include_router(self_knowledge.router, prefix="/api")
 
     # ── Health Check ──────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])

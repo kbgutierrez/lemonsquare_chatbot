@@ -12,7 +12,7 @@ st.title("IT Support AI Enterprise Dashboard")
 # Sidebar for navigation
 page = st.sidebar.selectbox(
     "Choose a section",
-    ["Chat", "Documents", "Tickets", "Settings"]
+    ["Chat", "Documents", "Tickets", "Settings", "Knowledge Base Explorer"]
 )
 
 
@@ -379,6 +379,93 @@ elif page == "Settings":
                 st.success("AI settings updated successfully.")
                 st.json(response)
                 st.session_state.ai_settings = response.get("data") or settings_payload
+
+
+# Knowledge Base Explorer Section
+elif page == "Knowledge Base Explorer":
+    st.header("🔍 Knowledge Base Explorer")
+    st.markdown(
+        "View and manage all knowledge sources that the AI has learned from. "
+        "Filter by document type to understand what's in each category."
+    )
+    
+    st.markdown("---")
+    
+    # Map UI labels to strict backend doc_type values
+    doc_type_mapping = {
+        "📚 All Knowledge": None,
+        "💬 Resolved AI Chats": "resolved_chat",
+        "🎫 Helpdesk Tickets": "helpdesk_ticket",
+        "📄 PDF Manuals": "official_document",
+        "✍️ Manual KB Entries": "general_text"
+    }
+    
+    # Create the filter dropdown
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        selected_label = st.selectbox(
+            "Filter Knowledge Base by Source:",
+            options=list(doc_type_mapping.keys()),
+            help="Select a knowledge source to view all entries from that category."
+        )
+    
+    with col2:
+        limit = st.number_input(
+            "Results per page",
+            min_value=10,
+            max_value=500,
+            value=100,
+            step=10,
+            key="kb_limit"
+        )
+    
+    # Get the actual filter value to send to API
+    filter_value = doc_type_mapping[selected_label]
+    
+    # Display filter info
+    if filter_value:
+        st.info(f"🎯 Filter: `{filter_value}`")
+    else:
+        st.info("🎯 Filter: All knowledge sources (no filter applied)")
+    
+    # Fetch button
+    if st.button("🔎 Explore Knowledge Base", key="explore_kb_button", use_container_width=True):
+        # Build query params
+        params = {"limit": limit}
+        if filter_value:
+            params["doc_type"] = filter_value
+        
+        # Use GET request to the new explorer endpoint
+        response = make_request("GET", "/knowledge/explore", params)
+        
+        if response is None:
+            st.error("❌ Failed to query knowledge base. Check that the backend API is running.")
+        elif isinstance(response, list):
+            if len(response) == 0:
+                st.info("📭 No knowledge base entries found for this filter.")
+            else:
+                st.success(f"✅ Found {len(response)} entries")
+                st.markdown("### Results:")
+                
+                # Display each result as an expandable section
+                for i, result in enumerate(response, 1):
+                    with st.expander(
+                        f"**{i}. {result.get('category', 'Uncategorized')}** | Type: `{result['doc_type']}` | Source: {result['source']}"
+                    ):
+                        col1, col2 = st.columns([1, 1])
+                        with col1:
+                            st.caption(f"**ID:** `{result['id']}`")
+                            st.caption(f"**Type:** `{result['doc_type']}`")
+                        with col2:
+                            st.caption(f"**Source:** {result['source']}")
+                            if result.get('category'):
+                                st.caption(f"**Category:** {result['category']}")
+                        
+                        st.markdown("#### Content:")
+                        st.write(result['content'])
+        else:
+            st.error("❌ Unexpected response format from the knowledge explorer API.")
+
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("**Note:** Make sure the backend API is running on localhost:8000")
