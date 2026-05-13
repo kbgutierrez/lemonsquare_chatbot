@@ -94,6 +94,9 @@ export const API_ENDPOINTS = {
   CHAT_HISTORY:
     "/chat/history/:sessionId",
 
+  CHAT_USER_SESSIONS:
+    "/chat/user-sessions/:requesterId",
+
   CHAT_DEBUG:
     "/chat/debug",
 

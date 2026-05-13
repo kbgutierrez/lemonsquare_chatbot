@@ -64,6 +64,41 @@ const getUserToken = () => {
   return token
 }
 
+const resolveRequesterId = (
+  authToken
+) => {
+
+  if (
+    typeof authToken !==
+    "string"
+  ) {
+    return authToken
+  }
+
+  if (
+    DEV_MODE &&
+    authToken.startsWith(
+      "TEST_USER_"
+    )
+  ) {
+    const parts =
+      authToken.split("_")
+
+    const maybeId =
+      parts[parts.length - 1]
+
+    if (/^\d+$/.test(maybeId)) {
+      return maybeId
+    }
+  }
+
+  if (/^\d+$/.test(authToken)) {
+    return authToken
+  }
+
+  return authToken
+}
+
 /* ========================================
    RESPONSE VALIDATION
 ======================================== */
@@ -76,6 +111,7 @@ const validateChatResponse = (
     !response ||
     typeof response !== "object"
   ) {
+
     throw new Error(
       "Invalid backend response."
     )
@@ -85,6 +121,7 @@ const validateChatResponse = (
     typeof response.session_id !==
     "string"
   ) {
+
     throw new Error(
       "Backend response missing session_id."
     )
@@ -94,6 +131,7 @@ const validateChatResponse = (
     typeof response.response !==
     "string"
   ) {
+
     throw new Error(
       "Backend response missing AI message."
     )
@@ -156,6 +194,63 @@ const normalizeHistoryMessage = (
 
     createdAt:
       createdAt.toISOString(),
+  }
+}
+
+/* ========================================
+   NORMALIZE SESSION METADATA
+======================================== */
+
+const normalizeSession = (
+  session,
+  index
+) => {
+
+  const createdAt =
+    session?.created_at
+      ? new Date(
+          session.created_at
+        )
+      : new Date()
+
+  const updatedAt =
+    session?.updated_at
+      ? new Date(
+          session.updated_at
+        )
+      : createdAt
+
+  return {
+    id:
+      session?.session_id ||
+      `session-${index}`,
+
+    title:
+      session?.title ||
+      "Conversation",
+
+    preview:
+      session?.preview ||
+      "No preview available.",
+
+    createdAt:
+      createdAt.toISOString(),
+
+    updatedAt:
+      updatedAt.toISOString(),
+
+    messageCount:
+      Number(
+        session?.message_count || 0
+      ),
+
+    resolved:
+      Boolean(
+        session?.resolved
+      ),
+
+    resolvedAt:
+      session?.resolved_at || null,
   }
 }
 
@@ -400,6 +495,59 @@ const loadSession =
   }
 
 /* ========================================
+   LOAD USER SESSIONS
+======================================== */
+
+const loadUserSessions =
+  async () => {
+
+    const userToken =
+      getUserToken()
+
+    const requesterId =
+      resolveRequesterId(
+        userToken
+      )
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.CHAT_USER_SESSIONS,
+        {
+          requesterId,
+        }
+      )
+
+    console.log(
+      "LOAD_USER_SESSIONS",
+      {
+        userToken,
+        requesterId,
+      }
+    )
+
+    console.log(
+      "API_ENDPOINT",
+      endpoint
+    )
+
+    const response =
+      await apiRequest({
+        endpoint,
+      })
+
+    const sessions =
+      Array.isArray(
+        response
+      )
+        ? response
+        : response?.sessions || []
+
+    return sessions.map(
+      normalizeSession
+    )
+  }
+
+/* ========================================
    CLEAR SESSION
 ======================================== */
 
@@ -444,6 +592,8 @@ const chatbotService = {
   sendMessage,
 
   loadSession,
+
+  loadUserSessions,
 
   clearSession,
 

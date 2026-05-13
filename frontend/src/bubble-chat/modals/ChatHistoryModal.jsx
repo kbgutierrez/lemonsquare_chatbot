@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useState,
 } from "react"
 
@@ -54,7 +53,7 @@ const ChatHistoryModal = ({
 
     fetchHistory,
 
-    loadConversation,
+    selectConversation,
 
     deleteConversation,
 
@@ -62,15 +61,6 @@ const ChatHistoryModal = ({
   } =
     useConversationHistory()
 
-  /* ========================================
-     INITIAL FETCH
-  ======================================== */
-
-  useEffect(() => {
-
-    fetchHistory()
-
-  }, [fetchHistory])
 
   /* ========================================
      CLOSE
@@ -98,13 +88,18 @@ const ChatHistoryModal = ({
 
       try {
 
+        /*
+          ONLY select metadata.
+          Backend loading now belongs
+          to useChatMessages.
+        */
         const result =
-          await loadConversation(
+          selectConversation(
             conversation.id
           )
 
         console.log(
-          "RESTORED_CONVERSATION",
+          "SELECTED_CONVERSATION",
           result
         )
 
@@ -120,7 +115,7 @@ const ChatHistoryModal = ({
       } catch (error) {
 
         console.error(
-          "CONVERSATION_RESTORE_ERROR",
+          "CONVERSATION_SELECT_ERROR",
           error
         )
       }
@@ -298,7 +293,6 @@ const ChatHistoryModal = ({
               gap-2
             "
           >
-            {/* CLEAR ALL */}
             {conversations.length > 0 && (
               <button
                 type="button"
@@ -332,7 +326,6 @@ const ChatHistoryModal = ({
               </button>
             )}
 
-            {/* CLOSE */}
             <button
               type="button"
 
@@ -378,7 +371,6 @@ const ChatHistoryModal = ({
             p-4
           "
         >
-          {/* LOADING */}
           {loading && (
             <div
               className="
@@ -417,7 +409,6 @@ const ChatHistoryModal = ({
             </div>
           )}
 
-          {/* EMPTY */}
           {!loading &&
             conversations.length === 0 && (
               <div
@@ -453,7 +444,6 @@ const ChatHistoryModal = ({
               </div>
             )}
 
-          {/* CONVERSATIONS */}
           {!loading &&
             conversations.length > 0 && (
               <div
@@ -528,7 +518,6 @@ const ChatHistoryModal = ({
                           active:scale-[0.99]
                         "
                       >
-                        {/* DELETE */}
                         <button
                           type="button"
 
@@ -572,7 +561,6 @@ const ChatHistoryModal = ({
                           />
                         </button>
 
-                        {/* TOP */}
                         <div
                           className="
                             flex
@@ -664,7 +652,6 @@ const ChatHistoryModal = ({
                           />
                         </div>
 
-                        {/* FOOTER */}
                         <div
                           className="
                             mt-4

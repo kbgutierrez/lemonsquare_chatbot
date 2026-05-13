@@ -15,17 +15,49 @@ const ChatMessages = ({
   const previousLengthRef =
     useRef(0)
 
+  const initialLoadRef =
+    useRef(true)
+
   /* ========================================
      AUTO SCROLL
   ======================================== */
 
   useEffect(() => {
 
+    /*
+      INITIAL HISTORY LOAD
+      Avoid aggressive smooth-scroll.
+    */
+    if (
+      initialLoadRef.current
+    ) {
+
+      initialLoadRef.current =
+        false
+
+      messagesEndRef.current
+        ?.scrollIntoView({
+          behavior:
+            "auto",
+        })
+
+      previousLengthRef.current =
+        messages.length
+
+      return
+    }
+
+    /*
+      ONLY SCROLL
+      WHEN NEW MESSAGE ARRIVES.
+    */
     const hasNewMessage =
       messages.length >
       previousLengthRef.current
 
-    if (hasNewMessage) {
+    if (
+      hasNewMessage
+    ) {
 
       messagesEndRef.current
         ?.scrollIntoView({

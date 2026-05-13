@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useState,
 } from "react"
 
@@ -49,6 +50,21 @@ const ChatFooter = ({
     useState(true)
 
   /* ========================================
+     RESET DRAFT ON RESOLVE
+  ======================================== */
+
+  useEffect(() => {
+
+    if (
+      resolved
+    ) {
+
+      setMessage("")
+    }
+
+  }, [resolved])
+
+  /* ========================================
      SEND
   ======================================== */
 
@@ -83,6 +99,9 @@ const ChatFooter = ({
             finalMessage
           )
 
+          /*
+            Clear draft after send.
+          */
           setMessage("")
 
         } catch (error) {

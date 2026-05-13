@@ -9,97 +9,8 @@ import chatbotService
   from "../services/chatbotService"
 
 /* ========================================
-   STORAGE KEY
+   CHAT HOOK
 ======================================== */
-
-const HISTORY_STORAGE_KEY =
-  "chat_session_history"
-
-/* ========================================
-   SAVE SESSION HISTORY
-======================================== */
-
-const saveConversationHistory =
-  ({
-    sessionId,
-    messages,
-  }) => {
-
-    if (
-      !sessionId ||
-      !Array.isArray(messages) ||
-      messages.length === 0
-    ) {
-      return
-    }
-
-    const firstUserMessage =
-      messages.find(
-        (msg) =>
-          msg.sender ===
-          "user"
-      )
-
-    const preview =
-      firstUserMessage?.text ||
-      "Conversation"
-
-    const conversation = {
-      id:
-        sessionId,
-
-      title:
-        preview.slice(
-          0,
-          32
-        ),
-
-      preview:
-        preview.slice(
-          0,
-          80
-        ),
-
-      updatedAt:
-        new Date().toISOString(),
-
-      messageCount:
-        messages.length,
-    }
-
-    let existing = []
-
-    try {
-
-      existing =
-        JSON.parse(
-          localStorage.getItem(
-            HISTORY_STORAGE_KEY
-          ) || "[]"
-        )
-
-    } catch {
-
-      existing = []
-    }
-
-    const filtered =
-      existing.filter(
-        (item) =>
-          item.id !==
-          sessionId
-      )
-
-    const updated = [
-      conversation,
-      ...filtered,
-    ]
-
-    localStorage.setItem(
-      HISTORY_STORAGE_KEY,
-      JSON.stringify(updated)
-    )
-  }
 
 export const useChatMessages =
   () => {
@@ -130,7 +41,10 @@ export const useChatMessages =
     const sessionIdRef =
       useRef(null)
 
-    const activeHistoryLoadRef =
+    /*
+      Prevent stale async overwrites.
+    */
+    const activeLoadIdRef =
       useRef(null)
 
     /* ========================================
@@ -167,32 +81,49 @@ export const useChatMessages =
     }, [])
 
     /* ========================================
-       LOAD HISTORY
+       LOAD CONVERSATION
     ======================================== */
 
-    useEffect(() => {
-
-      const loadHistory =
-        async () => {
+    const loadConversation =
+      useCallback(
+        async (
+          targetSessionId
+        ) => {
 
           if (
-            !sessionId
+            !targetSessionId
           ) {
             return
           }
 
-          const requestId =
+          /*
+            Generate a unique load id so stale
+            async responses can be ignored.
+          */
+          const loadId =
             crypto.randomUUID()
 
-          activeHistoryLoadRef.current =
-            requestId
+          activeLoadIdRef.current =
+            loadId
+
+          setLoading(true)
 
           try {
 
             const data =
               await chatbotService.loadSession(
-                sessionId
+                targetSessionId
               )
+
+            /*
+              Ignore stale requests.
+            */
+            if (
+              activeLoadIdRef.current !==
+              loadId
+            ) {
+              return
+            }
 
             if (
               !mountedRef.current
@@ -200,32 +131,27 @@ export const useChatMessages =
               return
             }
 
-            /*
-              Prevent stale async overwrite.
-            */
-            if (
-              activeHistoryLoadRef.current !==
-              requestId
-            ) {
-              return
-            }
-
-            if (
+            const normalizedMessages =
               Array.isArray(
                 data?.messages
               )
-            ) {
+                ? data.messages
+                : []
 
-              setMessages(
-                data.messages
-              )
+            setMessages(
+              normalizedMessages
+            )
 
-              saveConversationHistory({
-                sessionId,
-                messages:
-                  data.messages,
-              })
-            }
+            console.log(
+              "SESSION_LOADED",
+              {
+                sessionId:
+                  targetSessionId,
+
+                messageCount:
+                  normalizedMessages.length,
+              }
+            )
 
           } catch (error) {
 
@@ -234,23 +160,55 @@ export const useChatMessages =
               error
             )
 
-            sessionIdRef.current =
-              null
+            if (
+              mountedRef.current
+            ) {
+
+              setMessages([])
+
+              setSessionId(
+                null
+              )
+
+              sessionIdRef.current =
+                null
+            }
+
+          } finally {
 
             if (
               mountedRef.current
             ) {
 
-              setSessionId(
-                null
+              setLoading(
+                false
               )
             }
           }
-        }
+        },
+        []
+      )
 
-      loadHistory()
+    /* ========================================
+       AUTO LOAD SESSION
+    ======================================== */
 
-    }, [sessionId])
+    useEffect(() => {
+
+      if (
+        !sessionId
+      ) {
+        return
+      }
+
+      loadConversation(
+        sessionId
+      )
+
+    }, [
+      sessionId,
+      loadConversation,
+    ])
 
     /* ========================================
        SEND MESSAGE
@@ -271,6 +229,9 @@ export const useChatMessages =
             return
           }
 
+          /*
+            Prevent duplicate requests.
+          */
           if (
             requestLockRef.current
           ) {
@@ -294,12 +255,9 @@ export const useChatMessages =
               getTime(),
           }
 
-          const typingMessageId =
-            crypto.randomUUID()
-
           const typingMessage = {
             id:
-              typingMessageId,
+              crypto.randomUUID(),
 
             sender:
               "agent",
@@ -319,6 +277,9 @@ export const useChatMessages =
             userMessage,
           ]
 
+          /*
+            Optimistic UI.
+          */
           setMessages([
             ...optimisticMessages,
             typingMessage,
@@ -339,6 +300,9 @@ export const useChatMessages =
                 }
               )
 
+            /*
+              NEW SESSION CREATED
+            */
             if (
               response?.sessionId
             ) {
@@ -346,8 +310,22 @@ export const useChatMessages =
               sessionIdRef.current =
                 response.sessionId
 
+              /*
+                Only trigger state update
+                if session changed.
+              */
               setSessionId(
-                response.sessionId
+                (previous) => {
+
+                  if (
+                    previous ===
+                    response.sessionId
+                  ) {
+                    return previous
+                  }
+
+                  return response.sessionId
+                }
               )
             }
 
@@ -378,13 +356,13 @@ export const useChatMessages =
               finalMessages
             )
 
-            saveConversationHistory({
-              sessionId:
-                response.sessionId,
-
-              messages:
-                finalMessages,
-            })
+            console.log(
+              "MESSAGE_SENT_SUCCESS",
+              {
+                sessionId:
+                  response.sessionId,
+              }
+            )
 
           } catch (error) {
 
@@ -442,7 +420,6 @@ export const useChatMessages =
       useCallback(
         ({
           sessionId,
-          messages,
         }) => {
 
           if (
@@ -451,6 +428,12 @@ export const useChatMessages =
             return
           }
 
+          /*
+            Clear previous state
+            before switching sessions.
+          */
+          setMessages([])
+
           sessionIdRef.current =
             sessionId
 
@@ -458,8 +441,11 @@ export const useChatMessages =
             sessionId
           )
 
-          setMessages(
-            messages || []
+          console.log(
+            "RESTORE_CONVERSATION",
+            {
+              sessionId,
+            }
           )
         },
         []
@@ -473,13 +459,20 @@ export const useChatMessages =
       useCallback(
         () => {
 
-          setMessages([])
+          activeLoadIdRef.current =
+            null
 
           sessionIdRef.current =
             null
 
+          setMessages([])
+
           setSessionId(
             null
+          )
+
+          console.log(
+            "CONVERSATION_CLEARED"
           )
         },
         []
@@ -487,10 +480,15 @@ export const useChatMessages =
 
     return {
       messages,
+
       loading,
+
       sessionId,
+
       sendMessage,
+
       clearConversation,
+
       restoreConversation,
     }
   }

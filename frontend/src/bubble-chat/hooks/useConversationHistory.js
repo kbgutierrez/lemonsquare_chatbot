@@ -8,14 +8,14 @@ import chatbotService
   from "../services/chatbotService"
 
 /* ========================================
-   STORAGE KEY
+   FALLBACK STORAGE KEY
 ======================================== */
 
 const HISTORY_STORAGE_KEY =
   "chat_session_history"
 
 /* ========================================
-   HELPERS
+   FALLBACK CACHE HELPERS
 ======================================== */
 
 const loadStoredHistory =
@@ -55,6 +55,24 @@ const saveStoredHistory =
   }
 
 /* ========================================
+   SORT HISTORY
+======================================== */
+
+const sortHistory =
+  (history) => {
+
+    return [...history].sort(
+      (a, b) =>
+        new Date(
+          b.updatedAt
+        ) -
+        new Date(
+          a.updatedAt
+        )
+    )
+  }
+
+/* ========================================
    HOOK
 ======================================== */
 
@@ -71,117 +89,111 @@ export const useConversationHistory =
       useState(null)
 
     /* ========================================
-       FETCH HISTORY
+       FETCH USER HISTORY
     ======================================== */
 
     const fetchHistory =
-      useCallback(async () => {
-
-        try {
-
-          setLoading(true)
-
-          const stored =
-            loadStoredHistory()
-
-          /*
-            newest first
-          */
-          const sorted =
-            [...stored].sort(
-              (a, b) =>
-                new Date(
-                  b.updatedAt
-                ) -
-                new Date(
-                  a.updatedAt
-                )
-            )
-
-          setConversations(
-            sorted
-          )
-
-        } catch (error) {
-
-          console.error(
-            "FETCH_HISTORY_ERROR",
-            error
-          )
-
-        } finally {
-
-          setLoading(false)
-        }
-
-      }, [])
-
-    /* ========================================
-       LOAD CONVERSATION
-    ======================================== */
-
-    const loadConversation =
       useCallback(
-        async (
-          sessionId
-        ) => {
+        async () => {
 
           try {
 
-            setSelectedConversationId(
-              sessionId
+            setLoading(true)
+
+            /*
+              PRIMARY SOURCE:
+              Backend user sessions
+            */
+            const backendHistory =
+              await chatbotService.loadUserSessions()
+
+            const sorted =
+              sortHistory(
+                backendHistory
+              )
+
+            setConversations(
+              sorted
             )
 
-            const response =
-              await chatbotService.loadSession(
-                sessionId
-              )
+            /*
+              Save fallback cache.
+            */
+            saveStoredHistory(
+              sorted
+            )
 
-            const existing =
-              loadStoredHistory()
-
-            const conversation =
-              existing.find(
-                (item) =>
-                  item.id ===
-                  sessionId
-              )
-
-            return {
-              sessionId,
-
-              messages:
-                response?.messages || [],
-
-              resolved:
-                Boolean(
-                  conversation?.resolved
-                ),
-            }
+            console.log(
+              "BACKEND_HISTORY_LOADED",
+              sorted
+            )
 
           } catch (error) {
 
             console.error(
-              "LOAD_CONVERSATION_ERROR",
+              "FETCH_HISTORY_ERROR",
               error
             )
 
-            return {
-              sessionId:
-                null,
+            /*
+              FALLBACK:
+              Use cached history
+              if backend fails.
+            */
+            const cached =
+              loadStoredHistory()
 
-              messages: [],
+            setConversations(
+              sortHistory(
+                cached
+              )
+            )
 
-              resolved:
-                false,
-            }
+          } finally {
+
+            setLoading(
+              false
+            )
           }
         },
         []
       )
 
     /* ========================================
-       SAVE CONVERSATION
+       SELECT CONVERSATION
+    ======================================== */
+
+    const selectConversation =
+      useCallback(
+        (
+          sessionId
+        ) => {
+
+          setSelectedConversationId(
+            sessionId
+          )
+
+          const conversation =
+            conversations.find(
+              (item) =>
+                item.id ===
+                sessionId
+            )
+
+          return {
+            sessionId,
+
+            resolved:
+              Boolean(
+                conversation?.resolved
+              ),
+          }
+        },
+        [conversations]
+      )
+
+    /* ========================================
+       SAVE CONVERSATION METADATA
     ======================================== */
 
     const saveConversation =
@@ -200,7 +212,7 @@ export const useConversationHistory =
           }
 
           const existing =
-            loadStoredHistory()
+            [...conversations]
 
           const alreadyExists =
             existing.find(
@@ -257,20 +269,27 @@ export const useConversationHistory =
             )
 
           const updated =
-            [
+            sortHistory([
               updatedConversation,
               ...filtered,
-            ]
+            ])
 
+          /*
+            Optimistic UI update.
+          */
+          setConversations(
+            updated
+          )
+
+          /*
+            Fallback cache.
+          */
           saveStoredHistory(
             updated
           )
 
-          setConversations(
-            updated
-          )
         },
-        []
+        [conversations]
       )
 
     /* ========================================
@@ -285,23 +304,30 @@ export const useConversationHistory =
 
           try {
 
-            const existing =
-              loadStoredHistory()
-
-            const filtered =
-              existing.filter(
+            const updated =
+              conversations.filter(
                 (item) =>
                   item.id !==
                   sessionId
               )
 
-            saveStoredHistory(
-              filtered
+            setConversations(
+              updated
             )
 
-            setConversations(
-              filtered
+            saveStoredHistory(
+              updated
             )
+
+            if (
+              selectedConversationId ===
+              sessionId
+            ) {
+
+              setSelectedConversationId(
+                null
+              )
+            }
 
           } catch (error) {
 
@@ -311,7 +337,10 @@ export const useConversationHistory =
             )
           }
         },
-        []
+        [
+          conversations,
+          selectedConversationId,
+        ]
       )
 
     /* ========================================
@@ -327,6 +356,10 @@ export const useConversationHistory =
           )
 
           setConversations([])
+
+          setSelectedConversationId(
+            null
+          )
         },
         []
       )
@@ -343,11 +376,8 @@ export const useConversationHistory =
 
           try {
 
-            const existing =
-              loadStoredHistory()
-
             const updated =
-              existing.map(
+              conversations.map(
                 (
                   conversation
                 ) => {
@@ -371,11 +401,11 @@ export const useConversationHistory =
                 }
               )
 
-            saveStoredHistory(
+            setConversations(
               updated
             )
 
-            setConversations(
+            saveStoredHistory(
               updated
             )
 
@@ -387,7 +417,7 @@ export const useConversationHistory =
             )
           }
         },
-        []
+        [conversations]
       )
 
     /* ========================================
@@ -401,7 +431,6 @@ export const useConversationHistory =
     }, [fetchHistory])
 
     return {
-
       loading,
 
       conversations,
@@ -410,7 +439,7 @@ export const useConversationHistory =
 
       fetchHistory,
 
-      loadConversation,
+      selectConversation,
 
       saveConversation,
 

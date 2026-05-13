@@ -87,7 +87,6 @@ const ResolveConversationModal = ({
             backdrop-blur-xl
           "
         >
-          {/* BACKGROUND */}
           <div
             className="
               absolute
@@ -169,7 +168,6 @@ const ResolveConversationModal = ({
                 </div>
               </div>
 
-              {/* CLOSE */}
               <button
                 type="button"
 
@@ -219,35 +217,7 @@ const ResolveConversationModal = ({
                 Confirm that the current support session
                 has been completed and safely resolve
                 the conversation.
-
-                Once resolved:
               </p>
-
-              <ul
-                className="
-                  mt-3
-                  space-y-2
-
-                  text-xs
-                  text-slate-500
-                "
-              >
-                <li>
-                  • Conversation becomes read-only
-                </li>
-
-                <li>
-                  • Chat remains available in history
-                </li>
-
-                <li>
-                  • Messages can still be reviewed
-                </li>
-
-                <li>
-                  • New replies will be disabled
-                </li>
-              </ul>
             </div>
 
             {/* ACTIONS */}
@@ -312,16 +282,6 @@ const ResolveConversationModal = ({
                   font-medium
 
                   text-white
-
-                  shadow-lg
-                  shadow-violet-500/20
-
-                  transition
-
-                  hover:scale-[1.02]
-                  hover:shadow-violet-500/30
-
-                  active:scale-[0.98]
                 "
               >
                 Resolve

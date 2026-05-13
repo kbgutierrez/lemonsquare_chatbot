@@ -6,6 +6,8 @@ import {
 import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
 
+import ticketService from "./services/ticketService"
+
 import ChatHistoryModal from "./modals/ChatHistoryModal.jsx"
 import ClearConversationModal from "./modals/ClearConversationModal.jsx"
 import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
@@ -22,6 +24,10 @@ import {
 } from "./hooks/useChatMessages"
 
 import {
+  useConversationHistory,
+} from "./hooks/useConversationHistory"
+
+import {
   CHAT_CONFIG,
 } from "./constants/chatConfig"
 
@@ -32,6 +38,9 @@ const BubbleChat = () => {
 
   const [activeModal, setActiveModal] =
     useState(null)
+
+  const [resolved, setResolved] =
+    useState(false)
 
   /* ========================================
      DRAG
@@ -54,10 +63,20 @@ const BubbleChat = () => {
   const {
     messages,
     loading,
+    sessionId,
     sendMessage,
     clearConversation,
     restoreConversation,
   } = useChatMessages()
+
+  /* ========================================
+     HISTORY
+  ======================================== */
+
+  const {
+    resolveConversation,
+  } =
+    useConversationHistory()
 
   /* ========================================
      SMART REPOSITION
@@ -69,7 +88,10 @@ const BubbleChat = () => {
       repositionForWindow()
     }
 
-  }, [open])
+  }, [
+    open,
+    repositionForWindow,
+  ])
 
   /* ========================================
      CLOSE MODAL
@@ -100,24 +122,126 @@ const BubbleChat = () => {
   const handleLoadConversation =
     ({
       sessionId,
-      messages,
+      resolved,
     }) => {
 
+      /*
+        Session-driven restore.
+        Backend loading handled
+        inside useChatMessages.
+      */
       restoreConversation({
         sessionId,
-        messages,
       })
 
       /*
-        Automatically open chat window
-        after restoring conversation.
+        Restore resolved state.
+      */
+      setResolved(
+        Boolean(
+          resolved
+        )
+      )
+
+      /*
+        Automatically open chat.
       */
       setOpen(true)
 
       /*
-        Close modal
+        Close modal.
       */
       setActiveModal(null)
+
+      console.log(
+        "CONVERSATION_SELECTED",
+        {
+          sessionId,
+          resolved,
+        }
+      )
+    }
+
+  /* ========================================
+     RESOLVE CHAT
+  ======================================== */
+
+  const handleResolveConversation =
+    async () => {
+
+      try {
+
+        if (
+          !sessionId ||
+          !messages.length
+        ) {
+          return
+        }
+
+        /*
+          Push resolved chat
+          into backend AI memory.
+        */
+        await ticketService.resolveTicket({
+          sessionId,
+          messages,
+        })
+
+        /*
+          Persist resolved state.
+        */
+        resolveConversation(
+          sessionId
+        )
+
+        /*
+          Lock conversation.
+        */
+        setResolved(true)
+
+        /*
+          Close modal.
+        */
+        setActiveModal(null)
+
+        console.log(
+          "CONVERSATION_RESOLVED",
+          {
+            sessionId,
+          }
+        )
+
+      } catch (error) {
+
+        console.error(
+          "RESOLVE_ERROR",
+          error
+        )
+      }
+    }
+
+  /* ========================================
+     NEW CHAT
+  ======================================== */
+
+  const handleClearConversation =
+    () => {
+
+      clearConversation()
+
+      /*
+        Reset resolved state.
+      */
+      setResolved(false)
+
+      /*
+        Close modal.
+      */
+      setActiveModal(null)
+
+      console.log(
+        "CONVERSATION_CLEARED"
+      )
     }
 
   /* ========================================
@@ -140,7 +264,7 @@ const BubbleChat = () => {
         onClose={closeModal}
 
         onClearConversation={
-          clearConversation
+          handleClearConversation
         }
       />
     ),
@@ -160,6 +284,10 @@ const BubbleChat = () => {
     resolve: (
       <ResolveConversationModal
         onClose={closeModal}
+
+        onResolve={
+          handleResolveConversation
+        }
       />
     ),
 
@@ -284,6 +412,8 @@ const BubbleChat = () => {
             messages={messages}
 
             loading={loading}
+
+            resolved={resolved}
 
             onSendMessage={
               sendMessage
