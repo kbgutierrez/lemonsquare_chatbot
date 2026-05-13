@@ -129,6 +129,41 @@ async def get_chat_history(
     )
 
 
+@router.get("/user-sessions/{requester_id}", summary="Get all chat sessions for a specific user")
+def get_user_chat_sessions(
+    requester_id: str,
+    limit: int = 20,
+    db: Session = Depends(get_chatbot_db)
+):
+    """
+    Returns a list of past chat sessions for a specific employee.
+    Used to populate the 'Chat History' sidebar in the frontend UI.
+    """
+    from app.models.chatbot import ChatSession
+    
+    # Fetch sessions belonging ONLY to this user, newest first
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.RequesterUserID == requester_id)
+        .order_by(ChatSession.CreatedAt.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    result = []
+    for s in sessions:
+        # We don't send the full message history here to save bandwidth.
+        # We just send the metadata so the frontend can build the sidebar menu.
+        result.append({
+            "session_id": s.SessionID,
+            "status": s.Status,
+            "created_at": s.CreatedAt.isoformat() if s.CreatedAt else None,
+            "message_count": len(s.messages) if s.messages else 0 
+        })
+        
+    return result
+
+
 
 
 @router.post("/debug", response_model=ChatResponse)
