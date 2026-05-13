@@ -29,15 +29,20 @@ BaseChatbot = declarative_base()
 
 class ChatSession(BaseChatbot):
     """A conversation session between a user and the AI."""
-
     __tablename__ = "ChatSession"
 
-    SessionID = Column(
-        String(36),
-        primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
+    SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     RequesterUserID = Column(BigInteger, nullable=False, default=1)
+    
+    # --- THE NEWLY DISCOVERED COLUMNS ---
+    ChatTitle = Column(String(255))
+    StartTime = Column(DateTime, default=datetime.utcnow)
+    LastActive = Column(DateTime)
+    IsActive = Column(Boolean, default=True)
+    RelatedTicketID = Column(String(50))
+    IssueSummary = Column(Text)
+    ResolutionSummary = Column(Text)
+    SessionStatus = Column(String(50), default="Active")
 
     messages = relationship(
         "ChatMessage",
