@@ -54,7 +54,7 @@ async def handle_chat(
         logger.debug("Authenticating token: %s", request.user_token[:10] + "...")
         user_data = await fetch_user_details(request.user_token)
         logger.debug("Auth returned user_data: %s", user_data)
-        user_id = user_data.get("id") or 1
+        user_id = int(user_data.get("id") or 1)
         user_name = (
             f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
         ).strip()
@@ -133,12 +133,12 @@ async def get_chat_history(
 from datetime import datetime
 
 @router.get(
-    "/user-sessions/{requester_userid}", 
+    "/user-sessions/{requester_id}", 
     response_model=list[ChatSessionMetaResponse], 
     summary="Get all chat sessions for a specific user"
 )
 def get_user_chat_sessions(
-    requester_userid: str,
+    requester_id: str,
     limit: int = 20,
     db: Session = Depends(get_chatbot_db)
 ):
@@ -147,7 +147,7 @@ def get_user_chat_sessions(
     # We can use order_by again because StartTime exists!
     sessions = (
         db.query(ChatSession)
-        .filter(ChatSession.RequesterUserID == requester_userid)
+        .filter(ChatSession.RequesterUserID == requester_id)
         .order_by(ChatSession.StartTime.desc())
         .limit(limit)
         .all()
