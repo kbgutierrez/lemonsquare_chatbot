@@ -130,9 +130,11 @@ async def get_chat_history(
     )
 
 
+from datetime import datetime
+
 @router.get(
     "/user-sessions/{requester_id}", 
-    response_model=list[ChatSessionMetaResponse], # <--- ADDED HERE
+    response_model=list[ChatSessionMetaResponse], 
     summary="Get all chat sessions for a specific user"
 )
 def get_user_chat_sessions(
@@ -140,33 +142,63 @@ def get_user_chat_sessions(
     limit: int = 20,
     db: Session = Depends(get_chatbot_db)
 ):
-    """
-    Returns a list of past chat sessions for a specific employee.
-    Used to populate the 'Chat History' sidebar in the frontend UI.
-    """
+    """Returns past chat sessions using ONLY the available database columns."""
     from app.models.chatbot import ChatSession
     
-    # Fetch sessions belonging ONLY to this user, newest first
-    sessions = (
-        db.query(ChatSession)
-        .filter(ChatSession.RequesterUserID == requester_id)
-        .order_by(ChatSession.CreatedAt.desc())
-        .limit(limit)
-        .all()
-    )
+    # 1. Fetch sessions for the user without SQL sorting
+    sessions = db.query(ChatSession).filter(ChatSession.RequesterUserID == requester_id).all()
     
     result = []
     for s in sessions:
-        # We don't send the full message history here to save bandwidth.
-        # We just send the metadata so the frontend can build the sidebar menu.
+        # 2. Infer the session start time from its first message
+        session_date = None
+        if s.messages:
+            sorted_messages = sorted(s.messages, key=lambda m: m.CreatedAt)
+            session_date = sorted_messages[0].CreatedAt
+            
         result.append({
             "session_id": s.SessionID,
-            "status": s.Status,
-            "created_at": s.CreatedAt, # Pydantic will auto-format the datetime object
+            "status": "Archived", # Hardcoded because it is not in the DB
+            "created_at": session_date,
             "message_count": len(s.messages) if s.messages else 0 
         })
         
-    return result
+    # 3. Sort them in Python (newest first) and apply the limit
+    result.sort(key=lambda x: x["created_at"] if x["created_at"] else datetime.min, reverse=True)
+    return result[:limit]
+
+
+@router.get(
+    "/all-sessions", 
+    response_model=list[ChatSessionMetaResponse], 
+    summary="Admin Audit: List all chats"
+)
+def get_all_chat_sessions(
+    limit: int = 50,
+    db: Session = Depends(get_chatbot_db)
+):
+    """Admin-only endpoint to review all employee chats using ONLY available columns."""
+    from app.models.chatbot import ChatSession
+    
+    sessions = db.query(ChatSession).all()
+    
+    result = []
+    for s in sessions:
+        session_date = None
+        if s.messages:
+            sorted_messages = sorted(s.messages, key=lambda m: m.CreatedAt)
+            session_date = sorted_messages[0].CreatedAt
+            
+        result.append({
+            "session_id": s.SessionID,
+            "user_id": str(s.RequesterUserID), # Convert BigInt to string for safety
+            "status": "Archived",
+            "created_at": session_date,
+            "message_count": len(s.messages) if s.messages else 0 
+        })
+        
+    result.sort(key=lambda x: x["created_at"] if x["created_at"] else datetime.min, reverse=True)
+    return result[:limit]
 
 
 
