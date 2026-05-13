@@ -12,10 +12,6 @@ import {
   API_CONFIG,
 } from "../../../config/sqlVariables"
 
-import {
-  categories,
-} from "../../data/categories.js"
-
 import FileTable from "./FileTable.jsx"
 
 const API_URL =
@@ -84,7 +80,36 @@ const KnowledgeFilesSection =
 
     }, [])
 
-    /* TOGGLE ACTIVE */
+    /* DYNAMIC CATEGORY TABS */
+    const dynamicCategories =
+      useMemo(() => {
+
+        const uniqueCategories =
+          [
+            ...new Set(
+              files
+                .map(
+                  (file) =>
+                    file.category
+                )
+                .filter(Boolean)
+            ),
+          ]
+
+        return uniqueCategories.map(
+          (category) => ({
+            id: category,
+            name: category
+              .replaceAll(
+                "_",
+                " "
+              ),
+          })
+        )
+
+      }, [files])
+
+    /* TOGGLE ACTIVE / BLOCK */
     const toggleFile =
       async (
         documentId,
@@ -133,58 +158,6 @@ const KnowledgeFilesSection =
 
           console.error(
             "TOGGLE_FILE_ERROR",
-            error
-          )
-        }
-      }
-
-    /* DELETE */
-    const deleteFile =
-      async (
-        documentId
-      ) => {
-
-        const confirmed =
-          window.confirm(
-            "Delete this document?"
-          )
-
-        if (!confirmed)
-          return
-
-        try {
-
-          const response =
-            await fetch(
-              `${API_URL}/${documentId}`,
-              {
-                method:
-                  "DELETE",
-              }
-            )
-
-          if (
-            !response.ok
-          ) {
-
-            throw new Error(
-              "Failed to delete document"
-            )
-          }
-
-          setFiles(
-            (prev) =>
-              prev.filter(
-                (file) =>
-                  file.document_id !==
-                  documentId
-              )
-          )
-
-        } catch (error) {
-
-          console.error(
-            "DELETE_DOCUMENT_ERROR",
             error
           )
         }
@@ -262,7 +235,7 @@ const KnowledgeFilesSection =
                 "All Files",
             },
 
-            ...categories,
+            ...dynamicCategories,
           ].map((category) => {
 
             const active =
@@ -528,10 +501,6 @@ const KnowledgeFilesSection =
 
                 onToggleFile={
                   toggleFile
-                }
-
-                onDeleteFile={
-                  deleteFile
                 }
               />
             )}

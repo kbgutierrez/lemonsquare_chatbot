@@ -8,49 +8,89 @@ import chatbotService
   from "../services/chatbotService"
 
 /* ========================================
-   STORAGE KEY
+   SORT HISTORY
 ======================================== */
 
-const HISTORY_STORAGE_KEY =
-  "chat_session_history"
+const sortHistory =
+  (history = []) => {
+
+    return [...history].sort(
+      (a, b) =>
+        new Date(
+          b.updatedAt ||
+          b.createdAt
+        ) -
+        new Date(
+          a.updatedAt ||
+          a.createdAt
+        )
+    )
+  }
 
 /* ========================================
-   HELPERS
+   BUILD PREVIEW FROM BACKEND HISTORY
 ======================================== */
 
-const loadStoredHistory =
-  () => {
+const buildConversationPreview =
+  (messages = []) => {
 
-    try {
+    const firstUserMessage =
+      messages.find(
+        (message) =>
+          message.sender === "user"
+      )
 
-      const raw =
-        localStorage.getItem(
-          HISTORY_STORAGE_KEY
-        )
+    const latestMessage =
+      messages[
+        messages.length - 1
+      ]
 
-      if (!raw) {
-        return []
-      }
+    const title =
+      firstUserMessage?.text
+        ?.trim()
+        ?.slice(0, 32) ||
+      "Conversation"
 
-      const parsed =
-        JSON.parse(raw)
+    const preview =
+      latestMessage?.text
+        ?.trim()
+        ?.slice(0, 80) ||
+      "No preview available."
 
-      return Array.isArray(parsed)
-        ? parsed
-        : []
-
-    } catch {
-
-      return []
+    return {
+      title,
+      preview,
     }
   }
 
-const saveStoredHistory =
-  (history) => {
+/* ========================================
+   DEDUPLICATE SESSIONS
+======================================== */
 
-    localStorage.setItem(
-      HISTORY_STORAGE_KEY,
-      JSON.stringify(history)
+const deduplicateSessions =
+  (sessions = []) => {
+
+    const unique =
+      new Map()
+
+    sessions.forEach(
+      (session) => {
+
+        if (
+          !session?.id
+        ) {
+          return
+        }
+
+        unique.set(
+          session.id,
+          session
+        )
+      }
+    )
+
+    return Array.from(
+      unique.values()
     )
   }
 
@@ -71,182 +111,230 @@ export const useConversationHistory =
       useState(null)
 
     /* ========================================
-       FETCH HISTORY
+       FETCH USER HISTORY
     ======================================== */
 
     const fetchHistory =
-      useCallback(async () => {
-
-        try {
-
-          setLoading(true)
-
-          const stored =
-            loadStoredHistory()
-
-          /*
-            newest first
-          */
-          const sorted =
-            [...stored].sort(
-              (a, b) =>
-                new Date(
-                  b.updatedAt
-                ) -
-                new Date(
-                  a.updatedAt
-                )
-            )
-
-          setConversations(
-            sorted
-          )
-
-        } catch (error) {
-
-          console.error(
-            "FETCH_HISTORY_ERROR",
-            error
-          )
-
-        } finally {
-
-          setLoading(false)
-        }
-
-      }, [])
-
-    /* ========================================
-       LOAD CONVERSATION
-    ======================================== */
-
-    const loadConversation =
       useCallback(
-        async (
-          sessionId
-        ) => {
+        async () => {
 
           try {
 
-            setSelectedConversationId(
-              sessionId
-            )
+            setLoading(true)
 
-            const response =
-              await chatbotService.loadSession(
-                sessionId
+            /*
+              STEP 1:
+              Load backend sessions
+            */
+            const backendSessions =
+              await chatbotService.loadUserSessions()
+
+            /*
+              STEP 2:
+              Hydrate previews using
+              REAL backend history
+            */
+            const hydratedSessions =
+              await Promise.all(
+                backendSessions.map(
+                  async (
+                    session
+                  ) => {
+
+                    try {
+
+                      const history =
+                        await chatbotService.loadSession(
+                          session.id
+                        )
+
+                      const {
+                        title,
+                        preview,
+                      } =
+                        buildConversationPreview(
+                          history.messages
+                        )
+
+                      return {
+                        ...session,
+
+                        title,
+
+                        preview,
+
+                        updatedAt:
+                          history.messages?.[
+                            history.messages.length - 1
+                          ]?.createdAt ||
+                          session.createdAt,
+                      }
+
+                    } catch (error) {
+
+                      console.error(
+                        "SESSION_PREVIEW_LOAD_ERROR",
+                        session.id,
+                        error
+                      )
+
+                      return {
+                        ...session,
+
+                        title:
+                          "Conversation",
+
+                        preview:
+                          "Unable to load preview.",
+                      }
+                    }
+                  }
+                )
               )
 
-            return {
-              sessionId,
+            /*
+              STEP 3:
+              Remove duplicates
+            */
+            const deduplicated =
+              deduplicateSessions(
+                hydratedSessions
+              )
 
-              messages:
-                response?.messages || [],
-            }
+            /*
+              STEP 4:
+              Sort newest first
+            */
+            const sorted =
+              sortHistory(
+                deduplicated
+              )
+
+            setConversations(
+              sorted
+            )
+
+            console.log(
+              "BACKEND_HISTORY_LOADED",
+              sorted
+            )
 
           } catch (error) {
 
             console.error(
-              "LOAD_CONVERSATION_ERROR",
+              "FETCH_HISTORY_ERROR",
               error
             )
 
-            return {
-              sessionId:
-                null,
+            setConversations(
+              []
+            )
 
-              messages: [],
-            }
+          } finally {
+
+            setLoading(
+              false
+            )
           }
         },
         []
+      )
+
+    /* ========================================
+       SELECT CONVERSATION
+    ======================================== */
+
+    const selectConversation =
+      useCallback(
+        (
+          sessionId
+        ) => {
+
+          setSelectedConversationId(
+            sessionId
+          )
+
+          const conversation =
+            conversations.find(
+              (item) =>
+                item.id ===
+                sessionId
+            )
+
+          return {
+            sessionId,
+
+            resolved:
+              Boolean(
+                conversation?.resolved
+              ),
+          }
+        },
+        [conversations]
       )
 
     /* ========================================
        SAVE CONVERSATION
     ======================================== */
 
+    /*
+      IMPORTANT:
+      Frontend no longer owns
+      history persistence.
+
+      Backend is source of truth.
+
+      We only refresh history.
+    */
+
     const saveConversation =
       useCallback(
-        ({
-          sessionId,
-          messages,
-        }) => {
+        async () => {
 
-          if (
-            !sessionId ||
-            !Array.isArray(messages) ||
-            messages.length === 0
-          ) {
-            return
-          }
+          await fetchHistory()
 
-          const firstUserMessage =
-            messages.find(
-              (msg) =>
-                msg.sender ===
-                "user"
-            )
+        },
+        [fetchHistory]
+      )
 
-          const preview =
-            firstUserMessage?.text ||
-            "Conversation"
+    /* ========================================
+       DELETE PLACEHOLDER
+    ======================================== */
 
-          const updatedConversation = {
-            id:
-              sessionId,
+    const deleteConversation =
+      useCallback(
+        (
+          sessionId
+        ) => {
 
-            title:
-              preview.slice(
-                0,
-                32
-              ),
-
-            preview:
-              preview.slice(
-                0,
-                80
-              ),
-
-            updatedAt:
-              new Date().toISOString(),
-
-            messageCount:
-              messages.length,
-          }
-
-          const existing =
-            loadStoredHistory()
-
-          const filtered =
-            existing.filter(
-              (item) =>
-                item.id !==
-                sessionId
-            )
-
-          const updated =
-            [
-              updatedConversation,
-              ...filtered,
-            ]
-
-          saveStoredHistory(
-            updated
-          )
-
-          setConversations(
-            updated
+          console.warn(
+            "DELETE_CONVERSATION_NOT_IMPLEMENTED",
+            sessionId
           )
         },
         []
       )
 
     /* ========================================
-       DELETE CONVERSATION
+       CLEAR PLACEHOLDER
     ======================================== */
 
-    const deleteConversation =
+    const clearAllHistory =
+      useCallback(
+        () => {
+
+          console.warn(
+            "CLEAR_ALL_NOT_IMPLEMENTED"
+          )
+        },
+        []
+      )
+
+    /* ========================================
+       RESOLVE CONVERSATION
+    ======================================== */
+
+    const resolveConversation =
       useCallback(
         async (
           sessionId
@@ -254,33 +342,24 @@ export const useConversationHistory =
 
           try {
 
-            const existing =
-              loadStoredHistory()
-
-            const filtered =
-              existing.filter(
-                (item) =>
-                  item.id !==
-                  sessionId
-              )
-
-            saveStoredHistory(
-              filtered
+            await chatbotService.resolveConversation(
+              sessionId
             )
 
-            setConversations(
-              filtered
-            )
+            /*
+              Refresh backend truth
+            */
+            await fetchHistory()
 
           } catch (error) {
 
             console.error(
-              "DELETE_CONVERSATION_ERROR",
+              "RESOLVE_CONVERSATION_ERROR",
               error
             )
           }
         },
-        []
+        [fetchHistory]
       )
 
     /* ========================================
@@ -294,7 +373,6 @@ export const useConversationHistory =
     }, [fetchHistory])
 
     return {
-
       loading,
 
       conversations,
@@ -303,10 +381,14 @@ export const useConversationHistory =
 
       fetchHistory,
 
-      loadConversation,
+      selectConversation,
 
       saveConversation,
 
       deleteConversation,
+
+      clearAllHistory,
+
+      resolveConversation,
     }
   }

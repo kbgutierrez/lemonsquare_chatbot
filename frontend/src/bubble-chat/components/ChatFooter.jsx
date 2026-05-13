@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useState,
 } from "react"
 
@@ -8,6 +9,7 @@ import {
   Sparkles,
   ChevronDown,
   LoaderCircle,
+  Lock,
 } from "lucide-react"
 
 const quickQuestions = [
@@ -38,6 +40,7 @@ const chip = `
 const ChatFooter = ({
   onSendMessage,
   loading = false,
+  resolved = false,
 }) => {
 
   const [message, setMessage] =
@@ -45,6 +48,21 @@ const ChatFooter = ({
 
   const [showQuestions, setShowQuestions] =
     useState(true)
+
+  /* ========================================
+     RESET DRAFT ON RESOLVE
+  ======================================== */
+
+  useEffect(() => {
+
+    if (
+      resolved
+    ) {
+
+      setMessage("")
+    }
+
+  }, [resolved])
 
   /* ========================================
      SEND
@@ -55,6 +73,12 @@ const ChatFooter = ({
       async (
         customMessage
       ) => {
+
+        if (
+          resolved
+        ) {
+          return
+        }
 
         const finalMessage =
           (
@@ -75,6 +99,9 @@ const ChatFooter = ({
             finalMessage
           )
 
+          /*
+            Clear draft after send.
+          */
           setMessage("")
 
         } catch (error) {
@@ -88,6 +115,7 @@ const ChatFooter = ({
       [
         message,
         loading,
+        resolved,
         onSendMessage,
       ]
     )
@@ -122,6 +150,12 @@ const ChatFooter = ({
       question
     ) => {
 
+      if (
+        resolved
+      ) {
+        return
+      }
+
       setMessage(question)
 
       await handleSend(
@@ -141,192 +175,263 @@ const ChatFooter = ({
         py-3
       "
     >
-      {/* FAQ */}
-      <div className="mb-3">
-
-        {!showQuestions && (
-          <div className="flex justify-end">
-            <button
-              type="button"
-
-              aria-label="Open FAQ"
-
-              onClick={() =>
-                setShowQuestions(
-                  true
-                )
-              }
-
-              className={`
-                ${chip}
-
-                flex
-                items-center
-                gap-1.5
-
-                px-2.5
-                py-1
-
-                text-[9px]
-                font-semibold
-
-                uppercase
-                tracking-[0.12em]
-
-                text-violet-600
-              `}
-            >
-              <Sparkles className="h-3 w-3" />
-
-              FAQ
-
-              <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
-            </button>
-          </div>
-        )}
-
+      {/* RESOLVED BANNER */}
+      {resolved && (
         <div
-          className={`
-            overflow-hidden
+          className="
+            mb-3
 
-            transition-all
-            duration-300
-            ease-in-out
+            flex
+            items-center
+            gap-3
 
-            ${
-              showQuestions
-                ? "max-h-40 opacity-100"
-                : "max-h-0 opacity-0"
-            }
-          `}
+            rounded-2xl
+
+            border
+            border-emerald-200
+
+            bg-emerald-50
+
+            px-4
+            py-3
+          "
         >
-          {/* TOP */}
           <div
             className="
-              mb-2
-
               flex
+              h-10
+              w-10
+              shrink-0
               items-center
-              gap-3
+              justify-center
+
+              rounded-xl
+
+              bg-emerald-100
             "
           >
-            <div
+            <Lock
               className="
-                flex
-                shrink-0
-                items-center
-                gap-2
-              "
-            >
-              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
-
-              <p
-                className="
-                  text-[9px]
-                  font-semibold
-                  uppercase
-                  tracking-[0.14em]
-                  text-violet-500
-                "
-              >
-                Frequently Asked
-              </p>
-            </div>
-
-            <div
-              className="
-                h-px
-                flex-1
-
-                bg-gradient-to-r
-                from-violet-200
-                to-transparent
+                h-5
+                w-5
+                text-emerald-700
               "
             />
-
-            <button
-              type="button"
-
-              aria-label="Hide FAQ"
-
-              onClick={() =>
-                setShowQuestions(
-                  false
-                )
-              }
-
-              className={`
-                ${chip}
-
-                flex
-                h-6
-                w-6
-                items-center
-                justify-center
-
-                text-violet-500
-              `}
-            >
-              <ChevronDown className="h-3.5 w-3.5" />
-            </button>
           </div>
 
-          {/* QUESTIONS */}
-          <div
-            className="
-              flex
-              gap-2
+          <div>
+            <p
+              className="
+                text-sm
+                font-semibold
 
-              overflow-x-auto
+                text-emerald-800
+              "
+            >
+              Conversation Resolved
+            </p>
 
-              pb-1
-
-              [scrollbar-width:none]
-              [&::-webkit-scrollbar]:hidden
-            "
-          >
-            {quickQuestions.map(
-              (
-                question
-              ) => (
-                <button
-                  key={
-                    question
-                  }
-
-                  type="button"
-
-                  disabled={
-                    loading
-                  }
-
-                  onClick={() =>
-                    handleQuickQuestion(
-                      question
-                    )
-                  }
-
-                  className={`
-                    ${chip}
-
-                    px-3
-                    py-1.5
-
-                    text-[11px]
-                    font-medium
-                    text-violet-700
-
-                    disabled:cursor-not-allowed
-                    disabled:opacity-50
-                  `}
-                >
-                  {question}
-                </button>
-              )
-            )}
+            <p
+              className="
+                mt-1
+                text-xs
+                text-emerald-700
+              "
+            >
+              This chat is now read-only.
+            </p>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* FAQ */}
+      {!resolved && (
+        <div className="mb-3">
+
+          {!showQuestions && (
+            <div className="flex justify-end">
+              <button
+                type="button"
+
+                aria-label="Open FAQ"
+
+                onClick={() =>
+                  setShowQuestions(
+                    true
+                  )
+                }
+
+                className={`
+                  ${chip}
+
+                  flex
+                  items-center
+                  gap-1.5
+
+                  px-2.5
+                  py-1
+
+                  text-[9px]
+                  font-semibold
+
+                  uppercase
+                  tracking-[0.12em]
+
+                  text-violet-600
+                `}
+              >
+                <Sparkles className="h-3 w-3" />
+
+                FAQ
+
+                <ChevronDown className="h-3.5 w-3.5 -rotate-90" />
+              </button>
+            </div>
+          )}
+
+          <div
+            className={`
+              overflow-hidden
+
+              transition-all
+              duration-300
+              ease-in-out
+
+              ${
+                showQuestions
+                  ? "max-h-40 opacity-100"
+                  : "max-h-0 opacity-0"
+              }
+            `}
+          >
+            {/* TOP */}
+            <div
+              className="
+                mb-2
+
+                flex
+                items-center
+                gap-3
+              "
+            >
+              <div
+                className="
+                  flex
+                  shrink-0
+                  items-center
+                  gap-2
+                "
+              >
+                <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+
+                <p
+                  className="
+                    text-[9px]
+                    font-semibold
+                    uppercase
+                    tracking-[0.14em]
+                    text-violet-500
+                  "
+                >
+                  Frequently Asked
+                </p>
+              </div>
+
+              <div
+                className="
+                  h-px
+                  flex-1
+
+                  bg-gradient-to-r
+                  from-violet-200
+                  to-transparent
+                "
+              />
+
+              <button
+                type="button"
+
+                aria-label="Hide FAQ"
+
+                onClick={() =>
+                  setShowQuestions(
+                    false
+                  )
+                }
+
+                className={`
+                  ${chip}
+
+                  flex
+                  h-6
+                  w-6
+                  items-center
+                  justify-center
+
+                  text-violet-500
+                `}
+              >
+                <ChevronDown className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* QUESTIONS */}
+            <div
+              className="
+                flex
+                gap-2
+
+                overflow-x-auto
+
+                pb-1
+
+                [scrollbar-width:none]
+                [&::-webkit-scrollbar]:hidden
+              "
+            >
+              {quickQuestions.map(
+                (
+                  question
+                ) => (
+                  <button
+                    key={
+                      question
+                    }
+
+                    type="button"
+
+                    disabled={
+                      loading
+                    }
+
+                    onClick={() =>
+                      handleQuickQuestion(
+                        question
+                      )
+                    }
+
+                    className={`
+                      ${chip}
+
+                      px-3
+                      py-1.5
+
+                      text-[11px]
+                      font-medium
+                      text-violet-700
+
+                      disabled:cursor-not-allowed
+                      disabled:opacity-50
+                    `}
+                  >
+                    {question}
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* INPUT */}
       <div
@@ -351,7 +456,10 @@ const ChatFooter = ({
 
           value={message}
 
-          disabled={loading}
+          disabled={
+            loading ||
+            resolved
+          }
 
           maxLength={
             MAX_MESSAGE_LENGTH
@@ -374,9 +482,11 @@ const ChatFooter = ({
           }
 
           placeholder={
-            loading
-              ? "AI is replying..."
-              : "Ask something..."
+            resolved
+              ? "Resolved conversations are read-only."
+              : loading
+                ? "AI is replying..."
+                : "Ask something..."
           }
 
           className="
@@ -395,6 +505,7 @@ const ChatFooter = ({
             placeholder:text-slate-400
 
             disabled:cursor-not-allowed
+            disabled:opacity-70
           "
         />
 
@@ -405,6 +516,7 @@ const ChatFooter = ({
 
           disabled={
             loading ||
+            resolved ||
             !message.trim()
           }
 
@@ -439,6 +551,8 @@ const ChatFooter = ({
         >
           {loading ? (
             <LoaderCircle className="h-4 w-4 animate-spin" />
+          ) : resolved ? (
+            <Lock className="h-4 w-4" />
           ) : (
             <SendHorizonal className="h-4 w-4" />
           )}
@@ -456,9 +570,11 @@ const ChatFooter = ({
         "
       >
         <p className="text-[10px] text-slate-400">
-          {loading
-            ? "AI is generating a response..."
-            : "AI assistance enabled"}
+          {resolved
+            ? "Conversation locked"
+            : loading
+              ? "AI is generating a response..."
+              : "AI assistance enabled"}
         </p>
 
         <div
@@ -476,17 +592,21 @@ const ChatFooter = ({
               rounded-full
 
               ${
-                loading
-                  ? "bg-yellow-400"
-                  : "bg-emerald-400"
+                resolved
+                  ? "bg-slate-400"
+                  : loading
+                    ? "bg-yellow-400"
+                    : "bg-emerald-400"
               }
             `}
           />
 
           <span className="text-[10px] text-slate-400">
-            {loading
-              ? "Typing..."
-              : "Online"}
+            {resolved
+              ? "Resolved"
+              : loading
+                ? "Typing..."
+                : "Online"}
           </span>
         </div>
       </div>

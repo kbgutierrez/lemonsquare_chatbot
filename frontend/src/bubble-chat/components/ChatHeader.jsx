@@ -1,9 +1,16 @@
-import ChatMenu from './ChatMenu.jsx'
+import {
+  CheckCircle2,
+  Lock,
+} from "lucide-react"
+
+import ChatMenu from "./ChatMenu.jsx"
 
 const ChatHeader = ({
+  resolved = false,
   onClose,
-  onOpenModal
+  onOpenModal,
 }) => {
+
   return (
     <div
       className="
@@ -27,6 +34,7 @@ const ChatHeader = ({
 
       {/* LEFT */}
       <div className="min-w-0">
+
         <p
           className="
             text-[10px]
@@ -39,17 +47,30 @@ const ChatHeader = ({
         </p>
 
         <div className="mt-1 flex items-center gap-2">
-          
-          {/* STATUS */}
-          <div
-            className="
-              h-2
-              w-2
-              rounded-full
-              bg-emerald-300
-            "
-          />
 
+          {/* STATUS ICON */}
+          {resolved ? (
+            <Lock
+              className="
+                h-3.5
+                w-3.5
+                shrink-0
+
+                text-emerald-200
+              "
+            />
+          ) : (
+            <div
+              className="
+                h-2
+                w-2
+                rounded-full
+                bg-emerald-300
+              "
+            />
+          )}
+
+          {/* TITLE */}
           <h2
             className="
               truncate
@@ -57,8 +78,44 @@ const ChatHeader = ({
               font-semibold
             "
           >
-            Virtual Support Assistant
+            {resolved
+              ? "Resolved Conversation"
+              : "Virtual Support Assistant"}
           </h2>
+
+          {/* RESOLVED BADGE */}
+          {resolved && (
+            <span
+              className="
+                flex
+                items-center
+                gap-1
+
+                rounded-full
+
+                bg-emerald-400/20
+
+                px-2
+                py-0.5
+
+                text-[9px]
+                font-semibold
+                uppercase
+                tracking-[0.08em]
+
+                text-emerald-100
+              "
+            >
+              <CheckCircle2
+                className="
+                  h-3
+                  w-3
+                "
+              />
+
+              Resolved
+            </span>
+          )}
         </div>
       </div>
 
@@ -66,12 +123,24 @@ const ChatHeader = ({
       <div className="flex items-center gap-2">
 
         {/* MENU */}
-        <ChatMenu onSelect={onOpenModal} />
+        <ChatMenu
+          resolved={
+            resolved
+          }
+
+          onSelect={
+            onOpenModal
+          }
+        />
 
         {/* CLOSE */}
         <button
           type="button"
-          onClick={onClose}
+
+          onClick={
+            onClose
+          }
+
           className="
             flex
             h-10

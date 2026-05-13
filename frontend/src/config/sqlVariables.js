@@ -84,6 +84,9 @@ export const API_ENDPOINTS = {
   DOCUMENT_DEBUG_PIPELINE:
     "/documents/debug/full-pipeline",
 
+  DOCUMENT_MANUAL_ENTRY:
+    "/documents/manual",
+
   /* ====================================
      CHAT
   ==================================== */
@@ -93,6 +96,12 @@ export const API_ENDPOINTS = {
 
   CHAT_HISTORY:
     "/chat/history/:sessionId",
+
+  CHAT_USER_SESSIONS:
+    "/chat/user-sessions/:requesterId",
+
+  CHAT_RESOLVE:
+    "/chat/resolve/:sessionId",
 
   CHAT_DEBUG:
     "/chat/debug",

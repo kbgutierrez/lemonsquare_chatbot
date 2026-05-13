@@ -3,187 +3,249 @@ import {
   buildApiUrl,
 } from "../../config/sqlVariables"
 
-/*
-  TICKET SERVICE
+/* ========================================
+   REQUEST HELPER
+======================================== */
 
-  FUTURE SAFE:
-  - SQL Server
-  - AI summarization
-  - escalation
-  - analytics
-  - admin dashboard
-  - SLA systems
-*/
+const apiRequest = async ({
+  endpoint,
+  method = "GET",
+  body = null,
+}) => {
 
-/* CREATE */
-const createTicket =
-  async ({
-    SessionID,
-
-    RequesterUserID,
-
-    ChatTitle,
-
-    IssueSummary,
-
-    Description,
-
-    PriorityLevel,
-
-    CategoryName,
-  }) => {
-
-    const payload = {
-      SessionID,
-
-      RequesterUserID,
-
-      ChatTitle,
-
-      IssueSummary,
-
-      Description,
-
-      PriorityLevel,
-
-      CategoryName,
-
-      CreatedAt:
-        new Date().toISOString(),
-    }
-
-    console.log(
-      "CREATE_TICKET_PAYLOAD",
-      payload
-    )
-
-    console.log(
-      "API_ENDPOINT",
-      buildApiUrl(
-        API_ENDPOINTS.TICKET_CREATE
-      )
-    )
-
-    /*
-      FUTURE:
-      return await fetch(...)
-    */
-
-    return {
-      success: true,
-
-      RelatedTicketID:
-        "TICKET_ID_PLACEHOLDER",
-
-      payload,
-    }
-  }
-
-/* LOAD */
-const loadTicket =
-  async (RelatedTicketID) => {
-
-    console.log(
-      "LOAD_TICKET",
+  const response =
+    await fetch(
+      endpoint,
       {
-        RelatedTicketID,
+        method,
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          body
+            ? JSON.stringify(
+                body
+              )
+            : null,
       }
     )
 
-    console.log(
-      "API_ENDPOINT",
-      buildApiUrl(
-        API_ENDPOINTS.TICKETS
-      )
-    )
+  let data = null
 
-    return {
-      success: true,
+  try {
 
-      ticket: null,
-    }
+    data =
+      await response.json()
+
+  } catch {
+
+    data = null
   }
 
-/* UPDATE */
-const updateTicket =
-  async ({
-    RelatedTicketID,
+  if (!response.ok) {
 
-    TicketStatus,
-
-    ResolutionSummary,
-  }) => {
-
-    const payload = {
-      RelatedTicketID,
-
-      TicketStatus,
-
-      ResolutionSummary,
-
-      UpdatedAt:
-        new Date().toISOString(),
-    }
-
-    console.log(
-      "UPDATE_TICKET_PAYLOAD",
-      payload
+    console.error(
+      "TICKET_SYNC_ERROR",
+      data
     )
 
-    console.log(
-      "API_ENDPOINT",
-      buildApiUrl(
-        API_ENDPOINTS.TICKET_UPDATE,
-        {
-          id:
-            RelatedTicketID,
+    throw new Error(
+      data?.detail ||
+      "Ticket sync failed."
+    )
+  }
+
+  return data
+}
+
+/* ========================================
+   GENERATE TICKET NUMBER
+======================================== */
+
+const generateTicketNumber =
+  () => {
+
+    return `CHAT-${Date.now()}`
+  }
+
+/* ========================================
+   NORMALIZE MESSAGE
+======================================== */
+
+const getMessageContent =
+  (message) => {
+
+    return (
+      message?.content ||
+      message?.text ||
+      message?.MessageContent ||
+      ""
+    )
+  }
+
+const getMessageRole =
+  (message) => {
+
+    return (
+      message?.role ||
+      message?.sender ||
+      message?.SenderRole ||
+      ""
+    )
+  }
+
+/* ========================================
+   EXTRACT SUMMARY
+======================================== */
+
+const extractConversationSummary =
+  (messages = []) => {
+
+    const userMessages =
+      messages.filter(
+        (message) => {
+
+          const role =
+            getMessageRole(
+              message
+            )
+
+          return (
+            role === "user"
+          )
         }
       )
-    )
+
+    const assistantMessages =
+      messages.filter(
+        (message) => {
+
+          const role =
+            getMessageRole(
+              message
+            )
+
+          return (
+            role === "assistant" ||
+            role === "agent"
+          )
+        }
+      )
+
+    const firstUserMessage =
+      getMessageContent(
+        userMessages[0]
+      ) ||
+      "User issue"
+
+    const latestAssistantMessage =
+      getMessageContent(
+        assistantMessages[
+          assistantMessages.length - 1
+        ]
+      ) ||
+      "Issue resolved."
 
     return {
-      success: true,
+      issue_reported:
+        firstUserMessage,
 
-      payload,
+      issue_found:
+        firstUserMessage,
+
+      issue_cause:
+        "Resolved through AI support conversation.",
+
+      work_done:
+        latestAssistantMessage,
     }
   }
 
-/* RESOLVE */
+/* ========================================
+   RESOLVE TICKET
+======================================== */
+
 const resolveTicket =
   async ({
-    RelatedTicketID,
-
-    ResolutionSummary,
+    sessionId,
+    messages,
   }) => {
 
+    console.log(
+      "RESOLVE_MESSAGES",
+      messages
+    )
+
+    const extracted =
+      extractConversationSummary(
+        messages
+      )
+
+    /*
+      IMPORTANT:
+      Backend schema typo:
+      issue_resported
+    */
     const payload = {
-      RelatedTicketID,
+      ticket_number:
+        generateTicketNumber(),
 
-      ResolutionSummary,
+      issue_resported:
+        extracted.issue_reported,
 
-      ResolvedAt:
-        new Date().toISOString(),
+      issue_found:
+        extracted.issue_found,
+
+      issue_cause:
+        extracted.issue_cause,
+
+      work_done:
+        extracted.work_done,
     }
 
     console.log(
-      "RESOLVE_TICKET_PAYLOAD",
+      "SYNC_PAYLOAD",
       payload
+    )
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.TICKET_SYNC
+      )
+
+    console.log(
+      "SYNC_ENDPOINT",
+      endpoint
+    )
+
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "POST",
+        body: payload,
+      })
+
+    console.log(
+      "SYNC_RESPONSE",
+      response
     )
 
     return {
       success: true,
 
-      payload,
+      sessionId,
+
+      ticketNumber:
+        response?.ticket_number,
+
+      response,
     }
   }
 
 const ticketService = {
-  createTicket,
-
-  loadTicket,
-
-  updateTicket,
-
   resolveTicket,
 }
 

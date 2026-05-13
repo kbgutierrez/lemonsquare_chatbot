@@ -1,5 +1,4 @@
 import {
-  useEffect,
   useState,
 } from "react"
 
@@ -7,6 +6,9 @@ import {
   History,
   MessageSquare,
   ChevronRight,
+  Trash2,
+  Lock,
+  CheckCircle2,
   X,
 } from "lucide-react"
 
@@ -51,19 +53,14 @@ const ChatHistoryModal = ({
 
     fetchHistory,
 
-    loadConversation,
+    selectConversation,
+
+    deleteConversation,
+
+    clearAllHistory,
   } =
     useConversationHistory()
 
-  /* ========================================
-     INITIAL FETCH
-  ======================================== */
-
-  useEffect(() => {
-
-    fetchHistory()
-
-  }, [fetchHistory])
 
   /* ========================================
      CLOSE
@@ -91,27 +88,21 @@ const ChatHistoryModal = ({
 
       try {
 
+        /*
+          ONLY select metadata.
+          Backend loading now belongs
+          to useChatMessages.
+        */
         const result =
-          await loadConversation(
+          selectConversation(
             conversation.id
           )
 
         console.log(
-          "RESTORED_CONVERSATION",
+          "SELECTED_CONVERSATION",
           result
         )
 
-        /*
-          Restore active session
-        */
-        localStorage.setItem(
-          "chat_session_id",
-          conversation.id
-        )
-
-        /*
-          Push messages back to parent
-        */
         onLoadConversation?.(
           result
         )
@@ -124,10 +115,37 @@ const ChatHistoryModal = ({
       } catch (error) {
 
         console.error(
-          "CONVERSATION_RESTORE_ERROR",
+          "CONVERSATION_SELECT_ERROR",
           error
         )
       }
+    }
+
+  /* ========================================
+     DELETE CONVERSATION
+  ======================================== */
+
+  const handleDeleteConversation =
+    (
+      event,
+      sessionId
+    ) => {
+
+      event.stopPropagation()
+
+      deleteConversation(
+        sessionId
+      )
+    }
+
+  /* ========================================
+     CLEAR ALL HISTORY
+  ======================================== */
+
+  const handleClearAll =
+    () => {
+
+      clearAllHistory()
     }
 
   return (
@@ -268,38 +286,81 @@ const ChatHistoryModal = ({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={
-              handleClose
-            }
+          <div
             className="
               flex
-              h-10
-              w-10
               items-center
-              justify-center
-
-              rounded-xl
-
-              border
-              border-violet-100
-
-              bg-white
-
-              transition
-
-              hover:bg-violet-50
+              gap-2
             "
           >
-            <X
+            {conversations.length > 0 && (
+              <button
+                type="button"
+
+                onClick={
+                  handleClearAll
+                }
+
+                className="
+                  rounded-xl
+
+                  border
+                  border-red-100
+
+                  bg-red-50
+
+                  px-3
+                  py-2
+
+                  text-xs
+                  font-medium
+
+                  text-red-600
+
+                  transition
+
+                  hover:bg-red-100
+                "
+              >
+                Clear All
+              </button>
+            )}
+
+            <button
+              type="button"
+
+              onClick={
+                handleClose
+              }
+
               className="
-                h-5
-                w-5
-                text-slate-600
+                flex
+                h-10
+                w-10
+                items-center
+                justify-center
+
+                rounded-xl
+
+                border
+                border-violet-100
+
+                bg-white
+
+                transition
+
+                hover:bg-violet-50
               "
-            />
-          </button>
+            >
+              <X
+                className="
+                  h-5
+                  w-5
+                  text-slate-600
+                "
+              />
+            </button>
+          </div>
         </div>
 
         {/* BODY */}
@@ -309,23 +370,7 @@ const ChatHistoryModal = ({
             overflow-y-auto
             p-4
           "
-          style={{
-            scrollbarWidth:
-              "none",
-
-            msOverflowStyle:
-              "none",
-          }}
         >
-          <style>
-            {`
-              div::-webkit-scrollbar {
-                display: none;
-              }
-            `}
-          </style>
-
-          {/* LOADING */}
           {loading && (
             <div
               className="
@@ -364,7 +409,6 @@ const ChatHistoryModal = ({
             </div>
           )}
 
-          {/* EMPTY */}
           {!loading &&
             conversations.length === 0 && (
               <div
@@ -400,7 +444,6 @@ const ChatHistoryModal = ({
               </div>
             )}
 
-          {/* CONVERSATIONS */}
           {!loading &&
             conversations.length > 0 && (
               <div
@@ -411,60 +454,225 @@ const ChatHistoryModal = ({
                 {conversations.map(
                   (
                     conversation
-                  ) => (
-                    <button
-                      key={
-                        conversation.id
-                      }
+                  ) => {
 
-                      type="button"
+                    const isResolved =
+                      Boolean(
+                        conversation.resolved
+                      )
 
-                      onClick={() =>
-                        handleConversationClick(
-                          conversation
-                        )
-                      }
-
-                      className="
-                        group
-                        w-full
-
-                        rounded-2xl
-
-                        border
-                        border-violet-100
-
-                        bg-white
-
-                        p-4
-
-                        text-left
-
-                        transition-all
-                        duration-200
-
-                        hover:-translate-y-0.5
-                        hover:bg-violet-50
-                        hover:shadow-lg
-
-                        active:scale-[0.99]
-                      "
-                    >
-                      {/* TOP */}
+                    return (
                       <div
+                        key={
+                          conversation.id
+                        }
+
+                        role="button"
+
+                        tabIndex={0}
+
+                        onClick={() =>
+                          handleConversationClick(
+                            conversation
+                          )
+                        }
+
+                        onKeyDown={(event) => {
+
+                          if (
+                            event.key === "Enter" ||
+                            event.key === " "
+                          ) {
+
+                            handleConversationClick(
+                              conversation
+                            )
+                          }
+                        }}
+
                         className="
-                          flex
-                          items-start
-                          justify-between
-                          gap-3
+                          group
+                          relative
+                          w-full
+
+                          cursor-pointer
+
+                          rounded-2xl
+
+                          border
+                          border-violet-100
+
+                          bg-white
+
+                          p-4
+
+                          text-left
+
+                          transition-all
+                          duration-200
+
+                          hover:-translate-y-0.5
+                          hover:bg-violet-50
+                          hover:shadow-lg
+
+                          active:scale-[0.99]
                         "
                       >
-                        <div
+                        <button
+                          type="button"
+
+                          onClick={(
+                            event
+                          ) =>
+                            handleDeleteConversation(
+                              event,
+                              conversation.id
+                            )
+                          }
+
                           className="
-                            min-w-0
-                            flex-1
+                            absolute
+                            right-3
+                            top-3
+
+                            z-20
+
+                            flex
+                            h-8
+                            w-8
+                            items-center
+                            justify-center
+
+                            rounded-lg
+
+                            text-slate-400
+
+                            transition
+
+                            hover:bg-red-50
+                            hover:text-red-500
                           "
                         >
+                          <Trash2
+                            className="
+                              h-4
+                              w-4
+                            "
+                          />
+                        </button>
+
+                        <div
+                          className="
+                            flex
+                            items-start
+                            justify-between
+                            gap-3
+                          "
+                        >
+                          <div
+                            className="
+                              min-w-0
+                              flex-1
+                            "
+                          >
+                            <div
+                              className="
+                                flex
+                                items-center
+                                gap-2
+                              "
+                            >
+                              {isResolved ? (
+                                <Lock
+                                  className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+
+                                    text-emerald-600
+                                  "
+                                />
+                              ) : (
+                                <MessageSquare
+                                  className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+
+                                    text-violet-600
+                                  "
+                                />
+                              )}
+
+                              <p
+                                className="
+                                  truncate
+
+                                  text-sm
+                                  font-semibold
+
+                                  text-slate-900
+                                "
+                              >
+                                {
+                                  conversation.title
+                                }
+                              </p>
+                            </div>
+
+                            <p
+                              className="
+                                mt-2
+                                line-clamp-2
+
+                                text-xs
+                                text-slate-500
+                              "
+                            >
+                              {
+                                conversation.preview
+                              }
+                            </p>
+                          </div>
+
+                          <ChevronRight
+                            className="
+                              mt-1
+                              h-5
+                              w-5
+                              shrink-0
+
+                              text-slate-400
+
+                              transition-transform
+                              duration-200
+
+                              group-hover:translate-x-1
+                            "
+                          />
+                        </div>
+
+                        <div
+                          className="
+                            mt-4
+
+                            flex
+                            items-center
+                            justify-between
+                            gap-3
+                          "
+                        >
+                          <p
+                            className="
+                              text-[10px]
+                              text-slate-400
+                            "
+                          >
+                            {formatDate(
+                              conversation.updatedAt
+                            )}
+                          </p>
+
                           <div
                             className="
                               flex
@@ -472,107 +680,62 @@ const ChatHistoryModal = ({
                               gap-2
                             "
                           >
-                            <MessageSquare
+                            {isResolved && (
+                              <span
+                                className="
+                                  flex
+                                  items-center
+                                  gap-1
+
+                                  rounded-full
+
+                                  bg-emerald-100
+
+                                  px-2
+                                  py-1
+
+                                  text-[10px]
+                                  font-medium
+
+                                  text-emerald-700
+                                "
+                              >
+                                <CheckCircle2
+                                  className="
+                                    h-3
+                                    w-3
+                                  "
+                                />
+
+                                Resolved
+                              </span>
+                            )}
+
+                            <span
                               className="
-                                h-4
-                                w-4
-                                shrink-0
+                                rounded-full
 
-                                text-violet-600
-                              "
-                            />
+                                bg-violet-100
 
-                            <p
-                              className="
-                                truncate
+                                px-2
+                                py-1
 
-                                text-sm
-                                font-semibold
+                                text-[10px]
+                                font-medium
 
-                                text-slate-900
+                                text-violet-700
                               "
                             >
                               {
-                                conversation.title
-                              }
-                            </p>
+                                conversation.messageCount || 0
+                              }{" "}
+                              messages
+                            </span>
                           </div>
-
-                          <p
-                            className="
-                              mt-2
-                              line-clamp-2
-
-                              text-xs
-                              text-slate-500
-                            "
-                          >
-                            {
-                              conversation.preview
-                            }
-                          </p>
                         </div>
-
-                        <ChevronRight
-                          className="
-                            h-5
-                            w-5
-                            shrink-0
-
-                            text-slate-400
-
-                            transition-transform
-                            duration-200
-
-                            group-hover:translate-x-1
-                          "
-                        />
                       </div>
-
-                      {/* FOOTER */}
-                      <div
-                        className="
-                          mt-4
-
-                          flex
-                          items-center
-                          justify-between
-                        "
-                      >
-                        <p
-                          className="
-                            text-[10px]
-                            text-slate-400
-                          "
-                        >
-                          {formatDate(
-                            conversation.updatedAt
-                          )}
-                        </p>
-
-                        <span
-                          className="
-                            rounded-full
-
-                            bg-violet-100
-
-                            px-2
-                            py-1
-
-                            text-[10px]
-                            font-medium
-
-                            text-violet-700
-                          "
-                        >
-                          {
-                            conversation.messageCount || 0
-                          }{" "}
-                          messages
-                        </span>
-                      </div>
-                    </button>
-                  )
+                    )
+                  }
                 )}
               </div>
             )}

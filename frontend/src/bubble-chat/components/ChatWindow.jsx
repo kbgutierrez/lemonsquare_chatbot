@@ -5,6 +5,7 @@ import ChatFooter from "./ChatFooter.jsx"
 const ChatWindow = ({
   messages = [],
   loading = false,
+  resolved = false,
   onSendMessage,
   onClose,
   onOpenModal,
@@ -30,7 +31,14 @@ const ChatWindow = ({
     >
       {/* HEADER */}
       <ChatHeader
-        onClose={onClose}
+        resolved={
+          resolved
+        }
+
+        onClose={
+          onClose
+        }
+
         onOpenModal={
           onOpenModal
         }
@@ -82,6 +90,39 @@ const ChatWindow = ({
           "
         />
 
+        {/* RESOLVED BANNER */}
+        {resolved && (
+          <div
+            className="
+              absolute
+              left-1/2
+              top-3
+              z-20
+
+              -translate-x-1/2
+
+              rounded-full
+
+              border
+              border-emerald-200
+
+              bg-emerald-50
+
+              px-4
+              py-2
+
+              text-xs
+              font-medium
+
+              text-emerald-700
+
+              shadow-sm
+            "
+          >
+            This conversation has been resolved.
+          </div>
+        )}
+
         {/* MESSAGES */}
         <div
           className="
@@ -106,6 +147,10 @@ const ChatWindow = ({
       <ChatFooter
         loading={
           loading
+        }
+
+        resolved={
+          resolved
         }
 
         onSendMessage={

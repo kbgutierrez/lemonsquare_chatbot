@@ -7,7 +7,6 @@ import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
 
 import ChatHistoryModal from "./modals/ChatHistoryModal.jsx"
-import ClearConversationModal from "./modals/ClearConversationModal.jsx"
 import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
 import CallAgentModal from "./modals/CallAgentModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
@@ -54,9 +53,16 @@ const BubbleChat = () => {
   const {
     messages,
     loading,
+    sessionId,
+    resolved,
+
     sendMessage,
+
     clearConversation,
+
     restoreConversation,
+
+    resolveConversation,
   } = useChatMessages()
 
   /* ========================================
@@ -66,10 +72,14 @@ const BubbleChat = () => {
   useEffect(() => {
 
     if (open) {
+
       repositionForWindow()
     }
 
-  }, [open])
+  }, [
+    open,
+    repositionForWindow,
+  ])
 
   /* ========================================
      CLOSE MODAL
@@ -100,24 +110,116 @@ const BubbleChat = () => {
   const handleLoadConversation =
     ({
       sessionId,
-      messages,
     }) => {
 
       restoreConversation({
         sessionId,
-        messages,
       })
 
-      /*
-        Automatically open chat window
-        after restoring conversation.
-      */
       setOpen(true)
 
-      /*
-        Close modal
-      */
       setActiveModal(null)
+
+      console.log(
+        "CONVERSATION_SELECTED",
+        {
+          sessionId,
+        }
+      )
+    }
+
+  /* ========================================
+     RESOLVE CHAT
+  ======================================== */
+
+  const handleResolveConversation =
+    async () => {
+
+      try {
+
+        if (
+          !sessionId ||
+          !messages.length
+        ) {
+          return
+        }
+
+        /*
+          Proper backend resolve.
+        */
+        await resolveConversation()
+
+        /*
+          Close modal.
+        */
+        setActiveModal(null)
+
+        console.log(
+          "CONVERSATION_RESOLVED",
+          {
+            sessionId,
+          }
+        )
+
+      } catch (error) {
+
+        console.error(
+          "RESOLVE_ERROR",
+          error
+        )
+      }
+    }
+
+  /* ========================================
+     NEW CHAT
+  ======================================== */
+
+  const handleNewChat =
+    () => {
+
+      /*
+        Backend history is preserved.
+
+        This only resets the current
+        frontend session state.
+      */
+      clearConversation()
+
+      setOpen(true)
+
+      setActiveModal(null)
+
+      console.log(
+        "NEW_CHAT_STARTED"
+      )
+    }
+
+  /* ========================================
+     MENU ACTIONS
+  ======================================== */
+
+  const handleOpenModal =
+    (
+      modalId
+    ) => {
+
+      /*
+        NEW CHAT
+        No modal needed.
+      */
+      if (
+        modalId ===
+        "new-chat"
+      ) {
+
+        handleNewChat()
+
+        return
+      }
+
+      setActiveModal(
+        modalId
+      )
     }
 
   /* ========================================
@@ -131,16 +233,6 @@ const BubbleChat = () => {
 
         onLoadConversation={
           handleLoadConversation
-        }
-      />
-    ),
-
-    clear: (
-      <ClearConversationModal
-        onClose={closeModal}
-
-        onClearConversation={
-          clearConversation
         }
       />
     ),
@@ -160,6 +252,10 @@ const BubbleChat = () => {
     resolve: (
       <ResolveConversationModal
         onClose={closeModal}
+
+        onResolve={
+          handleResolveConversation
+        }
       />
     ),
 
@@ -285,6 +381,8 @@ const BubbleChat = () => {
 
             loading={loading}
 
+            resolved={resolved}
+
             onSendMessage={
               sendMessage
             }
@@ -294,7 +392,7 @@ const BubbleChat = () => {
             }
 
             onOpenModal={
-              setActiveModal
+              handleOpenModal
             }
           />
         </div>
