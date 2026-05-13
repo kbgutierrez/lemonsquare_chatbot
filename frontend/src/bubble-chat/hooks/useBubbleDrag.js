@@ -10,7 +10,8 @@ import {
 } from "../constants/chatConfig"
 
 import {
-  getSnapPosition,
+  getCornerSnapPosition,
+  getSideSnapPosition,
 } from "../utils/snapPosition"
 
 const DRAG_THRESHOLD = 6
@@ -20,20 +21,46 @@ export const useBubbleDrag =
 
     const {
       BUBBLE_SIZE,
+      EDGE_PADDING,
     } = CHAT_CONFIG
 
     const [dragging, setDragging] =
       useState(false)
 
     const [position, setPosition] =
-      useState(() =>
-        getSnapPosition(
-          window.innerWidth - 100,
-          window.innerHeight - 100
-        )
-      )
+      useState(() => ({
+        x:
+          window.innerWidth -
+          BUBBLE_SIZE -
+          EDGE_PADDING,
 
-    /* POINTER */
+        y:
+          window.innerHeight -
+          BUBBLE_SIZE -
+          EDGE_PADDING,
+      }))
+
+    /*
+      REMEMBER CLOSED POSITION
+    */
+
+    const freePosition =
+      useRef({
+        x:
+          window.innerWidth -
+          BUBBLE_SIZE -
+          EDGE_PADDING,
+
+        y:
+          window.innerHeight -
+          BUBBLE_SIZE -
+          EDGE_PADDING,
+      })
+
+    /* ========================================
+       POINTER
+    ======================================== */
+
     const pointerDown =
       useRef(false)
 
@@ -52,23 +79,10 @@ export const useBubbleDrag =
         y: 0,
       })
 
-    /*
-      REMEMBER SIDES
+    /* ========================================
+       SIDE DETECTION
+    ======================================== */
 
-      IMPORTANT FOR:
-      - maximize
-      - minimize
-      - rotate
-      - resize
-    */
-
-    const lastHorizontalSide =
-      useRef("right")
-
-    const lastVerticalSide =
-      useRef("bottom")
-
-    /* SIDE */
     const isLeftSide =
       useMemo(
         () =>
@@ -87,25 +101,41 @@ export const useBubbleDrag =
         [position.y]
       )
 
-    /* CLAMP */
+    /* ========================================
+       CLAMP
+    ======================================== */
+
     const clampPosition = (
       x,
       y
     ) => ({
       x: Math.min(
-        Math.max(0, x),
+        Math.max(
+          EDGE_PADDING,
+          x
+        ),
+
         window.innerWidth -
-          BUBBLE_SIZE
+          BUBBLE_SIZE -
+          EDGE_PADDING
       ),
 
       y: Math.min(
-        Math.max(0, y),
+        Math.max(
+          EDGE_PADDING,
+          y
+        ),
+
         window.innerHeight -
-          BUBBLE_SIZE
+          BUBBLE_SIZE -
+          EDGE_PADDING
       ),
     })
 
-    /* EVENTS */
+    /* ========================================
+       EVENTS
+    ======================================== */
+
     useEffect(() => {
 
       const move =
@@ -116,7 +146,9 @@ export const useBubbleDrag =
 
           if (
             !pointerDown.current
-          ) return
+          ) {
+            return
+          }
 
           const dx =
             clientX -
@@ -129,6 +161,7 @@ export const useBubbleDrag =
           /*
             START DRAG
           */
+
           if (
             !moved.current &&
             (
@@ -147,28 +180,16 @@ export const useBubbleDrag =
           }
 
           /*
-            IGNORE MICRO MOVES
+            IGNORE SMALL MOVES
           */
+
           if (
             !moved.current
-          ) return
+          ) {
+            return
+          }
 
-          /*
-            REMEMBER SIDE
-          */
-          lastHorizontalSide.current =
-            clientX <
-            window.innerWidth / 2
-              ? "left"
-              : "right"
-
-          lastVerticalSide.current =
-            clientY <
-            window.innerHeight / 2
-              ? "top"
-              : "bottom"
-
-          setPosition(
+          const nextPosition =
             clampPosition(
               clientX -
                 dragOffset.current.x,
@@ -176,6 +197,13 @@ export const useBubbleDrag =
               clientY -
                 dragOffset.current.y
             )
+
+          /*
+            TRUE FREE DRAG
+          */
+
+          setPosition(
+            nextPosition
           )
         }
 
@@ -205,49 +233,53 @@ export const useBubbleDrag =
             false
 
           /*
-            SNAP TO EDGE
+            SNAP TO NEAREST SIDE
+            AFTER RELEASE
           */
+
           if (
             moved.current
           ) {
 
+            const snapped =
+              getSideSnapPosition(
+                position.x,
+                position.y
+              )
+
+            freePosition.current =
+              snapped
+
             setPosition(
-              (prev) =>
-                getSnapPosition(
-                  prev.x,
-                  prev.y
-                )
+              snapped
             )
           }
+
+          moved.current =
+            false
 
           setDragging(false)
         }
 
-      /*
-        WINDOW RESIZE
-      */
+      /* ========================================
+         RESIZE
+      ======================================== */
+
       const handleResize =
         () => {
 
-          const padding = 20
+          const clamped =
+            clampPosition(
+              freePosition.current.x,
+              freePosition.current.y
+            )
 
-          setPosition({
-            x:
-              lastHorizontalSide.current ===
-              "left"
-                ? padding
-                : window.innerWidth -
-                  BUBBLE_SIZE -
-                  padding,
+          freePosition.current =
+            clamped
 
-            y:
-              lastVerticalSide.current ===
-              "top"
-                ? padding
-                : window.innerHeight -
-                  BUBBLE_SIZE -
-                  padding,
-          })
+          setPosition(
+            clamped
+          )
         }
 
       window.addEventListener(
@@ -306,9 +338,16 @@ export const useBubbleDrag =
         )
       }
 
-    }, [BUBBLE_SIZE])
+    }, [
+      position,
+      BUBBLE_SIZE,
+      EDGE_PADDING,
+    ])
 
-    /* START */
+    /* ========================================
+       START DRAG
+    ======================================== */
+
     const startDrag =
       (event) => {
 
@@ -338,36 +377,31 @@ export const useBubbleDrag =
         }
       }
 
-    /* DRAG CHECK */
+    /* ========================================
+       DRAG CHECK
+    ======================================== */
+
     const wasDragged =
       () =>
         moved.current
 
-    /*
-      SMART OPEN
-    */
+    /* ========================================
+       OPEN CHAT
+       SNAP TO CORNER ONLY
+    ======================================== */
+
     const repositionForWindow =
       () => {
 
-        const padding = 20
+        const snapped =
+          getCornerSnapPosition(
+            freePosition.current.x,
+            freePosition.current.y
+          )
 
-        setPosition({
-          x:
-            lastHorizontalSide.current ===
-            "left"
-              ? padding
-              : window.innerWidth -
-                BUBBLE_SIZE -
-                padding,
-
-          y:
-            lastVerticalSide.current ===
-            "top"
-              ? padding
-              : window.innerHeight -
-                BUBBLE_SIZE -
-                padding,
-        })
+        setPosition(
+          snapped
+        )
       }
 
     return {

@@ -1,5 +1,6 @@
 import UploadTableRow from "./UploadTableRow"
 import UploadPagination from "./UploadPagination"
+import UploadMobileCard from "./UploadMobileCard"
 
 const UploadTable = ({
   uploadedFiles,
@@ -9,6 +10,9 @@ const UploadTable = ({
   removeFile,
   setCurrentPage,
 }) => {
+
+  const hasFiles =
+    paginatedFiles.length > 0
 
   return (
     <div
@@ -21,7 +25,8 @@ const UploadTable = ({
 
         overflow-hidden
 
-        rounded-[30px]
+        rounded-[24px]
+        md:rounded-[30px]
 
         border
         border-[#26332d]
@@ -35,15 +40,20 @@ const UploadTable = ({
       <div
         className="
           flex
-          shrink-0
-          items-center
-          justify-between
+          flex-col
+          gap-4
 
           border-b
           border-[#24312b]
 
-          px-5
+          px-4
           py-4
+
+          sm:flex-row
+          sm:items-center
+          sm:justify-between
+
+          md:px-5
         "
       >
         {/* LEFT */}
@@ -78,8 +88,8 @@ const UploadTable = ({
         {/* STATUS */}
         <div
           className="
-            hidden
-            shrink-0
+            inline-flex
+            w-fit
             items-center
             gap-2
 
@@ -92,8 +102,6 @@ const UploadTable = ({
 
             px-3
             py-2
-
-            md:flex
           "
         >
           <div
@@ -120,7 +128,7 @@ const UploadTable = ({
         </div>
       </div>
 
-      {/* TABLE AREA */}
+      {/* CONTENT */}
       <div
         className="
           min-h-0
@@ -128,145 +136,258 @@ const UploadTable = ({
           overflow-hidden
         "
       >
-        {/* SCROLL CONTAINER */}
-        <div
-          className="
-            h-full
-            overflow-auto
-
-            [scrollbar-width:none]
-            [&::-webkit-scrollbar]:hidden
-          "
-        >
-          <table
+        {/* EMPTY */}
+        {!hasFiles && (
+          <div
             className="
-              min-w-full
-              border-collapse
+              flex
+              h-full
+              items-center
+              justify-center
+
+              px-6
+              py-12
             "
           >
-            {/* HEAD */}
-            <thead
+            <div
               className="
-                sticky
-                top-0
-                z-10
+                flex
+                flex-col
+                items-center
+                justify-center
 
-                bg-[#161f1d]/95
-
-                backdrop-blur-xl
+                text-center
               "
             >
-              <tr className="text-left">
+              <div
+                className="
+                  mb-4
 
-                <th
+                  flex
+                  h-16
+                  w-16
+                  items-center
+                  justify-center
+
+                  rounded-3xl
+
+                  border
+                  border-[#2b3933]
+
+                  bg-[#18211f]
+                "
+              >
+                <div
                   className="
-                    px-5
-                    py-4
+                    h-3
+                    w-3
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+                    rounded-full
 
-                    tracking-[0.18em]
-
-                    text-[#73867d]
+                    bg-[#f5d547]
                   "
-                >
-                  File
-                </th>
+                />
+              </div>
 
-                <th
-                  className="
-                    px-5
-                    py-4
+              <h3
+                className="
+                  text-sm
+                  font-semibold
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+                  text-white
+                "
+              >
+                No uploaded files
+              </h3>
 
-                    tracking-[0.18em]
+              <p
+                className="
+                  mt-2
 
-                    text-[#73867d]
-                  "
-                >
-                  Size
-                </th>
+                  max-w-sm
 
-                <th
-                  className="
-                    px-5
-                    py-4
+                  text-sm
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+                  text-[#81958c]
+                "
+              >
+                Uploaded documents will
+                appear here once added
+                to the knowledge base.
+              </p>
+            </div>
+          </div>
+        )}
 
-                    tracking-[0.18em]
+        {/* MOBILE CARDS */}
+        {hasFiles && (
+          <div
+            className="
+              flex
+              h-full
+              flex-col
 
-                    text-[#73867d]
-                  "
-                >
-                  Category
-                </th>
+              overflow-y-auto
 
-                <th
-                  className="
-                    px-5
-                    py-4
+              p-3
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+              md:hidden
+            "
+          >
+            <div className="space-y-3">
+              {paginatedFiles.map(
+                (file) => (
+                  <UploadMobileCard
+                    key={file.id}
+                    file={file}
+                    removeFile={
+                      removeFile
+                    }
+                  />
+                )
+              )}
+            </div>
+          </div>
+        )}
 
-                    tracking-[0.18em]
+        {/* DESKTOP TABLE */}
+        {hasFiles && (
+          <div
+            className="
+              hidden
+              h-full
 
-                    text-[#73867d]
-                  "
-                >
-                  Status
-                </th>
+              overflow-auto
 
-                <th
-                  className="
-                    px-5
-                    py-4
+              md:block
+            "
+          >
+            <table
+              className="
+                min-w-full
+                border-collapse
+              "
+            >
+              {/* HEAD */}
+              <thead
+                className="
+                  sticky
+                  top-0
+                  z-10
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+                  bg-[#161f1d]/95
 
-                    tracking-[0.18em]
+                  backdrop-blur-xl
+                "
+              >
+                <tr className="text-left">
+                  <th
+                    className="
+                      px-5
+                      py-4
 
-                    text-[#73867d]
-                  "
-                >
-                  Uploaded
-                </th>
+                      text-[11px]
+                      font-semibold
+                      uppercase
 
-                <th
-                  className="
-                    px-5
-                    py-4
+                      tracking-[0.18em]
 
-                    text-[11px]
-                    font-semibold
-                    uppercase
+                      text-[#73867d]
+                    "
+                  >
+                    File
+                  </th>
 
-                    tracking-[0.18em]
+                  <th
+                    className="
+                      px-5
+                      py-4
 
-                    text-[#73867d]
-                  "
-                >
-                  Action
-                </th>
-              </tr>
-            </thead>
+                      text-[11px]
+                      font-semibold
+                      uppercase
 
-            {/* BODY */}
-            <tbody>
-              {paginatedFiles.length >
-              0 ? (
-                paginatedFiles.map(
+                      tracking-[0.18em]
+
+                      text-[#73867d]
+                    "
+                  >
+                    Size
+                  </th>
+
+                  <th
+                    className="
+                      px-5
+                      py-4
+
+                      text-[11px]
+                      font-semibold
+                      uppercase
+
+                      tracking-[0.18em]
+
+                      text-[#73867d]
+                    "
+                  >
+                    Category
+                  </th>
+
+                  <th
+                    className="
+                      px-5
+                      py-4
+
+                      text-[11px]
+                      font-semibold
+                      uppercase
+
+                      tracking-[0.18em]
+
+                      text-[#73867d]
+                    "
+                  >
+                    Status
+                  </th>
+
+                  <th
+                    className="
+                      px-5
+                      py-4
+
+                      text-[11px]
+                      font-semibold
+                      uppercase
+
+                      tracking-[0.18em]
+
+                      text-[#73867d]
+                    "
+                  >
+                    Uploaded
+                  </th>
+
+                  <th
+                    className="
+                      px-5
+                      py-4
+
+                      text-[11px]
+                      font-semibold
+                      uppercase
+
+                      tracking-[0.18em]
+
+                      text-[#73867d]
+                    "
+                  >
+                    Action
+                  </th>
+                </tr>
+              </thead>
+
+              {/* BODY */}
+              <tbody>
+                {paginatedFiles.map(
                   (file) => (
                     <UploadTableRow
                       key={file.id}
@@ -276,89 +397,11 @@ const UploadTable = ({
                       }
                     />
                   )
-                )
-              ) : (
-                <tr>
-                  <td
-                    colSpan={6}
-                    className="
-                      px-6
-                      py-20
-
-                      text-center
-                    "
-                  >
-                    <div
-                      className="
-                        flex
-                        flex-col
-                        items-center
-                        justify-center
-                      "
-                    >
-                      <div
-                        className="
-                          mb-4
-
-                          flex
-                          h-16
-                          w-16
-                          items-center
-                          justify-center
-
-                          rounded-3xl
-
-                          border
-                          border-[#2b3933]
-
-                          bg-[#18211f]
-                        "
-                      >
-                        <div
-                          className="
-                            h-3
-                            w-3
-
-                            rounded-full
-
-                            bg-[#f5d547]
-                          "
-                        />
-                      </div>
-
-                      <h3
-                        className="
-                          text-sm
-                          font-semibold
-
-                          text-white
-                        "
-                      >
-                        No uploaded files
-                      </h3>
-
-                      <p
-                        className="
-                          mt-2
-
-                          max-w-sm
-
-                          text-sm
-
-                          text-[#81958c]
-                        "
-                      >
-                        Uploaded documents will
-                        appear here once added
-                        to the knowledge base.
-                      </p>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* PAGINATION */}
@@ -374,11 +417,9 @@ const UploadTable = ({
           currentPage={
             currentPage
           }
-
           totalPages={
             totalPages
           }
-
           setCurrentPage={
             setCurrentPage
           }

@@ -45,7 +45,7 @@ class Settings(BaseSettings):
     BIZPORTAL_TIMEOUT: float = 5.0
 
     class Config:
-        env_file = ".env"
+        env_file = ".env"c
         extra = "ignore"
 
 

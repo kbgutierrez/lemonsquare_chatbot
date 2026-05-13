@@ -4,6 +4,7 @@ import {
 } from "react"
 
 import SidebarMenu from "./components/SidebarMenu.jsx"
+import MobileSidebar from "./components/MobileSidebar.jsx"
 
 import AISettingsPanel
   from "./components/settings/AISettingsPanel.jsx"
@@ -34,7 +35,14 @@ const AdminPage = () => {
   const [isResizing, setIsResizing] =
     useState(false)
 
-  /* RESIZE SIDEBAR */
+  const [mobileSidebarOpen,
+    setMobileSidebarOpen] =
+    useState(false)
+
+  /* ========================================
+     RESIZE SIDEBAR
+  ======================================== */
+
   useEffect(() => {
 
     const handleMove =
@@ -94,12 +102,29 @@ const AdminPage = () => {
         relative
 
         flex
-        h-screen
+
+        h-[100dvh]
+        min-h-[100dvh]
+
         overflow-hidden
 
         bg-[#0b1311]
       "
     >
+      {/* MOBILE SIDEBAR */}
+      <MobileSidebar
+        open={mobileSidebarOpen}
+        setOpen={
+          setMobileSidebarOpen
+        }
+        activeView={
+          activeView
+        }
+        setActiveView={
+          setActiveView
+        }
+      />
+
       {/* BACKGROUND */}
       <div
         className="
@@ -111,6 +136,7 @@ const AdminPage = () => {
           overflow-hidden
         "
       >
+        {/* TOP LIGHT */}
         <div
           className="
             absolute
@@ -128,6 +154,7 @@ const AdminPage = () => {
           "
         />
 
+        {/* BOTTOM LIGHT */}
         <div
           className="
             absolute
@@ -144,31 +171,6 @@ const AdminPage = () => {
             blur-3xl
           "
         />
-
-        <div
-          className="
-            absolute
-            inset-0
-
-            opacity-[0.03]
-          "
-          style={{
-            backgroundImage:
-              `
-                linear-gradient(
-                  rgba(255,255,255,0.05) 1px,
-                  transparent 1px
-                ),
-                linear-gradient(
-                  90deg,
-                  rgba(255,255,255,0.05) 1px,
-                  transparent 1px
-                )
-              `,
-            backgroundSize:
-              "40px 40px",
-          }}
-        />
       </div>
 
       {/* MAIN LAYOUT */}
@@ -184,10 +186,12 @@ const AdminPage = () => {
 
           gap-4
 
-          p-4
+          p-2
+          sm:p-3
+          md:p-4
         "
       >
-        {/* SIDEBAR */}
+        {/* DESKTOP SIDEBAR */}
         <aside
           style={{
             width:
@@ -264,7 +268,8 @@ const AdminPage = () => {
 
             overflow-hidden
 
-            rounded-[32px]
+            rounded-[24px]
+            md:rounded-[32px]
 
             border
             border-[#25332d]
@@ -315,7 +320,7 @@ const AdminPage = () => {
             />
           </div>
 
-          {/* CONTENT SCROLL */}
+          {/* CONTENT */}
           <div
             className="
               relative
@@ -328,70 +333,13 @@ const AdminPage = () => {
 
               overflow-hidden
 
-              p-5
+              p-3
+              sm:p-4
+              md:p-5
             "
           >
-            {/* MOBILE TOPBAR */}
-            <div
-              className="
-                mb-5
-
-                flex
-                shrink-0
-                items-center
-                justify-between
-
-                lg:hidden
-              "
-            >
-              <div className="flex items-center gap-3">
-                <div
-                  className="
-                    flex
-                    h-10
-                    w-10
-                    items-center
-                    justify-center
-
-                    rounded-2xl
-
-                    bg-[#f5d547]
-                  "
-                >
-                  <span
-                    className="
-                      text-sm
-                      font-black
-
-                      text-[#111917]
-                    "
-                  >
-                    LS
-                  </span>
-                </div>
-
-                <div>
-                  <h2
-                    className="
-                      text-sm
-                      font-bold
-                      text-white
-                    "
-                  >
-                    Lemon Square
-                  </h2>
-
-                  <p
-                    className="
-                      text-xs
-                      text-[#8ea59b]
-                    "
-                  >
-                    Admin Panel
-                  </p>
-                </div>
-              </div>
-            </div>
+            {/* MOBILE HEADER SPACE */}
+            <div className="h-14 shrink-0 lg:hidden" />
 
             {/* ACTIVE VIEW */}
             <div

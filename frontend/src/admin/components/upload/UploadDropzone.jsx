@@ -7,6 +7,7 @@ import {
   FileUp,
   Plus,
   X,
+  Sparkles,
 } from "lucide-react"
 
 const UploadDropzone = ({
@@ -30,9 +31,7 @@ const UploadDropzone = ({
 
       event.preventDefault()
 
-      setIsDragging(
-        true
-      )
+      setIsDragging(true)
     }
 
   const handleDragLeave =
@@ -40,17 +39,13 @@ const UploadDropzone = ({
 
       event.preventDefault()
 
-      setIsDragging(
-        false
-      )
+      setIsDragging(false)
     }
 
   const onDrop =
     (event) => {
 
-      setIsDragging(
-        false
-      )
+      setIsDragging(false)
 
       handleDrop(event)
     }
@@ -64,38 +59,175 @@ const UploadDropzone = ({
     return (
       <div
         className="
-          rounded-[28px]
+          relative
+
+          overflow-hidden
+
+          rounded-[24px]
+          md:rounded-[28px]
 
           border
           border-[#26332d]
 
           bg-[#121a18]
 
-          p-5
+          p-4
+          sm:p-5
         "
       >
-        {/* TOP */}
+        {/* BACKGROUND */}
         <div
           className="
-            flex
-            items-start
-            justify-between
+            pointer-events-none
 
-            gap-4
+            absolute
+            inset-0
           "
         >
-          {/* LEFT */}
-          <div className="flex items-start gap-4">
+          <div
+            className="
+              absolute
+              right-[-40px]
+              top-[-40px]
 
-            {/* ICON */}
+              h-40
+              w-40
+
+              rounded-full
+
+              bg-[#d8b93d]/[0.04]
+
+              blur-3xl
+            "
+          />
+        </div>
+
+        {/* CONTENT */}
+        <div className="relative z-10">
+          {/* TOP */}
+          <div
+            className="
+              flex
+              flex-col
+              gap-4
+
+              lg:flex-row
+              lg:items-start
+              lg:justify-between
+            "
+          >
+            {/* LEFT */}
             <div
               className="
                 flex
-                h-14
-                w-14
-                shrink-0
-                items-center
-                justify-center
+                items-start
+                gap-3
+                sm:gap-4
+              "
+            >
+              {/* ICON */}
+              <div
+                className="
+                  flex
+                  h-14
+                  w-14
+                  shrink-0
+                  items-center
+                  justify-center
+
+                  rounded-2xl
+
+                  border
+                  border-[#2f3c36]
+
+                  bg-[#1a2320]
+                "
+              >
+                <FileUp
+                  className="
+                    h-6
+                    w-6
+
+                    text-[#d8b93d]
+                  "
+                />
+              </div>
+
+              {/* TEXT */}
+              <div className="min-w-0">
+                <div
+                  className="
+                    flex
+                    flex-wrap
+                    items-center
+                    gap-2
+                  "
+                >
+                  <h3
+                    className="
+                      text-lg
+                      font-semibold
+
+                      text-white
+                    "
+                  >
+                    Files Ready
+                  </h3>
+
+                  <div
+                    className="
+                      inline-flex
+                      items-center
+                      gap-1
+
+                      rounded-full
+
+                      border
+                      border-[#3b4b44]
+
+                      bg-[#1b2522]
+
+                      px-2.5
+                      py-1
+
+                      text-[10px]
+                      font-semibold
+                      uppercase
+
+                      tracking-[0.16em]
+
+                      text-[#cbd7d2]
+                    "
+                  >
+                    <Sparkles className="h-3 w-3" />
+
+                    Queue Active
+                  </div>
+                </div>
+
+                <p
+                  className="
+                    mt-1
+
+                    text-sm
+                    leading-relaxed
+
+                    text-[#8ea59b]
+                  "
+                >
+                  {uploadedFiles.length} file(s)
+                  selected for upload into the
+                  AI knowledge base.
+                </p>
+              </div>
+            </div>
+
+            {/* STATUS */}
+            <div
+              className="
+                inline-flex
+                w-fit
+                flex-col
 
                 rounded-2xl
 
@@ -103,208 +235,167 @@ const UploadDropzone = ({
                 border-[#2f3c36]
 
                 bg-[#1a2320]
+
+                px-4
+                py-3
               "
             >
-              <FileUp
+              <p
                 className="
-                  h-6
-                  w-6
-
-                  text-[#d8b93d]
-                "
-              />
-            </div>
-
-            {/* TEXT */}
-            <div>
-              <h3
-                className="
-                  text-lg
+                  text-[10px]
                   font-semibold
+                  uppercase
 
-                  text-white
+                  tracking-[0.18em]
+
+                  text-[#73867d]
                 "
               >
-                Files Ready
-              </h3>
+                Upload Queue
+              </p>
 
               <p
                 className="
                   mt-1
 
                   text-sm
+                  font-semibold
 
-                  text-[#8ea59b]
+                  text-white
                 "
               >
-                {uploadedFiles.length} file(s)
-                selected for upload.
+                Pending Files
               </p>
             </div>
           </div>
 
-          {/* STATUS */}
+          {/* ACTIONS */}
           <div
             className="
-              rounded-xl
+              mt-5
 
-              border
-              border-[#2f3c36]
+              flex
+              flex-col
+              gap-3
 
-              bg-[#1a2320]
-
-              px-3
-              py-2
+              sm:flex-row
+              sm:flex-wrap
             "
           >
-            <p
-              className="
-                text-[11px]
-                font-medium
-                uppercase
+            {/* CONFIRM */}
+            {hasPendingUploads && (
+              <button
+                onClick={
+                  confirmUpload
+                }
+                className="
+                  flex
+                  h-12
+                  items-center
+                  justify-center
 
-                tracking-[0.16em]
+                  rounded-2xl
 
-                text-[#73867d]
-              "
-            >
-              Upload Queue
-            </p>
+                  border
+                  border-[#d8b93d]/20
 
-            <p
-              className="
-                mt-1
+                  bg-[#d8b93d]
 
-                text-sm
-                font-semibold
+                  px-5
 
-                text-white
-              "
-            >
-              Pending
-            </p>
-          </div>
-        </div>
+                  text-sm
+                  font-semibold
 
-        {/* ACTIONS */}
-        <div
-          className="
-            mt-5
+                  text-[#111917]
 
-            flex
-            flex-wrap
-            gap-3
-          "
-        >
-          {/* CONFIRM */}
-          {hasPendingUploads && (
+                  transition-all
+                  duration-300
+
+                  hover:scale-[1.01]
+                  hover:bg-[#e6c84c]
+
+                  active:scale-[0.99]
+                "
+              >
+                Confirm Upload
+              </button>
+            )}
+
+            {/* ADD FILES */}
             <button
-              onClick={
-                confirmUpload
+              onClick={() =>
+                inputRef.current.click()
               }
               className="
                 flex
+                h-12
                 items-center
                 justify-center
+                gap-2
 
                 rounded-2xl
 
                 border
-                border-[#d8b93d]/20
+                border-[#2f3c36]
 
-                bg-[#d8b93d]
+                bg-[#1a2320]
 
                 px-5
-                py-3
 
                 text-sm
-                font-semibold
+                font-medium
 
-                text-[#111917]
+                text-[#d4dfda]
 
                 transition-all
-                duration-200
+                duration-300
 
-                hover:scale-[1.01]
-                hover:bg-[#e6c84c]
+                hover:border-[#46544e]
+                hover:bg-[#202b27]
               "
             >
-              Confirm Upload
+              <Plus className="h-4 w-4" />
+
+              Add Files
             </button>
-          )}
 
-          {/* ADD FILES */}
-          <button
-            onClick={() =>
-              inputRef.current.click()
-            }
-            className="
-              flex
-              items-center
-              gap-2
+            {/* CANCEL */}
+            <button
+              onClick={
+                clearFiles
+              }
+              className="
+                flex
+                h-12
+                items-center
+                justify-center
+                gap-2
 
-              rounded-2xl
+                rounded-2xl
 
-              border
-              border-[#2f3c36]
+                border
+                border-[#432828]
 
-              bg-[#1a2320]
+                bg-[#231818]
 
-              px-5
-              py-3
+                px-5
 
-              text-sm
-              font-medium
+                text-sm
+                font-medium
 
-              text-[#d4dfda]
+                text-[#ffb4b4]
 
-              transition-all
-              duration-200
+                transition-all
+                duration-300
 
-              hover:border-[#46544e]
-              hover:bg-[#202b27]
-            "
-          >
-            <Plus className="h-4 w-4" />
+                hover:bg-[#2d1d1d]
+              "
+            >
+              <X className="h-4 w-4" />
 
-            Add Files
-          </button>
-
-          {/* CANCEL */}
-          <button
-            onClick={
-              clearFiles
-            }
-            className="
-              flex
-              items-center
-              gap-2
-
-              rounded-2xl
-
-              border
-              border-[#432828]
-
-              bg-[#231818]
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-
-              text-[#ffb4b4]
-
-              transition-all
-              duration-200
-
-              hover:bg-[#2d1d1d]
-            "
-          >
-            <X className="h-4 w-4" />
-
-            Cancel
-          </button>
+              Cancel
+            </button>
+          </div>
         </div>
 
         {/* INPUT */}
@@ -329,27 +420,27 @@ const UploadDropzone = ({
   return (
     <div
       onDrop={onDrop}
-
       onDragOver={
         handleDragOver
       }
-
       onDragLeave={
         handleDragLeave
       }
-
       className={`
+        group
         relative
 
         overflow-hidden
 
-        rounded-[32px]
+        rounded-[28px]
+        md:rounded-[32px]
 
         border-2
         border-dashed
 
-        p-10
-        md:p-14
+        p-6
+        sm:p-8
+        md:p-12
 
         transition-all
         duration-300
@@ -404,12 +495,12 @@ const UploadDropzone = ({
             blur-3xl
 
             transition-all
-            duration-300
+            duration-500
 
             ${
               isDragging
                 ? `
-                  bg-[#d8b93d]/10
+                  bg-[#d8b93d]/12
                 `
                 : `
                   bg-[#d8b93d]/[0.03]
@@ -449,7 +540,9 @@ const UploadDropzone = ({
             border
 
             transition-all
-            duration-300
+            duration-500
+
+            group-hover:scale-[1.02]
 
             ${
               isDragging
@@ -498,6 +591,8 @@ const UploadDropzone = ({
             tracking-tight
 
             text-white
+
+            sm:text-3xl
           "
         >
           {isDragging
@@ -510,12 +605,14 @@ const UploadDropzone = ({
           className="
             mt-3
 
-            max-w-lg
+            max-w-xl
 
             text-sm
             leading-relaxed
 
             text-[#8ea59b]
+
+            sm:text-base
           "
         >
           Drag and drop PDF files here
@@ -532,6 +629,11 @@ const UploadDropzone = ({
           className="
             mt-8
 
+            flex
+            h-12
+            items-center
+            justify-center
+
             rounded-2xl
 
             border
@@ -539,8 +641,7 @@ const UploadDropzone = ({
 
             bg-[#d8b93d]
 
-            px-5
-            py-3
+            px-6
 
             text-sm
             font-semibold
@@ -548,10 +649,12 @@ const UploadDropzone = ({
             text-[#111917]
 
             transition-all
-            duration-200
+            duration-300
 
             hover:scale-[1.02]
             hover:bg-[#e6c84c]
+
+            active:scale-[0.99]
           "
         >
           Choose Files
