@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_orchestrator
 from app.core.exceptions import AuthenticationError
-from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord
+from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse
 from app.services import chat_service
 from app.services.orchestrator import SupportOrchestrator
 from app.services.user_service import fetch_user_details
@@ -129,7 +129,11 @@ async def get_chat_history(
     )
 
 
-@router.get("/user-sessions/{requester_id}", summary="Get all chat sessions for a specific user")
+@router.get(
+    "/user-sessions/{requester_id}", 
+    response_model=list[ChatSessionMetaResponse], # <--- ADDED HERE
+    summary="Get all chat sessions for a specific user"
+)
 def get_user_chat_sessions(
     requester_id: str,
     limit: int = 20,
@@ -157,7 +161,7 @@ def get_user_chat_sessions(
         result.append({
             "session_id": s.SessionID,
             "status": s.Status,
-            "created_at": s.CreatedAt.isoformat() if s.CreatedAt else None,
+            "created_at": s.CreatedAt, # Pydantic will auto-format the datetime object
             "message_count": len(s.messages) if s.messages else 0 
         })
         
