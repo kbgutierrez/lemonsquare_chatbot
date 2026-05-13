@@ -45,10 +45,12 @@ async def fetch_user_details(auth_token: str) -> dict:
             "lastname": f"Tester {user_id}",
         }
 
-    # ── Real BizPortal authentication ────────────────────────────────────
+    # ──  BizPortal authentication ────────────────────────────────────
     headers = {
-        "Authorization": f"Bearer {auth_token}",
         "Accept": "application/json",
+    }
+    params = {
+        "id": auth_token,
     }
     logger.debug("Attempting BizPortal auth call to: %s", settings.BIZPORTAL_API_URL)
 
@@ -57,6 +59,7 @@ async def fetch_user_details(auth_token: str) -> dict:
             response = await client.get(
                 settings.BIZPORTAL_API_URL,
                 headers=headers,
+                params=params,
                 timeout=settings.BIZPORTAL_TIMEOUT,
             )
             logger.debug("BizPortal response status: %d", response.status_code)

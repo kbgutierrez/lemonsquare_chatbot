@@ -1,0 +1,9 @@
+{
+  "ticket_number": "01102600026",
+  "issue_reported": "LOADING ONLY",
+  "issue_found": "LOCKING ON CONVERTION",
+  "issue_cause": "DUE TO FAILURE OF CONVERTING ALSO ON NETWORK PROBLEM",
+  "work_done": "DELETE ON GOING CONVERTION ON SQL AND ADVISE TO RE-CONVERT."
+}
+
+http://<serverip>:8000/api/tickets/sync

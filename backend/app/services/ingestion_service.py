@@ -114,6 +114,7 @@ class DocumentIngestionService:
         self.qdrant = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
+            timeout=settings.QDRANT_TIMEOUT,
         )
         self.collection_name = settings.QDRANT_COLLECTION
         self.embeddings = HuggingFaceEmbeddings(model_name=self.embed_model)
@@ -138,17 +139,30 @@ class DocumentIngestionService:
                 "Uploaded file is not a valid PDF. Only PDF files are supported."
             )
 
-    async def process_pdf_upload(self, file: UploadFile, db: Session) -> dict:
+    async def process_pdf_upload(self, file: UploadFile, db: Session, manual_category: str = None) -> dict:
         """
         Full ingestion pipeline for an uploaded PDF.
 
         Args:
             file: The uploaded file from FastAPI.
             db: Active database session for persisting document metadata.
+            manual_category: Optional category provided by the Admin UI. If valid, uses it. Otherwise AI guesses.
 
         Returns:
             A dict with status, document_id, category, chunks_processed.
         """
+        # 1. DUPLICATE PREVENTION: Check if file already exists in SQL
+        existing_doc = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.FileName == file.filename)
+            .first()
+        )
+        if existing_doc:
+            raise ValidationError(
+                f"File '{file.filename}' already exists in the database. "
+                f"Document ID: {existing_doc.DocumentID}"
+            )
+
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
 
@@ -159,7 +173,7 @@ class DocumentIngestionService:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            # 1. Extract text.
+            # 2. Extract text.
             pdf_reader = PdfReader(temp_file_path)
             raw_text = ""
             for page in pdf_reader.pages:
@@ -170,38 +184,50 @@ class DocumentIngestionService:
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 
-            # 2. AI auto-categorisation (async LLM call).
-            logger.info("Auto-categorizing '%s'...", file.filename)
-            ai_category = await self._classify_document(raw_text)
+            # 3. CATEGORY ASSIGNMENT: Lock in the subcategory from database or AI
+            logger.info("Categorizing '%s'...", file.filename)
+            
+            # If Admin selected a valid category, use it. Otherwise, let AI guess.
+            if manual_category and manual_category in self.allowed_categories:
+                ai_category = manual_category
+                logger.info("Using Admin-provided category: %s", ai_category)
+            else:
+                if manual_category:
+                    logger.warning(
+                        "Admin provided category '%s' but it's not in allowed list: %s",
+                        manual_category,
+                        self.allowed_categories,
+                    )
+                logger.info("No valid category provided. AI is auto-categorizing...")
+                ai_category = await self._classify_document(raw_text)
+            
             logger.info("Classified '%s' as: %s", file.filename, ai_category)
 
-            # 3. Chunk + embed (CPU-bound — run in thread).
+            # 4. Chunk + embed (CPU-bound — run in thread).
             chunks = self.text_splitter.split_text(raw_text)
             document_id = str(uuid.uuid4())
 
             logger.info("Embedding %d chunks for document %s...", len(chunks), document_id)
             vectors = await asyncio.to_thread(self.embeddings.embed_documents, chunks)
 
-            # 4. Build Qdrant points.
-            points = [
-                PointStruct(
-                    id=str(uuid.uuid4()),
-                    vector=vectors[i],
-                    payload={
-                        "page_content": chunk,
-                        "metadata": {
-                            "document_id": document_id,
-                            "source": file.filename,
-                            "category": ai_category,
-                            "chunk_index": i,
-                            "doc_type": "uploaded_manual",
-                        },
+            # 5. Build Qdrant points with deterministic chunk IDs and locked taxonomy.
+            points = []
+            for i, chunk in enumerate(chunks):
+                # Deterministic chunk ID so we never duplicate vectors for the same file
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{i}"))
+                payload = {
+                    "page_content": chunk,
+                    "metadata": {
+                        "document_id": document_id,
+                        "source": file.filename,
+                        "category": ai_category,              # The validated subcategory (database-driven)
+                        "chunk_index": i,
+                        "doc_type": "official_document",      # The hardcoded main category
                     },
-                )
-                for i, chunk in enumerate(chunks)
-            ]
+                }
+                points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
 
-            # 5. Upsert to Qdrant.
+            # 6. Upsert to Qdrant.
             try:
                 self.qdrant.upsert(
                     collection_name=self.collection_name,
@@ -210,7 +236,7 @@ class DocumentIngestionService:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
-            # 6. Persist metadata to SQL.
+            # 7. Persist metadata to SQL.
             db.add(
                 UploadedDocument(
                     DocumentID=document_id,
@@ -232,6 +258,73 @@ class DocumentIngestionService:
         finally:
             if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
+
+
+    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db: Session) -> dict:
+        """Embeds raw text into Qdrant, auto-guessing the category if none is provided."""
+        from app.models.chatbot import AIChatbotSetting
+        from langchain_groq import ChatGroq
+        import uuid
+        from qdrant_client.http.models import PointStruct
+        
+        # 1. FETCH ALLOWED CATEGORIES FROM DB
+        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+        raw_categories = getattr(active_config, 'AllowedCategories', "General_IT")
+        allowed_categories = [c.strip() for c in raw_categories.split(',')]
+
+        # 2. CATEGORY ASSIGNMENT (Admin override vs AI Guess)
+        if manual_category and manual_category in allowed_categories:
+            ai_category = manual_category
+            logger.info("Using Admin-provided category: %s", ai_category)
+        else:
+            logger.info("No category provided for manual entry. AI is auto-categorizing...")
+            
+            classify_llm = ChatGroq(
+                model="llama-3.1-8b-instant", 
+                temperature=0.0, 
+                api_key=settings.GROQ_API_KEY
+            )
+            
+            prompt = (
+                f"You are an IT categorization AI. Read this text: '{title} - {content}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
+                "Reply with ONLY the category name. Do not add punctuation."
+            )
+            
+            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
+            
+            # The Lock: Fallback if the AI hallucinates
+            if ai_category not in allowed_categories:
+                logger.warning(f"AI hallucinated category '{ai_category}'. Overriding to 'General_IT'.")
+                ai_category = "General_IT"
+
+        # 3. FORMAT AND VECTORIZE
+        document_id = str(uuid.uuid4())
+        searchable_text = f"TITLE: {title}\nCONTENT: {content}"
+        
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        
+        # 4. PUSH TO QDRANT
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "document_id": document_id,
+                "source": title,
+                "category": ai_category,        # The verified subcategory
+                "doc_type": "general_text"      # The strict main taxonomy
+            }
+        }
+        
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=document_id, vector=vector, payload=payload)]
+        )
+        
+        return {
+            "status": "success", 
+            "category": ai_category, 
+            "message": f"Manual entry added to AI Brain under '{ai_category}'."
+        }
 
     async def _classify_document(self, raw_text: str) -> str:
         """Use an LLM to classify the document into one of the allowed categories."""

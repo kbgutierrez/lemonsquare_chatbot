@@ -17,7 +17,7 @@ class TicketDeleteResponse(BaseModel):
 
 class TicketResolveRequest(BaseModel):
     ticket_number: str
-    issue_resported: str  
+    issue_reported: str  
     issue_found: str
     issue_cause: str
     work_done: str

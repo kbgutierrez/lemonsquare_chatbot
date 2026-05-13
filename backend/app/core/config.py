@@ -21,6 +21,7 @@ class Settings(BaseSettings):
 
     # ─── Qdrant ───────────────────────────────────────────────────────────
     QDRANT_COLLECTION: str = "helpdesk_multilingual_v1"
+    QDRANT_TIMEOUT: float = 60.0
 
     # ─── Default ML Model Names (overridden by DB settings at runtime) ────
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"
