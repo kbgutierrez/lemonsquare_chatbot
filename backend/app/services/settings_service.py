@@ -75,6 +75,7 @@ def update_settings(
         UseReformulator=new_settings.UseReformulator,
         UseReranker=new_settings.UseReranker,
         AllowedCategories=new_settings.AllowedCategories,
+        ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
         IsActive=True,
         UpdatedBy=updated_by,
     )

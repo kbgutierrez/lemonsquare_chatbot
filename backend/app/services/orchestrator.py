@@ -106,6 +106,7 @@ class SupportOrchestrator:
         self.qdrant = QdrantClient(
             url=settings.QDRANT_URL,
             api_key=settings.QDRANT_API_KEY,
+            timeout=settings.QDRANT_TIMEOUT,
         )
         self.collection_name = settings.QDRANT_COLLECTION
         self.embeddings = HuggingFaceEmbeddings(model_name=resolved_embed)

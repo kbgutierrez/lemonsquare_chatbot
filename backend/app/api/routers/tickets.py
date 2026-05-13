@@ -28,7 +28,11 @@ router = APIRouter(prefix="/tickets", tags=["Tickets"])
 # Qdrant client for ticket-blacklist operations.
 # This is a lightweight client object (no ML models), so constructing it
 # here as a module-level instance is acceptable.
-_qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+_qdrant = QdrantClient(
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY,
+    timeout=settings.QDRANT_TIMEOUT,
+)
 
 
 @router.get(
@@ -153,3 +157,51 @@ async def sync_resolved_ticket(
     result = await ingestion_service.process_resolved_ticket(payload.model_dump(), db_chatbot)
     
     return TicketSyncResponse(**result)
+
+@router.post("/tickets/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+async def whitelist_ticket(
+    ticket_number: str, 
+    db_chatbot: Session = Depends(get_chatbot_db),
+    db_helpdesk: Session = Depends(get_helpdesk_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """
+    Removes a ticket from the blacklist, fetches the original data from the Helpdesk, 
+    and immediately re-ingests it into Qdrant.
+    """
+    from app.models.chatbot import BlacklistedTicket
+    # Import your SQLAlchemy model that maps to [BigEHelpDeskDev].[dbo].[tbl_ticket_evaluation]
+    from app.models.helpdesk import TicketEvaluation 
+    
+    # 1. Verify and Remove from Blacklist
+    blacklisted_entry = db_chatbot.query(BlacklistedTicket).filter(BlacklistedTicket.TicketNumber == ticket_number).first()
+    if not blacklisted_entry:
+        raise HTTPException(status_code=404, detail=f"Ticket {ticket_number} is not currently blacklisted.")
+        
+    db_chatbot.delete(blacklisted_entry)
+    db_chatbot.commit()
+    
+    # 2. Fetch the original ticket data from the Helpdesk Database
+    original_ticket = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.ticket_number == ticket_number).first()
+    if not original_ticket:
+        raise HTTPException(
+            status_code=404, 
+            detail="Ticket removed from blacklist, but the original ticket could not be found in the Helpdesk DB to re-learn."
+        )
+
+    # 3. Format it perfectly for the Ingestion Service
+    ticket_payload = TicketResolveRequest(
+        ticket_number=original_ticket.ticket_number,
+        issue_reported=original_ticket.issue_reported or "None",
+        issue_found=original_ticket.issue_found or "None",
+        issue_cause=original_ticket.issue_cause or "None",
+        work_done=original_ticket.work_done or "None"
+    )
+
+    # 4. Push it back to Qdrant (The AI's Brain)
+    await ingestion_service.process_resolved_ticket(ticket_payload)
+    
+    return {
+        "status": "success", 
+        "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI."
+    }

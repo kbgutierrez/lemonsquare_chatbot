@@ -10,8 +10,10 @@ endpoints. Extracting each feature into its own router module means:
 
 import asyncio
 import logging
+import uuid
+from qdrant_client.http.models import PointStruct
 
-from fastapi import APIRouter, Depends, File, UploadFile
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
 from pydantic import BaseModel
 from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
@@ -22,9 +24,13 @@ from app.schemas.documents import (
     DocumentDeleteResponse,
     DocumentResponse,
     DocumentUploadResponse,
+    ManualEntryRequest,
+    
 )
+
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
@@ -37,16 +43,18 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
 )
 async def upload_document(
     file: UploadFile = File(...),
+    category: str | None = Form(None),
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentUploadResponse:
     """
-    Upload a PDF, auto-categorise it via LLM, embed and store in Qdrant,
+    Upload a PDF, categorise it (Admin-provided or AI auto-guessed), embed and store in Qdrant,
     and save metadata to SQL.
 
     File validation (PDF magic bytes) is handled inside the service.
+    The category must be one of the allowed categories from AIChatbotSettings.
     """
-    result = await ingestion_service.process_pdf_upload(file, db)
+    result = await ingestion_service.process_pdf_upload(file, db, manual_category=category)
     return DocumentUploadResponse(**result)
 
 
@@ -119,6 +127,9 @@ async def debug_full_rag_pipeline(
     }
 
 
+
+
+
 @router.get(
     "",
     response_model=list[DocumentResponse],
@@ -171,6 +182,25 @@ async def delete_document(
     """
     result = await ingestion_service.delete_document(document_id, db)
     return DocumentDeleteResponse(**result)
+
+
+@router.post("/manual", summary="Add manual text to KB")
+async def add_manual_knowledge(
+    request: ManualEntryRequest,
+    db: Session = Depends(get_chatbot_db), # <--- We need the DB for the category check
+    ingestion_service = Depends(get_ingestion_service)
+):
+    """Embeds raw text into Qdrant, auto-categorizing if necessary."""
+    
+    # Hand the data over to the service!
+    result = await ingestion_service.process_manual_entry(
+        title=request.title,
+        content=request.content,
+        manual_category=request.category,
+        db=db
+    )
+    
+    return result
 
 
 
