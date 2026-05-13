@@ -7,11 +7,12 @@ import {
 import {
   EllipsisVertical,
   History,
-  Trash2,
+  Plus,
   Ticket,
   Phone,
   CheckCheck,
   Info,
+  Lock,
 } from "lucide-react"
 
 const options = [
@@ -22,9 +23,9 @@ const options = [
   },
 
   {
-    id: "clear",
-    label: "Clear Conversation",
-    icon: Trash2,
+    id: "new-chat",
+    label: "New Chat",
+    icon: Plus,
   },
 
   {
@@ -53,16 +54,22 @@ const options = [
 ]
 
 const ChatMenu = ({
+  resolved = false,
   onSelect,
 }) => {
+
   const [open, setOpen] =
     useState(false)
 
   const menuRef =
     useRef(null)
 
-  /* OUTSIDE CLICK */
+  /* ========================================
+     OUTSIDE CLICK
+  ======================================== */
+
   useEffect(() => {
+
     const handleOutsideClick =
       (event) => {
 
@@ -72,6 +79,7 @@ const ChatMenu = ({
             event.target
           )
         ) {
+
           setOpen(false)
         }
       }
@@ -86,25 +94,32 @@ const ChatMenu = ({
         "mousedown",
         handleOutsideClick
       )
+
   }, [])
 
-  /* SELECT */
-  const handleSelect = (
-    id
-  ) => {
+  /* ========================================
+     SELECT
+  ======================================== */
 
-    /*
-      FUTURE SAFE:
-      - AI actions
-      - analytics
-      - API calls
-      - endpoint mapping
-    */
+  const handleSelect =
+    (id) => {
 
-    onSelect(id)
+      /*
+        Prevent duplicate resolve
+        on already resolved chats.
+      */
+      if (
+        resolved &&
+        id === "resolve"
+      ) {
 
-    setOpen(false)
-  }
+        return
+      }
+
+      onSelect?.(id)
+
+      setOpen(false)
+    }
 
   return (
     <div
@@ -114,9 +129,13 @@ const ChatMenu = ({
       {/* BUTTON */}
       <button
         type="button"
+
         onClick={() =>
-          setOpen((prev) => !prev)
+          setOpen(
+            (prev) => !prev
+          )
         }
+
         className={`
           flex
           h-10
@@ -138,7 +157,12 @@ const ChatMenu = ({
           }
         `}
       >
-        <EllipsisVertical className="h-5 w-5" />
+        <EllipsisVertical
+          className="
+            h-5
+            w-5
+          "
+        />
       </button>
 
       {/* DROPDOWN */}
@@ -206,6 +230,7 @@ const ChatMenu = ({
               font-semibold
               uppercase
               tracking-[0.22em]
+
               text-violet-600
             "
           >
@@ -214,7 +239,9 @@ const ChatMenu = ({
         </div>
 
         {/* OPTIONS */}
-        <div className="p-2">
+        <div
+          className="p-2"
+        >
           {options.map(
             (
               {
@@ -223,76 +250,145 @@ const ChatMenu = ({
                 icon: Icon,
               },
               index
-            ) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() =>
-                  handleSelect(id)
-                }
-                className="
-                  group
+            ) => {
 
-                  flex
-                  w-full
-                  items-center
-                  gap-3
+              const isResolveOption =
+                id === "resolve"
 
-                  rounded-xl
+              const isDisabled =
+                resolved &&
+                isResolveOption
 
-                  px-3
-                  py-3
+              return (
+                <button
+                  key={id}
 
-                  text-left
-                  text-sm
-                  text-slate-700
+                  type="button"
 
-                  transition-all
-                  duration-200
+                  disabled={
+                    isDisabled
+                  }
 
-                  hover:bg-violet-50
-                  hover:translate-x-1
-                "
-                style={{
-                  animationDelay: `
-                    ${index * 40}ms
-                  `,
-                }}
-              >
-                {/* ICON */}
-                <div
-                  className="
+                  onClick={() =>
+                    handleSelect(id)
+                  }
+
+                  className={`
+                    group
+
                     flex
-                    h-9
-                    w-9
+                    w-full
                     items-center
-                    justify-center
+                    gap-3
 
                     rounded-xl
 
-                    bg-violet-100
+                    px-3
+                    py-3
+
+                    text-left
+                    text-sm
 
                     transition-all
                     duration-200
 
-                    group-hover:bg-violet-200
-                  "
-                >
-                  <Icon
-                    className="
-                      h-4
-                      w-4
-                      text-violet-700
-                    "
-                  />
-                </div>
+                    ${
+                      isDisabled
+                        ? `
+                          cursor-not-allowed
+                          opacity-60
+                        `
+                        : `
+                          text-slate-700
 
-                {/* LABEL */}
-                <span className="font-medium">
-                  {label}
-                </span>
-              </button>
-            )
+                          hover:translate-x-1
+                          hover:bg-violet-50
+                        `
+                    }
+                  `}
+
+                  style={{
+                    animationDelay:
+                      `${index * 40}ms`,
+                  }}
+                >
+                  {/* ICON */}
+                  <div
+                    className={`
+                      flex
+                      h-9
+                      w-9
+                      items-center
+                      justify-center
+
+                      rounded-xl
+
+                      transition-all
+                      duration-200
+
+                      ${
+                        isDisabled
+                          ? `
+                            bg-emerald-100
+                          `
+                          : `
+                            bg-violet-100
+
+                            group-hover:bg-violet-200
+                          `
+                      }
+                    `}
+                  >
+                    {isDisabled ? (
+                      <Lock
+                        className="
+                          h-4
+                          w-4
+
+                          text-emerald-700
+                        "
+                      />
+                    ) : (
+                      <Icon
+                        className="
+                          h-4
+                          w-4
+
+                          text-violet-700
+                        "
+                      />
+                    )}
+                  </div>
+
+                  {/* LABEL */}
+                  <div
+                    className="
+                      flex
+                      flex-col
+                    "
+                  >
+                    <span
+                      className="
+                        font-medium
+                      "
+                    >
+                      {label}
+                    </span>
+
+                    {isDisabled && (
+                      <span
+                        className="
+                          text-[10px]
+                          text-emerald-600
+                        "
+                      >
+                        Already resolved
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            }
           )}
         </div>
       </div>

@@ -1,10 +1,15 @@
 import {
+  useState,
+} from "react"
+
+import {
   AnimatePresence,
   motion,
 } from "framer-motion"
 
 import {
   CheckCircle2,
+  Loader2,
   X,
 } from "lucide-react"
 
@@ -12,6 +17,59 @@ const ResolveConversationModal = ({
   onClose,
   onResolve,
 }) => {
+
+  const [resolving, setResolving] =
+    useState(false)
+
+  /* ========================================
+     HANDLE RESOLVE
+  ======================================== */
+
+  const handleResolve =
+    async () => {
+
+      /*
+        Prevent duplicate clicks
+      */
+      if (resolving) {
+        return
+      }
+
+      try {
+
+        setResolving(true)
+
+        await onResolve?.()
+
+      } catch (error) {
+
+        console.error(
+          "RESOLVE_MODAL_ERROR",
+          error
+        )
+
+      } finally {
+
+        setResolving(false)
+      }
+    }
+
+  /* ========================================
+     HANDLE CLOSE
+  ======================================== */
+
+  const handleClose =
+    () => {
+
+      /*
+        Prevent closing while resolving
+      */
+      if (resolving) {
+        return
+      }
+
+      onClose?.()
+    }
 
   return (
     <AnimatePresence>
@@ -171,8 +229,12 @@ const ResolveConversationModal = ({
               <button
                 type="button"
 
+                disabled={
+                  resolving
+                }
+
                 onClick={
-                  onClose
+                  handleClose
                 }
 
                 className="
@@ -185,6 +247,9 @@ const ResolveConversationModal = ({
 
                   hover:bg-slate-100
                   hover:text-slate-900
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
                 "
               >
                 <X size={18} />
@@ -214,9 +279,23 @@ const ResolveConversationModal = ({
                   text-slate-600
                 "
               >
-                Confirm that the current support session
-                has been completed and safely resolve
-                the conversation.
+                Confirm that the current support
+                session has been completed and
+                safely resolve the conversation.
+
+                <span
+                  className="
+                    mt-3
+                    block
+
+                    font-medium
+                    text-emerald-700
+                  "
+                >
+                  The resolved conversation will
+                  automatically be learned by the AI
+                  and appear in the Admin panel.
+                </span>
               </p>
             </div>
 
@@ -233,8 +312,12 @@ const ResolveConversationModal = ({
               <button
                 type="button"
 
+                disabled={
+                  resolving
+                }
+
                 onClick={
-                  onClose
+                  handleClose
                 }
 
                 className="
@@ -256,6 +339,9 @@ const ResolveConversationModal = ({
                   transition
 
                   hover:bg-slate-50
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-50
                 "
               >
                 Cancel
@@ -264,11 +350,20 @@ const ResolveConversationModal = ({
               <button
                 type="button"
 
+                disabled={
+                  resolving
+                }
+
                 onClick={
-                  onResolve
+                  handleResolve
                 }
 
                 className="
+                  flex
+                  items-center
+                  justify-center
+                  gap-2
+
                   rounded-2xl
 
                   bg-gradient-to-r
@@ -282,9 +377,39 @@ const ResolveConversationModal = ({
                   font-medium
 
                   text-white
+
+                  transition-all
+
+                  hover:scale-[1.02]
+
+                  disabled:cursor-not-allowed
+                  disabled:opacity-70
                 "
               >
-                Resolve
+                {resolving ? (
+                  <>
+                    <Loader2
+                      className="
+                        h-4
+                        w-4
+                        animate-spin
+                      "
+                    />
+
+                    Resolving...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2
+                      className="
+                        h-4
+                        w-4
+                      "
+                    />
+
+                    Resolve
+                  </>
+                )}
               </button>
             </div>
           </div>

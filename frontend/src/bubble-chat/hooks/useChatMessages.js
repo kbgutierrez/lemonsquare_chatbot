@@ -28,6 +28,13 @@ export const useChatMessages =
     const [sessionId, setSessionId] =
       useState(null)
 
+    /*
+      Backend-authoritative
+      resolved state.
+    */
+    const [resolved, setResolved] =
+      useState(false)
+
     /* ========================================
        REFS
     ======================================== */
@@ -51,17 +58,18 @@ export const useChatMessages =
        TIME FORMAT
     ======================================== */
 
-    const getTime = (
-      date = new Date()
-    ) =>
-      new Date(date)
-        .toLocaleTimeString(
-          [],
-          {
-            hour: "2-digit",
-            minute: "2-digit",
-          }
-        )
+    const getTime =
+      (
+        date = new Date()
+      ) =>
+        new Date(date)
+          .toLocaleTimeString(
+            [],
+            {
+              hour: "2-digit",
+              minute: "2-digit",
+            }
+          )
 
     /* ========================================
        MOUNT CLEANUP
@@ -81,6 +89,54 @@ export const useChatMessages =
     }, [])
 
     /* ========================================
+       CHECK RESOLVED STATUS
+    ======================================== */
+
+    const syncResolvedStatus =
+      useCallback(
+        async (
+          targetSessionId
+        ) => {
+
+          if (
+            !targetSessionId
+          ) {
+
+            setResolved(false)
+
+            return
+          }
+
+          try {
+
+            const sessions =
+              await chatbotService.loadUserSessions()
+
+            const matchedSession =
+              sessions.find(
+                (session) =>
+                  session.id ===
+                  targetSessionId
+              )
+
+            setResolved(
+              Boolean(
+                matchedSession?.resolved
+              )
+            )
+
+          } catch (error) {
+
+            console.error(
+              "SYNC_RESOLVED_STATUS_ERROR",
+              error
+            )
+          }
+        },
+        []
+      )
+
+    /* ========================================
        LOAD CONVERSATION
     ======================================== */
 
@@ -97,8 +153,9 @@ export const useChatMessages =
           }
 
           /*
-            Generate a unique load id so stale
-            async responses can be ignored.
+            Generate a unique load id
+            so stale async responses
+            can be ignored.
           */
           const loadId =
             crypto.randomUUID()
@@ -110,6 +167,9 @@ export const useChatMessages =
 
           try {
 
+            /*
+              Load backend history.
+            */
             const data =
               await chatbotService.loadSession(
                 targetSessionId
@@ -142,6 +202,13 @@ export const useChatMessages =
               normalizedMessages
             )
 
+            /*
+              Sync backend resolved state.
+            */
+            await syncResolvedStatus(
+              targetSessionId
+            )
+
             console.log(
               "SESSION_LOADED",
               {
@@ -166,9 +233,9 @@ export const useChatMessages =
 
               setMessages([])
 
-              setSessionId(
-                null
-              )
+              setSessionId(null)
+
+              setResolved(false)
 
               sessionIdRef.current =
                 null
@@ -180,13 +247,11 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(
-                false
-              )
+              setLoading(false)
             }
           }
         },
-        []
+        [syncResolvedStatus]
       )
 
     /* ========================================
@@ -195,9 +260,7 @@ export const useChatMessages =
 
     useEffect(() => {
 
-      if (
-        !sessionId
-      ) {
+      if (!sessionId) {
         return
       }
 
@@ -220,12 +283,23 @@ export const useChatMessages =
           text
         ) => {
 
+          /*
+            Prevent sending
+            on resolved chat.
+          */
+          if (resolved) {
+
+            console.warn(
+              "MESSAGE_BLOCKED_RESOLVED_CHAT"
+            )
+
+            return
+          }
+
           const trimmed =
             text?.trim()
 
-          if (
-            !trimmed
-          ) {
+          if (!trimmed) {
             return
           }
 
@@ -262,14 +336,11 @@ export const useChatMessages =
             sender:
               "agent",
 
-            text:
-              "",
+            text: "",
 
-            time:
-              "",
+            time: "",
 
-            isTyping:
-              true,
+            isTyping: true,
           }
 
           const optimisticMessages = [
@@ -310,12 +381,10 @@ export const useChatMessages =
               sessionIdRef.current =
                 response.sessionId
 
-              /*
-                Only trigger state update
-                if session changed.
-              */
               setSessionId(
-                (previous) => {
+                (
+                  previous
+                ) => {
 
                   if (
                     previous ===
@@ -385,8 +454,7 @@ export const useChatMessages =
               time:
                 getTime(),
 
-              isError:
-                true,
+              isError: true,
             }
 
             setMessages([
@@ -400,16 +468,92 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(
-                false
-              )
+              setLoading(false)
             }
 
             requestLockRef.current =
               false
           }
         },
-        [messages]
+        [
+          messages,
+          resolved,
+        ]
+      )
+
+    /* ========================================
+       RESOLVE CONVERSATION
+    ======================================== */
+
+    const resolveConversation =
+      useCallback(
+        async () => {
+
+          if (
+            !sessionIdRef.current
+          ) {
+
+            throw new Error(
+              "No active session found."
+            )
+          }
+
+          /*
+            Prevent duplicate resolve.
+          */
+          if (resolved) {
+
+            console.warn(
+              "CHAT_ALREADY_RESOLVED"
+            )
+
+            return
+          }
+
+          try {
+
+            setLoading(true)
+
+            /*
+              REAL BACKEND RESOLVE
+            */
+            await chatbotService.resolveConversation(
+              sessionIdRef.current
+            )
+
+            /*
+              Backend is source of truth.
+            */
+            setResolved(true)
+
+            console.log(
+              "BACKEND_CONVERSATION_RESOLVED",
+              {
+                sessionId:
+                  sessionIdRef.current,
+              }
+            )
+
+          } catch (error) {
+
+            console.error(
+              "RESOLVE_CONVERSATION_ERROR",
+              error
+            )
+
+            throw error
+
+          } finally {
+
+            if (
+              mountedRef.current
+            ) {
+
+              setLoading(false)
+            }
+          }
+        },
+        [resolved]
       )
 
     /* ========================================
@@ -422,9 +566,7 @@ export const useChatMessages =
           sessionId,
         }) => {
 
-          if (
-            !sessionId
-          ) {
+          if (!sessionId) {
             return
           }
 
@@ -467,9 +609,9 @@ export const useChatMessages =
 
           setMessages([])
 
-          setSessionId(
-            null
-          )
+          setSessionId(null)
+
+          setResolved(false)
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -485,7 +627,11 @@ export const useChatMessages =
 
       sessionId,
 
+      resolved,
+
       sendMessage,
+
+      resolveConversation,
 
       clearConversation,
 

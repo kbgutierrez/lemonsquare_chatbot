@@ -213,44 +213,49 @@ const normalizeSession = (
         )
       : new Date()
 
-  const updatedAt =
-    session?.updated_at
-      ? new Date(
-          session.updated_at
-        )
-      : createdAt
-
   return {
     id:
       session?.session_id ||
       `session-${index}`,
 
-    title:
-      session?.title ||
-      "Conversation",
+    /*
+      Backend does NOT provide
+      title/preview.
 
-    preview:
-      session?.preview ||
-      "No preview available.",
+      These are hydrated later
+      from REAL backend history.
+    */
+    title: null,
+
+    preview: null,
 
     createdAt:
       createdAt.toISOString(),
 
     updatedAt:
-      updatedAt.toISOString(),
+      createdAt.toISOString(),
 
     messageCount:
       Number(
         session?.message_count || 0
       ),
 
+    /*
+      BACKEND STATUS IS SOURCE OF TRUTH
+    */
     resolved:
-      Boolean(
-        session?.resolved
-      ),
+      String(
+        session?.status || ""
+      ).toLowerCase() ===
+      "resolved",
 
     resolvedAt:
-      session?.resolved_at || null,
+      String(
+        session?.status || ""
+      ).toLowerCase() ===
+      "resolved"
+        ? createdAt.toISOString()
+        : null,
   }
 }
 
@@ -478,6 +483,18 @@ const loadSession =
           finalUrl,
       })
 
+    /*
+      IMPORTANT:
+      Backend history endpoint
+      is ONLY for messages.
+
+      Resolved state comes from:
+      GET /chat/user-sessions/:requesterId
+
+      Backend session registry
+      is the source of truth.
+    */
+
     return {
       sessionId:
         response?.session_id ||
@@ -583,6 +600,42 @@ const loadAISettings =
         "AI settings endpoint not yet connected.",
     }
   }
+/* ========================================
+   RESOLVE CONVERSATION
+======================================== */
+
+const resolveConversation =
+  async (
+    SessionID
+  ) => {
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.CHAT_RESOLVE,
+        {
+          sessionId:
+            SessionID,
+        }
+      )
+
+    console.log(
+      "RESOLVE_CONVERSATION",
+      {
+        SessionID,
+      }
+    )
+
+    console.log(
+      "API_ENDPOINT",
+      endpoint
+    )
+
+    return await apiRequest({
+      endpoint,
+      method: "POST",
+    })
+  }
+
 
 /* ========================================
    EXPORT
@@ -596,6 +649,8 @@ const chatbotService = {
   loadUserSessions,
 
   clearSession,
+
+  resolveConversation,
 
   loadAISettings,
 }

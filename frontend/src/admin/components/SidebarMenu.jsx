@@ -3,6 +3,8 @@ import {
   FolderOpen,
   BrainCircuit,
   Ticket,
+  FileText,
+  MessagesSquare,
 } from "lucide-react"
 
 const menuItems = [
@@ -16,6 +18,18 @@ const menuItems = [
     id: "files",
     label: "Knowledge Files",
     icon: FolderOpen,
+  },
+
+  {
+    id: "resolved_chats",
+    label: "Resolved Chats",
+    icon: MessagesSquare,
+  },
+
+  {
+    id: "manual_entries",
+    label: "Manual Entries",
+    icon: FileText,
   },
 
   {
@@ -41,6 +55,8 @@ const SidebarMenu = ({
       className="
         flex
         h-full
+        min-h-0
+        w-full
         flex-col
 
         overflow-hidden
@@ -52,15 +68,17 @@ const SidebarMenu = ({
 
         bg-[#111917]
 
-        p-4
+        p-3
+        sm:p-4
 
         shadow-[0_10px_40px_rgba(0,0,0,0.35)]
       "
     >
-      {/* LOGO */}
+      {/* HEADER */}
       <div
         className="
-          mb-8
+          mb-6
+          shrink-0
 
           flex
           items-center
@@ -73,16 +91,18 @@ const SidebarMenu = ({
 
           bg-[#161f1d]
 
-          px-4
-          py-4
+          px-3
+          py-3
+          sm:px-4
+          sm:py-4
         "
       >
-        {/* LOGO BOX */}
+        {/* LOGO */}
         <div
           className="
             flex
-            h-11
-            w-11
+            h-10
+            w-10
             shrink-0
             items-center
             justify-center
@@ -106,7 +126,7 @@ const SidebarMenu = ({
         </div>
 
         {/* TEXT */}
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h2
             className="
               truncate
@@ -126,6 +146,8 @@ const SidebarMenu = ({
             className="
               mt-0.5
 
+              truncate
+
               text-xs
 
               text-[#8ea59b]
@@ -136,8 +158,8 @@ const SidebarMenu = ({
         </div>
       </div>
 
-      {/* NAVIGATION */}
-      <div className="mb-3 px-2">
+      {/* NAV LABEL */}
+      <div className="mb-3 shrink-0 px-2">
         <p
           className="
             text-[11px]
@@ -153,76 +175,54 @@ const SidebarMenu = ({
         </p>
       </div>
 
-      {/* MENU */}
-      <div className="flex flex-col gap-2">
-        {menuItems.map(
-          ({
-            id,
-            label,
-            icon: Icon,
-          }) => {
+      {/* SCROLLABLE MENU */}
+      <div
+        className="
+          flex-1
+          min-h-0
 
-            const active =
-              activeView === id
+          overflow-y-auto
+          overflow-x-hidden
 
-            return (
-              <button
-                key={id}
-                type="button"
-                onClick={() =>
-                  setActiveView(id)
-                }
-                className={`
-                  group
+          pr-1
 
-                  flex
-                  w-full
-                  items-center
-                  gap-3
+          [scrollbar-width:none]
+          [&::-webkit-scrollbar]:hidden
+        "
+      >
+        <div className="flex flex-col gap-2">
+          {menuItems.map(
+            ({
+              id,
+              label,
+              icon: Icon,
+            }) => {
 
-                  rounded-2xl
+              const active =
+                activeView === id
 
-                  px-3.5
-                  py-3
-
-                  text-left
-
-                  transition-all
-                  duration-200
-
-                  ${
-                    active
-                      ? `
-                        border
-                        border-[#46544d]
-
-                        bg-[#1c2723]
-
-                        text-white
-                      `
-                      : `
-                        border
-                        border-transparent
-
-                        text-[#b6c3bd]
-
-                        hover:bg-[#171f1d]
-                        hover:text-white
-                      `
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() =>
+                    setActiveView(id)
                   }
-                `}
-              >
-                {/* ICON */}
-                <div
                   className={`
-                    flex
-                    h-10
-                    w-10
-                    shrink-0
-                    items-center
-                    justify-center
+                    group
 
-                    rounded-xl
+                    flex
+                    w-full
+                    min-w-0
+                    items-center
+                    gap-3
+
+                    rounded-2xl
+
+                    px-3
+                    py-3
+
+                    text-left
 
                     transition-all
                     duration-200
@@ -230,39 +230,80 @@ const SidebarMenu = ({
                     ${
                       active
                         ? `
-                          bg-[#f5d547]
+                          border
+                          border-[#46544d]
 
-                          text-[#111917]
+                          bg-[#1c2723]
+
+                          text-white
                         `
                         : `
-                          bg-[#202a27]
+                          border
+                          border-transparent
 
                           text-[#b6c3bd]
 
-                          group-hover:bg-[#2a3632]
-                          group-hover:text-white
+                          hover:bg-[#171f1d]
+                          hover:text-white
                         `
                     }
                   `}
                 >
-                  <Icon className="h-4.5 w-4.5" />
-                </div>
+                  {/* ICON */}
+                  <div
+                    className={`
+                      flex
+                      h-10
+                      w-10
+                      shrink-0
+                      items-center
+                      justify-center
 
-                {/* LABEL */}
-                <span
-                  className="
-                    truncate
+                      rounded-xl
 
-                    text-sm
-                    font-medium
-                  "
-                >
-                  {label}
-                </span>
-              </button>
-            )
-          }
-        )}
+                      transition-all
+                      duration-200
+
+                      ${
+                        active
+                          ? `
+                            bg-[#f5d547]
+
+                            text-[#111917]
+                          `
+                          : `
+                            bg-[#202a27]
+
+                            text-[#b6c3bd]
+
+                            group-hover:bg-[#2a3632]
+                            group-hover:text-white
+                          `
+                      }
+                    `}
+                  >
+                    <Icon className="h-4.5 w-4.5 shrink-0" />
+                  </div>
+
+                  {/* LABEL */}
+                  <span
+                    className="
+                      min-w-0
+                      flex-1
+
+                      truncate
+
+                      text-sm
+                      font-medium
+                    "
+                  >
+                    {label}
+                  </span>
+                </button>
+              )
+            }
+          )}
+        </div>
       </div>
     </aside>
   )

@@ -1,5 +1,4 @@
 import {
-  Trash2,
   ShieldCheck,
   ShieldOff,
   FileText,
@@ -8,7 +7,6 @@ import {
 const FileTable = ({
   files = [],
   onToggleFile,
-  onDeleteFile,
 }) => {
 
   const formatDate =
@@ -178,7 +176,7 @@ const FileTable = ({
                 text-[#70847b]
               "
             >
-              Actions
+              AI Control
             </th>
           </tr>
         </thead>
@@ -298,7 +296,6 @@ const FileTable = ({
                 >
                   <div className="flex items-center gap-4">
 
-                    {/* ICON */}
                     <div
                       className="
                         flex
@@ -326,7 +323,6 @@ const FileTable = ({
                       />
                     </div>
 
-                    {/* TEXT */}
                     <div className="min-w-0">
 
                       <p
@@ -494,12 +490,12 @@ const FileTable = ({
                     />
 
                     {isActive
-                      ? "Active"
+                      ? "Whitelisted"
                       : "Blocked"}
                   </span>
                 </td>
 
-                {/* ACTIONS */}
+                {/* ACTION */}
                 <td
                   className="
                     border-b
@@ -514,10 +510,8 @@ const FileTable = ({
                       flex
                       items-center
                       justify-center
-                      gap-2
                     "
                   >
-                    {/* TOGGLE */}
                     <button
                       onClick={() =>
                         onToggleFile?.(
@@ -534,8 +528,8 @@ const FileTable = ({
 
                         border
 
-                        px-3
-                        py-2
+                        px-4
+                        py-2.5
 
                         text-sm
                         font-medium
@@ -565,60 +559,14 @@ const FileTable = ({
                       {isActive ? (
                         <>
                           <ShieldOff className="h-4 w-4" />
-
-                          <span className="hidden xl:inline">
-                            Block
-                          </span>
+                          Block File
                         </>
                       ) : (
                         <>
                           <ShieldCheck className="h-4 w-4" />
-
-                          <span className="hidden xl:inline">
-                            Enable
-                          </span>
+                          Whitelist File
                         </>
                       )}
-                    </button>
-
-                    {/* DELETE */}
-                    <button
-                      onClick={() =>
-                        onDeleteFile?.(
-                          file.document_id
-                        )
-                      }
-                      className="
-                        flex
-                        items-center
-                        gap-2
-
-                        rounded-xl
-
-                        border
-                        border-red-500/20
-
-                        bg-red-500/10
-
-                        px-3
-                        py-2
-
-                        text-sm
-                        font-medium
-
-                        text-red-400
-
-                        transition-all
-                        duration-200
-
-                        hover:bg-red-500/20
-                      "
-                    >
-                      <Trash2 className="h-4 w-4" />
-
-                      <span className="hidden xl:inline">
-                        Delete
-                      </span>
                     </button>
                   </div>
                 </td>

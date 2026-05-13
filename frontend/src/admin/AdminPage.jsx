@@ -17,30 +17,11 @@ import KnowledgeFilesSection
 import TicketsSection
   from "./components/tickets/TicketsSection.jsx"
 
-const sidebarItems = [
-  {
-    id: "upload",
-    label: "Upload",
-  },
+import ResolvedChatsSection
+  from "./components/resolved-chats/ResolvedChatsSection.jsx"
 
-  {
-    id: "files",
-    label:
-      "Knowledge Files",
-  },
-
-  {
-    id: "tickets",
-    label:
-      "Tickets",
-  },
-
-  {
-    id: "ai",
-    label:
-      "AI Configuration",
-  },
-]
+import ManualEntriesSection
+  from "./components/manual-entries/ManualEntriesSection.jsx"
 
 const AdminPage = () => {
 
@@ -228,10 +209,6 @@ const AdminPage = () => {
 
             setActiveView={
               setActiveView
-            }
-
-            items={
-              sidebarItems
             }
           />
         </aside>
@@ -432,6 +409,16 @@ const AdminPage = () => {
               {activeView ===
                 "files" && (
                 <KnowledgeFilesSection />
+              )}
+
+              {activeView ===
+                "resolved_chats" && (
+                <ResolvedChatsSection />
+              )}
+
+              {activeView ===
+                "manual_entries" && (
+                <ManualEntriesSection />
               )}
 
               {activeView ===
