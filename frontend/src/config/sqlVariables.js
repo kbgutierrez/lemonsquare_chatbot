@@ -1,5 +1,6 @@
 /*
   CENTRALIZED APP CONFIG
+
   Future-safe for:
   - SQL Server
   - REST API
@@ -9,15 +10,59 @@
   - Admin Dashboard
 */
 
-/* API */
-export const API_CONFIG = {
-  BASE_URL:
-    "http://localhost:8000/api",
+/* ========================================
+   ENVIRONMENT
+======================================== */
 
-  TIMEOUT: 30000,
+const ENV = {
+  API_BASE_URL:
+    import.meta.env.VITE_API_BASE_URL ||
+    "/api",
+
+  WS_BASE_URL:
+    import.meta.env.VITE_WS_BASE_URL ||
+    "/ws",
+
+  APP_ENV:
+    import.meta.env.MODE ||
+    "development",
 }
 
-/* ENDPOINTS */
+/* ========================================
+   API CONFIG
+======================================== */
+
+export const API_CONFIG = {
+  BASE_URL:
+    ENV.API_BASE_URL.replace(
+      /\/$/,
+      ""
+    ),
+
+  TIMEOUT: 30000,
+
+  HEADERS: {
+    "Content-Type":
+      "application/json",
+  },
+}
+
+/* ========================================
+   WEBSOCKET CONFIG
+======================================== */
+
+export const WS_CONFIG = {
+  BASE_URL:
+    ENV.WS_BASE_URL.replace(
+      /\/$/,
+      ""
+    ),
+}
+
+/* ========================================
+   ENDPOINTS
+======================================== */
+
 export const API_ENDPOINTS = {
   /* Upload */
   UPLOAD:
@@ -46,7 +91,7 @@ export const API_ENDPOINTS = {
   CATEGORY_DELETE:
     "/categories/:id/delete",
 
-  /* CHAT */
+  /* Chat */
   CHAT_SEND:
     "/chat",
 
@@ -66,7 +111,7 @@ export const API_ENDPOINTS = {
   TICKET_UPDATE:
     "/tickets/:id/update",
 
-  /* AI SETTINGS */
+  /* AI Settings */
   AI_SETTINGS:
     "/settings/ai",
 
@@ -74,7 +119,10 @@ export const API_ENDPOINTS = {
     "/settings/ai/update",
 }
 
-/* SQL TABLES */
+/* ========================================
+   SQL TABLES
+======================================== */
+
 export const SQL_TABLES = {
   CHAT_SESSION:
     "ChatSession",
@@ -92,7 +140,10 @@ export const SQL_TABLES = {
     "AIChatbot_Settings",
 }
 
-/* AI DEFAULTS */
+/* ========================================
+   AI DEFAULTS
+======================================== */
+
 export const AI_DEFAULTS = {
   ActiveModel:
     "llama-3.3-70b-versatile",
@@ -117,7 +168,10 @@ export const AI_DEFAULTS = {
   UseReranker: true,
 }
 
-/* SESSION DEFAULTS */
+/* ========================================
+   SESSION DEFAULTS
+======================================== */
+
 export const SESSION_DEFAULTS = {
   SessionStatus:
     "active",
@@ -125,25 +179,49 @@ export const SESSION_DEFAULTS = {
   IsActive: true,
 }
 
-/* URL BUILDER */
+/* ========================================
+   BUILD API URL
+======================================== */
+
 export const buildApiUrl = (
   endpoint,
   params = {}
 ) => {
 
   let url =
-    API_CONFIG.BASE_URL +
-    endpoint
+    `${API_CONFIG.BASE_URL}${endpoint}`
 
   Object.entries(params).forEach(
     ([key, value]) => {
 
       url = url.replace(
         `:${key}`,
-        value
+        encodeURIComponent(
+          value
+        )
       )
     }
   )
 
   return url
+}
+
+/* ========================================
+   DEBUG LOGGING
+======================================== */
+
+if (
+  ENV.APP_ENV ===
+  "development"
+) {
+
+  console.log(
+    "API_BASE_URL:",
+    API_CONFIG.BASE_URL
+  )
+
+  console.log(
+    "APP_ENV:",
+    ENV.APP_ENV
+  )
 }
