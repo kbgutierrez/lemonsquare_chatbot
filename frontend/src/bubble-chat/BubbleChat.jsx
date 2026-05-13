@@ -33,7 +33,10 @@ const BubbleChat = () => {
   const [activeModal, setActiveModal] =
     useState(null)
 
-  /* DRAG */
+  /* ========================================
+     DRAG
+  ======================================== */
+
   const {
     position,
     dragging,
@@ -44,15 +47,22 @@ const BubbleChat = () => {
     repositionForWindow,
   } = useBubbleDrag()
 
-  /* CHAT */
+  /* ========================================
+     CHAT
+  ======================================== */
+
   const {
     messages,
     loading,
     sendMessage,
     clearConversation,
+    restoreConversation,
   } = useChatMessages()
 
-  /* SMART REPOSITION */
+  /* ========================================
+     SMART REPOSITION
+  ======================================== */
+
   useEffect(() => {
 
     if (open) {
@@ -61,11 +71,17 @@ const BubbleChat = () => {
 
   }, [open])
 
-  /* CLOSE MODAL */
+  /* ========================================
+     CLOSE MODAL
+  ======================================== */
+
   const closeModal =
     () => setActiveModal(null)
 
-  /* CLICK / DRAG */
+  /* ========================================
+     CLICK / DRAG
+  ======================================== */
+
   const handlePointerUp =
     () => {
 
@@ -77,17 +93,52 @@ const BubbleChat = () => {
       }
     }
 
-  /* MODALS */
+  /* ========================================
+     RESTORE HISTORY CHAT
+  ======================================== */
+
+  const handleLoadConversation =
+    ({
+      sessionId,
+      messages,
+    }) => {
+
+      restoreConversation({
+        sessionId,
+        messages,
+      })
+
+      /*
+        Automatically open chat window
+        after restoring conversation.
+      */
+      setOpen(true)
+
+      /*
+        Close modal
+      */
+      setActiveModal(null)
+    }
+
+  /* ========================================
+     MODALS
+  ======================================== */
+
   const modals = {
     history: (
       <ChatHistoryModal
         onClose={closeModal}
+
+        onLoadConversation={
+          handleLoadConversation
+        }
       />
     ),
 
     clear: (
       <ClearConversationModal
         onClose={closeModal}
+
         onClearConversation={
           clearConversation
         }
@@ -231,13 +282,17 @@ const BubbleChat = () => {
         >
           <ChatWindow
             messages={messages}
+
             loading={loading}
+
             onSendMessage={
               sendMessage
             }
+
             onClose={() =>
               setOpen(false)
             }
+
             onOpenModal={
               setActiveModal
             }
@@ -282,6 +337,7 @@ const BubbleChat = () => {
         >
           <ChatBubble
             isOpen={open}
+
             expandDirection={
               isLeftSide
                 ? "right"
@@ -292,7 +348,11 @@ const BubbleChat = () => {
       </div>
 
       {/* MODALS */}
-      <div className="pointer-events-auto">
+      <div
+        className="
+          pointer-events-auto
+        "
+      >
         {modals[activeModal]}
       </div>
     </div>

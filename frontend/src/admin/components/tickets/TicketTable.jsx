@@ -3,7 +3,6 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  Trash2,
   MessageSquareText,
 } from "lucide-react"
 
@@ -116,9 +115,11 @@ const DetailBlock = ({
 const ActionButton = ({
   children,
   className,
+  disabled = false,
   ...props
 }) => (
   <button
+    disabled={disabled}
     {...props}
     className={`
       flex
@@ -136,6 +137,9 @@ const ActionButton = ({
       transition-all
       duration-200
 
+      disabled:cursor-not-allowed
+      disabled:opacity-50
+
       ${className}
     `}
   >
@@ -145,8 +149,7 @@ const ActionButton = ({
 
 const TicketRow = ({
   ticket,
-  deleteTicket,
-  toggleBlock,
+  blockTicket,
 }) => {
 
   const [expanded, setExpanded] =
@@ -312,10 +315,12 @@ const TicketRow = ({
               gap-3
             "
           >
-            {/* BLOCK */}
             <ActionButton
+              disabled={
+                ticket.is_blacklisted
+              }
               onClick={() =>
-                toggleBlock(
+                blockTicket(
                   ticket.ticket_number
                 )
               }
@@ -328,8 +333,6 @@ const TicketRow = ({
                     bg-emerald-500/10
 
                     text-emerald-400
-
-                    hover:bg-emerald-500/20
                   `
                   : `
                     border
@@ -348,7 +351,7 @@ const TicketRow = ({
                   <ShieldCheck className="h-4 w-4" />
 
                   <span className="hidden xl:inline">
-                    Unblock
+                    Blocked
                   </span>
                 </>
               ) : (
@@ -356,35 +359,10 @@ const TicketRow = ({
                   <Ban className="h-4 w-4" />
 
                   <span className="hidden xl:inline">
-                    Block
+                    Block Ticket
                   </span>
                 </>
               )}
-            </ActionButton>
-
-            {/* DELETE */}
-            <ActionButton
-              onClick={() =>
-                deleteTicket(
-                  ticket.ticket_number
-                )
-              }
-              className="
-                border
-                border-red-500/20
-
-                bg-red-500/10
-
-                text-red-400
-
-                hover:bg-red-500/20
-              "
-            >
-              <Trash2 className="h-4 w-4" />
-
-              <span className="hidden xl:inline">
-                Delete
-              </span>
             </ActionButton>
           </div>
         </td>
@@ -422,8 +400,7 @@ const TicketRow = ({
 
 const TicketTable = ({
   tickets,
-  deleteTicket,
-  toggleBlock,
+  blockTicket,
 }) => {
 
   return (
@@ -588,12 +565,8 @@ const TicketTable = ({
 
                 ticket={ticket}
 
-                deleteTicket={
-                  deleteTicket
-                }
-
-                toggleBlock={
-                  toggleBlock
+                blockTicket={
+                  blockTicket
                 }
               />
             )

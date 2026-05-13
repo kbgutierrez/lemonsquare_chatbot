@@ -3,6 +3,51 @@ import {
   User,
 } from "lucide-react"
 
+const TypingDots = () => {
+
+  return (
+    <div
+      className="
+        flex
+        items-center
+        gap-1
+      "
+    >
+      <span
+        className="
+          h-2
+          w-2
+          rounded-full
+          bg-violet-400
+          animate-bounce
+        "
+      />
+
+      <span
+        className="
+          h-2
+          w-2
+          rounded-full
+          bg-violet-400
+          animate-bounce
+          [animation-delay:0.15s]
+        "
+      />
+
+      <span
+        className="
+          h-2
+          w-2
+          rounded-full
+          bg-violet-400
+          animate-bounce
+          [animation-delay:0.3s]
+        "
+      />
+    </div>
+  )
+}
+
 const ChatMessage = ({
   message = {},
 }) => {
@@ -23,8 +68,9 @@ const ChatMessage = ({
     sender === "agent"
 
   const isTyping =
-    message?.id ===
-    "typing"
+    Boolean(
+      message?.isTyping
+    )
 
   const config = isAgent
     ? {
@@ -92,7 +138,7 @@ const ChatMessage = ({
         items-end
         gap-2
 
-        transition-opacity
+        transition-all
         duration-200
 
         ${wrapper}
@@ -136,40 +182,39 @@ const ChatMessage = ({
           ${bubble}
         `}
       >
-        {/* TEXT */}
-        <p
-          className={`
-            whitespace-pre-wrap
-            break-words
-
-            text-sm
-            leading-relaxed
-
-            ${
-              isTyping
-                ? "animate-pulse"
-                : ""
-            }
-          `}
-        >
-          {text}
-        </p>
-
-        {/* TIME */}
-        {!!timestamp && (
+        {/* TYPING */}
+        {isTyping ? (
+          <TypingDots />
+        ) : (
           <p
-            className={`
-              mt-2
+            className="
+              whitespace-pre-wrap
+              break-words
 
-              text-right
-              text-[11px]
-
-              ${time}
-            `}
+              text-sm
+              leading-relaxed
+            "
           >
-            {timestamp}
+            {text}
           </p>
         )}
+
+        {/* TIME */}
+        {!!timestamp &&
+          !isTyping && (
+            <p
+              className={`
+                mt-2
+
+                text-right
+                text-[11px]
+
+                ${time}
+              `}
+            >
+              {timestamp}
+            </p>
+          )}
       </div>
 
       {/* USER AVATAR */}

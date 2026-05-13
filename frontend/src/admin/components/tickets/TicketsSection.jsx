@@ -28,8 +28,7 @@ const TicketsSection = () => {
 
     totalPages,
 
-    deleteTicket,
-    toggleBlock,
+    blockTicket,
   } = useTickets()
 
   return (
@@ -161,12 +160,8 @@ const TicketsSection = () => {
                   paginatedTickets
                 }
 
-                deleteTicket={
-                  deleteTicket
-                }
-
-                toggleBlock={
-                  toggleBlock
+                blockTicket={
+                  blockTicket
                 }
               />
             </div>

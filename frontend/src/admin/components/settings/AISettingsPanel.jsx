@@ -173,11 +173,19 @@ const AISettingsPanel = () => {
         mx-auto
 
         flex
+        h-full
         w-full
         max-w-[1700px]
         flex-col
 
-        gap-5
+        gap-6
+
+        overflow-y-auto
+
+        pr-2
+
+        [scrollbar-width:none]
+        [&::-webkit-scrollbar]:hidden
       "
     >
       {/* AI CONFIG */}
@@ -216,6 +224,12 @@ const AISettingsPanel = () => {
           {/* EMBEDDING */}
           <SettingsSelect
             label="Embedding Model"
+
+            warning={`
+Changing the embedding model may invalidate
+existing vector embeddings and retrieval results.
+A full document and ticket re-index may be required.
+`}
 
             value={
               settings.EmbeddingModel
@@ -471,6 +485,7 @@ const AISettingsPanel = () => {
       >
         <div className="space-y-5">
 
+          {/* SYSTEM PROMPT */}
           <SettingsTextarea
             rows={7}
 
@@ -488,6 +503,7 @@ const AISettingsPanel = () => {
             }
           />
 
+          {/* REFORMULATOR PROMPT */}
           <SettingsTextarea
             rows={5}
 
@@ -505,6 +521,31 @@ const AISettingsPanel = () => {
             }
           />
 
+          {/* CHAT EXTRACTION PROMPT */}
+          <SettingsTextarea
+            rows={5}
+
+            label="Chat Extraction Prompt"
+
+            placeholder="
+Extract concise issue details, intent,
+priority, affected systems, and important
+technical context from user conversations.
+            "
+
+            value={
+              settings.ChatExtractionPrompt
+            }
+
+            onChange={(e) =>
+              update(
+                "ChatExtractionPrompt",
+                e.target.value
+              )
+            }
+          />
+
+          {/* ALLOWED CATEGORIES */}
           <SettingsTextarea
             rows={4}
 

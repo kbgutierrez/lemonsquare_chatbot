@@ -186,10 +186,10 @@ export const useTickets =
     ])
 
     /* ========================================
-       DELETE TICKET
+       BLOCK TICKET
     ======================================== */
 
-    const deleteTicket =
+    const blockTicket =
       useCallback(
         async (
           ticketNumber
@@ -201,66 +201,7 @@ export const useTickets =
           try {
 
             console.log(
-              "DELETE_TICKET",
-              ticketNumber
-            )
-
-            /* OPTIMISTIC UPDATE */
-
-            setTickets(
-              (prev) =>
-                prev.filter(
-                  (
-                    ticket
-                  ) =>
-                    ticket.ticket_number !==
-                    ticketNumber
-                )
-            )
-
-            await ticketAdminService.deleteTicket(
-              ticketNumber
-            )
-
-          } catch (error) {
-
-            console.error(
-              "DELETE_TICKET_ERROR",
-              error
-            )
-
-            /* ROLLBACK */
-
-            if (
-              mountedRef.current
-            ) {
-
-              setTickets(
-                previousTickets
-              )
-            }
-          }
-        },
-        [tickets]
-      )
-
-    /* ========================================
-       BLOCK / UNBLOCK
-    ======================================== */
-
-    const toggleBlock =
-      useCallback(
-        async (
-          ticketNumber
-        ) => {
-
-          const previousTickets =
-            [...tickets]
-
-          try {
-
-            console.log(
-              "TOGGLE_BLOCK",
+              "BLOCK_TICKET",
               ticketNumber
             )
 
@@ -282,7 +223,7 @@ export const useTickets =
                         ...ticket,
 
                         is_blacklisted:
-                          !ticket.is_blacklisted,
+                          true,
                       }
                     }
 
@@ -291,19 +232,14 @@ export const useTickets =
                 )
             )
 
-            if (
-              ticketAdminService.toggleBlock
-            ) {
-
-              await ticketAdminService.toggleBlock(
-                ticketNumber
-              )
-            }
+            await ticketAdminService.deleteTicket(
+              ticketNumber
+            )
 
           } catch (error) {
 
             console.error(
-              "TOGGLE_BLOCK_ERROR",
+              "BLOCK_TICKET_ERROR",
               error
             )
 
@@ -378,9 +314,7 @@ export const useTickets =
 
       totalPages,
 
-      deleteTicket,
-
-      toggleBlock,
+      blockTicket,
     }
 
   }

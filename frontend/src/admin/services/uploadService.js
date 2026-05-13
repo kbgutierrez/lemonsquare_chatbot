@@ -73,6 +73,16 @@ const uploadRequest =
 
     try {
 
+      console.log(
+        "UPLOAD_REQUEST_URL",
+        endpoint
+      )
+
+      console.log(
+        "UPLOAD_FILE",
+        formData.get("file")
+      )
+
       const response =
         await fetch(
           endpoint,
@@ -125,13 +135,15 @@ const uploadRequest =
         )
       }
 
+      /* HTTP ERROR */
+
       if (!response.ok) {
 
         const errorMessage =
-          responseData?.detail ||
           responseData?.error ||
+          responseData?.detail ||
           responseData?.message ||
-          "Upload failed."
+          `Upload failed with status ${response.status}`
 
         throw new Error(
           errorMessage
@@ -142,6 +154,8 @@ const uploadRequest =
 
     } catch (error) {
 
+      /* TIMEOUT */
+
       if (
         error.name ===
         "AbortError"
@@ -151,6 +165,8 @@ const uploadRequest =
           "Upload timeout. Backend took too long to respond."
         )
       }
+
+      /* NETWORK ERROR */
 
       if (
         error instanceof
@@ -193,7 +209,7 @@ export const uploadDocument =
 
     const endpoint =
       buildApiUrl(
-        API_ENDPOINTS.UPLOAD
+        API_ENDPOINTS.DOCUMENT_UPLOAD
       )
 
     console.log(

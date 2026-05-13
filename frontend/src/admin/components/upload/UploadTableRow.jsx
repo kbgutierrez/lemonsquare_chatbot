@@ -10,6 +10,10 @@ const UploadTableRow = ({
   removeFile,
 }) => {
 
+  const isUploading =
+    file.statusType ===
+    "loading"
+
   return (
     <tr
       className="
@@ -154,6 +158,7 @@ const UploadTableRow = ({
       {/* ACTION */}
       <td className="px-5 py-4">
         <button
+          disabled={isUploading}
           onClick={() =>
             removeFile(file.id)
           }
@@ -169,10 +174,13 @@ const UploadTableRow = ({
             border
             border-transparent
 
-            text-[#9caf a7]
+            text-[#9cafa7]
 
             transition-all
             duration-200
+
+            disabled:cursor-not-allowed
+            disabled:opacity-40
 
             hover:border-red-500/20
             hover:bg-red-500/10

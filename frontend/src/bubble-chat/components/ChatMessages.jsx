@@ -7,7 +7,6 @@ import ChatMessage from "./ChatMessage.jsx"
 
 const ChatMessages = ({
   messages = [],
-  loading = false,
 }) => {
 
   const messagesEndRef =
@@ -31,7 +30,7 @@ const ChatMessages = ({
       messagesEndRef.current
         ?.scrollIntoView({
           behavior:
-            "auto",
+            "smooth",
         })
 
       previousLengthRef.current =
@@ -39,6 +38,9 @@ const ChatMessages = ({
     }
 
   }, [messages])
+
+  const hasMessages =
+    messages.length > 0
 
   return (
     <div
@@ -58,23 +60,22 @@ const ChatMessages = ({
       "
     >
       {/* EMPTY STATE */}
-      {!loading &&
-        messages.length === 0 && (
-          <div
-            className="
-              flex
-              flex-1
-              items-center
-              justify-center
+      {!hasMessages && (
+        <div
+          className="
+            flex
+            flex-1
+            items-center
+            justify-center
 
-              text-center
-              text-sm
-              text-zinc-400
-            "
-          >
-            Start a conversation.
-          </div>
-        )}
+            text-center
+            text-sm
+            text-zinc-400
+          "
+        >
+          Start a conversation.
+        </div>
+      )}
 
       {/* MESSAGES */}
       {messages.map(
@@ -90,24 +91,6 @@ const ChatMessages = ({
             }
           />
         )
-      )}
-
-      {/* TYPING */}
-      {loading && (
-        <ChatMessage
-          message={{
-            id:
-              "typing",
-
-            sender:
-              "agent",
-
-            text:
-              "Typing...",
-
-            time: "",
-          }}
-        />
       )}
 
       {/* AUTO SCROLL TARGET */}

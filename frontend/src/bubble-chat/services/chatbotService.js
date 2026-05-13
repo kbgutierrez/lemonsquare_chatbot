@@ -19,17 +19,144 @@ import {
 
 const REQUEST_TIMEOUT = 30000
 
+/*
+  DEVELOPMENT MODE
+
+  TEMPORARY:
+  Uses TEST_USER_1 until
+  real BizPortal auth exists.
+*/
+const DEV_MODE = true
+
 /* ========================================
    GET USER TOKEN
 ======================================== */
 
 const getUserToken = () => {
 
-  return (
+  /*
+    DEVELOPMENT TOKEN
+  */
+  if (DEV_MODE) {
+
+    return "TEST_USER_1"
+  }
+
+  /*
+    PRODUCTION TOKEN
+  */
+  const token =
     localStorage.getItem(
       "user_token"
-    ) || "TEST_USER_1"
-  )
+    )
+
+  if (
+    !token ||
+    token === "null" ||
+    token === "undefined"
+  ) {
+
+    throw new Error(
+      "User authentication token not found."
+    )
+  }
+
+  return token
+}
+
+/* ========================================
+   RESPONSE VALIDATION
+======================================== */
+
+const validateChatResponse = (
+  response
+) => {
+
+  if (
+    !response ||
+    typeof response !== "object"
+  ) {
+    throw new Error(
+      "Invalid backend response."
+    )
+  }
+
+  if (
+    typeof response.session_id !==
+    "string"
+  ) {
+    throw new Error(
+      "Backend response missing session_id."
+    )
+  }
+
+  if (
+    typeof response.response !==
+    "string"
+  ) {
+    throw new Error(
+      "Backend response missing AI message."
+    )
+  }
+
+  return {
+    sessionId:
+      response.session_id,
+
+    message:
+      response.response,
+
+    ticketIds:
+      Array.isArray(
+        response.ticket_ids_used
+      )
+        ? response.ticket_ids_used
+        : [],
+  }
+}
+
+/* ========================================
+   NORMALIZE HISTORY MESSAGE
+======================================== */
+
+const normalizeHistoryMessage = (
+  message,
+  index
+) => {
+
+  const createdAt =
+    message?.CreatedAt
+      ? new Date(
+          message.CreatedAt
+        )
+      : new Date()
+
+  return {
+    id:
+      message?.MessageID ||
+      `${index}-${createdAt.toISOString()}`,
+
+    sender:
+      message?.SenderRole ===
+      "user"
+        ? "user"
+        : "agent",
+
+    text:
+      message?.MessageContent || "",
+
+    time:
+      createdAt.toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      ),
+
+    createdAt:
+      createdAt.toISOString(),
+  }
 }
 
 /* ========================================
@@ -82,10 +209,6 @@ const apiRequest = async ({
       response.status
     )
 
-    /* ========================================
-       READ RAW TEXT FIRST
-    ======================================== */
-
     const rawText =
       await response.text()
 
@@ -96,10 +219,6 @@ const apiRequest = async ({
 
     let responseData =
       null
-
-    /* ========================================
-       SAFE JSON PARSE
-    ======================================== */
 
     try {
 
@@ -122,10 +241,6 @@ const apiRequest = async ({
       )
     }
 
-    /* ========================================
-       HTTP ERROR
-    ======================================== */
-
     if (!response.ok) {
 
       const errorMessage =
@@ -143,10 +258,6 @@ const apiRequest = async ({
 
   } catch (error) {
 
-    /* ========================================
-       TIMEOUT
-    ======================================== */
-
     if (
       error.name ===
       "AbortError"
@@ -157,13 +268,9 @@ const apiRequest = async ({
       )
     }
 
-    /* ========================================
-       NETWORK ERROR
-    ======================================== */
-
     if (
-      error instanceof
-      TypeError
+      error instanceof TypeError &&
+      error.message === "Failed to fetch"
     ) {
 
       throw new Error(
@@ -191,15 +298,18 @@ const sendMessage =
     MessageContent,
   }) => {
 
+    const userToken =
+      getUserToken()
+
     const payload = {
       session_id:
-        SessionID,
+        SessionID || null,
 
       message:
         MessageContent,
 
       user_token:
-        getUserToken(),
+        userToken,
     }
 
     const endpoint =
@@ -217,11 +327,16 @@ const sendMessage =
       endpoint
     )
 
-    return apiRequest({
-      endpoint,
-      method: "POST",
-      body: payload,
-    })
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "POST",
+        body: payload,
+      })
+
+    return validateChatResponse(
+      response
+    )
   }
 
 /* ========================================
@@ -232,6 +347,9 @@ const loadSession =
   async (
     SessionID
   ) => {
+
+    const userToken =
+      getUserToken()
 
     const endpoint =
       buildApiUrl(
@@ -244,7 +362,7 @@ const loadSession =
 
     const finalUrl =
       `${endpoint}?user_token=${encodeURIComponent(
-        getUserToken()
+        userToken
       )}`
 
     console.log(
@@ -259,10 +377,26 @@ const loadSession =
       finalUrl
     )
 
-    return apiRequest({
-      endpoint:
-        finalUrl,
-    })
+    const response =
+      await apiRequest({
+        endpoint:
+          finalUrl,
+      })
+
+    return {
+      sessionId:
+        response?.session_id ||
+        SessionID,
+
+      messages:
+        Array.isArray(
+          response?.messages
+        )
+          ? response.messages.map(
+              normalizeHistoryMessage
+            )
+          : [],
+    }
   }
 
 /* ========================================

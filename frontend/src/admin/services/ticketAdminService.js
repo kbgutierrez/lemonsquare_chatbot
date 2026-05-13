@@ -15,6 +15,7 @@ const REQUEST_TIMEOUT =
 const apiRequest = async ({
   endpoint,
   method = "GET",
+  body = null,
 }) => {
 
   const controller =
@@ -29,6 +30,12 @@ const apiRequest = async ({
 
   try {
 
+    console.log(
+      "TICKET_API_REQUEST",
+      method,
+      endpoint
+    )
+
     const response =
       await fetch(
         endpoint,
@@ -39,6 +46,13 @@ const apiRequest = async ({
             "Content-Type":
               "application/json",
           },
+
+          body:
+            body
+              ? JSON.stringify(
+                  body
+                )
+              : null,
 
           signal:
             controller.signal,
@@ -87,9 +101,9 @@ const apiRequest = async ({
     if (!response.ok) {
 
       const errorMessage =
+        responseData?.error ||
         responseData?.detail ||
         responseData?.message ||
-        responseData?.error ||
         `Request failed with status ${response.status}`
 
       throw new Error(
@@ -142,6 +156,7 @@ const apiRequest = async ({
 const getTickets =
   async ({
     search = "",
+    skip = 0,
     limit = 50,
   } = {}) => {
 
@@ -151,13 +166,27 @@ const getTickets =
       )
 
     const params =
-      new URLSearchParams({
-        search:
-          search.trim(),
+      new URLSearchParams()
 
-        limit:
-          String(limit),
-      })
+    if (
+      search?.trim()
+    ) {
+
+      params.append(
+        "search",
+        search.trim()
+      )
+    }
+
+    params.append(
+      "skip",
+      String(skip)
+    )
+
+    params.append(
+      "limit",
+      String(limit)
+    )
 
     const finalUrl =
       `${endpoint}?${params.toString()}`
@@ -182,12 +211,22 @@ const deleteTicket =
     ticketNumber
   ) => {
 
+    if (
+      !ticketNumber
+    ) {
+
+      throw new Error(
+        "Ticket number is required."
+      )
+    }
+
     const endpoint =
-      `${buildApiUrl(
-        API_ENDPOINTS.TICKETS
-      )}/${encodeURIComponent(
-        ticketNumber
-      )}`
+      buildApiUrl(
+        API_ENDPOINTS.TICKET_DELETE,
+        {
+          ticketNumber,
+        }
+      )
 
     console.log(
       "DELETE_TICKET_URL",

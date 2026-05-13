@@ -1,9 +1,8 @@
 import {
   API_CONFIG,
+  API_ENDPOINTS,
+  buildApiUrl,
 } from "../../config/sqlVariables"
-
-const BASE =
-  API_CONFIG.BASE_URL
 
 const REQUEST_TIMEOUT =
   API_CONFIG.TIMEOUT ||
@@ -31,6 +30,12 @@ const apiRequest = async ({
 
   try {
 
+    console.log(
+      "SETTINGS_API_REQUEST",
+      method,
+      endpoint
+    )
+
     const response =
       await fetch(
         endpoint,
@@ -55,7 +60,7 @@ const apiRequest = async ({
       )
 
     console.log(
-      "ADMIN_API_STATUS",
+      "SETTINGS_API_STATUS",
       response.status
     )
 
@@ -63,7 +68,7 @@ const apiRequest = async ({
       await response.text()
 
     console.log(
-      "ADMIN_API_RESPONSE",
+      "SETTINGS_API_RESPONSE",
       rawText
     )
 
@@ -82,7 +87,7 @@ const apiRequest = async ({
     } catch (parseError) {
 
       console.error(
-        "ADMIN_JSON_PARSE_ERROR",
+        "SETTINGS_PARSE_ERROR",
         parseError
       )
 
@@ -95,11 +100,40 @@ const apiRequest = async ({
 
     if (!response.ok) {
 
-      const errorMessage =
-        responseData?.detail ||
-        responseData?.message ||
-        responseData?.error ||
+      let errorMessage =
         `Request failed with status ${response.status}`
+
+      /* FASTAPI VALIDATION ERRORS */
+
+      if (
+        Array.isArray(
+          responseData?.detail
+        )
+      ) {
+
+        errorMessage =
+          responseData.detail
+            .map((item) => {
+
+              const field =
+                item?.loc?.[
+                  item.loc.length - 1
+                ]
+
+              return field
+                ? `${field}: ${item.msg}`
+                : item.msg
+            })
+            .join(" • ")
+
+      } else {
+
+        errorMessage =
+          responseData?.error ||
+          responseData?.detail ||
+          responseData?.message ||
+          errorMessage
+      }
 
       throw new Error(
         errorMessage
@@ -151,9 +185,13 @@ const apiRequest = async ({
 const getSettings =
   async () => {
 
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.AI_SETTINGS
+      )
+
     return apiRequest({
-      endpoint:
-        `${BASE}/settings/ai`,
+      endpoint,
     })
   }
 
@@ -169,9 +207,13 @@ const updateSettings =
       payload
     )
 
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.AI_SETTINGS
+      )
+
     return apiRequest({
-      endpoint:
-        `${BASE}/settings/ai/update`,
+      endpoint,
 
       method:
         "POST",

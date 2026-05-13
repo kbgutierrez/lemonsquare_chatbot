@@ -70,6 +70,8 @@ export const useAISettings =
         ReformulatorPrompt: "",
 
         AllowedCategories: "",
+
+        ChatExtractionPrompt: "",
       })
 
     /* ========================================
@@ -172,6 +174,9 @@ export const useAISettings =
 
               AllowedCategories:
                 data.AllowedCategories || "",
+
+              ChatExtractionPrompt:
+                data.ChatExtractionPrompt || "",
             }
 
             setSettings(
@@ -309,6 +314,43 @@ export const useAISettings =
             setSuccess("")
             setError("")
 
+            /* ========================================
+               FRONTEND VALIDATION
+            ======================================== */
+
+            if (
+              !settings.SystemPrompt?.trim()
+            ) {
+
+              setError(
+                "System Prompt is required."
+              )
+
+              return
+            }
+
+            if (
+              !settings.ReformulatorPrompt?.trim()
+            ) {
+
+              setError(
+                "Reformulator Prompt is required."
+              )
+
+              return
+            }
+
+            if (
+              !settings.AllowedCategories?.trim()
+            ) {
+
+              setError(
+                "Allowed Categories is required."
+              )
+
+              return
+            }
+
             const payload = {
               ActiveModel:
                 settings.ActiveModel,
@@ -348,13 +390,16 @@ export const useAISettings =
                 ),
 
               SystemPrompt:
-                settings.SystemPrompt || "",
+                settings.SystemPrompt.trim(),
 
               ReformulatorPrompt:
-                settings.ReformulatorPrompt || "",
+                settings.ReformulatorPrompt.trim(),
 
               AllowedCategories:
-                settings.AllowedCategories || "",
+                settings.AllowedCategories.trim(),
+
+              ChatExtractionPrompt:
+                settings.ChatExtractionPrompt?.trim() || null,
             }
 
             console.log(
