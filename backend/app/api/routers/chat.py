@@ -25,6 +25,7 @@ from app.services.orchestrator import SupportOrchestrator
 from app.services.user_service import fetch_user_details
 from app.api.deps import get_chatbot_db, get_orchestrator, get_ingestion_service
 from app.services.ingestion_service import DocumentIngestionService
+from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse, ResolveChatResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -221,3 +222,20 @@ async def debug_rag_pipeline(
         "ticket_ids_used": debug_data.get("ticket_ids_used", []),
         "debug_info": debug_data,
     }
+
+@router.post(
+    "/resolve/{session_id}", 
+    response_model=ResolveChatResponse, 
+    summary="Mark chat as resolved and extract KB data"
+)
+async def mark_chat_resolved(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """
+    Frontend triggers this when an employee clicks 'Mark as Resolved'.
+    The AI will extract the problem/solution as strict JSON and add it to its brain.
+    """
+    result = await ingestion_service.process_resolved_chat(session_id, db)
+    return result
