@@ -133,40 +133,36 @@ async def get_chat_history(
 from datetime import datetime
 
 @router.get(
-    "/user-sessions/{requester_id}", 
+    "/user-sessions/{requester_userid}", 
     response_model=list[ChatSessionMetaResponse], 
     summary="Get all chat sessions for a specific user"
 )
 def get_user_chat_sessions(
-    requester_id: str,
+    requester_userid: str,
     limit: int = 20,
     db: Session = Depends(get_chatbot_db)
 ):
-    """Returns past chat sessions using ONLY the available database columns."""
     from app.models.chatbot import ChatSession
     
-    # 1. Fetch sessions for the user without SQL sorting
-    sessions = db.query(ChatSession).filter(ChatSession.RequesterUserID == requester_id).all()
+    # We can use order_by again because StartTime exists!
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.RequesterUserID == requester_userid)
+        .order_by(ChatSession.StartTime.desc())
+        .limit(limit)
+        .all()
+    )
     
     result = []
     for s in sessions:
-        # 2. Infer the session start time from its first message
-        session_date = None
-        if s.messages:
-            sorted_messages = sorted(s.messages, key=lambda m: m.CreatedAt)
-            session_date = sorted_messages[0].CreatedAt
-            
         result.append({
             "session_id": s.SessionID,
-            "status": "Archived", # Hardcoded because it is not in the DB
-            "created_at": session_date,
+            "status": s.SessionStatus or "Active", # Using your real database column!
+            "created_at": s.StartTime,             # Using your real database column!
             "message_count": len(s.messages) if s.messages else 0 
         })
         
-    # 3. Sort them in Python (newest first) and apply the limit
-    result.sort(key=lambda x: x["created_at"] if x["created_at"] else datetime.min, reverse=True)
-    return result[:limit]
-
+    return result
 
 @router.get(
     "/all-sessions", 
