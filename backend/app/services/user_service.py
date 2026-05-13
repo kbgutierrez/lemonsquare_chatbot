@@ -14,7 +14,6 @@ SECURITY CHANGES vs original:
 """
 
 import logging
-
 import httpx
 
 from app.core.config import settings
@@ -33,9 +32,9 @@ async def fetch_user_details(auth_token: str) -> dict:
     """
 
     # ── Test-user bypass (local dev only) ────────────────────────────────
-    if settings.ALLOW_TEST_AUTH and auth_token.startswith("TEST_USER_"):
+    if getattr(settings, "ALLOW_TEST_AUTH", False) and str(auth_token).startswith("TEST_USER_"):
         try:
-            user_id = int(auth_token.split("_")[-1])
+            user_id = int(str(auth_token).split("_")[-1])
         except ValueError:
             raise AuthenticationError("Malformed test token.")
         logger.debug("Test-auth bypass: simulating User #%d", user_id)
@@ -49,9 +48,12 @@ async def fetch_user_details(auth_token: str) -> dict:
     headers = {
         "Accept": "application/json",
     }
+    
+    # NEW FIX: Using 'user_id' as the query parameter key
     params = {
-        "id": auth_token,
+        "user_id": auth_token,
     }
+    
     logger.debug("Attempting BizPortal auth call to: %s", settings.BIZPORTAL_API_URL)
 
     async with httpx.AsyncClient() as client:
@@ -60,26 +62,32 @@ async def fetch_user_details(auth_token: str) -> dict:
                 settings.BIZPORTAL_API_URL,
                 headers=headers,
                 params=params,
-                timeout=settings.BIZPORTAL_TIMEOUT,
+                timeout=getattr(settings, "BIZPORTAL_TIMEOUT", 5.0),
             )
             logger.debug("BizPortal response status: %d", response.status_code)
             logger.debug("BizPortal response body: %s", response.text[:200])
 
             if response.status_code in (401, 403):
-                logger.warning("BizPortal returned %d for token: %s", response.status_code, auth_token[:10])
+                logger.warning("BizPortal returned %d for token: %s", response.status_code, str(auth_token)[:10])
                 raise AuthenticationError("Invalid or expired user token.")
 
             response.raise_for_status()
             user_data = response.json()
             logger.info("BizPortal raw response: %s", user_data)
             
-            # Check if BizPortal returned an error in the response body
+            # Check if BizPortal returned an explicitly formatted error in the response body
             if user_data.get("status") == "error":
-                logger.warning("BizPortal error response: %s", user_data.get("response"))
-                raise AuthenticationError(f"BizPortal error: {user_data.get('response', 'Unknown error')}")
+                error_msg = user_data.get("response", "Unknown error")
+                logger.warning("BizPortal error response: %s", error_msg)
+                raise AuthenticationError(f"BizPortal error: {error_msg}")
             
-            logger.info("BizPortal auth successful, user_data: %s", user_data)
-            return user_data
+            # NEW FIX: Safely extract the inner user dictionary from the "response" key
+            if user_data.get("status") == "success" and "response" in user_data:
+                final_user_dict = user_data["response"]
+                logger.info("BizPortal auth successful, extracted user_data: %s", final_user_dict)
+                return final_user_dict
+            else:
+                raise AuthenticationError("User details not found in API response format.")
 
         except httpx.RequestError as exc:
             logger.error("BizPortal unreachable (RequestError): %s", exc)

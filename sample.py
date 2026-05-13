@@ -3,11 +3,11 @@ from pathlib import Path
 
 # --- Configuration ---
 OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'backend'}
+EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend'}
 EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
 
 # Add a set of allowed extensions for text/code files
-ALLOWED_EXTENSIONS = {'.py', '.txt', '.md', '.json', '.html', '.css', '.js', '.csv', '.xml'}
+ALLOWED_EXTENSIONS = {'.py'}
 
 def generate_tree(root_dir, prefix=""):
     """Recursively generates a visual directory tree."""
