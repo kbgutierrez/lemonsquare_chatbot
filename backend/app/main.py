@@ -60,6 +60,7 @@ async def lifespan(app: FastAPI):
         qdrant_client = QdrantClient(
             url=app_settings.QDRANT_URL,
             api_key=app_settings.QDRANT_API_KEY,
+            timeout=app_settings.QDRANT_TIMEOUT,
         )
         if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
             logger.critical(

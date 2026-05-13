@@ -25,3 +25,9 @@ class DocumentUploadResponse(BaseModel):
 class DocumentDeleteResponse(BaseModel):
     status: str
     document_id: str
+
+
+class ManualEntryRequest(BaseModel):
+    title: str
+    content: str
+    category: str
