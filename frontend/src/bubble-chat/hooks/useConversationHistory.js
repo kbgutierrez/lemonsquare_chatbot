@@ -137,11 +137,26 @@ export const useConversationHistory =
                 sessionId
               )
 
+            const existing =
+              loadStoredHistory()
+
+            const conversation =
+              existing.find(
+                (item) =>
+                  item.id ===
+                  sessionId
+              )
+
             return {
               sessionId,
 
               messages:
                 response?.messages || [],
+
+              resolved:
+                Boolean(
+                  conversation?.resolved
+                ),
             }
 
           } catch (error) {
@@ -156,6 +171,9 @@ export const useConversationHistory =
                 null,
 
               messages: [],
+
+              resolved:
+                false,
             }
           }
         },
@@ -180,6 +198,16 @@ export const useConversationHistory =
           ) {
             return
           }
+
+          const existing =
+            loadStoredHistory()
+
+          const alreadyExists =
+            existing.find(
+              (item) =>
+                item.id ===
+                sessionId
+            )
 
           const firstUserMessage =
             messages.find(
@@ -213,10 +241,13 @@ export const useConversationHistory =
 
             messageCount:
               messages.length,
-          }
 
-          const existing =
-            loadStoredHistory()
+            resolved:
+              alreadyExists?.resolved || false,
+
+            resolvedAt:
+              alreadyExists?.resolvedAt || null,
+          }
 
           const filtered =
             existing.filter(
@@ -248,7 +279,7 @@ export const useConversationHistory =
 
     const deleteConversation =
       useCallback(
-        async (
+        (
           sessionId
         ) => {
 
@@ -284,6 +315,82 @@ export const useConversationHistory =
       )
 
     /* ========================================
+       CLEAR ALL HISTORY
+    ======================================== */
+
+    const clearAllHistory =
+      useCallback(
+        () => {
+
+          localStorage.removeItem(
+            HISTORY_STORAGE_KEY
+          )
+
+          setConversations([])
+        },
+        []
+      )
+
+    /* ========================================
+       RESOLVE CONVERSATION
+    ======================================== */
+
+    const resolveConversation =
+      useCallback(
+        (
+          sessionId
+        ) => {
+
+          try {
+
+            const existing =
+              loadStoredHistory()
+
+            const updated =
+              existing.map(
+                (
+                  conversation
+                ) => {
+
+                  if (
+                    conversation.id !==
+                    sessionId
+                  ) {
+                    return conversation
+                  }
+
+                  return {
+                    ...conversation,
+
+                    resolved:
+                      true,
+
+                    resolvedAt:
+                      new Date().toISOString(),
+                  }
+                }
+              )
+
+            saveStoredHistory(
+              updated
+            )
+
+            setConversations(
+              updated
+            )
+
+          } catch (error) {
+
+            console.error(
+              "RESOLVE_CONVERSATION_ERROR",
+              error
+            )
+          }
+        },
+        []
+      )
+
+    /* ========================================
        INITIAL LOAD
     ======================================== */
 
@@ -308,5 +415,9 @@ export const useConversationHistory =
       saveConversation,
 
       deleteConversation,
+
+      clearAllHistory,
+
+      resolveConversation,
     }
   }
