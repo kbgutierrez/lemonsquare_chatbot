@@ -2,7 +2,7 @@ import {
   Save,
   LoaderCircle,
   CheckCircle2,
-  AlertCircle,
+  AlertTriangle,
 } from "lucide-react"
 
 const SettingsActions = ({
@@ -15,41 +15,55 @@ const SettingsActions = ({
   return (
     <div
       className="
-        sticky
-        bottom-0
-        z-20
-
         flex
         flex-col
-        gap-4
+        gap-5
 
-        rounded-[28px]
+        rounded-[32px]
 
         border
         border-[#26342f]
 
-        bg-[#101715]/95
+        bg-[#101715]
 
-        p-5
+        p-7
 
-        shadow-[0_10px_50px_rgba(0,0,0,0.35)]
-
-        backdrop-blur-xl
+        shadow-[0_20px_60px_rgba(0,0,0,0.35)]
 
         lg:flex-row
         lg:items-center
         lg:justify-between
       "
     >
-      {/* STATUS */}
-      <div
-        className="
-          flex
-          flex-wrap
-          items-center
-          gap-3
-        "
-      >
+      {/* LEFT */}
+      <div className="space-y-3">
+
+        <div>
+          <h3
+            className="
+              text-lg
+              font-semibold
+
+              text-white
+            "
+          >
+            Apply Configuration
+          </h3>
+
+          <p
+            className="
+              mt-1
+
+              text-sm
+
+              text-[#8ea59b]
+            "
+          >
+            Save and activate the current
+            AI pipeline configuration.
+          </p>
+        </div>
+
         {/* SUCCESS */}
         {success && (
           <div
@@ -66,7 +80,7 @@ const SettingsActions = ({
               bg-emerald-500/10
 
               px-4
-              py-2
+              py-2.5
 
               text-sm
               font-medium
@@ -96,7 +110,7 @@ const SettingsActions = ({
               bg-red-500/10
 
               px-4
-              py-2
+              py-2.5
 
               text-sm
               font-medium
@@ -104,7 +118,7 @@ const SettingsActions = ({
               text-red-400
             "
           >
-            <AlertCircle className="h-4 w-4" />
+            <AlertTriangle className="h-4 w-4" />
 
             {error}
           </div>
@@ -121,29 +135,32 @@ const SettingsActions = ({
 
         className="
           inline-flex
+          min-w-[260px]
           items-center
           justify-center
           gap-3
 
-          rounded-2xl
+          rounded-3xl
 
           border
           border-[#f5d547]/20
 
           bg-[#f5d547]
 
-          px-6
-          py-3.5
+          px-8
+          py-5
 
-          text-sm
+          text-base
           font-semibold
 
           text-[#111917]
 
-          transition-all
-          duration-200
+          shadow-[0_10px_40px_rgba(245,213,71,0.18)]
 
-          hover:scale-[1.01]
+          transition-all
+          duration-300
+
+          hover:scale-[1.02]
           hover:bg-[#f8de67]
 
           active:scale-[0.99]
@@ -155,19 +172,19 @@ const SettingsActions = ({
         {saving ? (
           <LoaderCircle
             className="
-              h-4
-              w-4
+              h-5
+              w-5
               animate-spin
             "
           />
         ) : (
-          <Save className="h-4 w-4" />
+          <Save className="h-5 w-5" />
         )}
 
         {
           saving
-            ? "Saving..."
-            : "Save AI Settings"
+            ? "Saving Configuration..."
+            : "Save AI Configuration"
         }
       </button>
     </div>

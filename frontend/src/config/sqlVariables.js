@@ -64,59 +64,58 @@ export const WS_CONFIG = {
 ======================================== */
 
 export const API_ENDPOINTS = {
-  /* Upload */
-  UPLOAD:
-    "/upload",
 
-  UPLOAD_STATUS:
-    "/upload/status",
+  /* ====================================
+     DOCUMENTS
+  ==================================== */
 
-  /* Files */
-  FILES:
-    "/files",
+  DOCUMENTS:
+    "/documents",
 
-  FILE_DELETE:
-    "/files/:id/delete",
+  DOCUMENT_UPLOAD:
+    "/documents/upload",
 
-  FILES_BY_CATEGORY:
-    "/files/category/:categoryId",
+  DOCUMENT_DELETE:
+    "/documents/:documentId",
 
-  /* Categories */
-  CATEGORIES:
-    "/categories",
+  DOCUMENT_TEST_SEARCH:
+    "/documents/test-search",
 
-  CATEGORY_CREATE:
-    "/categories/create",
+  DOCUMENT_DEBUG_PIPELINE:
+    "/documents/debug/full-pipeline",
 
-  CATEGORY_DELETE:
-    "/categories/:id/delete",
+  /* ====================================
+     CHAT
+  ==================================== */
 
-  /* Chat */
   CHAT_SEND:
     "/chat",
 
   CHAT_HISTORY:
     "/chat/history/:sessionId",
 
-  CHAT_RESOLVE:
-    "/chat/resolve/:sessionId",
+  CHAT_DEBUG:
+    "/chat/debug",
 
-  /* Tickets */
+  /* ====================================
+     TICKETS
+  ==================================== */
+
   TICKETS:
     "/tickets",
 
-  TICKET_CREATE:
-    "/tickets/create",
+  TICKET_DELETE:
+    "/tickets/:ticketNumber",
 
-  TICKET_UPDATE:
-    "/tickets/:id/update",
+  TICKET_SYNC:
+    "/tickets/sync",
 
-  /* AI Settings */
+  /* ====================================
+     AI SETTINGS
+  ==================================== */
+
   AI_SETTINGS:
-    "/settings/ai",
-
-  AI_SETTINGS_UPDATE:
-    "/settings/ai/update",
+    "/settings",
 }
 
 /* ========================================

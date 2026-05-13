@@ -1,14 +1,34 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
 import ticketAdminService
   from "../services/ticketAdminService"
 
+const ITEMS_PER_PAGE = 10
+
+const SEARCH_DEBOUNCE = 400
+
 export const useTickets =
   () => {
+
+    /* ========================================
+       REFS
+    ======================================== */
+
+    const mountedRef =
+      useRef(true)
+
+    const debounceRef =
+      useRef(null)
+
+    /* ========================================
+       STATE
+    ======================================== */
 
     const [tickets, setTickets] =
       useState([])
@@ -22,176 +42,261 @@ export const useTickets =
     const [currentPage, setCurrentPage] =
       useState(1)
 
-    const itemsPerPage = 10
-
-    /* FETCH */
-    const fetchTickets =
-      async () => {
-
-        try {
-
-          setLoading(true)
-
-          const data =
-            await ticketAdminService.getTickets({
-              search,
-            })
-
-          setTickets(
-            Array.isArray(data)
-              ? data
-              : []
-          )
-
-        } catch (error) {
-
-          console.error(
-            "FETCH_TICKETS_ERROR",
-            error
-          )
-
-          setTickets([])
-
-        } finally {
-
-          setLoading(false)
-        }
-      }
+    /* ========================================
+       CLEANUP
+    ======================================== */
 
     useEffect(() => {
 
-      fetchTickets()
+      mountedRef.current =
+        true
 
-    }, [search])
+      return () => {
 
-    /* DELETE */
-    const deleteTicket =
-      async (
-        ticketNumber
-      ) => {
+        mountedRef.current =
+          false
 
-        try {
+        if (
+          debounceRef.current
+        ) {
 
-          console.log(
-            "DELETE_TICKET",
-            ticketNumber
+          clearTimeout(
+            debounceRef.current
           )
+        }
+      }
 
-          /* OPTIMISTIC UI */
-          setTickets((prev) =>
-            prev.filter(
-              (ticket) =>
-                ticket.ticket_number !==
-                ticketNumber
+    }, [])
+
+    /* ========================================
+       FETCH TICKETS
+    ======================================== */
+
+    const fetchTickets =
+      useCallback(
+        async (
+          searchValue =
+            ""
+        ) => {
+
+          try {
+
+            if (
+              mountedRef.current
+            ) {
+
+              setLoading(
+                true
+              )
+            }
+
+            const data =
+              await ticketAdminService.getTickets({
+                search:
+                  searchValue,
+              })
+
+            if (
+              !mountedRef.current
+            ) {
+              return
+            }
+
+            const normalized =
+              Array.isArray(
+                data
+              )
+                ? data
+                : []
+
+            setTickets(
+              normalized
             )
+
+          } catch (error) {
+
+            console.error(
+              "FETCH_TICKETS_ERROR",
+              error
+            )
+
+            if (
+              mountedRef.current
+            ) {
+
+              setTickets([])
+            }
+
+          } finally {
+
+            if (
+              mountedRef.current
+            ) {
+
+              setLoading(
+                false
+              )
+            }
+          }
+        },
+        []
+      )
+
+    /* ========================================
+       SEARCH EFFECT
+    ======================================== */
+
+    useEffect(() => {
+
+      setCurrentPage(1)
+
+      if (
+        debounceRef.current
+      ) {
+
+        clearTimeout(
+          debounceRef.current
+        )
+      }
+
+      debounceRef.current =
+        setTimeout(() => {
+
+          fetchTickets(
+            search
           )
 
-          /* BACKEND */
-          if (
-            ticketAdminService.deleteTicket
-          ) {
+        }, SEARCH_DEBOUNCE)
+
+      return () => {
+
+        if (
+          debounceRef.current
+        ) {
+
+          clearTimeout(
+            debounceRef.current
+          )
+        }
+      }
+
+    }, [
+      search,
+      fetchTickets,
+    ])
+
+    /* ========================================
+       BLOCK TICKET
+    ======================================== */
+
+    const blockTicket =
+      useCallback(
+        async (
+          ticketNumber
+        ) => {
+
+          const previousTickets =
+            [...tickets]
+
+          try {
+
+            console.log(
+              "BLOCK_TICKET",
+              ticketNumber
+            )
+
+            /* OPTIMISTIC UPDATE */
+
+            setTickets(
+              (prev) =>
+                prev.map(
+                  (
+                    ticket
+                  ) => {
+
+                    if (
+                      ticket.ticket_number ===
+                      ticketNumber
+                    ) {
+
+                      return {
+                        ...ticket,
+
+                        is_blacklisted:
+                          true,
+                      }
+                    }
+
+                    return ticket
+                  }
+                )
+            )
 
             await ticketAdminService.deleteTicket(
               ticketNumber
             )
-          }
 
-        } catch (error) {
+          } catch (error) {
 
-          console.error(
-            "DELETE_TICKET_ERROR",
-            error
-          )
-
-          /* REFRESH ON FAIL */
-          fetchTickets()
-        }
-      }
-
-    /* BLOCK / UNBLOCK */
-    const toggleBlock =
-      async (
-        ticketNumber
-      ) => {
-
-        try {
-
-          console.log(
-            "TOGGLE_BLOCK",
-            ticketNumber
-          )
-
-          /* OPTIMISTIC UPDATE */
-          setTickets((prev) =>
-            prev.map(
-              (ticket) => {
-
-                if (
-                  ticket.ticket_number ===
-                  ticketNumber
-                ) {
-
-                  return {
-                    ...ticket,
-
-                    is_blacklisted:
-                      !ticket.is_blacklisted,
-                  }
-                }
-
-                return ticket
-              }
+            console.error(
+              "BLOCK_TICKET_ERROR",
+              error
             )
-          )
 
-          /* OPTIONAL BACKEND */
-          if (
-            ticketAdminService.toggleBlock
-          ) {
+            /* ROLLBACK */
 
-            await ticketAdminService.toggleBlock(
-              ticketNumber
-            )
+            if (
+              mountedRef.current
+            ) {
+
+              setTickets(
+                previousTickets
+              )
+            }
           }
+        },
+        [tickets]
+      )
 
-        } catch (error) {
-
-          console.error(
-            "TOGGLE_BLOCK_ERROR",
-            error
-          )
-
-          /* REFRESH */
-          fetchTickets()
-        }
-      }
-
-    /* PAGINATION */
-    const paginatedTickets =
-      useMemo(() => {
-
-        const start =
-          (currentPage - 1) *
-          itemsPerPage
-
-        return tickets.slice(
-          start,
-          start + itemsPerPage
-        )
-
-      }, [
-        tickets,
-        currentPage,
-      ])
+    /* ========================================
+       PAGINATION
+    ======================================== */
 
     const totalPages =
-      Math.max(
-        1,
+      useMemo(
+        () =>
+          Math.max(
+            1,
+            Math.ceil(
+              tickets.length /
+              ITEMS_PER_PAGE
+            )
+          ),
+        [tickets]
+      )
 
-        Math.ceil(
-          tickets.length /
-          itemsPerPage
-        )
+    const paginatedTickets =
+      useMemo(
+        () => {
+
+          const start =
+            (
+              currentPage -
+              1
+            ) *
+            ITEMS_PER_PAGE
+
+          return tickets.slice(
+            start,
+            start +
+              ITEMS_PER_PAGE
+          )
+
+        },
+        [
+          tickets,
+          currentPage,
+        ]
       )
 
     return {
@@ -209,8 +314,7 @@ export const useTickets =
 
       totalPages,
 
-      deleteTicket,
-
-      toggleBlock,
+      blockTicket,
     }
+
   }

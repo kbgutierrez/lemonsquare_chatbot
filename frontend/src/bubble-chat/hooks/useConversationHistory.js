@@ -1,7 +1,62 @@
 import {
+  useCallback,
   useEffect,
-  useState
-} from 'react'
+  useState,
+} from "react"
+
+import chatbotService
+  from "../services/chatbotService"
+
+/* ========================================
+   STORAGE KEY
+======================================== */
+
+const HISTORY_STORAGE_KEY =
+  "chat_session_history"
+
+/* ========================================
+   HELPERS
+======================================== */
+
+const loadStoredHistory =
+  () => {
+
+    try {
+
+      const raw =
+        localStorage.getItem(
+          HISTORY_STORAGE_KEY
+        )
+
+      if (!raw) {
+        return []
+      }
+
+      const parsed =
+        JSON.parse(raw)
+
+      return Array.isArray(parsed)
+        ? parsed
+        : []
+
+    } catch {
+
+      return []
+    }
+  }
+
+const saveStoredHistory =
+  (history) => {
+
+    localStorage.setItem(
+      HISTORY_STORAGE_KEY,
+      JSON.stringify(history)
+    )
+  }
+
+/* ========================================
+   HOOK
+======================================== */
 
 export const useConversationHistory =
   () => {
@@ -15,277 +70,228 @@ export const useConversationHistory =
     const [selectedConversationId, setSelectedConversationId] =
       useState(null)
 
-    /* ===================================== */
-    /* PLACEHOLDER CONFIG */
-    /* ===================================== */
-
-    const USER_ID =
-      'USER_ID_PLACEHOLDER'
-
-    const HISTORY_API =
-      'CHAT_HISTORY_API_PLACEHOLDER'
-
-    const LOAD_API =
-      'LOAD_CONVERSATION_API_PLACEHOLDER'
-
-    /* ===================================== */
-    /* FETCH HISTORY */
-    /* ===================================== */
+    /* ========================================
+       FETCH HISTORY
+    ======================================== */
 
     const fetchHistory =
-      async () => {
+      useCallback(async () => {
 
         try {
 
           setLoading(true)
 
-          console.log(
-            'FETCH CHAT HISTORY',
-            {
-              userId:
-                USER_ID,
-
-              endpoint:
-                HISTORY_API
-            }
-          )
+          const stored =
+            loadStoredHistory()
 
           /*
-            FUTURE DATABASE/API FLOW
-
-            const response =
-              await fetch(HISTORY_API, {
-                method: 'POST',
-
-                headers: {
-                  'Content-Type':
-                    'application/json'
-                },
-
-                body: JSON.stringify({
-                  userId: USER_ID
-                })
-              })
-
-            const data =
-              await response.json()
-
-            setConversations(data)
+            newest first
           */
-
-          /* MOCK DATA */
-          const mockHistory = [
-            {
-              id:
-                'conversation_1',
-
-              title:
-                'Password Reset',
-
-              preview:
-                'How do I reset my account password?',
-
-              updatedAt:
-                'Today • 10:42 AM',
-
-              messages: [
-                {
-                  sender:
-                    'user',
-
-                  text:
-                    'How do I reset my account password?'
-                },
-
-                {
-                  sender:
-                    'agent',
-
-                  text:
-                    'You can reset your password inside settings.'
-                }
-              ]
-            },
-
-            {
-              id:
-                'conversation_2',
-
-              title:
-                'Ticket Assistance',
-
-              preview:
-                'How do I create a support ticket?',
-
-              updatedAt:
-                'Yesterday • 08:15 PM',
-
-              messages: [
-                {
-                  sender:
-                    'user',
-
-                  text:
-                    'How do I create a support ticket?'
-                },
-
-                {
-                  sender:
-                    'agent',
-
-                  text:
-                    'Go to the support section and press Create Ticket.'
-                }
-              ]
-            }
-          ]
-
-          setTimeout(() => {
-
-            setConversations(
-              mockHistory
+          const sorted =
+            [...stored].sort(
+              (a, b) =>
+                new Date(
+                  b.updatedAt
+                ) -
+                new Date(
+                  a.updatedAt
+                )
             )
 
-            setLoading(false)
-
-          }, 600)
+          setConversations(
+            sorted
+          )
 
         } catch (error) {
 
-          console.error(error)
+          console.error(
+            "FETCH_HISTORY_ERROR",
+            error
+          )
+
+        } finally {
 
           setLoading(false)
         }
-      }
 
-    /* ===================================== */
-    /* LOAD CONVERSATION */
-    /* ===================================== */
+      }, [])
+
+    /* ========================================
+       LOAD CONVERSATION
+    ======================================== */
 
     const loadConversation =
-      async (
-        conversationId
-      ) => {
+      useCallback(
+        async (
+          sessionId
+        ) => {
 
-        try {
+          try {
 
-          setSelectedConversationId(
-            conversationId
-          )
-
-          console.log(
-            'LOAD CONVERSATION',
-            {
-              conversationId,
-
-              endpoint:
-                LOAD_API
-            }
-          )
-
-          /*
-            FUTURE DATABASE/API FLOW
-
-            const response =
-              await fetch(LOAD_API, {
-                method: 'POST',
-
-                headers: {
-                  'Content-Type':
-                    'application/json'
-                },
-
-                body: JSON.stringify({
-                  userId:
-                    USER_ID,
-
-                  conversationId
-                })
-              })
-
-            const data =
-              await response.json()
-
-            return data.messages
-          */
-
-          const conversation =
-            conversations.find(
-              (item) =>
-                item.id ===
-                conversationId
+            setSelectedConversationId(
+              sessionId
             )
 
-          return (
-            conversation?.messages ||
-            []
-          )
+            const response =
+              await chatbotService.loadSession(
+                sessionId
+              )
 
-        } catch (error) {
+            return {
+              sessionId,
 
-          console.error(error)
-
-          return []
-        }
-      }
-
-    /* ===================================== */
-    /* DELETE CONVERSATION */
-    /* ===================================== */
-
-    const deleteConversation =
-      async (
-        conversationId
-      ) => {
-
-        try {
-
-          console.log(
-            'DELETE CONVERSATION',
-            {
-              conversationId
+              messages:
+                response?.messages || [],
             }
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_CONVERSATION_ERROR",
+              error
+            )
+
+            return {
+              sessionId:
+                null,
+
+              messages: [],
+            }
+          }
+        },
+        []
+      )
+
+    /* ========================================
+       SAVE CONVERSATION
+    ======================================== */
+
+    const saveConversation =
+      useCallback(
+        ({
+          sessionId,
+          messages,
+        }) => {
+
+          if (
+            !sessionId ||
+            !Array.isArray(messages) ||
+            messages.length === 0
+          ) {
+            return
+          }
+
+          const firstUserMessage =
+            messages.find(
+              (msg) =>
+                msg.sender ===
+                "user"
+            )
+
+          const preview =
+            firstUserMessage?.text ||
+            "Conversation"
+
+          const updatedConversation = {
+            id:
+              sessionId,
+
+            title:
+              preview.slice(
+                0,
+                32
+              ),
+
+            preview:
+              preview.slice(
+                0,
+                80
+              ),
+
+            updatedAt:
+              new Date().toISOString(),
+
+            messageCount:
+              messages.length,
+          }
+
+          const existing =
+            loadStoredHistory()
+
+          const filtered =
+            existing.filter(
+              (item) =>
+                item.id !==
+                sessionId
+            )
+
+          const updated =
+            [
+              updatedConversation,
+              ...filtered,
+            ]
+
+          saveStoredHistory(
+            updated
           )
-
-          /*
-            FUTURE DATABASE/API FLOW
-
-            await fetch('/api/delete', {
-              method: 'POST',
-
-              body: JSON.stringify({
-                userId:
-                  USER_ID,
-
-                conversationId
-              })
-            })
-          */
 
           setConversations(
-            (prev) =>
-              prev.filter(
-                (conversation) =>
-                  conversation.id !==
-                  conversationId
-              )
+            updated
           )
+        },
+        []
+      )
 
-        } catch (error) {
+    /* ========================================
+       DELETE CONVERSATION
+    ======================================== */
 
-          console.error(error)
-        }
-      }
+    const deleteConversation =
+      useCallback(
+        async (
+          sessionId
+        ) => {
 
-    /* ===================================== */
-    /* INITIAL FETCH */
-    /* ===================================== */
+          try {
+
+            const existing =
+              loadStoredHistory()
+
+            const filtered =
+              existing.filter(
+                (item) =>
+                  item.id !==
+                  sessionId
+              )
+
+            saveStoredHistory(
+              filtered
+            )
+
+            setConversations(
+              filtered
+            )
+
+          } catch (error) {
+
+            console.error(
+              "DELETE_CONVERSATION_ERROR",
+              error
+            )
+          }
+        },
+        []
+      )
+
+    /* ========================================
+       INITIAL LOAD
+    ======================================== */
 
     useEffect(() => {
 
       fetchHistory()
 
-    }, [])
+    }, [fetchHistory])
 
     return {
 
@@ -299,6 +305,8 @@ export const useConversationHistory =
 
       loadConversation,
 
-      deleteConversation
+      saveConversation,
+
+      deleteConversation,
     }
   }

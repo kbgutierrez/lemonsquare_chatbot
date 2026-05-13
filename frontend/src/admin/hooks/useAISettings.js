@@ -1,6 +1,8 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
@@ -17,6 +19,10 @@ import aiSettingsService
 
 export const useAISettings =
   () => {
+
+    /* ========================================
+       STATE
+    ======================================== */
 
     const [loading, setLoading] =
       useState(true)
@@ -64,145 +70,211 @@ export const useAISettings =
         ReformulatorPrompt: "",
 
         AllowedCategories: "",
+
+        ChatExtractionPrompt: "",
       })
+
+    /* ========================================
+       REFS
+    ======================================== */
+
+    const mountedRef =
+      useRef(true)
+
+    /* ========================================
+       CLEANUP
+    ======================================== */
+
+    useEffect(() => {
+
+      mountedRef.current =
+        true
+
+      return () => {
+
+        mountedRef.current =
+          false
+      }
+
+    }, [])
 
     /* ========================================
        LOAD SETTINGS
     ======================================== */
 
     const loadSettings =
-      async () => {
+      useCallback(
+        async () => {
 
-        try {
+          try {
 
-          setLoading(true)
+            setLoading(true)
 
-          const data =
-            await aiSettingsService.getSettings()
+            setError("")
 
-          /* CLEAN PAYLOAD */
-          const cleaned = {
-            ActiveModel:
-              data.ActiveModel ||
-              AI_DEFAULTS.ActiveModel,
+            const data =
+              await aiSettingsService.getSettings()
 
-            ReformulatorModel:
-              data.ReformulatorModel ||
-              AI_DEFAULTS.ReformulatorModel,
+            if (
+              !mountedRef.current
+            ) {
+              return
+            }
 
-            EmbeddingModel:
-              data.EmbeddingModel ||
-              AI_DEFAULTS.EmbeddingModel,
+            const cleaned = {
+              ActiveModel:
+                data.ActiveModel ||
+                AI_DEFAULTS.ActiveModel,
 
-            RerankerModel:
-              data.RerankerModel ||
-              AI_DEFAULTS.RerankerModel,
+              ReformulatorModel:
+                data.ReformulatorModel ||
+                AI_DEFAULTS.ReformulatorModel,
 
-            Temperature:
-              Number(
-                data.Temperature ??
-                AI_DEFAULTS.Temperature
-              ),
+              EmbeddingModel:
+                data.EmbeddingModel ||
+                AI_DEFAULTS.EmbeddingModel,
 
-            TopK_Tickets:
-              Number(
-                data.TopK_Tickets ??
-                AI_DEFAULTS.TopK_Tickets
-              ),
+              RerankerModel:
+                data.RerankerModel ||
+                AI_DEFAULTS.RerankerModel,
 
-            ConfidenceThreshold:
-              Number(
-                data.ConfidenceThreshold ??
-                AI_DEFAULTS.ConfidenceThreshold
-              ),
+              Temperature:
+                Number(
+                  data.Temperature ??
+                  AI_DEFAULTS.Temperature
+                ),
 
-            UseReformulator:
-              Boolean(
-                data.UseReformulator
-              ),
+              TopK_Tickets:
+                Number(
+                  data.TopK_Tickets ??
+                  AI_DEFAULTS.TopK_Tickets
+                ),
 
-            UseReranker:
-              Boolean(
-                data.UseReranker
-              ),
+              ConfidenceThreshold:
+                Number(
+                  data.ConfidenceThreshold ??
+                  AI_DEFAULTS.ConfidenceThreshold
+                ),
 
-            SystemPrompt:
-              data.SystemPrompt || "",
+              UseReformulator:
+                Boolean(
+                  data.UseReformulator
+                ),
 
-            ReformulatorPrompt:
-              data.ReformulatorPrompt || "",
+              UseReranker:
+                Boolean(
+                  data.UseReranker
+                ),
 
-            AllowedCategories:
-              data.AllowedCategories || "",
+              SystemPrompt:
+                data.SystemPrompt || "",
+
+              ReformulatorPrompt:
+                data.ReformulatorPrompt || "",
+
+              AllowedCategories:
+                data.AllowedCategories || "",
+
+              ChatExtractionPrompt:
+                data.ChatExtractionPrompt || "",
+            }
+
+            setSettings(
+              cleaned
+            )
+
+          } catch (err) {
+
+            console.error(
+              "LOAD_SETTINGS_ERROR",
+              err
+            )
+
+            if (
+              mountedRef.current
+            ) {
+
+              setError(
+                err.message ||
+                "Failed to load settings."
+              )
+            }
+
+          } finally {
+
+            if (
+              mountedRef.current
+            ) {
+
+              setLoading(
+                false
+              )
+            }
           }
-
-          setSettings(cleaned)
-
-        } catch (err) {
-
-          console.error(
-            "LOAD_SETTINGS_ERROR",
-            err
-          )
-
-          setError(
-            "Failed to load settings."
-          )
-
-        } finally {
-
-          setLoading(false)
-        }
-      }
+        },
+        []
+      )
 
     useEffect(() => {
 
       loadSettings()
 
-    }, [])
+    }, [loadSettings])
 
     /* ========================================
        UPDATE FIELD
     ======================================== */
 
     const update =
-      (
-        key,
-        value
-      ) => {
+      useCallback(
+        (
+          key,
+          value
+        ) => {
 
-        setSettings((prev) => ({
-          ...prev,
-          [key]: value,
-        }))
-      }
+          setSuccess("")
+          setError("")
+
+          setSettings((prev) => ({
+            ...prev,
+            [key]: value,
+          }))
+        },
+        []
+      )
 
     /* ========================================
        SELECT MODEL
     ======================================== */
 
     const selectModel =
-      (model) => {
+      useCallback(
+        (model) => {
 
-        setSettings((prev) => ({
-          ...prev,
+          setSuccess("")
+          setError("")
 
-          ActiveModel:
-            model.ActiveModel,
+          setSettings((prev) => ({
+            ...prev,
 
-          ReformulatorModel:
-            model.ReformulatorModel,
+            ActiveModel:
+              model.ActiveModel,
 
-          EmbeddingModel:
-            model.EmbeddingModel,
+            ReformulatorModel:
+              model.ReformulatorModel,
 
-          RerankerModel:
-            model.RerankerModel,
+            EmbeddingModel:
+              model.EmbeddingModel,
 
-          Temperature:
-            model.RecommendedTemperature,
-        }))
-      }
+            RerankerModel:
+              model.RerankerModel,
+
+            Temperature:
+              model.RecommendedTemperature,
+          }))
+        },
+        []
+      )
 
     /* ========================================
        ACTIVE MODEL
@@ -226,94 +298,162 @@ export const useAISettings =
     ======================================== */
 
     const saveSettings =
-      async () => {
+      useCallback(
+        async () => {
 
-        try {
-
-          setSaving(true)
-
-          setSuccess("")
-
-          setError("")
-
-          /* STRICT PAYLOAD */
-          const payload = {
-            ActiveModel:
-              settings.ActiveModel,
-
-            ReformulatorModel:
-              settings.ReformulatorModel,
-
-            EmbeddingModel:
-              settings.EmbeddingModel,
-
-            RerankerModel:
-              settings.RerankerModel,
-
-            Temperature:
-              Number(
-                settings.Temperature
-              ),
-
-            TopK_Tickets:
-              Number(
-                settings.TopK_Tickets
-              ),
-
-            ConfidenceThreshold:
-              Number(
-                settings.ConfidenceThreshold
-              ),
-
-            UseReformulator:
-              Boolean(
-                settings.UseReformulator
-              ),
-
-            UseReranker:
-              Boolean(
-                settings.UseReranker
-              ),
-
-            SystemPrompt:
-              settings.SystemPrompt || "",
-
-            ReformulatorPrompt:
-              settings.ReformulatorPrompt || "",
-
-            AllowedCategories:
-              settings.AllowedCategories || "",
+          if (
+            saving
+          ) {
+            return
           }
 
-          console.log(
-            "SAVE_SETTINGS_PAYLOAD",
-            payload
-          )
+          try {
 
-          await aiSettingsService.updateSettings(
-            payload
-          )
+            setSaving(true)
 
-          setSuccess(
-            "AI settings updated successfully."
-          )
+            setSuccess("")
+            setError("")
 
-        } catch (err) {
+            /* ========================================
+               FRONTEND VALIDATION
+            ======================================== */
 
-          console.error(
-            "SAVE_SETTINGS_ERROR",
-            err
-          )
+            if (
+              !settings.SystemPrompt?.trim()
+            ) {
 
-          setError(
-            "Failed to save settings."
-          )
+              setError(
+                "System Prompt is required."
+              )
 
-        } finally {
+              return
+            }
 
-          setSaving(false)
-        }
-      }
+            if (
+              !settings.ReformulatorPrompt?.trim()
+            ) {
+
+              setError(
+                "Reformulator Prompt is required."
+              )
+
+              return
+            }
+
+            if (
+              !settings.AllowedCategories?.trim()
+            ) {
+
+              setError(
+                "Allowed Categories is required."
+              )
+
+              return
+            }
+
+            const payload = {
+              ActiveModel:
+                settings.ActiveModel,
+
+              ReformulatorModel:
+                settings.ReformulatorModel,
+
+              EmbeddingModel:
+                settings.EmbeddingModel,
+
+              RerankerModel:
+                settings.RerankerModel,
+
+              Temperature:
+                Number(
+                  settings.Temperature
+                ),
+
+              TopK_Tickets:
+                Number(
+                  settings.TopK_Tickets
+                ),
+
+              ConfidenceThreshold:
+                Number(
+                  settings.ConfidenceThreshold
+                ),
+
+              UseReformulator:
+                Boolean(
+                  settings.UseReformulator
+                ),
+
+              UseReranker:
+                Boolean(
+                  settings.UseReranker
+                ),
+
+              SystemPrompt:
+                settings.SystemPrompt.trim(),
+
+              ReformulatorPrompt:
+                settings.ReformulatorPrompt.trim(),
+
+              AllowedCategories:
+                settings.AllowedCategories.trim(),
+
+              ChatExtractionPrompt:
+                settings.ChatExtractionPrompt?.trim() || null,
+            }
+
+            console.log(
+              "SAVE_SETTINGS_PAYLOAD",
+              payload
+            )
+
+            await aiSettingsService.updateSettings(
+              payload
+            )
+
+            if (
+              mountedRef.current
+            ) {
+
+              setSuccess(
+                "AI settings updated successfully."
+              )
+            }
+
+          } catch (err) {
+
+            console.error(
+              "SAVE_SETTINGS_ERROR",
+              err
+            )
+
+            if (
+              mountedRef.current
+            ) {
+
+              setError(
+                err.message ||
+                "Failed to save settings."
+              )
+            }
+
+          } finally {
+
+            if (
+              mountedRef.current
+            ) {
+
+              setSaving(
+                false
+              )
+            }
+          }
+        },
+        [
+          saving,
+          settings,
+        ]
+      )
 
     return {
       loading,
