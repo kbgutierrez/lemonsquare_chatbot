@@ -166,7 +166,7 @@ elif page == "Manual Rules":
                 with col1:
                     if st.form_submit_button("Update Rule"):
                         res = api_put(f"/documents/manual/{selected_rule}", {"title": u_title, "content": u_content, "category": u_category})
-                        if res: st
+                        if res: st.success("Rule updated and re-embedded!")
 
 
 # ==========================================

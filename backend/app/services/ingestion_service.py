@@ -260,6 +260,46 @@ class DocumentIngestionService:
                 os.remove(temp_file_path)
 
 
+
+    async def _classify_document(self, text: str) -> str:
+        """Uses the AI to read a snippet of the document and assign a category."""
+        from langchain_groq import ChatGroq
+        from app.core.config import settings
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # We only need the first 3000 characters to figure out what the document is about.
+        # This saves tokens and makes the upload process much faster.
+        snippet = text[:3000]
+        
+        try:
+            classify_llm = ChatGroq(
+                model="llama-3.1-8b-instant", 
+                temperature=0.0, 
+                api_key=settings.GROQ_API_KEY
+            )
+            
+            prompt = (
+                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {self.allowed_categories}. "
+                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
+            )
+            
+            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
+            
+            # The Lock: Fallback if the AI hallucinates a category that isn't allowed
+            if ai_category not in self.allowed_categories:
+                logger.warning(f"AI hallucinated category '{ai_category}'. Defaulting to 'General_IT'.")
+                return "General"
+                
+            return ai_category
+            
+        except Exception as e:
+            logger.error(f"Error during AI categorization: {e}")
+            return "General_IT"  # Safe fallback if the LLM call fails
+
+
     async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db: Session) -> dict:
         """Embeds raw text into Qdrant, auto-guessing the category if none is provided."""
         from app.models.chatbot import AIChatbotSetting, ManualKnowledgeEntry
