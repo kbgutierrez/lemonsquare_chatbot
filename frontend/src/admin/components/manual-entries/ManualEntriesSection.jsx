@@ -13,13 +13,14 @@ import {
 
 import {
   API_CONFIG,
+  API_ENDPOINTS,
 } from "../../../config/sqlVariables"
 
 const API_URL =
-  `${API_CONFIG.BASE_URL}/self_knowledge?filter_type=general_text`
+  `${API_CONFIG.BASE_URL}/documents/manual`
 
 const CREATE_URL =
-  `${API_CONFIG.BASE_URL}/documents/manual`
+  `${API_CONFIG.BASE_URL}${API_ENDPOINTS.DOCUMENT_MANUAL_ENTRY}`
 
 const ITEMS_PER_PAGE = 6
 
@@ -44,12 +45,53 @@ const ManualEntriesSection =
     const [submitting, setSubmitting] =
       useState(false)
 
+    const [error, setError] =
+      useState("")
+
     const [form, setForm] =
       useState({
         title: "",
         category: "",
         content: "",
       })
+
+    /* ========================================
+       NORMALIZE SQL RESPONSE
+    ======================================== */
+
+    const normalizeEntry =
+      (item) => {
+
+        return {
+          id:
+            item.EntryID ||
+            item.entry_id ||
+            item.id,
+
+          title:
+            item.Title ||
+            item.title ||
+            "",
+
+          category:
+            item.Category ||
+            item.category ||
+            "General",
+
+          content:
+            item.Content ||
+            item.content ||
+            "",
+
+          created_at:
+            item.CreatedAt ||
+            item.created_at,
+        }
+      }
+
+    /* ========================================
+       LOAD MANUAL ENTRIES
+    ======================================== */
 
     const loadData =
       async () => {
@@ -63,10 +105,35 @@ const ManualEntriesSection =
               API_URL
             )
 
+          if (
+            !response.ok
+          ) {
+
+            throw new Error(
+              `Failed to fetch entries (${response.status})`
+            )
+          }
+
           const data =
             await response.json()
 
-          setItems(data)
+          console.log(
+            "MANUAL_ENTRIES_RESPONSE",
+            data
+          )
+
+          const normalized =
+            Array.isArray(
+              data
+            )
+              ? data.map(
+                  normalizeEntry
+                )
+              : []
+
+          setItems(
+            normalized
+          )
 
         } catch (error) {
 
@@ -74,6 +141,8 @@ const ManualEntriesSection =
             "MANUAL_ENTRIES_ERROR",
             error
           )
+
+          setItems([])
 
         } finally {
 
@@ -87,19 +156,31 @@ const ManualEntriesSection =
 
     }, [])
 
+    /* ========================================
+       FILTER
+    ======================================== */
+
     const filtered =
       useMemo(() => {
 
         return items.filter(
           (item) =>
-            item.content
-              ?.toLowerCase()
+            (
+              item.content ||
+              item.title ||
+              ""
+            )
+              .toLowerCase()
               .includes(
                 search.toLowerCase()
               )
         )
 
       }, [items, search])
+
+    /* ========================================
+       PAGINATION
+    ======================================== */
 
     const totalPages =
       Math.ceil(
@@ -116,19 +197,35 @@ const ManualEntriesSection =
           ITEMS_PER_PAGE
       )
 
+    /* ========================================
+       CREATE ENTRY
+    ======================================== */
+
     const createEntry =
       async () => {
+
+        setError("")
 
         if (
           !form.title.trim() ||
           !form.content.trim()
         ) {
+
+          setError(
+            "Title and content are required."
+          )
+
           return
         }
 
         try {
 
           setSubmitting(true)
+
+          console.log(
+            "CREATE_MANUAL_ENTRY_PAYLOAD",
+            form
+          )
 
           const response =
             await fetch(
@@ -148,32 +245,49 @@ const ManualEntriesSection =
               }
             )
 
+          const responseData =
+            await response.json()
+
+          console.log(
+            "CREATE_MANUAL_ENTRY_RESPONSE",
+            responseData
+          )
+
           if (
             !response.ok
           ) {
 
             throw new Error(
-              "Failed to create entry"
+              responseData?.detail ||
+                responseData?.message ||
+                "Failed to create manual entry."
             )
           }
 
-          setShowModal(
-            false
-          )
+          /* RELOAD LIST */
+          await loadData()
 
+          /* RESET */
           setForm({
             title: "",
             category: "",
             content: "",
           })
 
-          await loadData()
+          setShowModal(
+            false
+          )
 
         } catch (error) {
 
           console.error(
             "CREATE_ENTRY_ERROR",
             error
+          )
+
+          setError(
+            error.message ||
+              "Failed to create entry."
           )
 
         } finally {
@@ -192,7 +306,6 @@ const ManualEntriesSection =
             flex-wrap
             items-center
             justify-between
-
             gap-4
           "
         >
@@ -201,7 +314,6 @@ const ManualEntriesSection =
               className="
                 text-2xl
                 font-bold
-
                 text-white
               "
             >
@@ -211,9 +323,7 @@ const ManualEntriesSection =
             <p
               className="
                 mt-1
-
                 text-sm
-
                 text-[#8ea59b]
               "
             >
@@ -232,17 +342,12 @@ const ManualEntriesSection =
                 w-full
                 items-center
                 gap-3
-
                 rounded-2xl
-
                 border
                 border-[#2d3b35]
-
                 bg-[#18211f]
-
                 px-4
                 py-3
-
                 sm:w-[300px]
               "
             >
@@ -250,7 +355,6 @@ const ManualEntriesSection =
                 className="
                   h-4
                   w-4
-
                   text-[#70847b]
                 "
               />
@@ -285,22 +389,15 @@ const ManualEntriesSection =
                 flex
                 items-center
                 gap-2
-
                 rounded-2xl
-
                 bg-[#f5d547]
-
                 px-5
                 py-3
-
                 text-sm
                 font-semibold
-
                 text-[#111917]
-
                 transition-all
                 duration-200
-
                 hover:scale-[1.02]
               "
             >
@@ -315,14 +412,10 @@ const ManualEntriesSection =
           className="
             flex-1
             overflow-auto
-
             rounded-[28px]
-
             border
             border-[#26332d]
-
             bg-[#121a18]
-
             p-5
           "
         >
@@ -332,19 +425,15 @@ const ManualEntriesSection =
                 className="
                   h-10
                   w-10
-
                   rounded-full
-
                   border-2
                   border-[#f5d547]/20
                   border-t-[#f5d547]
-
                   animate-spin
                 "
               />
             </div>
-          ) : paginatedItems.length ===
-            0 ? (
+          ) : paginatedItems.length === 0 ? (
             <div className="flex h-full items-center justify-center">
               <div className="text-center">
 
@@ -352,10 +441,8 @@ const ManualEntriesSection =
                   className="
                     mx-auto
                     mb-4
-
                     h-10
                     w-10
-
                     text-[#f5d547]
                   "
                 />
@@ -364,7 +451,6 @@ const ManualEntriesSection =
                   className="
                     text-lg
                     font-semibold
-
                     text-white
                   "
                 >
@@ -380,19 +466,15 @@ const ManualEntriesSection =
                     key={item.id}
                     className="
                       rounded-3xl
-
                       border
                       border-[#26332d]
-
                       bg-[#18211f]
-
                       p-5
                     "
                   >
                     <div
                       className="
                         mb-3
-
                         flex
                         flex-wrap
                         items-center
@@ -402,39 +484,34 @@ const ManualEntriesSection =
                       <span
                         className="
                           rounded-2xl
-
                           bg-[#95c11f]/10
-
                           px-3
                           py-1
-
                           text-xs
                           font-semibold
-
                           text-[#95c11f]
                         "
                       >
                         {item.category}
                       </span>
-
-                      <span
-                        className="
-                          text-xs
-
-                          text-[#8ea59b]
-                        "
-                      >
-                        {item.source}
-                      </span>
                     </div>
+
+                    <h3
+                      className="
+                        mb-2
+                        text-lg
+                        font-semibold
+                        text-white
+                      "
+                    >
+                      {item.title}
+                    </h3>
 
                     <p
                       className="
                         whitespace-pre-wrap
-
                         text-sm
                         leading-relaxed
-
                         text-[#d7e0dc]
                       "
                     >
@@ -454,7 +531,6 @@ const ManualEntriesSection =
               flex
               items-center
               justify-center
-
               gap-2
             "
           >
@@ -476,17 +552,13 @@ const ManualEntriesSection =
                 className={`
                   h-10
                   w-10
-
                   rounded-xl
-
                   text-sm
                   font-semibold
-
                   transition-all
 
                   ${
-                    page ===
-                    number
+                    page === number
                       ? `
                         bg-[#f5d547]
                         text-[#111917]
@@ -494,7 +566,6 @@ const ManualEntriesSection =
                       : `
                         bg-[#18211f]
                         text-white
-
                         hover:bg-[#202b27]
                       `
                   }
@@ -513,13 +584,10 @@ const ManualEntriesSection =
               fixed
               inset-0
               z-50
-
               flex
               items-center
               justify-center
-
               bg-black/50
-
               p-4
             "
           >
@@ -527,21 +595,16 @@ const ManualEntriesSection =
               className="
                 w-full
                 max-w-2xl
-
                 rounded-[32px]
-
                 border
                 border-[#2a3a33]
-
                 bg-[#111917]
-
                 p-6
               "
             >
               <div
                 className="
                   mb-6
-
                   flex
                   items-center
                   justify-between
@@ -551,7 +614,6 @@ const ManualEntriesSection =
                   className="
                     text-xl
                     font-bold
-
                     text-white
                   "
                 >
@@ -560,9 +622,7 @@ const ManualEntriesSection =
 
                 <button
                   onClick={() =>
-                    setShowModal(
-                      false
-                    )
+                    setShowModal(false)
                   }
                 >
                   <X className="text-white" />
@@ -571,6 +631,23 @@ const ManualEntriesSection =
 
               <div className="space-y-4">
 
+                {error && (
+                  <div
+                    className="
+                      rounded-2xl
+                      border
+                      border-red-500/30
+                      bg-red-500/10
+                      px-4
+                      py-3
+                      text-sm
+                      text-red-300
+                    "
+                  >
+                    {error}
+                  </div>
+                )}
+
                 <input
                   placeholder="Title"
                   value={form.title}
@@ -578,57 +655,41 @@ const ManualEntriesSection =
                     setForm({
                       ...form,
                       title:
-                        e.target
-                          .value,
+                        e.target.value,
                     })
                   }
                   className="
                     w-full
-
                     rounded-2xl
-
                     border
                     border-[#2d3b35]
-
                     bg-[#18211f]
-
                     px-4
                     py-3
-
                     text-white
-
                     outline-none
                   "
                 />
 
                 <input
                   placeholder="Category (Optional)"
-                  value={
-                    form.category
-                  }
+                  value={form.category}
                   onChange={(e) =>
                     setForm({
                       ...form,
                       category:
-                        e.target
-                          .value,
+                        e.target.value,
                     })
                   }
                   className="
                     w-full
-
                     rounded-2xl
-
                     border
                     border-[#2d3b35]
-
                     bg-[#18211f]
-
                     px-4
                     py-3
-
                     text-white
-
                     outline-none
                   "
                 />
@@ -641,25 +702,18 @@ const ManualEntriesSection =
                     setForm({
                       ...form,
                       content:
-                        e.target
-                          .value,
+                        e.target.value,
                     })
                   }
                   className="
                     w-full
-
                     rounded-2xl
-
                     border
                     border-[#2d3b35]
-
                     bg-[#18211f]
-
                     px-4
                     py-3
-
                     text-white
-
                     outline-none
                   "
                 />
@@ -673,15 +727,10 @@ const ManualEntriesSection =
                   }
                   className="
                     w-full
-
                     rounded-2xl
-
                     bg-[#f5d547]
-
                     py-3
-
                     font-semibold
-
                     text-[#111917]
                   "
                 >
