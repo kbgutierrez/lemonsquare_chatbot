@@ -1,23 +1,93 @@
-KNOWLEDGE VIEW SEPERATED INTO 4
--TICKET
--DOCUMENTS
--RESOLVED CHAT
--MANUAL ENTRIES
+Here is a clear, structured summary you can hand right over to your frontend team (whether they are building in React or Streamlit). It outlines exactly what new superpowers they have and how the API contracts have evolved.
+
+---
+
+## 🚀 Backend Update: Full Knowledge Base CRUD
+
+**Overview for Frontend:** The backend has been upgraded to support full CRUD (Create, Read, Update, Delete) across *all* AI knowledge sources. Previously, items like manual rules and extracted chats were trapped in the vector database. They are now backed by SQL tables, meaning you can build UI to let Admins edit, correct, or delete any piece of knowledge the AI has learned.
+
+Additionally, the Knowledge Base Explorer API is now fully SQL-driven, meaning it is lightning fast and no longer returns fragmented document chunks.
+
+Here are the new endpoints and payload structures for your UI:
+
+---
+
+### 1. PDF Manuals (`official_document`)
+
+Admins no longer need to delete and re-upload a PDF just to fix a typo in the file name or change its category.
+
+* **NEW ENDPOINT:** `PUT /api/documents/{document_id}`
+* **Payload (Send only what you want to change):**
+```json
+{
+  "file_name": "New Server Guide",
+  "category": "Hardware_Guide"
+}
+
+```
+
+
+* **Response:** Returns the updated `DocumentResponse` object.
+
+---
+
+### 2. Manual Knowledge Rules (`general_text`)
+
+Manual rules typed by the Admin are now tracked in a SQL table, allowing for a dedicated management view.
+
+* **NEW ENDPOINT (Read):** `GET /api/documents/manual?skip=0&limit=50`
+* *Returns:* A list of `ManualEntryResponse` objects containing `entry_id`, `title`, `content`, `category`, and timestamps.
+
+
+* **NEW ENDPOINT (Update):** `PUT /api/documents/manual/{entry_id}`
+* **Payload:** ```json
+{
+"title": "Updated Rule Title",
+"content": "Updated rule text...",
+"category": "General_IT"
+}
+```
+
+```
 
 
 
-RESOLVE CONVER WORKS
--SHOULD SEPERATED ACTIVE CHAT TO RESOLVED
 
-HISTORY WORKS PER USER ID
--ACTIVE AND RESOLVED
+* **NEW ENDPOINT (Delete):** `DELETE /api/documents/manual/{entry_id}`
+
+---
+
+### 3. AI-Learned Chats (`resolved_chat`)
+
+If the AI hallucinates a summary when an employee clicks "Mark as Resolved," Admins can now edit the JSON summary directly or force the AI to unlearn it.
+
+* **NEW ENDPOINT (Update):** `PUT /api/self_knowledge/chats/{session_id}`
+* **Payload (Send only the fields that need correction):**
+```json
+{
+  "issue_reported": "User couldn't connect to VPN.",
+  "issue_found": "VPN client was outdated.",
+  "issue_cause": "Missed patch 2.1.",
+  "work_done": "Updated client and rebooted."
+}
+
+```
 
 
-TEST QUERIES FULL PIPELINE QUERY TO ANSWER FEATURE
--SHOW QUERY
--SHOW REFORMULATION IF
--SHOW RETRIEVED DOCUMENTS
--SHOW ANSWER
 
 
-BLACKLIST TICKETWORKS ALSO A FEATURE TO WHITELIST TICKETS
+* **NEW ENDPOINT (Delete):** `DELETE /api/self_knowledge/chats/{session_id}`
+
+---
+
+### 4. Knowledge Base Explorer API (Major Upgrade)
+
+The Explorer route (`GET /api/knowledge/explore`) keeps the same URL, but the behavior is vastly improved.
+
+* **What Changed:** Instead of scrolling the vector database (which was slow and returned 50 separate chunks for a single PDF), the endpoint now queries the SQL databases directly.
+* **Frontend Benefit:** * Queries are now near-instant.
+* You will receive exactly **one clean row per document/chat/ticket**, rather than fragmented chunks.
+* You can safely build standard pagination around it.
+
+
+* **Parameters:** `?doc_type=<type>&limit=100` (Valid types: `general_text`, `resolved_chat`, `official_document`, `helpdesk_ticket`, or omit for all).

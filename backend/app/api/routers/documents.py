@@ -19,14 +19,19 @@ from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
-from app.models.chatbot import UploadedDocument
+from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.schemas.documents import (
     DocumentDeleteResponse,
     DocumentResponse,
     DocumentUploadResponse,
     ManualEntryRequest,
+    DocumentUpdateRequest,
+    ManualEntryResponse,
+    ManualEntryUpdateRequest,
     
 )
+
+
 
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
@@ -184,82 +189,10 @@ async def delete_document(
     return DocumentDeleteResponse(**result)
 
 
-class DocTypeFilterRequest(BaseModel):
-    doc_type: str | None = None  # None = all, otherwise: "resolved_chat", "helpdesk_ticket", "official_document", "general_text"
-    limit: int = 100
-    skip: int = 0
-
-
-@router.post(
-    "/explore/by-type",
-    tags=["Documents", "Admin"],
-    summary="Filter knowledge base by doc_type for the Admin Explorer",
-)
-async def explore_by_doc_type(
-    request: DocTypeFilterRequest,
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
-):
-    """
-    Enterprise Admin tool: Query the knowledge base by source/type.
-    Returns all chunks for a given doc_type with their metadata.
-    
-    doc_type values:
-    - "resolved_chat": AI-extracted from resolved chats
-    - "helpdesk_ticket": From IT helpdesk webhook sync
-    - "official_document": Uploaded PDF manuals
-    - "general_text": Manual KB entries typed into admin dashboard
-    - None: All knowledge base entries
-    """
-    
-    # Build the Qdrant filter
-    query_filter = None
-    if request.doc_type:
-        query_filter = qdrant_models.Filter(
-            must=[
-                qdrant_models.FieldCondition(
-                    key="metadata.doc_type",
-                    match=qdrant_models.MatchValue(value=request.doc_type)
-                )
-            ]
-        )
-    
-    # Query Qdrant with the filter
-    results = ingestion_service.qdrant.scroll(
-        collection_name=ingestion_service.collection_name,
-        limit=request.limit,
-        offset=request.skip,
-        query_filter=query_filter,
-        with_payload=True,
-    )
-    
-    # Format results for the frontend
-    points = results[0] if results else []
-    formatted_results = []
-    
-    for point in points:
-        payload = point.payload or {}
-        metadata = payload.get("metadata", {})
-        formatted_results.append({
-            "id": point.id,
-            "doc_type": metadata.get("doc_type", "unknown"),
-            "title": metadata.get("title", "Untitled"),
-            "content": metadata.get("content", ""),
-            "source": metadata.get("source", "unknown"),
-            "page": metadata.get("page", None),
-            "timestamp": metadata.get("timestamp", None),
-        })
-    
-    return {
-        "total_count": len(formatted_results),
-        "doc_type_filter": request.doc_type,
-        "results": formatted_results,
-    }
-
-
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
-    db: Session = Depends(get_chatbot_db), # <--- We need the DB for the category check
+    db: Session = Depends(get_chatbot_db), 
     ingestion_service = Depends(get_ingestion_service)
 ):
     """Embeds raw text into Qdrant, auto-categorizing if necessary."""
@@ -272,6 +205,73 @@ async def add_manual_knowledge(
         db=db
     )
     
+    return result
+
+
+
+@router.put(
+    "/{document_id}",
+    response_model=DocumentResponse,
+    summary="Update a document's metadata",
+)
+async def update_document_metadata(
+    document_id: str,
+    request: DocumentUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+) -> DocumentResponse:
+    from fastapi import HTTPException
+    from app.models.chatbot import UploadedDocument
+    
+    try:
+        # Pass the updates to the service
+        await ingestion_service.update_document(document_id, request.model_dump(exclude_unset=True), db)
+        
+        # Fetch the fresh data
+        updated_doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        
+        # THE FIX: Manually map the PascalCase SQL columns to the snake_case Pydantic schema
+        return DocumentResponse(
+            document_id=updated_doc.DocumentID,
+            file_name=updated_doc.FileName,
+            category=updated_doc.Category,
+            chunk_count=updated_doc.ChunkCount,
+            uploaded_at=updated_doc.UploadedAt,
+        )
+        
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    
+
+@router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
+def get_manual_entries(
+    skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
+):
+    """Fetch manual entries securely from SQL instead of Qdrant."""
+    entries = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True).order_by(ManualKnowledgeEntry.CreatedAt.desc()).offset(skip).limit(limit).all()
+    return entries
+
+@router.put("/manual/{entry_id}", summary="Update a manual rule")
+async def update_manual_knowledge(
+    entry_id: str,
+    request: ManualEntryUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    from fastapi import HTTPException
+    try:
+        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+@router.delete("/manual/{entry_id}", summary="Delete a manual rule")
+async def delete_manual_knowledge(
+    entry_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    result = await ingestion_service.delete_manual_entry(entry_id, db)
     return result
 
 
