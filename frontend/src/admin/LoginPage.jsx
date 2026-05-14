@@ -3,8 +3,6 @@ import {
 } from "react"
 
 import {
-  Eye,
-  EyeOff,
   ShieldCheck,
   Loader2,
 } from "lucide-react"
@@ -13,18 +11,20 @@ const LoginPage = ({
   onLogin,
 }) => {
 
-  const [username, setUsername] =
-    useState("")
+  const [
+    userToken,
+    setUserToken,
+  ] = useState("")
 
-  const [password, setPassword] =
-    useState("")
+  const [
+    loading,
+    setLoading,
+  ] = useState(false)
 
-  const [showPassword,
-    setShowPassword] =
-    useState(false)
-
-  const [loading, setLoading] =
-    useState(false)
+  const [
+    error,
+    setError,
+  ] = useState("")
 
   /* ========================================
      LOGIN
@@ -35,31 +35,50 @@ const LoginPage = ({
 
       e.preventDefault()
 
+      const trimmedToken =
+        userToken.trim()
+
+      if (!trimmedToken) {
+
+        setError(
+          "User ID is required."
+        )
+
+        return
+      }
+
       try {
 
         setLoading(true)
 
-        /*
-          BACKEND READY
+        setError("")
 
-          FUTURE:
-          await authService.login({
-            username,
-            password,
-          })
+        /*
+          SIMPLE TOKEN SESSION
+
+          No authentication.
+          No backend validation.
+
+          Only persist the
+          user_token locally.
         */
+
+        localStorage.setItem(
+          "admin_auth",
+          "true"
+        )
+
+        localStorage.setItem(
+          "admin_user_token",
+          trimmedToken
+        )
 
         await new Promise(
           (resolve) =>
             setTimeout(
               resolve,
-              700
+              400
             )
-        )
-
-        localStorage.setItem(
-          "admin_auth",
-          "true"
         )
 
         onLogin()
@@ -189,7 +208,7 @@ const LoginPage = ({
               text-white
             "
           >
-            Admin Login
+            Admin Access
           </h1>
 
           <p
@@ -201,12 +220,12 @@ const LoginPage = ({
               text-[#8ea59b]
             "
           >
-            Lemon Square AI Dashboard
+            Enter your User ID
           </p>
         </div>
 
-        {/* USERNAME */}
-        <div className="mb-4">
+        {/* USER TOKEN */}
+        <div className="mb-6">
           <label
             className="
               mb-2
@@ -218,18 +237,18 @@ const LoginPage = ({
               text-[#d1d5db]
             "
           >
-            Username
+            User ID
           </label>
 
           <input
             type="text"
-            value={username}
+            value={userToken}
             onChange={(e) =>
-              setUsername(
+              setUserToken(
                 e.target.value
               )
             }
-            placeholder="Enter username"
+            placeholder="Enter User ID"
             className="
               w-full
 
@@ -253,97 +272,20 @@ const LoginPage = ({
               focus:border-[#f5d547]
             "
           />
-        </div>
 
-        {/* PASSWORD */}
-        <div className="mb-6">
-          <label
-            className="
-              mb-2
-              block
-
-              text-sm
-              font-medium
-
-              text-[#d1d5db]
-            "
-          >
-            Password
-          </label>
-
-          <div className="relative">
-            <input
-              type={
-                showPassword
-                  ? "text"
-                  : "password"
-              }
-              value={password}
-              onChange={(e) =>
-                setPassword(
-                  e.target.value
-                )
-              }
-              placeholder="Enter password"
+          {error && (
+            <p
               className="
-                w-full
-
-                rounded-2xl
-
-                border
-                border-[#2a3a33]
-
-                bg-[#151d1b]
-
-                px-4
-                py-3
-                pr-12
+                mt-2
 
                 text-sm
-                text-white
 
-                outline-none
-
-                transition-all
-
-                focus:border-[#f5d547]
-              "
-            />
-
-            <button
-              type="button"
-              onClick={() =>
-                setShowPassword(
-                  !showPassword
-                )
-              }
-              className="
-                absolute
-                right-4
-                top-1/2
-
-                -translate-y-1/2
-
-                text-[#8ea59b]
+                text-red-400
               "
             >
-              {showPassword ? (
-                <EyeOff
-                  className="
-                    h-5
-                    w-5
-                  "
-                />
-              ) : (
-                <Eye
-                  className="
-                    h-5
-                    w-5
-                  "
-                />
-              )}
-            </button>
-          </div>
+              {error}
+            </p>
+          )}
         </div>
 
         {/* LOGIN BUTTON */}
@@ -386,10 +328,10 @@ const LoginPage = ({
                 "
               />
 
-              Signing In...
+              Entering...
             </>
           ) : (
-            "Sign In"
+            "Continue"
           )}
         </button>
       </form>

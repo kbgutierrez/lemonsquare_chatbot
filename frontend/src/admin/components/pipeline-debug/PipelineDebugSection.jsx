@@ -1,6 +1,5 @@
-// FILE: frontend/src/admin/components/pipeline-debug/PipelineDebugSection.jsx
-
 import {
+  useEffect,
   useState,
 } from "react"
 
@@ -40,6 +39,26 @@ const PipelineDebugSection = () => {
     useState(true)
 
   /* ========================================
+     LOAD ADMIN TOKEN
+  ======================================== */
+
+  useEffect(() => {
+
+    const storedToken =
+      localStorage.getItem(
+        "admin_user_token"
+      )
+
+    if (storedToken) {
+
+      setUserToken(
+        storedToken
+      )
+    }
+
+  }, [])
+
+  /* ========================================
      RUN PIPELINE
   ======================================== */
 
@@ -51,6 +70,20 @@ const PipelineDebugSection = () => {
         setLoading(true)
 
         setError("")
+
+        if (!prompt.trim()) {
+
+          throw new Error(
+            "Prompt is required."
+          )
+        }
+
+        if (!userToken.trim()) {
+
+          throw new Error(
+            "User token is missing."
+          )
+        }
 
         const response =
           await pipelineDebugService
