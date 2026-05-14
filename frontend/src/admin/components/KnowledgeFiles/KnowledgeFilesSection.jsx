@@ -10,7 +10,7 @@ import {
 
 import {
   API_CONFIG,
-} from "../../../config/sqlVariables"
+} from "../../../config/sqlVariables.js"
 
 import FileTable from "./FileTable.jsx"
 
