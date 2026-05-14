@@ -303,8 +303,6 @@ const BubbleChat = () => {
 
           will-change-transform
 
-          touch-none
-
           ${
             dragging
               ? ""
@@ -421,7 +419,6 @@ const BubbleChat = () => {
 
             h-16
 
-            touch-none
             select-none
           "
           style={{
@@ -441,23 +438,12 @@ const BubbleChat = () => {
           whileTap={{
             scale: 0.96,
           }}
-          onMouseDown={
+          onPointerDown={
             open
               ? undefined
               : startDrag
           }
-
-          onMouseUp={
-            handlePointerUp
-          }
-
-          onTouchStart={
-            open
-              ? undefined
-              : startDrag
-          }
-
-          onTouchEnd={
+          onPointerUp={
             handlePointerUp
           }
         >

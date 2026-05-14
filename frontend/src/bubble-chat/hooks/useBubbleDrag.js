@@ -1,3 +1,5 @@
+// FILE: frontend/src/bubble-chat/hooks/useBubbleDrag.js
+
 import {
   useEffect,
   useMemo,
@@ -14,7 +16,7 @@ import {
   getSideSnapPosition,
 } from "../utils/snapPosition"
 
-const DRAG_THRESHOLD = 6
+const DRAG_THRESHOLD = 10
 
 export const useBubbleDrag =
   () => {
@@ -198,31 +200,17 @@ export const useBubbleDrag =
                 dragOffset.current.y
             )
 
-          /*
-            TRUE FREE DRAG
-          */
-
           setPosition(
             nextPosition
           )
         }
 
-      const mouseMove =
-        (event) =>
+      const pointerMove =
+        (event) => {
+
           move(
             event.clientX,
             event.clientY
-          )
-
-      const touchMove =
-        (event) => {
-
-          const touch =
-            event.touches[0]
-
-          move(
-            touch.clientX,
-            touch.clientY
           )
         }
 
@@ -231,11 +219,6 @@ export const useBubbleDrag =
 
           pointerDown.current =
             false
-
-          /*
-            SNAP TO NEAREST SIDE
-            AFTER RELEASE
-          */
 
           if (
             moved.current
@@ -283,25 +266,17 @@ export const useBubbleDrag =
         }
 
       window.addEventListener(
-        "mousemove",
-        mouseMove
+        "pointermove",
+        pointerMove
       )
 
       window.addEventListener(
-        "mouseup",
+        "pointerup",
         stopDrag
       )
 
       window.addEventListener(
-        "touchmove",
-        touchMove,
-        {
-          passive: true,
-        }
-      )
-
-      window.addEventListener(
-        "touchend",
+        "pointercancel",
         stopDrag
       )
 
@@ -313,22 +288,17 @@ export const useBubbleDrag =
       return () => {
 
         window.removeEventListener(
-          "mousemove",
-          mouseMove
+          "pointermove",
+          pointerMove
         )
 
         window.removeEventListener(
-          "mouseup",
+          "pointerup",
           stopDrag
         )
 
         window.removeEventListener(
-          "touchmove",
-          touchMove
-        )
-
-        window.removeEventListener(
-          "touchend",
+          "pointercancel",
           stopDrag
         )
 
@@ -351,28 +321,33 @@ export const useBubbleDrag =
     const startDrag =
       (event) => {
 
-        const point =
-          event.touches?.[0] ||
-          event
-
         pointerDown.current =
           true
 
         moved.current =
           false
 
+        /*
+          FIX MOBILE DRAG
+        */
+
+        event.currentTarget
+          ?.setPointerCapture?.(
+            event.pointerId
+          )
+
         startPoint.current = {
-          x: point.clientX,
-          y: point.clientY,
+          x: event.clientX,
+          y: event.clientY,
         }
 
         dragOffset.current = {
           x:
-            point.clientX -
+            event.clientX -
             position.x,
 
           y:
-            point.clientY -
+            event.clientY -
             position.y,
         }
       }

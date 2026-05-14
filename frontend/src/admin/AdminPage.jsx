@@ -1,3 +1,5 @@
+// FILE: frontend/src/admin/AdminPage.jsx
+
 import {
   useEffect,
   useState,
@@ -23,6 +25,9 @@ import ResolvedChatsSection
 
 import ManualEntriesSection
   from "./components/manual-entries/ManualEntriesSection.jsx"
+
+import PipelineDebugSection
+  from "./components/pipeline-debug/PipelineDebugSection.jsx"
 
 const AdminPage = () => {
 
@@ -372,6 +377,11 @@ const AdminPage = () => {
               {activeView ===
                 "tickets" && (
                 <TicketsSection />
+              )}
+
+              {activeView ===
+                "pipeline_debug" && (
+                <PipelineDebugSection />
               )}
 
               {activeView ===

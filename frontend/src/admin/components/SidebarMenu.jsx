@@ -1,3 +1,5 @@
+// FILE: frontend/src/admin/components/SidebarMenu.jsx
+
 import {
   Upload,
   FolderOpen,
@@ -5,6 +7,7 @@ import {
   Ticket,
   FileText,
   MessagesSquare,
+  Activity,
 } from "lucide-react"
 
 const menuItems = [
@@ -36,6 +39,12 @@ const menuItems = [
     id: "tickets",
     label: "Tickets",
     icon: Ticket,
+  },
+
+  {
+    id: "pipeline_debug",
+    label: "Pipeline Debug",
+    icon: Activity,
   },
 
   {
