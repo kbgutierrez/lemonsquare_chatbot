@@ -3,6 +3,11 @@ import {
   useState,
 } from "react"
 
+import {
+  AnimatePresence,
+  motion,
+} from "framer-motion"
+
 import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
 
@@ -144,14 +149,8 @@ const BubbleChat = () => {
           return
         }
 
-        /*
-          Proper backend resolve.
-        */
         await resolveConversation()
 
-        /*
-          Close modal.
-        */
         setActiveModal(null)
 
         console.log(
@@ -177,12 +176,6 @@ const BubbleChat = () => {
   const handleNewChat =
     () => {
 
-      /*
-        Backend history is preserved.
-
-        This only resets the current
-        frontend session state.
-      */
       clearConversation()
 
       setOpen(true)
@@ -203,10 +196,6 @@ const BubbleChat = () => {
       modalId
     ) => {
 
-      /*
-        NEW CHAT
-        No modal needed.
-      */
       if (
         modalId ===
         "new-chat"
@@ -230,7 +219,6 @@ const BubbleChat = () => {
     history: (
       <ChatHistoryModal
         onClose={closeModal}
-
         onLoadConversation={
           handleLoadConversation
         }
@@ -252,7 +240,6 @@ const BubbleChat = () => {
     resolve: (
       <ResolveConversationModal
         onClose={closeModal}
-
         onResolve={
           handleResolveConversation
         }
@@ -270,140 +257,168 @@ const BubbleChat = () => {
     <div
       className="
         pointer-events-none
+
         fixed
         inset-0
-        z-50
+
+        z-[70]
       "
     >
+      {/* BACKDROP */}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            transition={{
+              duration: 0.25,
+            }}
+            className="
+              pointer-events-none
+
+              absolute
+              inset-0
+
+              bg-black/[0.02]
+
+              backdrop-blur-[1px]
+            "
+          />
+        )}
+      </AnimatePresence>
+
       {/* FLOATING */}
-      <div
+      <motion.div
         className={`
           pointer-events-auto
+
           absolute
+
           will-change-transform
-          touch-none
 
           ${
             dragging
-              ? "transition-none"
+              ? ""
               : `
-                transition-transform
+                transition-[left,top]
                 duration-300
                 ease-out
               `
           }
         `}
         style={{
-          transform: `
-            translate3d(
-              ${position.x}px,
-              ${position.y}px,
-              0
-            )
-          `,
+          left: position.x,
+          top: position.y,
         }}
       >
-        {/* CHAT WINDOW */}
-        <div
-          className="
-            absolute
-            z-10
-            overflow-hidden
-            rounded-[30px]
+        {/* WINDOW */}
+        <AnimatePresence>
+          {open && (
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.94,
+                y: 14,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+              }}
+              transition={{
+                duration: 0.24,
+                ease: "easeOut",
+              }}
+              className="
+                absolute
+                z-10
 
-            border
-            border-violet-200/70
+                overflow-hidden
 
-            bg-white/95
-            backdrop-blur-xl
+                rounded-[28px]
+                sm:rounded-[32px]
 
-            shadow-[0_20px_60px_rgba(139,92,246,0.25)]
+                border
+                border-violet-200/70
 
-            transition-all
-            duration-300
-            ease-out
-          "
-          style={{
-            left:
-              isLeftSide
-                ? "18px"
-                : "auto",
+                bg-white/95
 
-            right:
-              !isLeftSide
-                ? "18px"
-                : "auto",
+                shadow-[0_20px_80px_rgba(139,92,246,0.22)]
 
-            top:
-              isTopSide
-                ? "72px"
-                : "auto",
+                backdrop-blur-2xl
+              "
+              style={{
+                left:
+                  isLeftSide
+                    ? 0
+                    : "auto",
 
-            bottom:
-              !isTopSide
-                ? "72px"
-                : "auto",
+                right:
+                  !isLeftSide
+                    ? 0
+                    : "auto",
 
-            width:
-              "min(94vw,380px)",
+                top:
+                  isTopSide
+                    ? "calc(100% + 12px)"
+                    : "auto",
 
-            maxWidth:
-              "calc(100vw - 40px)",
+                bottom:
+                  !isTopSide
+                    ? "calc(100% + 12px)"
+                    : "auto",
 
-            height:
-              "min(520px,calc(100vh - 120px))",
+                width:
+                  "min(96vw,390px)",
 
-            maxHeight:
-              "calc(100vh - 120px)",
+                maxWidth:
+                  "calc(100vw - 24px)",
 
-            opacity:
-              open ? 1 : 0,
+                height:
+                  "min(680px,calc(100dvh - 110px))",
 
-            transform:
-              open
-                ? `
-                  translateY(0)
-                  scale(1)
-                `
-                : `
-                  translateY(12px)
-                  scale(0.96)
-                `,
-
-            pointerEvents:
-              open
-                ? "auto"
-                : "none",
-          }}
-        >
-          <ChatWindow
-            messages={messages}
-
-            loading={loading}
-
-            resolved={resolved}
-
-            onSendMessage={
-              sendMessage
-            }
-
-            onClose={() =>
-              setOpen(false)
-            }
-
-            onOpenModal={
-              handleOpenModal
-            }
-          />
-        </div>
+                maxHeight:
+                  "calc(100dvh - 110px)",
+              }}
+            >
+              <ChatWindow
+                messages={messages}
+                loading={loading}
+                resolved={resolved}
+                onSendMessage={
+                  sendMessage
+                }
+                onClose={() =>
+                  setOpen(false)
+                }
+                onOpenModal={
+                  handleOpenModal
+                }
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* BUBBLE */}
-        <div
+        <motion.div
           className="
             relative
             z-20
+
             h-16
-            touch-none
+
             select-none
           "
           style={{
@@ -420,35 +435,36 @@ const BubbleChat = () => {
                   }px`
                 : 0,
           }}
-          onMouseDown={
-            startDrag
+          whileTap={{
+            scale: 0.96,
+          }}
+          onPointerDown={
+            open
+              ? undefined
+              : startDrag
           }
-          onMouseUp={
-            handlePointerUp
-          }
-          onTouchStart={
-            startDrag
-          }
-          onTouchEnd={
+          onPointerUp={
             handlePointerUp
           }
         >
           <ChatBubble
             isOpen={open}
-
             expandDirection={
               isLeftSide
                 ? "right"
                 : "left"
             }
           />
-        </div>
-      </div>
+        </motion.div>
+      </motion.div>
 
       {/* MODALS */}
       <div
         className="
           pointer-events-auto
+
+          relative
+          z-[120]
         "
       >
         {modals[activeModal]}

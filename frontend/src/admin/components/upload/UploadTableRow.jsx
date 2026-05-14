@@ -21,7 +21,7 @@ const UploadTableRow = ({
         border-[#24312b]
 
         transition-all
-        duration-200
+        duration-300
 
         hover:bg-[#171f1d]
       "
@@ -29,7 +29,6 @@ const UploadTableRow = ({
       {/* FILE */}
       <td className="px-5 py-4">
         <div className="flex items-center gap-3">
-
           {/* FILE ICON */}
           <div
             className="
@@ -62,7 +61,7 @@ const UploadTableRow = ({
           <div className="min-w-0">
             <p
               className="
-                max-w-[240px]
+                max-w-[260px]
                 truncate
 
                 text-sm
@@ -92,6 +91,8 @@ const UploadTableRow = ({
       {/* SIZE */}
       <td
         className="
+          whitespace-nowrap
+
           px-5
           py-4
 
@@ -110,6 +111,8 @@ const UploadTableRow = ({
           className="
             inline-flex
             items-center
+
+            whitespace-nowrap
 
             rounded-xl
 
@@ -143,6 +146,8 @@ const UploadTableRow = ({
       {/* UPLOADED */}
       <td
         className="
+          whitespace-nowrap
+
           px-5
           py-4
 

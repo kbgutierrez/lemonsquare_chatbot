@@ -5,6 +5,8 @@ import {
   Ticket,
   FileText,
   MessagesSquare,
+  Bug,
+  LogOut,
 } from "lucide-react"
 
 const menuItems = [
@@ -39,6 +41,12 @@ const menuItems = [
   },
 
   {
+    id: "pipeline_debug",
+    label: "Pipeline Debug",
+    icon: Bug,
+  },
+
+  {
     id: "ai",
     label: "AI Configuration",
     icon: BrainCircuit,
@@ -48,6 +56,7 @@ const menuItems = [
 const SidebarMenu = ({
   activeView,
   setActiveView,
+  onLogout,
 }) => {
 
   return (
@@ -82,6 +91,7 @@ const SidebarMenu = ({
 
           flex
           items-center
+          justify-between
           gap-3
 
           rounded-2xl
@@ -97,8 +107,79 @@ const SidebarMenu = ({
           sm:py-4
         "
       >
-        {/* LOGO */}
+        {/* LEFT */}
         <div
+          className="
+            flex
+            min-w-0
+            items-center
+            gap-3
+          "
+        >
+          {/* LOGO */}
+          <div
+            className="
+              flex
+              h-10
+              w-10
+              shrink-0
+              items-center
+              justify-center
+
+              rounded-2xl
+
+              bg-[#f5d547]
+            "
+          >
+            <span
+              className="
+                text-sm
+                font-black
+                tracking-wide
+
+                text-[#111917]
+              "
+            >
+              LS
+            </span>
+          </div>
+
+          {/* TEXT */}
+          <div className="min-w-0 flex-1">
+            <h2
+              className="
+                truncate
+
+                text-sm
+                font-bold
+
+                tracking-wide
+
+                text-white
+              "
+            >
+              Lemon Square
+            </h2>
+
+            <p
+              className="
+                mt-0.5
+
+                truncate
+
+                text-xs
+
+                text-[#8ea59b]
+              "
+            >
+              Admin Panel
+            </p>
+          </div>
+        </div>
+
+        {/* LOGOUT */}
+        <button
+          onClick={onLogout}
           className="
             flex
             h-10
@@ -107,55 +188,30 @@ const SidebarMenu = ({
             items-center
             justify-center
 
-            rounded-2xl
+            rounded-xl
 
-            bg-[#f5d547]
+            border
+            border-[#2d3b35]
+
+            bg-[#1a2320]
+
+            text-[#c6d1cc]
+
+            transition-all
+            duration-200
+
+            hover:border-red-500/40
+            hover:bg-red-500/10
+            hover:text-red-300
           "
         >
-          <span
+          <LogOut
             className="
-              text-sm
-              font-black
-              tracking-wide
-
-              text-[#111917]
+              h-4
+              w-4
             "
-          >
-            LS
-          </span>
-        </div>
-
-        {/* TEXT */}
-        <div className="min-w-0 flex-1">
-          <h2
-            className="
-              truncate
-
-              text-sm
-              font-bold
-
-              tracking-wide
-
-              text-white
-            "
-          >
-            Lemon Square
-          </h2>
-
-          <p
-            className="
-              mt-0.5
-
-              truncate
-
-              text-xs
-
-              text-[#8ea59b]
-            "
-          >
-            Admin Panel
-          </p>
-        </div>
+          />
+        </button>
       </div>
 
       {/* NAV LABEL */}

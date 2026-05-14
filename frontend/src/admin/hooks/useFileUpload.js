@@ -244,13 +244,9 @@ export const useFileUpload =
             setUploadedFiles(
               (prev) => {
 
-                refreshPendingState(
-                  prev
-                )
+                refreshPendingState(prev)
 
-                return [
-                  ...prev,
-                ]
+                return prev
               }
             )
           }
