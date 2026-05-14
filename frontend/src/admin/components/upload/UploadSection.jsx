@@ -19,6 +19,10 @@ const UploadSection = () => {
     hasPendingUploads,
     showTable,
 
+    categories,
+    selectedCategory,
+    setSelectedCategory,
+
     handleInputChange,
     handleDrop,
 
@@ -85,6 +89,18 @@ const UploadSection = () => {
               hasPendingUploads={
                 hasPendingUploads
               }
+
+              categories={
+                categories
+              }
+
+              selectedCategory={
+                selectedCategory
+              }
+
+              setSelectedCategory={
+                setSelectedCategory
+              }
             />
           </div>
         </div>
@@ -134,6 +150,18 @@ const UploadSection = () => {
 
               hasPendingUploads={
                 hasPendingUploads
+              }
+
+              categories={
+                categories
+              }
+
+              selectedCategory={
+                selectedCategory
+              }
+
+              setSelectedCategory={
+                setSelectedCategory
               }
             />
           </div>

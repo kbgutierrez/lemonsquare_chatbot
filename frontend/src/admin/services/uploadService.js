@@ -83,6 +83,13 @@ const uploadRequest =
         formData.get("file")
       )
 
+      console.log(
+        "UPLOAD_CATEGORY",
+        formData.get(
+          "category"
+        )
+      )
+
       const response =
         await fetch(
           endpoint,
@@ -193,7 +200,10 @@ const uploadRequest =
 ======================================== */
 
 export const uploadDocument =
-  async (file) => {
+  async (
+    file,
+    category
+  ) => {
 
     validateFile(
       file
@@ -206,6 +216,14 @@ export const uploadDocument =
       "file",
       file
     )
+
+    if (category) {
+
+      formData.append(
+        "category",
+        category
+      )
+    }
 
     const endpoint =
       buildApiUrl(

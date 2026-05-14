@@ -1,345 +1,196 @@
 import {
-  useEffect,
-  useMemo,
   useState,
 } from "react"
 
 import {
-  Search,
   FileText,
-  Plus,
-  X,
 } from "lucide-react"
 
-import {
-  API_CONFIG,
-} from "../../../config/sqlVariables"
+import useManualEntries
+  from "./hooks/useManualEntries"
 
-const API_URL =
-  `${API_CONFIG.BASE_URL}/self_knowledge?filter_type=general_text`
+import ManualEntriesHeader
+  from "./components/ManualEntriesHeader"
 
-const CREATE_URL =
-  `${API_CONFIG.BASE_URL}/documents/manual`
+import ManualEntryTabs
+  from "./components/ManualEntryTabs"
 
-const ITEMS_PER_PAGE = 6
+import ManualEntryCard
+  from "./components/ManualEntryCard"
+
+import ManualEntriesPagination
+  from "./components/ManualEntriesPagination"
+
+import ManualEntryModal
+  from "./components/ManualEntryModal"
 
 const ManualEntriesSection =
   () => {
 
-    const [items, setItems] =
-      useState([])
+    const [
+      showModal,
+      setShowModal,
+    ] = useState(false)
 
-    const [loading, setLoading] =
-      useState(true)
+    const [
+      editingEntry,
+      setEditingEntry,
+    ] = useState(null)
 
-    const [search, setSearch] =
-      useState("")
+    const {
+      loading,
+      submitting,
+      error,
+      successMessage,
 
-    const [page, setPage] =
-      useState(1)
+      search,
+      setSearch,
 
-    const [showModal, setShowModal] =
-      useState(false)
+      page,
+      setPage,
 
-    const [submitting, setSubmitting] =
-      useState(false)
+      categories,
 
-    const [form, setForm] =
-      useState({
-        title: "",
-        category: "",
-        content: "",
-      })
+      activeCategory,
+      setActiveCategory,
 
-    const loadData =
-      async () => {
+      paginatedItems,
 
-        try {
+      totalPages,
 
-          setLoading(true)
+      handleCreateEntry,
+      handleUpdateEntry,
+      handleDeleteEntry,
+    } =
+      useManualEntries()
 
-          const response =
-            await fetch(
-              API_URL
-            )
+    /* ========================================
+       OPEN CREATE MODAL
+    ======================================== */
 
-          const data =
-            await response.json()
+    const openCreateModal =
+      () => {
 
-          setItems(data)
-
-        } catch (error) {
-
-          console.error(
-            "MANUAL_ENTRIES_ERROR",
-            error
-          )
-
-        } finally {
-
-          setLoading(false)
-        }
-      }
-
-    useEffect(() => {
-
-      loadData()
-
-    }, [])
-
-    const filtered =
-      useMemo(() => {
-
-        return items.filter(
-          (item) =>
-            item.content
-              ?.toLowerCase()
-              .includes(
-                search.toLowerCase()
-              )
+        setEditingEntry(
+          null
         )
 
-      }, [items, search])
+        setShowModal(
+          true
+        )
+      }
 
-    const totalPages =
-      Math.ceil(
-        filtered.length /
-          ITEMS_PER_PAGE
-      )
+    /* ========================================
+       OPEN EDIT MODAL
+    ======================================== */
 
-    const paginatedItems =
-      filtered.slice(
-        (page - 1) *
-          ITEMS_PER_PAGE,
+    const openEditModal =
+      (item) => {
 
-        page *
-          ITEMS_PER_PAGE
-      )
+        console.log(
+          "OPEN_EDIT_MODAL_ITEM",
+          item
+        )
 
-    const createEntry =
-      async () => {
+        setEditingEntry(
+          item
+        )
 
-        if (
-          !form.title.trim() ||
-          !form.content.trim()
-        ) {
-          return
-        }
-
-        try {
-
-          setSubmitting(true)
-
-          const response =
-            await fetch(
-              CREATE_URL,
-              {
-                method: "POST",
-
-                headers: {
-                  "Content-Type":
-                    "application/json",
-                },
-
-                body:
-                  JSON.stringify(
-                    form
-                  ),
-              }
-            )
-
-          if (
-            !response.ok
-          ) {
-
-            throw new Error(
-              "Failed to create entry"
-            )
-          }
-
-          setShowModal(
-            false
-          )
-
-          setForm({
-            title: "",
-            category: "",
-            content: "",
-          })
-
-          await loadData()
-
-        } catch (error) {
-
-          console.error(
-            "CREATE_ENTRY_ERROR",
-            error
-          )
-
-        } finally {
-
-          setSubmitting(false)
-        }
+        setShowModal(
+          true
+        )
       }
 
     return (
       <div className="flex h-full flex-col gap-5">
 
         {/* HEADER */}
-        <div
-          className="
-            flex
-            flex-wrap
-            items-center
-            justify-between
+        <ManualEntriesHeader
+          search={search}
+          setSearch={
+            setSearch
+          }
+          setShowModal={
+            openCreateModal
+          }
+        />
 
-            gap-4
-          "
-        >
-          <div>
-            <h1
-              className="
-                text-2xl
-                font-bold
+        {/* CATEGORY TABS */}
+        <ManualEntryTabs
+          categories={
+            categories
+          }
+          activeCategory={
+            activeCategory
+          }
+          setActiveCategory={
+            setActiveCategory
+          }
+          setPage={
+            setPage
+          }
+        />
 
-                text-white
-              "
-            >
-              Manual Entries
-            </h1>
-
-            <p
-              className="
-                mt-1
-
-                text-sm
-
-                text-[#8ea59b]
-              "
-            >
-              Custom AI operational
-              rules and manually fed
-              knowledge.
-            </p>
+        {/* SUCCESS */}
+        {successMessage && (
+          <div
+            className="
+              rounded-2xl
+              border
+              border-emerald-500/20
+              bg-emerald-500/10
+              px-4
+              py-3
+              text-sm
+              text-emerald-300
+            "
+          >
+            {successMessage}
           </div>
+        )}
 
-          <div className="flex items-center gap-3">
-
-            {/* SEARCH */}
-            <div
-              className="
-                flex
-                w-full
-                items-center
-                gap-3
-
-                rounded-2xl
-
-                border
-                border-[#2d3b35]
-
-                bg-[#18211f]
-
-                px-4
-                py-3
-
-                sm:w-[300px]
-              "
-            >
-              <Search
-                className="
-                  h-4
-                  w-4
-
-                  text-[#70847b]
-                "
-              />
-
-              <input
-                value={search}
-                onChange={(e) =>
-                  setSearch(
-                    e.target.value
-                  )
-                }
-                placeholder="Search entries..."
-                className="
-                  w-full
-                  bg-transparent
-                  text-sm
-                  text-white
-                  outline-none
-                  placeholder:text-[#70847b]
-                "
-              />
-            </div>
-
-            {/* ADD BUTTON */}
-            <button
-              onClick={() =>
-                setShowModal(
-                  true
-                )
-              }
-              className="
-                flex
-                items-center
-                gap-2
-
-                rounded-2xl
-
-                bg-[#f5d547]
-
-                px-5
-                py-3
-
-                text-sm
-                font-semibold
-
-                text-[#111917]
-
-                transition-all
-                duration-200
-
-                hover:scale-[1.02]
-              "
-            >
-              <Plus className="h-4 w-4" />
-              Add Entry
-            </button>
+        {/* ERROR */}
+        {error && (
+          <div
+            className="
+              rounded-2xl
+              border
+              border-red-500/20
+              bg-red-500/10
+              px-4
+              py-3
+              text-sm
+              text-red-300
+            "
+          >
+            {error}
           </div>
-        </div>
+        )}
 
         {/* CONTENT */}
         <div
           className="
             flex-1
             overflow-auto
-
             rounded-[28px]
-
             border
             border-[#26332d]
-
             bg-[#121a18]
-
             p-5
           "
         >
+
           {loading ? (
             <div className="flex h-full items-center justify-center">
               <div
                 className="
                   h-10
                   w-10
-
+                  animate-spin
                   rounded-full
-
                   border-2
                   border-[#f5d547]/20
                   border-t-[#f5d547]
-
-                  animate-spin
                 "
               />
             </div>
@@ -352,10 +203,8 @@ const ManualEntriesSection =
                   className="
                     mx-auto
                     mb-4
-
                     h-10
                     w-10
-
                     text-[#f5d547]
                   "
                 />
@@ -364,7 +213,6 @@ const ManualEntriesSection =
                   className="
                     text-lg
                     font-semibold
-
                     text-white
                   "
                 >
@@ -374,73 +222,33 @@ const ManualEntriesSection =
             </div>
           ) : (
             <div className="grid gap-4">
+
               {paginatedItems.map(
                 (item) => (
-                  <div
-                    key={item.id}
-                    className="
-                      rounded-3xl
 
-                      border
-                      border-[#26332d]
+                  <ManualEntryCard
+                    key={
+                      item.id
+                    }
 
-                      bg-[#18211f]
+                    item={item}
 
-                      p-5
-                    "
-                  >
-                    <div
-                      className="
-                        mb-3
+                    submitting={
+                      submitting
+                    }
 
-                        flex
-                        flex-wrap
-                        items-center
-                        gap-3
-                      "
-                    >
-                      <span
-                        className="
-                          rounded-2xl
+                    handleUpdateEntry={
+                      handleUpdateEntry
+                    }
 
-                          bg-[#95c11f]/10
+                    handleDeleteEntry={
+                      handleDeleteEntry
+                    }
 
-                          px-3
-                          py-1
-
-                          text-xs
-                          font-semibold
-
-                          text-[#95c11f]
-                        "
-                      >
-                        {item.category}
-                      </span>
-
-                      <span
-                        className="
-                          text-xs
-
-                          text-[#8ea59b]
-                        "
-                      >
-                        {item.source}
-                      </span>
-                    </div>
-
-                    <p
-                      className="
-                        whitespace-pre-wrap
-
-                        text-sm
-                        leading-relaxed
-
-                        text-[#d7e0dc]
-                      "
-                    >
-                      {item.content}
-                    </p>
-                  </div>
+                    openEditModal={
+                      openEditModal
+                    }
+                  />
                 )
               )}
             </div>
@@ -448,251 +256,52 @@ const ManualEntriesSection =
         </div>
 
         {/* PAGINATION */}
-        {totalPages > 1 && (
-          <div
-            className="
-              flex
-              items-center
-              justify-center
-
-              gap-2
-            "
-          >
-            {Array.from(
-              {
-                length:
-                  totalPages,
-              },
-              (_, i) =>
-                i + 1
-            ).map((number) => (
-              <button
-                key={number}
-                onClick={() =>
-                  setPage(
-                    number
-                  )
-                }
-                className={`
-                  h-10
-                  w-10
-
-                  rounded-xl
-
-                  text-sm
-                  font-semibold
-
-                  transition-all
-
-                  ${
-                    page ===
-                    number
-                      ? `
-                        bg-[#f5d547]
-                        text-[#111917]
-                      `
-                      : `
-                        bg-[#18211f]
-                        text-white
-
-                        hover:bg-[#202b27]
-                      `
-                  }
-                `}
-              >
-                {number}
-              </button>
-            ))}
-          </div>
-        )}
+        <ManualEntriesPagination
+          page={page}
+          setPage={
+            setPage
+          }
+          totalPages={
+            totalPages
+          }
+        />
 
         {/* MODAL */}
-        {showModal && (
-          <div
-            className="
-              fixed
-              inset-0
-              z-50
+        <ManualEntryModal
+          showModal={
+            showModal
+          }
 
-              flex
-              items-center
-              justify-center
+          setShowModal={
+            setShowModal
+          }
 
-              bg-black/50
+          categories={
+            categories
+          }
 
-              p-4
-            "
-          >
-            <div
-              className="
-                w-full
-                max-w-2xl
+          submitting={
+            submitting
+          }
 
-                rounded-[32px]
+          error={error}
 
-                border
-                border-[#2a3a33]
+          handleCreateEntry={
+            handleCreateEntry
+          }
 
-                bg-[#111917]
+          handleUpdateEntry={
+            handleUpdateEntry
+          }
 
-                p-6
-              "
-            >
-              <div
-                className="
-                  mb-6
+          handleDeleteEntry={
+            handleDeleteEntry
+          }
 
-                  flex
-                  items-center
-                  justify-between
-                "
-              >
-                <h2
-                  className="
-                    text-xl
-                    font-bold
-
-                    text-white
-                  "
-                >
-                  Add Manual Entry
-                </h2>
-
-                <button
-                  onClick={() =>
-                    setShowModal(
-                      false
-                    )
-                  }
-                >
-                  <X className="text-white" />
-                </button>
-              </div>
-
-              <div className="space-y-4">
-
-                <input
-                  placeholder="Title"
-                  value={form.title}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      title:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-[#2d3b35]
-
-                    bg-[#18211f]
-
-                    px-4
-                    py-3
-
-                    text-white
-
-                    outline-none
-                  "
-                />
-
-                <input
-                  placeholder="Category (Optional)"
-                  value={
-                    form.category
-                  }
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      category:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-[#2d3b35]
-
-                    bg-[#18211f]
-
-                    px-4
-                    py-3
-
-                    text-white
-
-                    outline-none
-                  "
-                />
-
-                <textarea
-                  rows={8}
-                  placeholder="Knowledge content..."
-                  value={form.content}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      content:
-                        e.target
-                          .value,
-                    })
-                  }
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    border-[#2d3b35]
-
-                    bg-[#18211f]
-
-                    px-4
-                    py-3
-
-                    text-white
-
-                    outline-none
-                  "
-                />
-
-                <button
-                  onClick={
-                    createEntry
-                  }
-                  disabled={
-                    submitting
-                  }
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    bg-[#f5d547]
-
-                    py-3
-
-                    font-semibold
-
-                    text-[#111917]
-                  "
-                >
-                  {submitting
-                    ? "Creating..."
-                    : "Create Entry"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+          editingEntry={
+            editingEntry
+          }
+        />
       </div>
     )
   }

@@ -1,4 +1,6 @@
 import {
+  useEffect,
+  useRef,
   useState,
 } from "react"
 
@@ -8,6 +10,8 @@ import {
   Plus,
   X,
   Sparkles,
+  ChevronDown,
+  Check,
 } from "lucide-react"
 
 const UploadDropzone = ({
@@ -18,10 +22,22 @@ const UploadDropzone = ({
   clearFiles,
   confirmUpload,
   hasPendingUploads,
+
+  categories = [],
+  selectedCategory = "",
+  setSelectedCategory,
 }) => {
 
   const [isDragging, setIsDragging] =
     useState(false)
+
+  const [
+    dropdownOpen,
+    setDropdownOpen,
+  ] = useState(false)
+
+  const dropdownRef =
+    useRef(null)
 
   const hasFiles =
     uploadedFiles.length > 0
@@ -51,6 +67,274 @@ const UploadDropzone = ({
     }
 
   /* =========================================
+     OUTSIDE CLICK
+  ========================================= */
+
+  useEffect(() => {
+
+    const handleClickOutside =
+      (event) => {
+
+        if (
+          dropdownRef.current &&
+          !dropdownRef.current.contains(
+            event.target
+          )
+        ) {
+
+          setDropdownOpen(
+            false
+          )
+        }
+      }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    )
+
+    return () => {
+
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      )
+    }
+
+  }, [])
+
+  const categoryLabel =
+    selectedCategory ||
+    "Auto Detect Category"
+
+  /* =========================================
+     CATEGORY SELECTOR
+  ========================================= */
+
+  const CategorySelector =
+    () => (
+      <div
+        ref={dropdownRef}
+        className="
+          relative
+          w-full
+          max-w-[320px]
+        "
+      >
+        <button
+          type="button"
+          onClick={() =>
+            setDropdownOpen(
+              (prev) =>
+                !prev
+            )
+          }
+          className="
+            flex
+            h-12
+            w-full
+            items-center
+            justify-between
+
+            rounded-2xl
+
+            border
+            border-[#2f3c36]
+
+            bg-[#1a2320]
+
+            px-4
+
+            text-left
+            text-sm
+            text-white
+
+            transition-all
+            duration-300
+
+            hover:border-[#46544e]
+          "
+        >
+          <span
+            className={
+              selectedCategory
+                ? "text-white"
+                : "text-[#8ea59b]"
+            }
+          >
+            {categoryLabel}
+          </span>
+
+          <ChevronDown
+            className={`
+              h-4
+              w-4
+
+              text-[#8ea59b]
+
+              transition-transform
+              duration-300
+
+              ${
+                dropdownOpen
+                  ? "rotate-180"
+                  : ""
+              }
+            `}
+          />
+        </button>
+
+        {/* DROPDOWN */}
+        <div
+          className={`
+            absolute
+            left-0
+            right-0
+            top-[calc(100%+10px)]
+            z-50
+
+            overflow-hidden
+
+            rounded-2xl
+
+            border
+            border-[#2d3b35]
+
+            bg-[#18211f]
+
+            shadow-[0_20px_60px_rgba(0,0,0,0.45)]
+
+            transition-all
+            duration-300
+
+            ${
+              dropdownOpen
+                ? `
+                  pointer-events-auto
+                  translate-y-0
+                  opacity-100
+                `
+                : `
+                  pointer-events-none
+                  -translate-y-2
+                  opacity-0
+                `
+            }
+          `}
+        >
+
+          {/* AUTO DETECT */}
+          <button
+            type="button"
+            onClick={() => {
+
+              setSelectedCategory(
+                ""
+              )
+
+              setDropdownOpen(
+                false
+              )
+            }}
+            className="
+              flex
+              w-full
+              items-center
+              justify-between
+
+              border-b
+              border-[#22302b]
+
+              px-4
+              py-3
+
+              text-sm
+              text-white
+
+              hover:bg-[#202b27]
+            "
+          >
+            <span>
+              Auto Detect Category
+            </span>
+
+            {!selectedCategory && (
+              <Check
+                className="
+                  h-4
+                  w-4
+                  text-[#f5d547]
+                "
+              />
+            )}
+          </button>
+
+          {/* CATEGORIES */}
+          <div
+            className="
+              max-h-[240px]
+              overflow-y-auto
+            "
+          >
+            {categories.map(
+              (category) => {
+
+                const active =
+                  selectedCategory ===
+                  category
+
+                return (
+                  <button
+                    key={category}
+                    type="button"
+                    onClick={() => {
+
+                      setSelectedCategory(
+                        category
+                      )
+
+                      setDropdownOpen(
+                        false
+                      )
+                    }}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      justify-between
+
+                      px-4
+                      py-3
+
+                      text-sm
+                      text-white
+
+                      hover:bg-[#202b27]
+                    "
+                  >
+                    <span>
+                      {category}
+                    </span>
+
+                    {active && (
+                      <Check
+                        className="
+                          h-4
+                          w-4
+                          text-[#f5d547]
+                        "
+                      />
+                    )}
+                  </button>
+                )
+              }
+            )}
+          </div>
+        </div>
+      </div>
+    )
+
+  /* =========================================
      COMPACT MODE
   ========================================= */
 
@@ -60,26 +344,19 @@ const UploadDropzone = ({
       <div
         className="
           relative
-
           overflow-hidden
-
           rounded-[24px]
           md:rounded-[28px]
-
           border
           border-[#26332d]
-
           bg-[#121a18]
-
           p-4
           sm:p-5
         "
       >
-        {/* BACKGROUND */}
         <div
           className="
             pointer-events-none
-
             absolute
             inset-0
           "
@@ -89,21 +366,17 @@ const UploadDropzone = ({
               absolute
               right-[-40px]
               top-[-40px]
-
               h-40
               w-40
-
               rounded-full
-
               bg-[#d8b93d]/[0.04]
-
               blur-3xl
             "
           />
         </div>
 
-        {/* CONTENT */}
         <div className="relative z-10">
+
           {/* TOP */}
           <div
             className="
@@ -116,7 +389,6 @@ const UploadDropzone = ({
               lg:justify-between
             "
           >
-            {/* LEFT */}
             <div
               className="
                 flex
@@ -125,7 +397,6 @@ const UploadDropzone = ({
                 sm:gap-4
               "
             >
-              {/* ICON */}
               <div
                 className="
                   flex
@@ -134,12 +405,9 @@ const UploadDropzone = ({
                   shrink-0
                   items-center
                   justify-center
-
                   rounded-2xl
-
                   border
                   border-[#2f3c36]
-
                   bg-[#1a2320]
                 "
               >
@@ -147,13 +415,11 @@ const UploadDropzone = ({
                   className="
                     h-6
                     w-6
-
                     text-[#d8b93d]
                   "
                 />
               </div>
 
-              {/* TEXT */}
               <div className="min-w-0">
                 <div
                   className="
@@ -167,7 +433,6 @@ const UploadDropzone = ({
                     className="
                       text-lg
                       font-semibold
-
                       text-white
                     "
                   >
@@ -179,23 +444,16 @@ const UploadDropzone = ({
                       inline-flex
                       items-center
                       gap-1
-
                       rounded-full
-
                       border
                       border-[#3b4b44]
-
                       bg-[#1b2522]
-
                       px-2.5
                       py-1
-
                       text-[10px]
                       font-semibold
                       uppercase
-
                       tracking-[0.16em]
-
                       text-[#cbd7d2]
                     "
                   >
@@ -208,10 +466,8 @@ const UploadDropzone = ({
                 <p
                   className="
                     mt-1
-
                     text-sm
                     leading-relaxed
-
                     text-[#8ea59b]
                   "
                 >
@@ -222,20 +478,15 @@ const UploadDropzone = ({
               </div>
             </div>
 
-            {/* STATUS */}
             <div
               className="
                 inline-flex
                 w-fit
                 flex-col
-
                 rounded-2xl
-
                 border
                 border-[#2f3c36]
-
                 bg-[#1a2320]
-
                 px-4
                 py-3
               "
@@ -245,9 +496,7 @@ const UploadDropzone = ({
                   text-[10px]
                   font-semibold
                   uppercase
-
                   tracking-[0.18em]
-
                   text-[#73867d]
                 "
               >
@@ -257,10 +506,8 @@ const UploadDropzone = ({
               <p
                 className="
                   mt-1
-
                   text-sm
                   font-semibold
-
                   text-white
                 "
               >
@@ -269,20 +516,22 @@ const UploadDropzone = ({
             </div>
           </div>
 
+          {/* CATEGORY */}
+          <div className="mt-5">
+            <CategorySelector />
+          </div>
+
           {/* ACTIONS */}
           <div
             className="
               mt-5
-
               flex
               flex-col
               gap-3
-
               sm:flex-row
               sm:flex-wrap
             "
           >
-            {/* CONFIRM */}
             {hasPendingUploads && (
               <button
                 onClick={
@@ -293,27 +542,18 @@ const UploadDropzone = ({
                   h-12
                   items-center
                   justify-center
-
                   rounded-2xl
-
                   border
                   border-[#d8b93d]/20
-
                   bg-[#d8b93d]
-
                   px-5
-
                   text-sm
                   font-semibold
-
                   text-[#111917]
-
                   transition-all
                   duration-300
-
                   hover:scale-[1.01]
                   hover:bg-[#e6c84c]
-
                   active:scale-[0.99]
                 "
               >
@@ -321,7 +561,6 @@ const UploadDropzone = ({
               </button>
             )}
 
-            {/* ADD FILES */}
             <button
               onClick={() =>
                 inputRef.current.click()
@@ -332,24 +571,16 @@ const UploadDropzone = ({
                 items-center
                 justify-center
                 gap-2
-
                 rounded-2xl
-
                 border
                 border-[#2f3c36]
-
                 bg-[#1a2320]
-
                 px-5
-
                 text-sm
                 font-medium
-
                 text-[#d4dfda]
-
                 transition-all
                 duration-300
-
                 hover:border-[#46544e]
                 hover:bg-[#202b27]
               "
@@ -359,7 +590,6 @@ const UploadDropzone = ({
               Add Files
             </button>
 
-            {/* CANCEL */}
             <button
               onClick={
                 clearFiles
@@ -370,24 +600,16 @@ const UploadDropzone = ({
                 items-center
                 justify-center
                 gap-2
-
                 rounded-2xl
-
                 border
                 border-[#432828]
-
                 bg-[#231818]
-
                 px-5
-
                 text-sm
                 font-medium
-
                 text-[#ffb4b4]
-
                 transition-all
                 duration-300
-
                 hover:bg-[#2d1d1d]
               "
             >
@@ -398,7 +620,6 @@ const UploadDropzone = ({
           </div>
         </div>
 
-        {/* INPUT */}
         <input
           ref={inputRef}
           type="file"
@@ -429,19 +650,14 @@ const UploadDropzone = ({
       className={`
         group
         relative
-
         overflow-hidden
-
         rounded-[28px]
         md:rounded-[32px]
-
         border-2
         border-dashed
-
         p-6
         sm:p-8
         md:p-12
-
         transition-all
         duration-300
 
@@ -449,32 +665,24 @@ const UploadDropzone = ({
           isDragging
             ? `
               scale-[1.01]
-
               border-[#d8b93d]
-
               bg-[#1a241f]
-
               shadow-[0_0_0_4px_rgba(216,185,61,0.08)]
             `
             : `
               border-[#2c3b35]
-
               bg-[#141c1a]
-
               hover:border-[#44524c]
               hover:bg-[#17211e]
             `
         }
       `}
     >
-      {/* BACKGROUND */}
       <div
         className="
           pointer-events-none
-
           absolute
           inset-0
-
           overflow-hidden
         "
       >
@@ -483,17 +691,12 @@ const UploadDropzone = ({
             absolute
             left-1/2
             top-1/2
-
             h-72
             w-72
-
             -translate-x-1/2
             -translate-y-1/2
-
             rounded-full
-
             blur-3xl
-
             transition-all
             duration-500
 
@@ -510,50 +713,39 @@ const UploadDropzone = ({
         />
       </div>
 
-      {/* CONTENT */}
       <div
         className="
           relative
           z-10
-
           flex
           flex-col
           items-center
           justify-center
-
           text-center
         "
       >
-        {/* ICON */}
         <div
           className={`
             mb-5
-
             flex
             h-20
             w-20
             items-center
             justify-center
-
             rounded-[28px]
-
             border
-
             transition-all
             duration-500
-
             group-hover:scale-[1.02]
 
             ${
               isDragging
                 ? `
                   border-[#d8b93d]/40
-
                   bg-[#d8b93d]/15
                 `
                 : `
                   border-[#2f3c36]
-
                   bg-[#1a2320]
                 `
             }
@@ -565,7 +757,6 @@ const UploadDropzone = ({
                 className="
                   h-9
                   w-9
-
                   text-[#d8b93d]
                 "
               />
@@ -575,23 +766,18 @@ const UploadDropzone = ({
                 className="
                   h-8
                   w-8
-
                   text-[#d6e2dc]
                 "
               />
             )}
         </div>
 
-        {/* TITLE */}
         <h2
           className="
             text-2xl
             font-bold
-
             tracking-tight
-
             text-white
-
             sm:text-3xl
           "
         >
@@ -600,18 +786,13 @@ const UploadDropzone = ({
             : "Upload Files"}
         </h2>
 
-        {/* DESCRIPTION */}
         <p
           className="
             mt-3
-
             max-w-xl
-
             text-sm
             leading-relaxed
-
             text-[#8ea59b]
-
             sm:text-base
           "
         >
@@ -621,61 +802,50 @@ const UploadDropzone = ({
           knowledge base.
         </p>
 
-        {/* BUTTON */}
+        {/* CATEGORY */}
+        <div className="mt-6 w-full flex justify-center">
+          <CategorySelector />
+        </div>
+
         <button
           onClick={() =>
             inputRef.current.click()
           }
           className="
             mt-8
-
             flex
             h-12
             items-center
             justify-center
-
             rounded-2xl
-
             border
             border-[#d8b93d]/20
-
             bg-[#d8b93d]
-
             px-6
-
             text-sm
             font-semibold
-
             text-[#111917]
-
             transition-all
             duration-300
-
             hover:scale-[1.02]
             hover:bg-[#e6c84c]
-
             active:scale-[0.99]
           "
         >
           Choose Files
         </button>
 
-        {/* FOOTER */}
         <p
           className="
             mt-4
-
             text-xs
-
             tracking-wide
-
             text-[#6f847b]
           "
         >
           Supported format: PDF
         </p>
 
-        {/* INPUT */}
         <input
           ref={inputRef}
           type="file"
