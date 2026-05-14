@@ -21,7 +21,7 @@ import UploadSection
   from "./components/upload/UploadSection.jsx"
 
 import KnowledgeFilesSection
-  from "./components/Knowledge FIles/KnowledgeFilesSection.jsx"
+  from "./components/KnowledgeFiles/KnowledgeFilesSection.jsx"
 
 import TicketsSection
   from "./components/tickets/TicketsSection.jsx"
@@ -41,29 +41,34 @@ const AdminPage = () => {
      AUTH
   ======================================== */
 
-  const [isAuthenticated,
-    setIsAuthenticated] =
-    useState(false)
+  const [
+    isAuthenticated,
+    setIsAuthenticated,
+  ] = useState(false)
 
   /* ========================================
      UI STATE
   ======================================== */
 
-  const [activeView,
-    setActiveView] =
-    useState("upload")
+  const [
+    activeView,
+    setActiveView,
+  ] = useState("upload")
 
-  const [sidebarWidth,
-    setSidebarWidth] =
-    useState(280)
+  const [
+    sidebarWidth,
+    setSidebarWidth,
+  ] = useState(280)
 
-  const [isResizing,
-    setIsResizing] =
-    useState(false)
+  const [
+    isResizing,
+    setIsResizing,
+  ] = useState(false)
 
-  const [mobileSidebarOpen,
-    setMobileSidebarOpen] =
-    useState(false)
+  const [
+    mobileSidebarOpen,
+    setMobileSidebarOpen,
+  ] = useState(false)
 
   /* ========================================
      CHECK AUTH
@@ -203,12 +208,15 @@ const AdminPage = () => {
       {/* MOBILE SIDEBAR */}
       <MobileSidebar
         open={mobileSidebarOpen}
+
         setOpen={
           setMobileSidebarOpen
         }
+
         activeView={
           activeView
         }
+
         setActiveView={
           setActiveView
         }

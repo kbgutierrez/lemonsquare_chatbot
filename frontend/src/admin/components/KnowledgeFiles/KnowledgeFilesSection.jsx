@@ -1,203 +1,50 @@
 import {
-  useEffect,
-  useMemo,
-  useState,
+  useRef,
 } from "react"
 
 import {
   Search,
 } from "lucide-react"
 
+import FileTable
+  from "./FileTable"
+
 import {
-  API_CONFIG,
-} from "../../../config/sqlVariables.js"
+  useKnowledgeFiles,
+} from "./hooks/useKnowledgeFiles"
 
-import FileTable from "./FileTable.jsx"
-
-const API_URL =
-  `${API_CONFIG.BASE_URL}/documents`
+import {
+  useHorizontalDragScroll,
+} from "../../hooks/useHorizontalDragScroll"
 
 const KnowledgeFilesSection =
   () => {
 
-    const [
+    const {
+      loading,
+
+      search,
+      setSearch,
+
       selectedCategory,
       setSelectedCategory,
-    ] = useState("all")
 
-    const [files, setFiles] =
-      useState([])
+      dynamicCategories,
 
-    const [loading, setLoading] =
-      useState(true)
+      allCategories,
 
-    const [search, setSearch] =
-      useState("")
+      filteredFiles,
 
-    /* LOAD FILES */
-    useEffect(() => {
+      handleDelete,
+      handleUpdate,
+    } = useKnowledgeFiles()
 
-      const loadFiles =
-        async () => {
+    const tabsRef =
+      useRef(null)
 
-          try {
-
-            setLoading(true)
-
-            const response =
-              await fetch(
-                API_URL
-              )
-
-            if (
-              !response.ok
-            ) {
-
-              throw new Error(
-                "Failed to load documents"
-              )
-            }
-
-            const data =
-              await response.json()
-
-            setFiles(data)
-
-          } catch (error) {
-
-            console.error(
-              "LOAD_DOCUMENTS_ERROR",
-              error
-            )
-
-          } finally {
-
-            setLoading(false)
-          }
-        }
-
-      loadFiles()
-
-    }, [])
-
-    /* DYNAMIC CATEGORY TABS */
-    const dynamicCategories =
-      useMemo(() => {
-
-        const uniqueCategories =
-          [
-            ...new Set(
-              files
-                .map(
-                  (file) =>
-                    file.category
-                )
-                .filter(Boolean)
-            ),
-          ]
-
-        return uniqueCategories.map(
-          (category) => ({
-            id: category,
-            name: category
-              .replaceAll(
-                "_",
-                " "
-              ),
-          })
-        )
-
-      }, [files])
-
-    /* TOGGLE ACTIVE / BLOCK */
-    const toggleFile =
-      async (
-        documentId,
-        currentState
-      ) => {
-
-        try {
-
-          await fetch(
-            `${API_URL}/${documentId}`,
-            {
-              method:
-                "PATCH",
-
-              headers: {
-                "Content-Type":
-                  "application/json",
-              },
-
-              body:
-                JSON.stringify(
-                  {
-                    is_active:
-                      !currentState,
-                  }
-                ),
-            }
-          )
-
-          setFiles(
-            (prev) =>
-              prev.map(
-                (file) =>
-                  file.document_id ===
-                  documentId
-                    ? {
-                        ...file,
-                        is_active:
-                          !currentState,
-                      }
-                    : file
-              )
-          )
-
-        } catch (error) {
-
-          console.error(
-            "TOGGLE_FILE_ERROR",
-            error
-          )
-        }
-      }
-
-    /* FILTER */
-    const filteredFiles =
-      useMemo(
-        () => {
-
-          return files.filter(
-            (file) => {
-
-              const matchesCategory =
-                selectedCategory ===
-                  "all" ||
-                file.category ===
-                  selectedCategory
-
-              const matchesSearch =
-                file.file_name
-                  ?.toLowerCase()
-                  .includes(
-                    search.toLowerCase()
-                  )
-
-              return (
-                matchesCategory &&
-                matchesSearch
-              )
-            }
-          )
-        },
-
-        [
-          files,
-          selectedCategory,
-          search,
-        ]
-      )
+    useHorizontalDragScroll(
+      tabsRef
+    )
 
     return (
       <div
@@ -214,101 +61,172 @@ const KnowledgeFilesSection =
           gap-5
         "
       >
-        {/* TOP CATEGORY TABS */}
+        {/* =====================================
+            CATEGORY TABS
+        ===================================== */}
         <div
           className="
-            flex
-            flex-wrap
-            items-center
-            gap-2
-
-            border-b
-            border-[#24312b]
-
-            pb-3
+            relative
           "
         >
-          {[
-            {
-              id: "all",
-              name:
-                "All Files",
-            },
+          {/* LEFT FADE */}
+          <div
+            className="
+              pointer-events-none
 
-            ...dynamicCategories,
-          ].map((category) => {
+              absolute
+              bottom-0
+              left-0
+              top-0
+              z-10
 
-            const active =
-              selectedCategory ===
-              category.id
+              w-12
 
-            return (
-              <button
-                key={
+              bg-gradient-to-r
+              from-[#0f1614]
+              to-transparent
+            "
+          />
+
+          {/* RIGHT FADE */}
+          <div
+            className="
+              pointer-events-none
+
+              absolute
+              bottom-0
+              right-0
+              top-0
+              z-10
+
+              w-12
+
+              bg-gradient-to-l
+              from-[#0f1614]
+              to-transparent
+            "
+          />
+
+          {/* SCROLL CONTAINER */}
+          <div
+            ref={tabsRef}
+
+            className="
+              cursor-grab
+              overflow-x-auto
+
+              active:cursor-grabbing
+
+              border-b
+              border-[#24312b]
+
+              pb-3
+
+              select-none
+
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
+            "
+          >
+            <div
+              className="
+                flex
+                min-w-max
+                items-center
+                gap-2
+
+                pr-8
+              "
+            >
+              {[
+                {
+                  id: "all",
+                  name:
+                    "All Files",
+                },
+
+                ...dynamicCategories,
+              ].map((category) => {
+
+                const active =
+                  selectedCategory ===
                   category.id
-                }
 
-                onClick={() =>
-                  setSelectedCategory(
-                    category.id
-                  )
-                }
+                return (
+                  <button
+                    key={
+                      category.id
+                    }
 
-                className={`
-                  relative
+                    onClick={() =>
+                      setSelectedCategory(
+                        category.id
+                      )
+                    }
 
-                  rounded-t-2xl
+                    className={`
+                      relative
 
-                  px-5
-                  py-3
+                      shrink-0
 
-                  text-sm
-                  font-medium
+                      rounded-t-2xl
 
-                  transition-all
-                  duration-200
+                      px-5
+                      py-3
 
-                  ${
-                    active
-                      ? `
-                        border
-                        border-b-0
-                        border-[#2d3b35]
+                      text-sm
+                      font-medium
 
-                        bg-[#151d1b]
+                      whitespace-nowrap
 
-                        text-white
-                      `
-                      : `
-                        text-[#7f948b]
+                      transition-all
+                      duration-200
 
-                        hover:text-white
-                      `
-                  }
-                `}
-              >
-                {category.name}
+                      ${
+                        active
+                          ? `
+                            border
+                            border-b-0
+                            border-[#2d3b35]
 
-                {active && (
-                  <div
-                    className="
-                      absolute
-                      bottom-0
-                      left-0
+                            bg-[#151d1b]
 
-                      h-[2px]
-                      w-full
+                            text-white
+                          `
+                          : `
+                            text-[#7f948b]
 
-                      bg-[#f5d547]
-                    "
-                  />
-                )}
-              </button>
-            )
-          })}
+                            hover:text-white
+                          `
+                      }
+                    `}
+                  >
+                    {category.name}
+
+                    {active && (
+                      <div
+                        className="
+                          absolute
+                          bottom-0
+                          left-0
+
+                          h-[2px]
+                          w-full
+
+                          bg-[#f5d547]
+                        "
+                      />
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
         </div>
 
-        {/* TABLE CONTAINER */}
+        {/* =====================================
+            TABLE CONTAINER
+        ===================================== */}
         <div
           className="
             flex
@@ -499,8 +417,16 @@ const KnowledgeFilesSection =
                   filteredFiles
                 }
 
-                onToggleFile={
-                  toggleFile
+                categories={
+                  allCategories
+                }
+
+                onDelete={
+                  handleDelete
+                }
+
+                onUpdate={
+                  handleUpdate
                 }
               />
             )}
