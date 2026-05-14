@@ -68,26 +68,6 @@ class VectorSearchRequest(BaseModel):
     limit: int = 5
 
 
-@router.post(
-    "/test-search",
-    tags=["Documents", "Admin"],
-    summary="Admin tool to inspect Qdrant search results",
-)
-async def test_vector_search(
-    request: VectorSearchRequest,
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
-):
-    """Admin tool to see EXACTLY what Qdrant returns for a given search query."""
-    vector = await asyncio.to_thread(
-        ingestion_service.embeddings.embed_query, request.query
-    )
-
-    results = ingestion_service.qdrant.query_points(
-        collection_name=ingestion_service.collection_name,
-        query=vector,
-        with_payload=True,
-        limit=request.limit,
-    )
 
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
 async def debug_full_rag_pipeline(
