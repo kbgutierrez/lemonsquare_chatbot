@@ -5,8 +5,14 @@ import {
   useState,
 } from "react"
 
-import SidebarMenu from "./components/SidebarMenu.jsx"
-import MobileSidebar from "./components/MobileSidebar.jsx"
+import SidebarMenu
+  from "./components/SidebarMenu.jsx"
+
+import MobileSidebar
+  from "./components/MobileSidebar.jsx"
+
+import LoginPage
+  from "./LoginPage.jsx"
 
 import AISettingsPanel
   from "./components/settings/AISettingsPanel.jsx"
@@ -31,18 +37,81 @@ import PipelineDebugSection
 
 const AdminPage = () => {
 
-  const [activeView, setActiveView] =
+  /* ========================================
+     AUTH
+  ======================================== */
+
+  const [isAuthenticated,
+    setIsAuthenticated] =
+    useState(false)
+
+  /* ========================================
+     UI STATE
+  ======================================== */
+
+  const [activeView,
+    setActiveView] =
     useState("upload")
 
-  const [sidebarWidth, setSidebarWidth] =
+  const [sidebarWidth,
+    setSidebarWidth] =
     useState(280)
 
-  const [isResizing, setIsResizing] =
+  const [isResizing,
+    setIsResizing] =
     useState(false)
 
   const [mobileSidebarOpen,
     setMobileSidebarOpen] =
     useState(false)
+
+  /* ========================================
+     CHECK AUTH
+  ======================================== */
+
+  useEffect(() => {
+
+    const auth =
+      localStorage.getItem(
+        "admin_auth"
+      )
+
+    if (auth === "true") {
+
+      setIsAuthenticated(
+        true
+      )
+    }
+
+  }, [])
+
+  /* ========================================
+     LOGIN
+  ======================================== */
+
+  const handleLogin =
+    () => {
+
+      setIsAuthenticated(
+        true
+      )
+    }
+
+  /* ========================================
+     LOGOUT
+  ======================================== */
+
+  const handleLogout =
+    () => {
+
+      localStorage.removeItem(
+        "admin_auth"
+      )
+
+      setIsAuthenticated(
+        false
+      )
+    }
 
   /* ========================================
      RESIZE SIDEBAR
@@ -100,6 +169,21 @@ const AdminPage = () => {
     }
 
   }, [isResizing])
+
+  /* ========================================
+     LOGIN SCREEN
+  ======================================== */
+
+  if (!isAuthenticated) {
+
+    return (
+      <LoginPage
+        onLogin={
+          handleLogin
+        }
+      />
+    )
+  }
 
   return (
     <section
@@ -218,6 +302,10 @@ const AdminPage = () => {
 
             setActiveView={
               setActiveView
+            }
+
+            onLogout={
+              handleLogout
             }
           />
         </aside>
