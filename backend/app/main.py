@@ -21,6 +21,7 @@ import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
+from app.api.routers import auth
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
@@ -127,6 +128,7 @@ def create_app() -> FastAPI:
     app.include_router(settings.router, prefix=PREFIX)
     app.include_router(explorer.router, prefix=PREFIX)
     app.include_router(self_knowledge.router, prefix="/api")
+    app.include_router(auth.router, prefix=PREFIX)
 
     # ── Health Check ──────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])

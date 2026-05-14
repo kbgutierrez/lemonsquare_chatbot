@@ -66,6 +66,13 @@ Earl/
 │   ├── createtablecbot.sql
 │   ├── helpdeskdev.sql
 │   └── helpdeskdevaluation.sql
+├── src
+│   └── admin
+│       └── components
+│           ├── manual-entries
+│           │   └── ManualEntriesSection.jsx
+│           └── resolved-chats
+│               └── ResolvedChatsSection.jsx
 ├── streamlit_app.py
 ├── streamlit_chat_history.py
 └── webhook.txt
@@ -222,476 +229,242 @@ if __name__ == "__main__":
 --- FILE: streamlit_app.py ---
 import streamlit as st
 import requests
-from typing import Dict, Any
+import pandas as pd
+import json
 
-# Configuration
-API_BASE_URL = "http://localhost:8000/api"
+# --- CONFIGURATION ---
+st.set_page_config(page_title="BigE Enterprise Dashboard", layout="wide")
+API_BASE = "http://localhost:8000/api"
 
-st.set_page_config(page_title="IT Support AI Dashboard", layout="wide")
+# --- HELPER FUNCTIONS ---
+def api_get(endpoint, params=None):
+    try:
+        res = requests.get(f"{API_BASE}{endpoint}", params=params)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"API GET Error ({endpoint}): {e}")
+        return []
 
-st.title("IT Support AI Enterprise Dashboard")
+def api_post(endpoint, json_data=None, files=None):
+    try:
+        res = requests.post(f"{API_BASE}{endpoint}", json=json_data, files=files)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"API POST Error ({endpoint}): {e}")
+        return None
 
-# Sidebar for navigation
-page = st.sidebar.selectbox(
-    "Choose a section",
-    ["Chat", "Documents", "Tickets", "Settings", "Knowledge Base Explorer"]
+def api_put(endpoint, json_data):
+    try:
+        res = requests.put(f"{API_BASE}{endpoint}", json=json_data)
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"API PUT Error ({endpoint}): {e}")
+        return None
+
+def api_delete(endpoint):
+    try:
+        res = requests.delete(f"{API_BASE}{endpoint}")
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        st.error(f"API DELETE Error ({endpoint}): {e}")
+        return None
+
+# --- SIDEBAR NAVIGATION ---
+st.sidebar.title("⚙️ AI Admin Dashboard")
+page = st.sidebar.radio(
+    "Navigation",
+    ["Knowledge Explorer", "PDF Documents", "Manual Rules", "AI Self-Knowledge", "Chat Simulator"]
 )
 
-
-def make_request(method: str, endpoint: str, data: Dict = None, files: Dict = None) -> Dict:
-    """Helper function to make API requests"""
-    url = f"{API_BASE_URL}{endpoint}"
-    try:
-        if method == "GET":
-            response = requests.get(url, params=data)
-        elif method == "POST":
-            if files:
-                response = requests.post(url, files=files, data=data)
-            else:
-                response = requests.post(url, json=data)
-        elif method == "DELETE":
-            response = requests.delete(url, json=data)
-        else:
-            raise ValueError(f"Unsupported method: {method}")
-
-        if 200 <= response.status_code < 300:
-            try:
-                return response.json()
-            except ValueError:
-                return {"message": response.text}
-        else:
-            st.error(f"Error {response.status_code}: {response.text}")
-            return {}
-    except Exception as e:
-        st.error(f"Request failed: {str(e)}")
-        return {}
-
-
-def load_ai_settings() -> Dict[str, Any]:
-    settings = make_request("GET", "/settings/ai")
-    if settings:
-        st.session_state.ai_settings = settings
-    return settings
-
-
-# Chat Section
-if page == "Chat":
-    st.header("AI Chat")
-
-    if "session_id" not in st.session_state:
-        st.session_state.session_id = None
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-    if "user_token" not in st.session_state:
-        st.session_state.user_token = "TEST_USER_1"
-
-    with st.expander("Chat configuration", expanded=True):
-        st.session_state.user_token = st.text_input(
-            "User Token",
-            value=st.session_state.user_token,
-            help="Use TEST_USER_1 for local development or provide a valid auth token."
-        )
-
-    # Display chat history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    # Chat input
-    if prompt := st.chat_input("Ask me anything about IT support..."):
-        if not st.session_state.user_token:
-            st.error("Please provide a user token before sending a chat message.")
-        else:
-            st.session_state.messages.append({"role": "user", "content": prompt})
-            with st.chat_message("user"):
-                st.write(prompt)
-
-            chat_data = {
-                "session_id": st.session_state.session_id,
-                "message": prompt,
-                "user_token": st.session_state.user_token,
-            }
-            response = make_request("POST", "/chat", chat_data)
-
-            if response:
-                st.session_state.session_id = response.get("session_id")
-                ai_response = response.get("response", "No response")
-                ticket_ids = response.get("ticket_ids_used", [])
-
-                st.session_state.messages.append({"role": "assistant", "content": ai_response})
-                with st.chat_message("assistant"):
-                    st.write(ai_response)
-                    if ticket_ids:
-                        st.write(f"Referenced tickets: {', '.join(map(str, ticket_ids))}")
-
-
-# Documents Section
-elif page == "Documents":
-    st.header("Document Management")
-
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Upload", "List", "Delete", "RAG Debugger", "Full Pipeline Debug"])
-
-    with tab1:
-        st.subheader("Upload Document")
-        uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
-        if uploaded_file is not None and st.button("Upload"):
-            files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
-            response = make_request("POST", "/documents/upload", files=files)
-            if response:
-                st.success("Document uploaded successfully!")
-                st.json(response)
-
-    with tab2:
-        st.subheader("List Documents")
-        category = st.selectbox("Filter by category", ["All", "Hardware", "Software", "Network", "Other"])
-        category_param = None if category == "All" else category
-        col1, col2 = st.columns(2)
-        with col1:
-            skip = st.number_input("Skip", min_value=0, value=0, step=10, key="doc_skip")
-        with col2:
-            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10, key="doc_limit")
-
-        if st.button("Fetch Documents"):
-            params = {"category": category_param} if category_param else {}
-            params.update({"skip": skip, "limit": limit})
-            documents = make_request("GET", "/documents", params)
-            if documents:
-                st.dataframe(documents)
-
-    with tab3:
-        st.subheader("Delete Document")
-        document_id = st.text_input("Enter Document ID to delete")
-        if st.button("Delete Document"):
-            if document_id:
-                response = make_request("DELETE", f"/documents/{document_id}")
-                if response:
-                    st.success("Document deleted successfully!")
-                    st.json(response)
-            else:
-                st.error("Please enter a Document ID")
-
-    with tab4:
-        st.subheader("RAG Debugger: Query Qdrant Directly")
-        query = st.text_input("Search query", help="Inspect the exact document chunks returned by Qdrant.")
-        limit = st.number_input("Result limit", min_value=1, max_value=20, value=5, step=1)
-
-        if st.button("Run Qdrant Test Search"):
-            if not query:
-                st.error("Please enter a search query to run the debug search.")
-            else:
-                response = make_request("POST", "/documents/test-search", {"query": query, "limit": limit})
-                if response:
-                    st.success("Qdrant results retrieved.")
-                    results = response.get("results", [])
-                    if results:
-                        st.write(f"Query: {response.get('query')}")
-                        st.table([
-                            {
-                                "score": hit.get("score"),
-                                "type": hit.get("type"),
-                                "content": hit.get("content"),
-                            }
-                            for hit in results
-                        ])
-                        st.json(response)
-                    else:
-                        st.info("No results returned from Qdrant.")
-
-    with tab5:
-        st.subheader("Full Pipeline Debug")
-        st.write("See the complete RAG pipeline: Query → Reformulation → Retrieval → Answer")
-        query = st.text_input("Query", help="Test the full RAG pipeline end-to-end.")
-        user_token = st.text_input("User Token", value="TEST_USER_1", help="Token for auth (use TEST_USER_1 for testing)")
-
-        if st.button("Run Full Pipeline Debug", key="chat_debug_button"):
-            if not query:
-                st.error("Please enter a query to run the full pipeline debug.")
-            elif not user_token:
-                st.error("Please provide a user token.")
-            else:
-                response = make_request("POST", "/documents/debug/full-pipeline", {"query": query})
-                if response:
-                    st.success("Full pipeline debug completed.")
-                    
-                    # 1. Original Query
-                    st.subheader("1. Original Query")
-                    st.code(response.get("original_query", "N/A"))
-                    
-                    # 2. Reformulated Query
-                    st.subheader("2. Reformulated Query")
-                    reformulated = response.get("reformulated_query")
-                    st.code(reformulated or "No reformulation")
-                    if reformulated and reformulated != response.get("original_query"):
-                        st.write("✅ Reformulation applied.")
-                    else:
-                        st.write("❌ No reformulation applied.")
-                    
-                    # 3. Retrieval Results
-                    st.subheader("3. Retrieval Results")
-                    retrieval = response.get("retrieval_results", {})
-                    tickets = retrieval.get("tickets", [])
-                    documents = retrieval.get("documents", [])
-                    
-                    if tickets or documents:
-                        st.write(f"Found {len(tickets)} tickets and {len(documents)} documents:")
-                        
-                        # Tickets
-                        if tickets:
-                            st.write("**Tickets:**")
-                            for i, ticket in enumerate(tickets, 1):
-                                with st.expander(f"Ticket {i} (Score: {ticket['score']:.3f})"):
-                                    st.write(ticket["content"])
-                        
-                        # Documents
-                        if documents:
-                            st.write("**Documents:**")
-                            for i, doc in enumerate(documents, 1):
-                                with st.expander(f"Document {i} (Score: {doc['score']:.3f})"):
-                                    st.write(doc["content"])
-                    else:
-                        st.warning("No retrieval results found.")
-                    
-                    # 4. Final AI Answer
-                    st.subheader("4. Final AI Answer")
-                    answer = response.get("final_answer")
-                    if answer:
-                        st.write(answer)
-                    else:
-                        st.error("No answer generated.")
-                    
-                    # Raw Debug Data
-                    with st.expander("Raw Debug Data"):
-                        st.json(response.get("raw_debug", {}))
-                else:
-                    st.error("Failed to run full pipeline debug.")
-
-# Tickets Section
-elif page == "Tickets":
-    st.header("Ticket Management")
-
-    tab1, tab2 = st.tabs(["List Tickets", "Delete Ticket"])
-
-    with tab1:
-        st.subheader("List Resolved Tickets")
-        search = st.text_input("Search by ticket number")
-        col1, col2 = st.columns(2)
-        with col1:
-            skip = st.number_input("Skip", min_value=0, value=0, step=10)
-        with col2:
-            limit = st.number_input("Limit", min_value=1, max_value=100, value=50, step=10)
-        if st.button("Fetch Tickets"):
-            params = {"search": search} if search else {}
-            params.update({"skip": skip, "limit": limit})
-            tickets = make_request("GET", "/tickets", params)
-            if tickets:
-                df_data = []
-                for ticket in tickets:
-                    df_data.append({
-                        "ID": ticket["id"],
-                        "Ticket Number": ticket["ticket_number"],
-                        "Issue Reported": ticket["issue_reported"],
-                        "Work Done": ticket["work_done"],
-                        "Blacklisted": ticket["is_blacklisted"]
-                    })
-                st.dataframe(df_data)
-
-    with tab2:
-        st.subheader("Delete Ticket from AI Knowledge")
-        ticket_number = st.text_input("Enter Ticket Number to delete")
-        if st.button("Delete Ticket"):
-            if ticket_number:
-                response = make_request("DELETE", f"/tickets/{ticket_number}")
-                if response:
-                    st.success("Ticket deleted and blacklisted successfully!")
-                    st.json(response)
-            else:
-                st.error("Please enter a Ticket Number")
-
-
-# Settings Section
-elif page == "Settings":
-    st.header("AI Settings")
-
-    if "ai_settings" not in st.session_state:
-        st.session_state.ai_settings = None
-
-    if st.button("Load Current AI Settings") or st.session_state.ai_settings is None:
-        load_ai_settings()
-
-    current_settings = st.session_state.ai_settings or {}
-
-    if current_settings:
-        with st.expander("Current Active Settings", expanded=True):
-            st.json(current_settings)
-
-    st.markdown("---")
-    st.subheader("Update AI Settings")
-    with st.form("settings_form"):
-        active_model = st.text_input("Active Model", value=current_settings.get("ActiveModel", ""))
-        reformulator_model = st.text_input("Reformulator Model", value=current_settings.get("ReformulatorModel", ""))
-        system_prompt = st.text_area("System Prompt", value=current_settings.get("SystemPrompt", ""), height=120)
-        reformulator_prompt = st.text_area(
-            "Reformulator Prompt",
-            value=current_settings.get("ReformulatorPrompt", ""),
-            height=100,
-        )
-        temperature = st.number_input(
-            "Temperature",
-            min_value=0.0,
-            max_value=2.0,
-            value=max(0.0, min(2.0, float(current_settings.get("Temperature", 0.7)) if current_settings.get("Temperature") is not None else 0.7)),
-            step=0.05,
-        )
-        confidence_threshold = st.number_input(
-            "Confidence Threshold",
-            min_value=0.0,
-            max_value=1.0,
-            value=max(0.0, min(1.0, float(current_settings.get("ConfidenceThreshold", 0.5)) if current_settings.get("ConfidenceThreshold") is not None else 0.5)),
-            step=0.01,
-        )
-        embedding_model = st.text_input("Embedding Model", value=current_settings.get("EmbeddingModel", ""))
-        reranker_model = st.text_input("Reranker Model", value=current_settings.get("RerankerModel", ""))
-        top_k_tickets = st.number_input(
-            "Top K Tickets",
-            min_value=1,
-            max_value=50,
-            value=max(1, min(50, int(current_settings.get("TopK_Tickets", 5)) if current_settings.get("TopK_Tickets") is not None else 5)),
-            step=1,
-        )
-        use_reformulator = st.checkbox(
-            "Use Reformulator",
-            value=current_settings.get("UseReformulator", True),
-        )
-        use_reranker = st.checkbox(
-            "Use Reranker",
-            value=current_settings.get("UseReranker", True),
-        )
-        allowed_categories = st.text_area(
-            "Allowed Categories",
-            value=current_settings.get(
-                "AllowedCategories",
-                "Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT",
-            ),
-            help="Comma-separated list of categories to include in AI responses.",
-            height=100,
-        )
-
-        submit_update = st.form_submit_button("Save AI Settings")
-
-    if submit_update:
-        if not active_model or not system_prompt:
-            st.error("Active Model and System Prompt are required.")
-        else:
-            settings_payload = {
-                "ActiveModel": active_model,
-                "ReformulatorModel": reformulator_model,
-                "SystemPrompt": system_prompt,
-                "ReformulatorPrompt": reformulator_prompt,
-                "Temperature": temperature,
-                "ConfidenceThreshold": confidence_threshold,
-                "EmbeddingModel": embedding_model,
-                "RerankerModel": reranker_model,
-                "TopK_Tickets": top_k_tickets,
-                "UseReformulator": use_reformulator,
-                "UseReranker": use_reranker,
-                "AllowedCategories": allowed_categories,
-            }
-            response = make_request("POST", "/settings/ai/update", settings_payload)
-            if response:
-                st.success("AI settings updated successfully.")
-                st.json(response)
-                st.session_state.ai_settings = response.get("data") or settings_payload
-
-
-# Knowledge Base Explorer Section
-elif page == "Knowledge Base Explorer":
-    st.header("🔍 Knowledge Base Explorer")
-    st.markdown(
-        "View and manage all knowledge sources that the AI has learned from. "
-        "Filter by document type to understand what's in each category."
-    )
-    
-    st.markdown("---")
-    
-    # Map UI labels to strict backend doc_type values
-    doc_type_mapping = {
-        "📚 All Knowledge": None,
-        "💬 Resolved AI Chats": "resolved_chat",
-        "🎫 Helpdesk Tickets": "helpdesk_ticket",
-        "📄 PDF Manuals": "official_document",
-        "✍️ Manual KB Entries": "general_text"
-    }
-    
-    # Create the filter dropdown
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        selected_label = st.selectbox(
-            "Filter Knowledge Base by Source:",
-            options=list(doc_type_mapping.keys()),
-            help="Select a knowledge source to view all entries from that category."
-        )
-    
-    with col2:
-        limit = st.number_input(
-            "Results per page",
-            min_value=10,
-            max_value=500,
-            value=100,
-            step=10,
-            key="kb_limit"
-        )
-    
-    # Get the actual filter value to send to API
-    filter_value = doc_type_mapping[selected_label]
-    
-    # Display filter info
-    if filter_value:
-        st.info(f"🎯 Filter: `{filter_value}`")
-    else:
-        st.info("🎯 Filter: All knowledge sources (no filter applied)")
-    
-    # Fetch button
-    if st.button("🔎 Explore Knowledge Base", key="explore_kb_button", use_container_width=True):
-        # Build query params
-        params = {"limit": limit}
-        if filter_value:
-            params["doc_type"] = filter_value
-        
-        # Use GET request to the new explorer endpoint
-        response = make_request("GET", "/knowledge/explore", params)
-        
-        if response is None:
-            st.error("❌ Failed to query knowledge base. Check that the backend API is running.")
-        elif isinstance(response, list):
-            if len(response) == 0:
-                st.info("📭 No knowledge base entries found for this filter.")
-            else:
-                st.success(f"✅ Found {len(response)} entries")
-                st.markdown("### Results:")
-                
-                # Display each result as an expandable section
-                for i, result in enumerate(response, 1):
-                    with st.expander(
-                        f"**{i}. {result.get('category', 'Uncategorized')}** | Type: `{result['doc_type']}` | Source: {result['source']}"
-                    ):
-                        col1, col2 = st.columns([1, 1])
-                        with col1:
-                            st.caption(f"**ID:** `{result['id']}`")
-                            st.caption(f"**Type:** `{result['doc_type']}`")
-                        with col2:
-                            st.caption(f"**Source:** {result['source']}")
-                            if result.get('category'):
-                                st.caption(f"**Category:** {result['category']}")
-                        
-                        st.markdown("#### Content:")
-                        st.write(result['content'])
-        else:
-            st.error("❌ Unexpected response format from the knowledge explorer API.")
-
-
 st.sidebar.markdown("---")
-st.sidebar.markdown("**Note:** Make sure the backend API is running on localhost:8000")
+st.sidebar.caption("Connected to FastAPI backend.")
 
+# ==========================================
+# PAGE 1: KNOWLEDGE EXPLORER (The SQL Source of Truth)
+# ==========================================
+if page == "Knowledge Explorer":
+    st.title("🌐 Global Knowledge Explorer")
+    st.write("Blazing fast SQL-backed view of everything the AI knows.")
+
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        doc_type = st.selectbox("Filter by Source", ["All", "official_document", "general_text", "resolved_chat", "helpdesk_ticket"])
+    with col2:
+        category = st.text_input("Filter by Category (Optional)", placeholder="e.g. Hardware_Guide")
+    with col3:
+        limit = st.number_input("Limit Results", min_value=10, max_value=500, value=100)
+
+    if st.button("Fetch Knowledge"):
+        params = {"limit": limit}
+        if doc_type != "All": params["doc_type"] = doc_type
+        if category: params["category"] = category
+        
+        with st.spinner("Fetching from SQL..."):
+            data = api_get("/knowledge/explore", params=params)
+            if data:
+                df = pd.DataFrame(data)
+                st.dataframe(df, use_container_width=True, hide_index=True)
+            else:
+                st.info("No data found for these filters.")
+
+
+# ==========================================
+# PAGE 2: PDF DOCUMENTS (CRUD)
+# ==========================================
+elif page == "PDF Documents":
+    st.title("📄 PDF Document Management")
+
+    tab1, tab2 = st.tabs(["Upload New PDF", "Manage Existing PDFs"])
+
+    with tab1:
+        st.subheader("Upload to AI Brain")
+        uploaded_file = st.file_uploader("Choose a PDF file", type="pdf")
+        cat_input = st.text_input("Category", value="General_IT")
+        if st.button("Upload & Embed"):
+            if uploaded_file:
+                files = {"file": (uploaded_file.name, uploaded_file, "application/pdf")}
+                data = {"category": cat_input}
+                with st.spinner("Processing & Vectorizing..."):
+                    # We use requests directly here because we are sending a file multipart/form-data
+                    res = requests.post(f"{API_BASE}/documents/upload", files=files, data=data)
+                    if res.status_code == 200:
+                        st.success("PDF Uploaded and Vectorized!")
+            else:
+                st.warning("Please select a file.")
+
+    with tab2:
+        st.subheader("Edit or Delete PDFs")
+        docs = api_get("/documents")
+        if docs:
+            doc_options = {d['document_id']: f"{d['file_name']} ({d['category']})" for d in docs}
+            selected_doc = st.selectbox("Select Document to Manage", options=doc_options.keys(), format_func=lambda x: doc_options[x])
+            
+            with st.form("edit_doc_form"):
+                new_name = st.text_input("New File Name", value=doc_options[selected_doc].split(" (")[0])
+                new_cat = st.text_input("New Category", value=doc_options[selected_doc].split("(")[1].replace(")", ""))
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("Update Metadata"):
+                        res = api_put(f"/documents/{selected_doc}", {"file_name": new_name, "category": new_cat})
+                        if res: st.success("Metadata updated in SQL and Qdrant!")
+                with col2:
+                    if st.form_submit_button("DELETE Document", type="primary"):
+                        res = api_delete(f"/documents/{selected_doc}")
+                        if res: st.success("Document scrubbed from database.")
+
+
+# ==========================================
+# PAGE 3: MANUAL RULES (CRUD)
+# ==========================================
+elif page == "Manual Rules":
+    st.title("✍️ Manual Knowledge Rules")
+
+    tab1, tab2 = st.tabs(["Add New Rule", "Manage Existing Rules"])
+
+    with tab1:
+        with st.form("add_rule_form"):
+            r_title = st.text_input("Rule Title")
+            r_content = st.text_area("Rule Content")
+            r_category = st.text_input("Category", value="General_IT")
+            if st.form_submit_button("Add to Brain"):
+                res = api_post("/documents/manual", {"title": r_title, "content": r_content, "category": r_category})
+                if res: st.success("Rule added!")
+
+    with tab2:
+        rules = api_get("/documents/manual")
+        if rules:
+            # FIX: Use lowercase 'entry_id' and 'title'
+            rule_opts = {r['entry_id']: r['title'] for r in rules}
+            selected_rule = st.selectbox("Select Rule", options=rule_opts.keys(), format_func=lambda x: rule_opts[x])
+            
+            # Find the selected rule data using lowercase 'entry_id'
+            current_rule = next(r for r in rules if r['entry_id'] == selected_rule)
+            
+            with st.form("edit_rule_form"):
+                # FIX: Use lowercase keys for title, content, and category
+                u_title = st.text_input("Title", value=current_rule['title'])
+                u_content = st.text_area("Content", value=current_rule['content'])
+                u_category = st.text_input("Category", value=current_rule['category'])
+                
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("Update Rule"):
+                        res = api_put(f"/documents/manual/{selected_rule}", {"title": u_title, "content": u_content, "category": u_category})
+                        if res: st.success("Rule updated and re-embedded!")
+
+
+# ==========================================
+# PAGE 4: AI SELF-KNOWLEDGE (CRUD)
+# ==========================================
+elif page == "AI Self-Knowledge":
+    st.title("🧠 AI Extracted Chats")
+    st.write("Manage what the AI has learned from resolved chat sessions.")
+
+    chats = api_get("/knowledge/explore", {"doc_type": "resolved_chat"})
+    if chats:
+        chat_opts = {c['id']: c['source'] for c in chats}
+        selected_chat = st.selectbox("Select Learned Chat", options=chat_opts.keys(), format_func=lambda x: chat_opts[x])
+        
+        current_chat = next(c for c in chats if c['id'] == selected_chat)
+        content_dict = json.loads(current_chat['content'])
+
+        with st.form("edit_chat_form"):
+            st.write("Edit AI Hallucinations:")
+            u_rep = st.text_area("Issue Reported", value=content_dict.get("Issue Reported", ""))
+            u_fnd = st.text_area("Issue Found", value=content_dict.get("Issue Found", ""))
+            u_cau = st.text_area("Root Cause", value=content_dict.get("Root Cause", ""))
+            u_wrk = st.text_area("Work Done", value=content_dict.get("Work Done", ""))
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("Save Corrections"):
+                    payload = {"issue_reported": u_rep, "issue_found": u_fnd, "issue_cause": u_cau, "work_done": u_wrk}
+                    res = api_put(f"/self_knowledge/chats/{selected_chat}", payload)
+                    if res: st.success("AI Knowledge corrected!")
+            with col2:
+                if st.form_submit_button("Force AI to Unlearn", type="primary"):
+                    res = api_delete(f"/self_knowledge/chats/{selected_chat}")
+                    if res: st.success("Chat purged from AI memory.")
+
+
+# ==========================================
+# PAGE 5: CHAT SIMULATOR
+# ==========================================
+elif page == "Chat Simulator":
+    st.title("💬 Chat Simulator")
+    
+    if "session_id" not in st.session_state:
+        st.session_state.session_id = "test-session-" + str(pd.Timestamp.now().timestamp())
+        st.session_state.chat_history = []
+
+    st.caption(f"Active Session: {st.session_state.session_id}")
+
+    for msg in st.session_state.chat_history:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
+
+    if prompt := st.chat_input("Ask the IT Support AI..."):
+        st.session_state.chat_history.append({"role": "user", "content": prompt})
+        with st.chat_message("user"): st.markdown(prompt)
+
+        with st.chat_message("assistant"):
+            with st.spinner("Thinking..."):
+                payload = {
+                    "message": prompt,
+                    "session_id": st.session_state.session_id,
+                    "user_token": "dummy_dev_token"
+                }
+                res = api_post("/chat", payload)
+                if res and "response" in res:
+                    st.markdown(res["response"])
+                    st.session_state.chat_history.append({"role": "assistant", "content": res["response"]})
+                else:
+                    st.error("Failed to get response.")
 
 --- FILE: streamlit_chat_history.py ---
 import streamlit as st
@@ -1135,7 +908,7 @@ async def handle_chat(
         logger.debug("Authenticating token: %s", request.user_token[:10] + "...")
         user_data = await fetch_user_details(request.user_token)
         logger.debug("Auth returned user_data: %s", user_data)
-        user_id = user_data.get("id") or 1
+        user_id = int(user_data.get("id") or 1)
         user_name = (
             f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
         ).strip()
@@ -1279,59 +1052,6 @@ def get_all_chat_sessions(
 
 
 
-
-@router.post("/debug", response_model=ChatResponse)
-async def debug_rag_pipeline(
-    request: ChatRequest,
-    db: Session = Depends(get_chatbot_db),
-    orchestrator: SupportOrchestrator = Depends(get_orchestrator),
-) -> dict:
-    """
-    Debug endpoint that returns the full RAG pipeline data.
-    
-    Returns detailed information about query transformation, retrieval, and answer generation.
-    """
-    # 1. Authenticate (same as regular chat)
-    try:
-        user_data = await fetch_user_details(request.user_token)
-        user_id = user_data.get("id") or 1
-        user_name = (
-            f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
-        ).strip()
-    except AuthenticationError:
-        raise
-    except Exception as exc:
-        logger.error("Auth service error; rejecting request: %s", exc)
-        raise AuthenticationError("User authentication failed.") from exc
-
-    # 2. Session management
-    session_id = chat_service.get_or_create_session(db, request.session_id, user_id)
-
-    # 3. Save user message
-    chat_service.save_message(db, session_id, "user", request.message)
-
-    # 4. Build history
-    history_text = chat_service.get_recent_history_text(db, session_id)
-
-    # 5. Run debug pipeline
-    debug_data = await orchestrator.debug_orchestrate(
-        user_query=request.message,
-        chat_history=history_text,
-        user_name=user_name,
-        db=db,
-    )
-
-    # 6. Save AI response
-    ai_response = debug_data["final_answer"]
-    chat_service.save_message(db, session_id, "ai", ai_response)
-
-    return {
-        "session_id": session_id,
-        "response": ai_response,
-        "ticket_ids_used": debug_data.get("ticket_ids_used", []),
-        "debug_info": debug_data,
-    }
-
 @router.post(
     "/resolve/{session_id}", 
     response_model=ResolveChatResponse, 
@@ -1372,14 +1092,19 @@ from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
-from app.models.chatbot import UploadedDocument
+from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.schemas.documents import (
     DocumentDeleteResponse,
     DocumentResponse,
     DocumentUploadResponse,
     ManualEntryRequest,
+    DocumentUpdateRequest,
+    ManualEntryResponse,
+    ManualEntryUpdateRequest,
     
 )
+
+
 
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
@@ -1416,26 +1141,6 @@ class VectorSearchRequest(BaseModel):
     limit: int = 5
 
 
-@router.post(
-    "/test-search",
-    tags=["Documents", "Admin"],
-    summary="Admin tool to inspect Qdrant search results",
-)
-async def test_vector_search(
-    request: VectorSearchRequest,
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
-):
-    """Admin tool to see EXACTLY what Qdrant returns for a given search query."""
-    vector = await asyncio.to_thread(
-        ingestion_service.embeddings.embed_query, request.query
-    )
-
-    results = ingestion_service.qdrant.query_points(
-        collection_name=ingestion_service.collection_name,
-        query=vector,
-        with_payload=True,
-        limit=request.limit,
-    )
 
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
 async def debug_full_rag_pipeline(
@@ -1537,82 +1242,10 @@ async def delete_document(
     return DocumentDeleteResponse(**result)
 
 
-class DocTypeFilterRequest(BaseModel):
-    doc_type: str | None = None  # None = all, otherwise: "resolved_chat", "helpdesk_ticket", "official_document", "general_text"
-    limit: int = 100
-    skip: int = 0
-
-
-@router.post(
-    "/explore/by-type",
-    tags=["Documents", "Admin"],
-    summary="Filter knowledge base by doc_type for the Admin Explorer",
-)
-async def explore_by_doc_type(
-    request: DocTypeFilterRequest,
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
-):
-    """
-    Enterprise Admin tool: Query the knowledge base by source/type.
-    Returns all chunks for a given doc_type with their metadata.
-    
-    doc_type values:
-    - "resolved_chat": AI-extracted from resolved chats
-    - "helpdesk_ticket": From IT helpdesk webhook sync
-    - "official_document": Uploaded PDF manuals
-    - "general_text": Manual KB entries typed into admin dashboard
-    - None: All knowledge base entries
-    """
-    
-    # Build the Qdrant filter
-    query_filter = None
-    if request.doc_type:
-        query_filter = qdrant_models.Filter(
-            must=[
-                qdrant_models.FieldCondition(
-                    key="metadata.doc_type",
-                    match=qdrant_models.MatchValue(value=request.doc_type)
-                )
-            ]
-        )
-    
-    # Query Qdrant with the filter
-    results = ingestion_service.qdrant.scroll(
-        collection_name=ingestion_service.collection_name,
-        limit=request.limit,
-        offset=request.skip,
-        query_filter=query_filter,
-        with_payload=True,
-    )
-    
-    # Format results for the frontend
-    points = results[0] if results else []
-    formatted_results = []
-    
-    for point in points:
-        payload = point.payload or {}
-        metadata = payload.get("metadata", {})
-        formatted_results.append({
-            "id": point.id,
-            "doc_type": metadata.get("doc_type", "unknown"),
-            "title": metadata.get("title", "Untitled"),
-            "content": metadata.get("content", ""),
-            "source": metadata.get("source", "unknown"),
-            "page": metadata.get("page", None),
-            "timestamp": metadata.get("timestamp", None),
-        })
-    
-    return {
-        "total_count": len(formatted_results),
-        "doc_type_filter": request.doc_type,
-        "results": formatted_results,
-    }
-
-
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
-    db: Session = Depends(get_chatbot_db), # <--- We need the DB for the category check
+    db: Session = Depends(get_chatbot_db), 
     ingestion_service = Depends(get_ingestion_service)
 ):
     """Embeds raw text into Qdrant, auto-categorizing if necessary."""
@@ -1629,163 +1262,251 @@ async def add_manual_knowledge(
 
 
 
+@router.put(
+    "/{document_id}",
+    response_model=DocumentResponse,
+    summary="Update a document's metadata",
+)
+async def update_document_metadata(
+    document_id: str,
+    request: DocumentUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+) -> DocumentResponse:
+    from fastapi import HTTPException
+    from app.models.chatbot import UploadedDocument
+    
+    try:
+        # Pass the updates to the service
+        await ingestion_service.update_document(document_id, request.model_dump(exclude_unset=True), db)
+        
+        # Fetch the fresh data
+        updated_doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        
+        # THE FIX: Manually map the PascalCase SQL columns to the snake_case Pydantic schema
+        return DocumentResponse(
+            document_id=updated_doc.DocumentID,
+            file_name=updated_doc.FileName,
+            category=updated_doc.Category,
+            chunk_count=updated_doc.ChunkCount,
+            uploaded_at=updated_doc.UploadedAt,
+        )
+        
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    
+
+from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
+
+@router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
+def get_manual_entries(
+    skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
+):
+    """Fetch manual entries securely from SQL instead of Qdrant."""
+    from app.models.chatbot import ManualKnowledgeEntry
+    
+    entries = db.query(ManualKnowledgeEntry).filter(
+        ManualKnowledgeEntry.IsActive == True
+    ).order_by(
+        ManualKnowledgeEntry.CreatedAt.desc()
+    ).offset(skip).limit(limit).all()
+
+    # Map the PascalCase SQL fields to the snake_case Pydantic schema
+    mapped_results = []
+    for entry in entries:
+        mapped_results.append(
+            ManualEntryResponse(
+                entry_id=entry.EntryID,
+                title=entry.Title,
+                content=entry.Content,
+                category=entry.Category,
+                created_at=entry.CreatedAt,
+                updated_at=entry.UpdatedAt
+            )
+        )
+        
+    return mapped_results
+
+
+@router.put("/manual/{entry_id}", summary="Update a manual rule")
+async def update_manual_knowledge(
+    entry_id: str,
+    request: ManualEntryUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """Updates the rule in SQL and replaces its brain vector in Qdrant."""
+    try:
+        # Pass exclude_unset=True so we only update the fields the user actually changed
+        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.delete("/manual/{entry_id}", summary="Delete a manual rule")
+async def delete_manual_knowledge(
+    entry_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """Deletes the rule from SQL and scrubs it from the AI's Qdrant brain."""
+    result = await ingestion_service.delete_manual_entry(entry_id, db)
+    return result
+
+
+
 
 
 --- FILE: backend\app\api\routers\explorer.py ---
 """
 Knowledge Base Explorer endpoints.
 
-Directly queries Qdrant to show what the AI has learned.
-Bypasses SQL entirely and pulls raw metadata from the vector database.
+Now queries the SQL database (Source of Truth) instead of scrolling Qdrant.
+This provides a lightning-fast, clean, and deduplicated view for the Admin Dashboard.
 """
 
 import logging
+import json
 from fastapi import APIRouter, Depends
-from qdrant_client.http import models as qdrant_models
+from sqlalchemy.orm import Session
 
-from app.api.deps import get_ingestion_service
+from app.api.deps import get_chatbot_db, get_helpdesk_db
 from app.schemas.knowledge import KnowledgeExplorerResponse
+from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry, LearnedChat, BlacklistedTicket
+from app.models.helpdesk import TicketEvaluation
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/knowledge", tags=["Explorer"])
 
-
 @router.get(
     "/explore",
     response_model=list[KnowledgeExplorerResponse],
-    summary="Browse Qdrant Knowledge Base"
+    summary="Browse Knowledge Base (SQL Source of Truth)"
 )
 async def explore_knowledge_base(
     doc_type: str | None = None,
-    limit: int = 50,
-    ingestion_service = Depends(get_ingestion_service)
+    category: str | None = None,  # NEW: Added category filter
+    limit: int = 100,
+    db_chatbot: Session = Depends(get_chatbot_db),
+    db_helpdesk: Session = Depends(get_helpdesk_db)
 ):
     """
-    Directly queries the Qdrant database to show what the AI currently knows.
-    Skips SQL entirely and browses raw vector database metadata.
-    
-    Query Parameters:
-    - doc_type: Filter by knowledge source type
-      - "resolved_chat": AI-extracted from resolved chats
-      - "helpdesk_ticket": From IT helpdesk webhook sync
-      - "official_document": Uploaded PDF manuals
-      - "general_text": Manual KB entries typed into admin dashboard
-      - None/omitted: All knowledge base entries
-    - limit: Max entries to return (default 50)
-    
-    Example URLs:
-    - GET /knowledge/explore?doc_type=resolved_chat&limit=100
-    - GET /knowledge/explore?doc_type=general_text
-    - GET /knowledge/explore (all entries)
+    Queries the SQL databases directly to show what the AI currently knows.
+    Supports filtering by top-level source (doc_type) and specific IT sub-categories (category).
     """
-    
-    # 1. Build the Qdrant filter if a specific type is requested
-    query_filter = None
-    if doc_type:
-        query_filter = qdrant_models.Filter(
-            must=[
-                qdrant_models.FieldCondition(
-                    key="metadata.doc_type",
-                    match=qdrant_models.MatchValue(value=doc_type)
-                )
-            ]
-        )
-
-    # 2. Use Qdrant's 'scroll' method to paginate through raw metadata
-    # (scroll is designed for browsing, not vector similarity)
-    scroll_result, _ = ingestion_service.qdrant.scroll(
-        collection_name=ingestion_service.collection_name,
-        scroll_filter=query_filter,
-        limit=limit,
-        with_payload=True,   # We want the metadata!
-        with_vectors=False   # We don't need the vector arrays for the UI
-    )
-
-    # 3. Format the raw Qdrant points into our clean response schema
     results = []
-    for point in scroll_result:
-        payload = point.payload or {}
-        metadata = payload.get("metadata", {})
+
+    # 1. Manual Knowledge (general_text)
+    if doc_type in [None, "general_text"]:
+        query = db_chatbot.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True)
+        if category:
+            query = query.filter(ManualKnowledgeEntry.Category == category)
+            
+        for m in query.order_by(ManualKnowledgeEntry.CreatedAt.desc()).limit(limit).all():
+            results.append({
+                "id": m.EntryID,
+                "doc_type": "general_text",
+                "source": m.Title,
+                "category": m.Category,
+                "content": m.Content
+            })
+
+    # 2. AI-Learned Chats (resolved_chat)
+    if doc_type in [None, "resolved_chat"] and (category is None or category == "AI Extraction"):
+        chats = db_chatbot.query(LearnedChat).filter(LearnedChat.IsActive == True).order_by(LearnedChat.LearnedAt.desc()).limit(limit).all()
+        for c in chats:
+            content_dict = {
+                "Issue Reported": c.IssueReported,
+                "Issue Found": c.IssueFound,
+                "Root Cause": c.RootCause,
+                "Work Done": c.WorkDone
+            }
+            results.append({
+                "id": c.SessionID,
+                "doc_type": "resolved_chat",
+                "source": f"Chat Session {c.SessionID[:8]}",
+                "category": "AI Extraction",
+                "content": json.dumps(content_dict, indent=2)
+            })
+
+    # 3. Official Documents / PDFs (official_document)
+    if doc_type in [None, "official_document"]:
+        query = db_chatbot.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+        if category:
+            query = query.filter(UploadedDocument.Category == category)
+            
+        for d in query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all():
+            results.append({
+                "id": d.DocumentID,
+                "doc_type": "official_document",
+                "source": d.FileName,
+                "category": d.Category,
+                "content": f"[PDF Document containing {d.ChunkCount} vector chunks. AI reads this dynamically during chat.]"
+            })
+
+    # 4. Helpdesk Tickets (helpdesk_ticket)
+    if doc_type in [None, "helpdesk_ticket"] and (category is None or category == "IT Helpdesk Sync"):
+        blacklisted = {b.TicketNumber for b in db_chatbot.query(BlacklistedTicket.TicketNumber).all()}
+        tickets = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None)).order_by(TicketEvaluation.id.desc()).limit(limit * 2).all()
         
-        results.append(
-            KnowledgeExplorerResponse(
-                id=str(point.id),
-                doc_type=metadata.get("doc_type", "unknown"),
-                source=metadata.get("source", "System Extracted"),
-                category=metadata.get("category", "Uncategorized"),
-                # For resolved chats: page_content is the JSON string
-                # For manuals/tickets: page_content is raw text
-                content=payload.get("page_content", "")
-            )
-        )
+        valid_tickets_added = 0
+        for t in tickets:
+            if t.ticket_number in blacklisted:
+                continue
+            if valid_tickets_added >= limit:
+                break
+                
+            results.append({
+                "id": str(t.id),
+                "doc_type": "helpdesk_ticket",
+                "source": f"Ticket {t.ticket_number}",
+                "category": "IT Helpdesk Sync",
+                "content": f"REPORTED: {t.issue_reported}\n\nRESOLUTION: {t.work_done}"
+            })
+            valid_tickets_added += 1
+
+    if doc_type is None and category is None:
+        results = results[:limit]
 
     return results
 
-
 --- FILE: backend\app\api\routers\self_knowledge.py ---
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-from app.api.deps import get_ingestion_service
-from app.schemas.self_knowledge import AIKnowledgeItem
+from app.api.deps import get_ingestion_service, get_chatbot_db
+from app.schemas.self_knowledge import AIKnowledgeItem, LearnedChatUpdateRequest
+from sqlalchemy.orm import Session
+
 
 router = APIRouter(prefix="/self_knowledge", tags=["AI Knowledge"])
 
-@router.get("", response_model=list[AIKnowledgeItem], summary="Get AI-Learned Chats & Manual Rules")
-async def get_ai_knowledge(
-    # Allow the frontend to request just one type, or default to "both"
-    filter_type: str = Query("both", description="Options: 'both', 'resolved_chat', 'general_text'"),
-    limit: int = 50,
+
+
+@router.put("/chats/{session_id}", summary="Admin override: Correct AI chat summary")
+async def edit_learned_chat(
+    session_id: str,
+    request: LearnedChatUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
     ingestion_service = Depends(get_ingestion_service)
 ):
-    """
-    Fetches the knowledge the AI has generated itself (Resolved Chats) 
-    and the quick rules manually typed by the Admin (General Text).
-    Skips uploaded PDFs and Helpdesk Tickets entirely.
-    """
-    # 1. Build the specific Qdrant filter
-    conditions = []
-    
-    if filter_type not in ["both", "resolved_chat", "general_text"]:
-        filter_type = "both"
+    """If the AI hallucinated the summary, an Admin can fix it here and re-embed it."""
+    try:
+        # exclude_unset=True ensures we only update fields the user actually sent
+        result = await ingestion_service.update_learned_chat(session_id, request.model_dump(exclude_unset=True), db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
-    if filter_type in ["both", "resolved_chat"]:
-        conditions.append(
-            FieldCondition(key="metadata.doc_type", match=MatchValue(value="resolved_chat"))
-        )
-        
-    if filter_type in ["both", "general_text"]:
-        conditions.append(
-            FieldCondition(key="metadata.doc_type", match=MatchValue(value="general_text"))
-        )
-
-    # Use 'should' which acts as an OR operator.
-    # It MUST be one of these conditions, locking out PDFs/Tickets.
-    query_filter = Filter(should=conditions)
-
-    # 2. Scroll Qdrant directly for the metadata
-    scroll_result, _ = ingestion_service.qdrant.scroll(
-        collection_name=ingestion_service.collection_name,
-        scroll_filter=query_filter,
-        limit=limit,
-        with_payload=True,
-        with_vectors=False,  # We don't need the heavy mathematical arrays here
-    )
-
-    # 3. Format perfectly for the frontend
-    results = []
-    for point in scroll_result:
-        payload = point.payload or {}
-        metadata = payload.get("metadata", {})
-        
-        results.append({
-            "id": str(point.id),
-            "doc_type": metadata.get("doc_type", "unknown"),
-            "source": metadata.get("source", "AI Extracted"),
-            "category": metadata.get("category", "Uncategorized"),
-            "content": payload.get("page_content", "") 
-        })
-
-    return results
+@router.delete("/chats/{session_id}", summary="Force AI to unlearn a chat")
+async def remove_learned_chat(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service = Depends(get_ingestion_service)
+):
+    """Deletes the extracted chat from SQL and scrubs its vectors from Qdrant."""
+    result = await ingestion_service.delete_learned_chat(session_id, db)
+    return result
 
 --- FILE: backend\app\api\routers\settings.py ---
 """
@@ -2023,7 +1744,7 @@ async def sync_resolved_ticket(
     
     return TicketSyncResponse(**result)
 
-@router.post("/tickets/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
 async def whitelist_ticket(
     ticket_number: str, 
     db_chatbot: Session = Depends(get_chatbot_db),
@@ -2523,6 +2244,36 @@ class BlacklistedTicket(BaseChatbot):
     BlacklistedBy = Column(BigInteger, default=1)
 
 
+class ManualKnowledgeEntry(BaseChatbot):
+    """Metadata and content record for manually typed knowledge base rules."""
+
+    __tablename__ = "tbl_manual_knowledge"
+
+    EntryID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    Title = Column(String(255), nullable=False)
+    Content = Column(Text, nullable=False)
+    Category = Column(String(100), nullable=False)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    CreatedBy = Column(BigInteger, default=1)
+    IsActive = Column(Boolean, default=True)
+
+
+
+class LearnedChat(BaseChatbot):
+    """Structured knowledge extracted by the AI from resolved chats."""
+
+    __tablename__ = "tbl_learned_chats"
+
+    SessionID = Column(String(36), primary_key=True)
+    IssueReported = Column(Text)
+    IssueFound = Column(Text)
+    RootCause = Column(Text)
+    WorkDone = Column(Text)
+    LearnedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    IsActive = Column(Boolean, default=True)
+
 --- FILE: backend\app\models\helpdesk.py ---
 """
 SQLAlchemy ORM models for the Helpdesk (read-only) database.
@@ -2638,8 +2389,29 @@ class DocumentDeleteResponse(BaseModel):
 class ManualEntryRequest(BaseModel):
     title: str
     content: str
-    category: str
+    category: str | None = None
 
+
+class ManualEntryResponse(BaseModel):
+    entry_id: str
+    title: str
+    content: str
+    category: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ManualEntryUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+
+
+class DocumentUpdateRequest(BaseModel):
+    file_name: str | None = None
+    category: str | None = None
 
 --- FILE: backend\app\schemas\knowledge.py ---
 """
@@ -2665,10 +2437,17 @@ from typing import Any
 
 class AIKnowledgeItem(BaseModel):
     id: str
-    doc_type: str  # Will only ever be "resolved_chat" or "general_text"
+    doc_type: str  
     source: str | None = None
     category: str | None = None
     content: str | dict[str, Any]
+
+
+class LearnedChatUpdateRequest(BaseModel):
+    issue_reported: str | None = None
+    issue_found: str | None = None
+    issue_cause: str | None = None
+    work_done: str | None = None
 
 --- FILE: backend\app\schemas\settings.py ---
 """
@@ -2955,7 +2734,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import ValidationError, VectorStoreError
-from app.models.chatbot import AIChatbotSetting, UploadedDocument
+from app.models.chatbot import AIChatbotSetting, UploadedDocument, LearnedChat
 import json
 
 logger = logging.getLogger(__name__)
@@ -3164,9 +2943,49 @@ class DocumentIngestionService:
                 os.remove(temp_file_path)
 
 
+
+    async def _classify_document(self, text: str) -> str:
+        """Uses the AI to read a snippet of the document and assign a category."""
+        from langchain_groq import ChatGroq
+        from app.core.config import settings
+        import logging
+        
+        logger = logging.getLogger(__name__)
+        
+        # We only need the first 3000 characters to figure out what the document is about.
+        # This saves tokens and makes the upload process much faster.
+        snippet = text[:3000]
+        
+        try:
+            classify_llm = ChatGroq(
+                model="llama-3.1-8b-instant", 
+                temperature=0.0, 
+                api_key=settings.GROQ_API_KEY
+            )
+            
+            prompt = (
+                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {self.allowed_categories}. "
+                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
+            )
+            
+            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
+            
+            # The Lock: Fallback if the AI hallucinates a category that isn't allowed
+            if ai_category not in self.allowed_categories:
+                logger.warning(f"AI hallucinated category '{ai_category}'. Defaulting to 'General_IT'.")
+                return "General"
+                
+            return ai_category
+            
+        except Exception as e:
+            logger.error(f"Error during AI categorization: {e}")
+            return "General_IT"  # Safe fallback if the LLM call fails
+
+
     async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db: Session) -> dict:
         """Embeds raw text into Qdrant, auto-guessing the category if none is provided."""
-        from app.models.chatbot import AIChatbotSetting
+        from app.models.chatbot import AIChatbotSetting, ManualKnowledgeEntry
         from langchain_groq import ChatGroq
         import uuid
         from qdrant_client.http.models import PointStruct
@@ -3176,8 +2995,12 @@ class DocumentIngestionService:
         raw_categories = getattr(active_config, 'AllowedCategories', "General_IT")
         allowed_categories = [c.strip() for c in raw_categories.split(',')]
 
-        # 2. CATEGORY ASSIGNMENT (Admin override vs AI Guess)
-        if manual_category and manual_category in allowed_categories:
+        # 2. STRICT CATEGORY VALIDATION (Admin override vs AI Guess)
+        if manual_category:
+            # If they provided a category, it MUST be valid. No silent fallback to AI.
+            if manual_category not in allowed_categories:
+                raise ValueError(f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}")
+            
             ai_category = manual_category
             logger.info("Using Admin-provided category: %s", ai_category)
         else:
@@ -3205,7 +3028,6 @@ class DocumentIngestionService:
         # 3. FORMAT AND VECTORIZE
         document_id = str(uuid.uuid4())
         searchable_text = f"TITLE: {title}\nCONTENT: {content}"
-        
         vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
         
         # 4. PUSH TO QDRANT
@@ -3214,8 +3036,8 @@ class DocumentIngestionService:
             "metadata": {
                 "document_id": document_id,
                 "source": title,
-                "category": ai_category,        # The verified subcategory
-                "doc_type": "general_text"      # The strict main taxonomy
+                "category": ai_category,        
+                "doc_type": "general_text"      
             }
         }
         
@@ -3223,87 +3045,180 @@ class DocumentIngestionService:
             collection_name=self.collection_name,
             points=[PointStruct(id=document_id, vector=vector, payload=payload)]
         )
+
+        # 5. NEW: SAVE TO MS SQL
+        new_entry = ManualKnowledgeEntry(
+            EntryID=document_id,
+            Title=title,
+            Content=content,
+            Category=ai_category
+        )
+        db.add(new_entry)
+        db.commit()
         
         return {
             "status": "success", 
+            "entry_id": document_id,
             "category": ai_category, 
             "message": f"Manual entry added to AI Brain under '{ai_category}'."
         }
 
-    async def _classify_document(self, raw_text: str) -> str:
-        """Use an LLM to classify the document into one of the allowed categories."""
-        classify_llm = ChatGroq(
-            model=self.classifier_model,
-            temperature=0.0,
-            api_key=settings.GROQ_API_KEY,
-        )
-        categories_string = ", ".join(self.allowed_categories)
-        prompt = (
-            "You are a strict document classifier API. Read the excerpt and "
-            f"categorize it into EXACTLY ONE of these tags: {categories_string}\n\n"
-            "Output ONLY the exact tag name. Do not explain.\n"
-            f"Excerpt: {raw_text[:1500]}\n"
-            "Category:"
-        )
-        result = await classify_llm.ainvoke(prompt)
-        ai_category = result.content.strip(' "\'\n')
+    async def update_manual_entry(self, entry_id: str, updates: dict, db: Session) -> dict:
+        from app.models.chatbot import AIChatbotSetting, ManualKnowledgeEntry
+        from qdrant_client.http.models import PointStruct
+        from datetime import datetime
 
-        if ai_category not in self.allowed_categories:
-            logger.warning(
-                "LLM returned unknown category '%s'. Falling back to 'General_IT'.",
-                ai_category,
-            )
-            return "General_IT"
-        return ai_category
+        # 1. Update SQL
+        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        if not entry:
+            raise ValueError("Manual entry not found.")
+
+        # Fetch allowed categories dynamically for validation
+        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+        raw_categories = getattr(active_config, 'AllowedCategories', "General_IT")
+        allowed_categories = [c.strip() for c in raw_categories.split(',')]
+
+        if updates.get("title"): 
+            entry.Title = updates["title"]
+        if updates.get("content"): 
+            entry.Content = updates["content"]
+            
+        # STRICT VALIDATION ON UPDATE
+        if updates.get("category"): 
+            new_category = updates["category"]
+            if new_category not in allowed_categories:
+                raise ValueError(f"Invalid category: '{new_category}'. Must be one of {allowed_categories}")
+            entry.Category = new_category
+            
+        entry.UpdatedAt = datetime.utcnow()
+        db.commit()
+
+        # 2. Re-embed and update Qdrant (Overwrites the old vector)
+        searchable_text = f"TITLE: {entry.Title}\nCONTENT: {entry.Content}"
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "document_id": entry.EntryID,
+                "source": entry.Title,
+                "category": entry.Category,
+                "doc_type": "general_text"
+            }
+        }
+        
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=entry.EntryID, vector=vector, payload=payload)]
+        )
+
+        return {"status": "success", "message": "Entry updated successfully."}
+
+    async def delete_manual_entry(self, entry_id: str, db: Session) -> dict:
+        from app.models.chatbot import ManualKnowledgeEntry
+
+        # 1. Soft Delete from SQL
+        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        if entry:
+            entry.IsActive = False
+            db.commit()
+
+        # 2. Hard Delete from Qdrant by Exact ID (No index required)
+        # Because the EntryID in SQL is the exact same UUID used in Qdrant
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=[entry_id]  # Pass the exact ID in a list
+        )
+
+        return {"status": "success", "message": "Manual entry deleted."}
 
     async def delete_document(self, document_id: str, db: Session) -> dict:
-        """
-        Remove a document from both SQL and Qdrant.
+        from app.models.chatbot import UploadedDocument
+        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
-        Args:
-            document_id: The UUID of the document to delete.
-            db: Active database session.
+        # 1. SOFT DELETE FROM SQL
+        # We fetch the document and set IsActive = False instead of using db.delete()
+        doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        if not doc:
+            raise ValueError("Document not found in database.")
 
-        Returns:
-            A dict with status and document_id.
-        """
-        logger.info("Deleting document %s...", document_id)
+        doc.IsActive = False
+        db.commit()
 
-        # 1. Soft-delete (or hard-delete) from SQL.
-        document = (
-            db.query(UploadedDocument)
-            .filter(UploadedDocument.DocumentID == document_id)
-            .first()
-        )
-        if document:
-            db.delete(document)
-            db.commit()
-            logger.info("SQL record for document %s deleted.", document_id)
-        else:
-            logger.warning("Document %s not found in SQL; proceeding to Qdrant delete.", document_id)
-
-        # 2. Delete from Qdrant.
-        try:
-            self.qdrant.delete(
-                collection_name=self.collection_name,
-                points_selector=Filter(
-                    must=[
-                        FieldCondition(
-                            key="metadata.document_id",
-                            match=MatchValue(value=document_id),
-                        )
-                    ]
-                ),
+        # 2. HARD DELETE FROM QDRANT
+        # Because a single PDF is split into many chunks, we use a Filter to find and 
+        # scrub every single vector chunk that belongs to this document_id.
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.document_id", 
+                        match=MatchValue(value=document_id)
+                    )
+                ]
             )
-            logger.info("Qdrant vectors for document %s deleted.", document_id)
-        except Exception as exc:
-            # Log and continue — SQL is the source of truth for UI state.
-            logger.error("Qdrant delete for document %s failed: %s", document_id, exc)
+        )
 
-        return {"status": "success", "document_id": document_id}
+        return {
+            "status": "success", 
+            "message": f"Document '{doc.FileName}' has been archived and scrubbed from the AI's memory."
+        }
     
 
-    # Add this inside the DocumentIngestionService class in backend/app/services/ingestion_service.py
+    async def update_document(self, document_id: str, updates: dict, db: Session) -> dict:
+        """
+        Updates a document's metadata in SQL and Qdrant without re-embedding text.
+        """
+        from app.models.chatbot import UploadedDocument
+        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+
+        # 1. Find the document in SQL
+        document = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        if not document:
+            raise ValueError(f"Document {document_id} not found in database.")
+
+        payload_updates = {}
+        
+        # 2. Apply updates conditionally
+        if updates.get("file_name"):
+            document.FileName = updates["file_name"]
+            payload_updates["metadata"] = payload_updates.get("metadata", {})
+            payload_updates["metadata"]["source"] = updates["file_name"] # Note: source maps to file_name in your payload
+
+        if updates.get("category"):
+            new_category = updates["category"]
+            if new_category not in self.allowed_categories:
+                raise ValueError(f"Invalid category: {new_category}. Must be one of {self.allowed_categories}")
+            
+            document.Category = new_category
+            payload_updates["metadata"] = payload_updates.get("metadata", {})
+            payload_updates["metadata"]["category"] = new_category
+
+        if not payload_updates:
+            return {"status": "skipped", "message": "No valid updates provided."}
+
+        # Save SQL changes
+        db.commit()
+
+        # 3. Patch Qdrant metadata instantly across all chunks
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload=payload_updates,
+            points=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.document_id",
+                        match=MatchValue(value=document_id),
+                    )
+                ]
+            )
+        )
+
+        logger.info("Successfully updated metadata for document %s", document_id)
+        return {"status": "success", "message": "Document metadata updated successfully."}
+    
+
     
     async def process_resolved_ticket(self, ticket_data: dict, db: Session) -> dict:
         """
@@ -3483,8 +3398,93 @@ class DocumentIngestionService:
 
         except Exception as exc:
             raise Exception(f"Failed to upsert chat to Qdrant: {exc}") from exc
+        
+        existing_learned = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        if not existing_learned:
+            learned_entry = LearnedChat(
+                SessionID=session_id,
+                IssueReported=extracted_data.get('issue_reported', 'None'),
+                IssueFound=extracted_data.get('issue_found', 'None'),
+                RootCause=extracted_data.get('issue_cause', 'None'),
+                WorkDone=extracted_data.get('work_done', 'None')
+            )
+            db.add(learned_entry)
+            db.commit()
 
         return {"status": "success", "session_id": session_id, "message": "Conversation extracted and learned!"}
+    
+    async def update_learned_chat(self, session_id: str, updates: dict, db: Session) -> dict:
+        from app.models.chatbot import LearnedChat
+        from qdrant_client.http.models import PointStruct
+        from datetime import datetime
+
+        # 1. Update SQL
+        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        if not chat:
+            raise ValueError("Learned chat not found.")
+
+        if updates.get("issue_reported"): chat.IssueReported = updates["issue_reported"]
+        if updates.get("issue_found"): chat.IssueFound = updates["issue_found"]
+        if updates.get("issue_cause"): chat.RootCause = updates["issue_cause"]
+        if updates.get("work_done"): chat.WorkDone = updates["work_done"]
+        chat.UpdatedAt = datetime.utcnow()
+        db.commit()
+
+        # 2. Re-format text block
+        searchable_text = (
+            f"ISSUE REPORTED: {chat.IssueReported}\n"
+            f"ACTUAL ISSUE FOUND: {chat.IssueFound}\n"
+            f"ROOT CAUSE: {chat.RootCause}\n"
+            f"RESOLUTION (WORK DONE): {chat.WorkDone}"
+        )
+
+        # 3. Re-embed and update Qdrant
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "source_session": session_id,
+                "doc_type": "resolved_chat",
+                "sql_ready_data": {
+                    "issue_reported": chat.IssueReported,
+                    "issue_found": chat.IssueFound,
+                    "issue_cause": chat.RootCause,
+                    "work_done": chat.WorkDone
+                }
+            }
+        }
+        
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
+        )
+
+        return {"status": "success", "message": "AI knowledge corrected successfully."}
+
+
+    
+
+    async def delete_learned_chat(self, session_id: str, db: Session) -> dict:
+        from app.models.chatbot import LearnedChat
+        import uuid
+
+        # 1. Soft Delete from SQL
+        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        if chat:
+            chat.IsActive = False
+            db.commit()
+
+        # 2. Hard Delete from Qdrant by Exact ID (No index required)
+        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+        
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=[ticket_uuid]  # Pass the exact ID in a list
+        )
+
+        return {"status": "success", "message": "AI forced to unlearn chat."}
 
 --- FILE: backend\app\services\orchestrator.py ---
 """
