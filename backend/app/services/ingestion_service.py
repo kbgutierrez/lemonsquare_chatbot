@@ -393,20 +393,18 @@ class DocumentIngestionService:
 
     async def delete_manual_entry(self, entry_id: str, db: Session) -> dict:
         from app.models.chatbot import ManualKnowledgeEntry
-        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
-        # 1. Soft Delete from SQL (Setting IsActive = 0)
+        # 1. Soft Delete from SQL
         entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
         if entry:
             entry.IsActive = False
             db.commit()
 
-        # 2. Hard Delete from Qdrant
+        # 2. Hard Delete from Qdrant by Exact ID (No index required)
+        # Because the EntryID in SQL is the exact same UUID used in Qdrant
         self.qdrant.delete(
             collection_name=self.collection_name,
-            points_selector=Filter(
-                must=[FieldCondition(key="metadata.document_id", match=MatchValue(value=entry_id))]
-            )
+            points_selector=[entry_id]  # Pass the exact ID in a list
         )
 
         return {"status": "success", "message": "Manual entry deleted."}
@@ -755,9 +753,12 @@ class DocumentIngestionService:
 
         return {"status": "success", "message": "AI knowledge corrected successfully."}
 
+
+    
+
     async def delete_learned_chat(self, session_id: str, db: Session) -> dict:
         from app.models.chatbot import LearnedChat
-        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
+        import uuid
 
         # 1. Soft Delete from SQL
         chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
@@ -765,14 +766,12 @@ class DocumentIngestionService:
             chat.IsActive = False
             db.commit()
 
-        # 2. Hard Delete from Qdrant
+        # 2. Hard Delete from Qdrant by Exact ID (No index required)
         ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+        
         self.qdrant.delete(
             collection_name=self.collection_name,
-            points_selector=Filter(
-                must=[FieldCondition(key="metadata.source_session", match=MatchValue(value=session_id))]
-            )
+            points_selector=[ticket_uuid]  # Pass the exact ID in a list
         )
 
         return {"status": "success", "message": "AI forced to unlearn chat."}
-        

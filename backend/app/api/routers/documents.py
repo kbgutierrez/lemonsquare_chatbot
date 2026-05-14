@@ -228,22 +228,30 @@ def get_manual_entries(
     skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
 ):
     """Fetch manual entries securely from SQL instead of Qdrant."""
-    entries = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True).order_by(ManualKnowledgeEntry.CreatedAt.desc()).offset(skip).limit(limit).all()
-    return entries
+    from app.models.chatbot import ManualKnowledgeEntry
+    
+    # 1. Fetch the raw PascalCase objects from SQL
+    entries = db.query(ManualKnowledgeEntry).filter(
+        ManualKnowledgeEntry.IsActive == True
+    ).order_by(
+        ManualKnowledgeEntry.CreatedAt.desc()
+    ).offset(skip).limit(limit).all()
 
-@router.put("/manual/{entry_id}", summary="Update a manual rule")
-async def update_manual_knowledge(
-    entry_id: str,
-    request: ManualEntryUpdateRequest,
-    db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
-):
-    from fastapi import HTTPException
-    try:
-        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+    # 2. THE FIX: Map the PascalCase SQL fields to the snake_case Pydantic schema
+    mapped_results = []
+    for entry in entries:
+        mapped_results.append(
+            ManualEntryResponse(
+                entry_id=entry.EntryID,
+                title=entry.Title,
+                content=entry.Content,
+                category=entry.Category,
+                created_at=entry.CreatedAt,
+                updated_at=entry.UpdatedAt
+            )
+        )
+        
+    return mapped_results
 
 @router.delete("/manual/{entry_id}", summary="Delete a manual rule")
 async def delete_manual_knowledge(
