@@ -131,3 +131,34 @@ class BlacklistedTicket(BaseChatbot):
     TicketNumber = Column(String(15), primary_key=True)
     BlacklistedAt = Column(DateTime, default=datetime.utcnow)
     BlacklistedBy = Column(BigInteger, default=1)
+
+
+class ManualKnowledgeEntry(BaseChatbot):
+    """Metadata and content record for manually typed knowledge base rules."""
+
+    __tablename__ = "tbl_manual_knowledge"
+
+    EntryID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    Title = Column(String(255), nullable=False)
+    Content = Column(Text, nullable=False)
+    Category = Column(String(100), nullable=False)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    CreatedBy = Column(BigInteger, default=1)
+    IsActive = Column(Boolean, default=True)
+
+
+
+class LearnedChat(BaseChatbot):
+    """Structured knowledge extracted by the AI from resolved chats."""
+
+    __tablename__ = "tbl_learned_chats"
+
+    SessionID = Column(String(36), primary_key=True)
+    IssueReported = Column(Text)
+    IssueFound = Column(Text)
+    RootCause = Column(Text)
+    WorkDone = Column(Text)
+    LearnedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    IsActive = Column(Boolean, default=True)

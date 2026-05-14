@@ -30,4 +30,26 @@ class DocumentDeleteResponse(BaseModel):
 class ManualEntryRequest(BaseModel):
     title: str
     content: str
+    category: str | None = None
+
+
+class ManualEntryResponse(BaseModel):
+    entry_id: str
+    title: str
+    content: str
     category: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ManualEntryUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+
+
+class DocumentUpdateRequest(BaseModel):
+    file_name: str | None = None
+    category: str | None = None

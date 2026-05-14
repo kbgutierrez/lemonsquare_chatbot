@@ -198,59 +198,6 @@ def get_all_chat_sessions(
 
 
 
-
-@router.post("/debug", response_model=ChatResponse)
-async def debug_rag_pipeline(
-    request: ChatRequest,
-    db: Session = Depends(get_chatbot_db),
-    orchestrator: SupportOrchestrator = Depends(get_orchestrator),
-) -> dict:
-    """
-    Debug endpoint that returns the full RAG pipeline data.
-    
-    Returns detailed information about query transformation, retrieval, and answer generation.
-    """
-    # 1. Authenticate (same as regular chat)
-    try:
-        user_data = await fetch_user_details(request.user_token)
-        user_id = user_data.get("id") or 1
-        user_name = (
-            f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
-        ).strip()
-    except AuthenticationError:
-        raise
-    except Exception as exc:
-        logger.error("Auth service error; rejecting request: %s", exc)
-        raise AuthenticationError("User authentication failed.") from exc
-
-    # 2. Session management
-    session_id = chat_service.get_or_create_session(db, request.session_id, user_id)
-
-    # 3. Save user message
-    chat_service.save_message(db, session_id, "user", request.message)
-
-    # 4. Build history
-    history_text = chat_service.get_recent_history_text(db, session_id)
-
-    # 5. Run debug pipeline
-    debug_data = await orchestrator.debug_orchestrate(
-        user_query=request.message,
-        chat_history=history_text,
-        user_name=user_name,
-        db=db,
-    )
-
-    # 6. Save AI response
-    ai_response = debug_data["final_answer"]
-    chat_service.save_message(db, session_id, "ai", ai_response)
-
-    return {
-        "session_id": session_id,
-        "response": ai_response,
-        "ticket_ids_used": debug_data.get("ticket_ids_used", []),
-        "debug_info": debug_data,
-    }
-
 @router.post(
     "/resolve/{session_id}", 
     response_model=ResolveChatResponse, 

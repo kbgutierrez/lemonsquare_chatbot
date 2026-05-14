@@ -158,7 +158,7 @@ async def sync_resolved_ticket(
     
     return TicketSyncResponse(**result)
 
-@router.post("/tickets/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
 async def whitelist_ticket(
     ticket_number: str, 
     db_chatbot: Session = Depends(get_chatbot_db),
