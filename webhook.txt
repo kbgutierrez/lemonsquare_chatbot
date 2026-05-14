@@ -1,93 +1,87 @@
-Here is a clear, structured summary you can hand right over to your frontend team (whether they are building in React or Streamlit). It outlines exactly what new superpowers they have and how the API contracts have evolved.
+Here is the complete, finalized summary of the entire architectural upgrade. You can hand this directly to your React and Streamlit frontend developers so they know exactly what was added, what was changed, and what needs to be deleted from their code.
 
 ---
 
-## 🚀 Backend Update: Full Knowledge Base CRUD
+# 🚀 API Architecture Update: Full Knowledge Base CRUD & Cleanup
 
-**Overview for Frontend:** The backend has been upgraded to support full CRUD (Create, Read, Update, Delete) across *all* AI knowledge sources. Previously, items like manual rules and extracted chats were trapped in the vector database. They are now backed by SQL tables, meaning you can build UI to let Admins edit, correct, or delete any piece of knowledge the AI has learned.
-
-Additionally, the Knowledge Base Explorer API is now fully SQL-driven, meaning it is lightning fast and no longer returns fragmented document chunks.
-
-Here are the new endpoints and payload structures for your UI:
+The backend has undergone a massive refactor to provide full **CRUD (Create, Read, Update, Delete)** capabilities across all AI knowledge sources. All data is now securely backed by SQL tables instead of floating in the vector database. We have also deleted obsolete endpoints to make the API clean and domain-specific.
 
 ---
 
-### 1. PDF Manuals (`official_document`)
+## ✨ 1. New & Updated Endpoints (What you can build now)
 
-Admins no longer need to delete and re-upload a PDF just to fix a typo in the file name or change its category.
+### A. PDF Manuals (`/api/documents`)
 
-* **NEW ENDPOINT:** `PUT /api/documents/{document_id}`
-* **Payload (Send only what you want to change):**
-```json
-{
-  "file_name": "New Server Guide",
-  "category": "Hardware_Guide"
-}
+Admins can now rename or re-categorize PDFs instantly without needing to delete and re-upload the file.
 
-```
-
-
-* **Response:** Returns the updated `DocumentResponse` object.
-
----
-
-### 2. Manual Knowledge Rules (`general_text`)
-
-Manual rules typed by the Admin are now tracked in a SQL table, allowing for a dedicated management view.
-
-* **NEW ENDPOINT (Read):** `GET /api/documents/manual?skip=0&limit=50`
-* *Returns:* A list of `ManualEntryResponse` objects containing `entry_id`, `title`, `content`, `category`, and timestamps.
-
-
-* **NEW ENDPOINT (Update):** `PUT /api/documents/manual/{entry_id}`
-* **Payload:** ```json
-{
-"title": "Updated Rule Title",
-"content": "Updated rule text...",
-"category": "General_IT"
-}
-```
-
-```
+* **[NEW]** `PUT /api/documents/{document_id}`
+* **Payload:** `{"file_name": "New Name.pdf", "category": "Hardware_Guide"}` *(Fields are optional; only send what changed).*
+* **Returns:** Updated `DocumentResponse`.
 
 
 
+### B. Manual Knowledge Rules (`/api/documents/manual`)
 
-* **NEW ENDPOINT (Delete):** `DELETE /api/documents/manual/{entry_id}`
+Manually typed rules are now tracked in SQL and fully manageable.
 
----
+* **[UPDATED]** `GET /api/documents/manual` -> Now fetches lightning-fast, paginated data from SQL.
+* **[NEW]** `PUT /api/documents/manual/{entry_id}`
+* **Payload:** `{"title": "...", "content": "...", "category": "..."}`
 
-### 3. AI-Learned Chats (`resolved_chat`)
 
-If the AI hallucinates a summary when an employee clicks "Mark as Resolved," Admins can now edit the JSON summary directly or force the AI to unlearn it.
+* **[NEW]** `DELETE /api/documents/manual/{entry_id}` -> Deletes the rule from the UI and scrubs it from the AI's memory.
 
-* **NEW ENDPOINT (Update):** `PUT /api/self_knowledge/chats/{session_id}`
-* **Payload (Send only the fields that need correction):**
-```json
-{
-  "issue_reported": "User couldn't connect to VPN.",
-  "issue_found": "VPN client was outdated.",
-  "issue_cause": "Missed patch 2.1.",
-  "work_done": "Updated client and rebooted."
-}
+### C. AI-Extracted Chats (`/api/self_knowledge`)
 
-```
+If the AI hallucinates a summary when a chat is resolved, Admins can now fix it or delete it.
+
+* **[NEW]** `PUT /api/self_knowledge/chats/{session_id}`
+* **Payload:** `{"issue_reported": "...", "issue_found": "...", "issue_cause": "...", "work_done": "..."}`
+
+
+* **[NEW]** `DELETE /api/self_knowledge/chats/{session_id}` -> Forces the AI to permanently unlearn that specific chat session.
+
+### D. The Knowledge Explorer (`/api/knowledge`)
+
+The global explorer endpoint has been completely rewritten to query the SQL databases instead of scrolling the vector engine.
+
+* **[UPDATED]** `GET /api/knowledge/explore?doc_type=...&limit=100`
+* **Massive Performance Boost:** Loads instantly.
+* **Clean Data:** Returns exactly **one clean row** per document/ticket/chat instead of fragmented vector chunks.
+* **Filters Supported:** Use `?doc_type=` to filter by:
+* `official_document` (PDFs)
+* `general_text` (Manual Rules)
+* `resolved_chat` (AI Chat Summaries)
+* `helpdesk_ticket` (Synced IT Tickets)
 
 
 
 
-* **NEW ENDPOINT (Delete):** `DELETE /api/self_knowledge/chats/{session_id}`
 
 ---
 
-### 4. Knowledge Base Explorer API (Major Upgrade)
+## 🗑️ 2. Deleted Endpoints (Remove these from Frontend)
 
-The Explorer route (`GET /api/knowledge/explore`) keeps the same URL, but the behavior is vastly improved.
+To clean up the architecture, several obsolete endpoints that relied on old vector-scrolling logic have been permanently deleted. **Please remove any frontend calls to these routes:**
 
-* **What Changed:** Instead of scrolling the vector database (which was slow and returned 50 separate chunks for a single PDF), the endpoint now queries the SQL databases directly.
-* **Frontend Benefit:** * Queries are now near-instant.
-* You will receive exactly **one clean row per document/chat/ticket**, rather than fragmented chunks.
-* You can safely build standard pagination around it.
+1. **`POST /api/documents/test-search`** -> DELETED. (Use `/api/documents/debug/full-pipeline` instead).
+2. **`POST /api/documents/explore/by-type`** -> DELETED. (Replaced by the new `GET /api/knowledge/explore` query parameters).
+3. **`GET /api/self_knowledge`** -> DELETED. (Replaced by the new `GET /api/knowledge/explore`).
+4. **`POST /api/chat/debug`** -> DELETED. (Use `/api/documents/debug/full-pipeline` instead).
+
+---
+
+## 🐛 3. Routing Bug Fix
+
+* **Ticket Whitelist Route Fixed:** * **OLD (Broken):** `POST /api/tickets/tickets/{ticket_number}/whitelist`
+* **NEW (Fixed):** `POST /api/tickets/{ticket_number}/whitelist`
 
 
-* **Parameters:** `?doc_type=<type>&limit=100` (Valid types: `general_text`, `resolved_chat`, `official_document`, `helpdesk_ticket`, or omit for all).
+
+---
+
+## 🛠️ Frontend Action Items
+
+* **React Team:** You now have all the necessary APIs to build complete "Edit" and "Delete" modals for every knowledge base management screen.
+* **Streamlit Admin:** * Update any Explorer dashboards to use the new `GET /api/knowledge/explore` endpoint. You can remove any long loading spinners, as this endpoint is now virtually instant.
+* Remove any buttons or tabs that point to the deleted endpoints listed in Section 2.
