@@ -7,7 +7,6 @@ import ChatMenu from "./ChatMenu.jsx"
 
 const ChatHeader = ({
   resolved = false,
-  onClose,
   onOpenModal,
 }) => {
 
@@ -120,46 +119,31 @@ const ChatHeader = ({
       </div>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center">
 
         {/* MENU */}
-        <ChatMenu
-          resolved={
-            resolved
-          }
-
-          onSelect={
-            onOpenModal
-          }
-        />
-
-        {/* CLOSE */}
-        <button
-          type="button"
-
-          onClick={
-            onClose
-          }
-
+        <div
           className="
-            flex
-            h-10
-            w-10
-            items-center
-            justify-center
-
             rounded-xl
 
-            bg-white/10
+            bg-white
 
-            transition-all
-            duration-200
+            shadow-sm
 
-            hover:bg-white/20
+            ring-1
+            ring-black/5
           "
         >
-          ✕
-        </button>
+          <ChatMenu
+            resolved={
+              resolved
+            }
+
+            onSelect={
+              onOpenModal
+            }
+          />
+        </div>
       </div>
     </div>
   )

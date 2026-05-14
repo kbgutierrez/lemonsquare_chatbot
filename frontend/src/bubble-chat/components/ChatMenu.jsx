@@ -7,6 +7,7 @@ import {
 import {
   EllipsisVertical,
   History,
+  MessageSquare,
   Plus,
   Ticket,
   Phone,
@@ -98,16 +99,42 @@ const ChatMenu = ({
   }, [])
 
   /* ========================================
+     ESC CLOSE
+  ======================================== */
+
+  useEffect(() => {
+
+    const handleEscape =
+      (event) => {
+
+        if (
+          event.key === "Escape"
+        ) {
+
+          setOpen(false)
+        }
+      }
+
+    window.addEventListener(
+      "keydown",
+      handleEscape
+    )
+
+    return () =>
+      window.removeEventListener(
+        "keydown",
+        handleEscape
+      )
+
+  }, [])
+
+  /* ========================================
      SELECT
   ======================================== */
 
   const handleSelect =
     (id) => {
 
-      /*
-        Prevent duplicate resolve
-        on already resolved chats.
-      */
       if (
         resolved &&
         id === "resolve"
@@ -124,11 +151,16 @@ const ChatMenu = ({
   return (
     <div
       ref={menuRef}
-      className="relative"
+      className="
+        relative
+        z-[200]
+      "
     >
       {/* BUTTON */}
       <button
         type="button"
+
+        aria-label="Chat menu"
 
         onClick={() =>
           setOpen(
@@ -143,16 +175,25 @@ const ChatMenu = ({
           items-center
           justify-center
 
+          rounded-xl
+
           text-violet-700
 
           transition-all
           duration-300
 
-          hover:scale-110
+          hover:bg-violet-100/70
+          hover:scale-105
+
+          active:scale-95
 
           ${
             open
-              ? "rotate-90"
+              ? `
+                rotate-90
+
+                bg-violet-100
+              `
               : ""
           }
         `}
@@ -171,23 +212,26 @@ const ChatMenu = ({
           absolute
           right-0
           top-12
-          z-50
 
-          w-64
+          z-[250]
+
+          w-72
+          max-w-[calc(100vw-24px)]
 
           origin-top-right
 
           overflow-hidden
 
-          rounded-2xl
+          rounded-[24px]
 
           border
-          border-violet-100
+          border-violet-100/80
 
           bg-white/95
-          backdrop-blur-xl
 
-          shadow-[0_20px_50px_rgba(139,92,246,0.18)]
+          shadow-[0_25px_70px_rgba(139,92,246,0.22)]
+
+          backdrop-blur-2xl
 
           transition-all
           duration-300
@@ -197,12 +241,14 @@ const ChatMenu = ({
             open
               ? `
                 pointer-events-auto
+
                 translate-y-0
                 scale-100
                 opacity-100
               `
               : `
                 pointer-events-none
+
                 -translate-y-2
                 scale-95
                 opacity-0
@@ -210,15 +256,47 @@ const ChatMenu = ({
           }
         `}
       >
+        {/* BACKGROUND GLOW */}
+        <div
+          className="
+            pointer-events-none
+
+            absolute
+            inset-0
+
+            overflow-hidden
+          "
+        >
+          <div
+            className="
+              absolute
+              right-[-40px]
+              top-[-40px]
+
+              h-36
+              w-36
+
+              rounded-full
+
+              bg-violet-200/20
+
+              blur-3xl
+            "
+          />
+        </div>
+
         {/* HEADER */}
         <div
           className="
+            relative
+            z-10
+
             border-b
-            border-violet-100
+            border-violet-100/80
 
             bg-gradient-to-r
-            from-violet-50
-            to-purple-50
+            from-violet-50/90
+            to-purple-50/70
 
             px-4
             py-3
@@ -229,6 +307,7 @@ const ChatMenu = ({
               text-[10px]
               font-semibold
               uppercase
+
               tracking-[0.22em]
 
               text-violet-600
@@ -240,7 +319,12 @@ const ChatMenu = ({
 
         {/* OPTIONS */}
         <div
-          className="p-2"
+          className="
+            relative
+            z-10
+
+            p-2
+          "
         >
           {options.map(
             (
@@ -248,8 +332,7 @@ const ChatMenu = ({
                 id,
                 label,
                 icon: Icon,
-              },
-              index
+              }
             ) => {
 
               const isResolveOption =
@@ -281,7 +364,7 @@ const ChatMenu = ({
                     items-center
                     gap-3
 
-                    rounded-xl
+                    rounded-2xl
 
                     px-3
                     py-3
@@ -301,27 +384,23 @@ const ChatMenu = ({
                         : `
                           text-slate-700
 
-                          hover:translate-x-1
                           hover:bg-violet-50
+                          hover:translate-x-1
                         `
                     }
                   `}
-
-                  style={{
-                    animationDelay:
-                      `${index * 40}ms`,
-                  }}
                 >
                   {/* ICON */}
                   <div
                     className={`
                       flex
-                      h-9
-                      w-9
+                      h-10
+                      w-10
+                      shrink-0
                       items-center
                       justify-center
 
-                      rounded-xl
+                      rounded-2xl
 
                       transition-all
                       duration-200
@@ -360,15 +439,18 @@ const ChatMenu = ({
                     )}
                   </div>
 
-                  {/* LABEL */}
+                  {/* TEXT */}
                   <div
                     className="
                       flex
+                      min-w-0
                       flex-col
                     "
                   >
                     <span
                       className="
+                        truncate
+
                         font-medium
                       "
                     >
@@ -379,6 +461,7 @@ const ChatMenu = ({
                       <span
                         className="
                           text-[10px]
+
                           text-emerald-600
                         "
                       >
