@@ -223,6 +223,8 @@ async def update_document_metadata(
         raise HTTPException(status_code=400, detail=str(exc))
     
 
+from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
+
 @router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
 def get_manual_entries(
     skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
@@ -230,14 +232,13 @@ def get_manual_entries(
     """Fetch manual entries securely from SQL instead of Qdrant."""
     from app.models.chatbot import ManualKnowledgeEntry
     
-    # 1. Fetch the raw PascalCase objects from SQL
     entries = db.query(ManualKnowledgeEntry).filter(
         ManualKnowledgeEntry.IsActive == True
     ).order_by(
         ManualKnowledgeEntry.CreatedAt.desc()
     ).offset(skip).limit(limit).all()
 
-    # 2. THE FIX: Map the PascalCase SQL fields to the snake_case Pydantic schema
+    # Map the PascalCase SQL fields to the snake_case Pydantic schema
     mapped_results = []
     for entry in entries:
         mapped_results.append(
@@ -253,12 +254,30 @@ def get_manual_entries(
         
     return mapped_results
 
+
+@router.put("/manual/{entry_id}", summary="Update a manual rule")
+async def update_manual_knowledge(
+    entry_id: str,
+    request: ManualEntryUpdateRequest,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """Updates the rule in SQL and replaces its brain vector in Qdrant."""
+    try:
+        # Pass exclude_unset=True so we only update the fields the user actually changed
+        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.delete("/manual/{entry_id}", summary="Delete a manual rule")
 async def delete_manual_knowledge(
     entry_id: str,
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
+    """Deletes the rule from SQL and scrubs it from the AI's Qdrant brain."""
     result = await ingestion_service.delete_manual_entry(entry_id, db)
     return result
 
