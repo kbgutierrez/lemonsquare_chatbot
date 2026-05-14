@@ -78,14 +78,24 @@ export const API_ENDPOINTS = {
   DOCUMENT_DELETE:
     "/documents/:documentId",
 
-  DOCUMENT_TEST_SEARCH:
-    "/documents/test-search",
-
   DOCUMENT_DEBUG_PIPELINE:
     "/documents/debug/full-pipeline",
 
   DOCUMENT_MANUAL_ENTRY:
     "/documents/manual",
+
+  DOCUMENT_MANUAL_ENTRY_UPDATE:
+    "/documents/manual/:entryId",
+
+  DOCUMENT_MANUAL_ENTRY_DELETE:
+    "/documents/manual/:entryId",
+
+  /* ====================================
+     KNOWLEDGE EXPLORER
+  ==================================== */
+
+  KNOWLEDGE_EXPLORE:
+    "/knowledge/explore",
 
   /* ====================================
      CHAT
@@ -103,8 +113,15 @@ export const API_ENDPOINTS = {
   CHAT_RESOLVE:
     "/chat/resolve/:sessionId",
 
-  CHAT_DEBUG:
-    "/chat/debug",
+  /* ====================================
+     SELF KNOWLEDGE
+  ==================================== */
+
+  SELF_KNOWLEDGE_UPDATE:
+    "/self_knowledge/chats/:sessionId",
+
+  SELF_KNOWLEDGE_DELETE:
+    "/self_knowledge/chats/:sessionId",
 
   /* ====================================
      TICKETS
@@ -118,6 +135,9 @@ export const API_ENDPOINTS = {
 
   TICKET_SYNC:
     "/tickets/sync",
+
+  TICKET_WHITELIST:
+    "/tickets/:ticketNumber/whitelist",
 
   /* ====================================
      AI SETTINGS

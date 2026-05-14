@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -8,6 +9,9 @@ import {
 import {
   uploadDocument,
 } from "../services/uploadService"
+
+import aiSettingsService
+  from "../services/aiSettingsService"
 
 const ITEMS_PER_PAGE = 5
 
@@ -36,6 +40,53 @@ export const useFileUpload =
 
     const [hasPendingUploads, setHasPendingUploads] =
       useState(false)
+
+    const [
+      selectedCategory,
+      setSelectedCategory,
+    ] = useState("")
+
+    const [categories, setCategories] =
+      useState([])
+
+    /* =========================================
+       LOAD CATEGORIES
+    ========================================= */
+
+    useEffect(() => {
+
+      const loadCategories =
+        async () => {
+
+          try {
+
+            const settings =
+              await aiSettingsService.getSettings()
+
+            const parsed =
+              settings?.AllowedCategories
+                ?.split(",")
+
+                ?.map((item) =>
+                  item.trim()
+                )
+
+                ?.filter(Boolean) || []
+
+            setCategories(parsed)
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_CATEGORIES_ERROR",
+              error
+            )
+          }
+        }
+
+      loadCategories()
+
+    }, [])
 
     /* =========================================
        FORMAT SIZE
@@ -128,14 +179,16 @@ export const useFileUpload =
       useCallback(
         async (
           localId,
-          file
+          file,
+          category
         ) => {
 
           try {
 
             const data =
               await uploadDocument(
-                file
+                file,
+                category
               )
 
             updateFile(
@@ -211,8 +264,6 @@ export const useFileUpload =
               false
             )
 
-            /* PARALLEL UPLOADS */
-
             await Promise.all(
               pending.map(
                 async (file) => {
@@ -230,7 +281,8 @@ export const useFileUpload =
 
                   await uploadFile(
                     file.id,
-                    file.raw
+                    file.raw,
+                    file.category
                   )
                 }
               )
@@ -311,7 +363,7 @@ export const useFileUpload =
                     ?.toUpperCase(),
 
                 category:
-                  "General",
+                  selectedCategory,
 
                 status:
                   "Pending",
@@ -361,12 +413,9 @@ export const useFileUpload =
         [
           formatSize,
           refreshPendingState,
+          selectedCategory,
         ]
       )
-
-    /* =========================================
-       INPUT CHANGE
-    ========================================= */
 
     const handleInputChange =
       useCallback(
@@ -382,10 +431,6 @@ export const useFileUpload =
         [handleFiles]
       )
 
-    /* =========================================
-       DROP
-    ========================================= */
-
     const handleDrop =
       useCallback(
         (event) => {
@@ -399,10 +444,6 @@ export const useFileUpload =
         },
         [handleFiles]
       )
-
-    /* =========================================
-       REMOVE FILE
-    ========================================= */
 
     const removeFile =
       useCallback(
@@ -428,16 +469,8 @@ export const useFileUpload =
         [refreshPendingState]
       )
 
-    /* =========================================
-       TABLE VISIBILITY
-    ========================================= */
-
     const showTable =
       uploadedFiles.length > 0
-
-    /* =========================================
-       PAGINATION
-    ========================================= */
 
     const totalPages =
       Math.max(
@@ -479,6 +512,10 @@ export const useFileUpload =
 
       hasPendingUploads,
       showTable,
+
+      categories,
+      selectedCategory,
+      setSelectedCategory,
 
       handleInputChange,
       handleDrop,
