@@ -450,50 +450,37 @@ class DocumentIngestionService:
         return {"status": "success", "message": "Manual entry deleted."}
 
     async def delete_document(self, document_id: str, db: Session) -> dict:
-        """
-        Remove a document from both SQL and Qdrant.
+        from app.models.chatbot import UploadedDocument
+        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 
-        Args:
-            document_id: The UUID of the document to delete.
-            db: Active database session.
+        # 1. SOFT DELETE FROM SQL
+        # We fetch the document and set IsActive = False instead of using db.delete()
+        doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        if not doc:
+            raise ValueError("Document not found in database.")
 
-        Returns:
-            A dict with status and document_id.
-        """
-        logger.info("Deleting document %s...", document_id)
+        doc.IsActive = False
+        db.commit()
 
-        # 1. Soft-delete (or hard-delete) from SQL.
-        document = (
-            db.query(UploadedDocument)
-            .filter(UploadedDocument.DocumentID == document_id)
-            .first()
-        )
-        if document:
-            db.delete(document)
-            db.commit()
-            logger.info("SQL record for document %s deleted.", document_id)
-        else:
-            logger.warning("Document %s not found in SQL; proceeding to Qdrant delete.", document_id)
-
-        # 2. Delete from Qdrant.
-        try:
-            self.qdrant.delete(
-                collection_name=self.collection_name,
-                points_selector=Filter(
-                    must=[
-                        FieldCondition(
-                            key="metadata.document_id",
-                            match=MatchValue(value=document_id),
-                        )
-                    ]
-                ),
+        # 2. HARD DELETE FROM QDRANT
+        # Because a single PDF is split into many chunks, we use a Filter to find and 
+        # scrub every single vector chunk that belongs to this document_id.
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.document_id", 
+                        match=MatchValue(value=document_id)
+                    )
+                ]
             )
-            logger.info("Qdrant vectors for document %s deleted.", document_id)
-        except Exception as exc:
-            # Log and continue — SQL is the source of truth for UI state.
-            logger.error("Qdrant delete for document %s failed: %s", document_id, exc)
+        )
 
-        return {"status": "success", "document_id": document_id}
+        return {
+            "status": "success", 
+            "message": f"Document '{doc.FileName}' has been archived and scrubbed from the AI's memory."
+        }
     
 
     async def update_document(self, document_id: str, updates: dict, db: Session) -> dict:
