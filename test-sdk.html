@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+
+  <title>LemonSquare SDK Test</title>
+
+  <link
+    rel="stylesheet"
+    href="http://localhost:4173/lemonsquare-chatbot.css"
+  />
+</head>
+
+<body>
+
+  <h1>SDK TEST PAGE</h1>
+
+  <script src="http://localhost:4173/lemonsquare-chat.js"></script>
+
+  <script>
+    window.LemonSquareChat.mount({
+      config: {
+        apiBaseUrl: "http://localhost:8000/api",
+        userToken: "11318",
+      },
+    })
+  </script>
+
+</body>
+</html>

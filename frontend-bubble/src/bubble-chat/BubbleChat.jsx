@@ -16,6 +16,7 @@ import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
 import CallAgentModal from "./modals/CallAgentModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
+import chatbotService from "./services/chatbotService"
 
 import {
   useBubbleDrag,
@@ -212,6 +213,16 @@ const BubbleChat = () => {
     }
 
   /* ========================================
+     REQUESTER ID
+  ======================================== */
+
+  const requesterId =
+    chatbotService.resolveRequesterId(
+      chatbotService.getUserToken()
+    )
+
+
+  /* ========================================
      MODALS
   ======================================== */
 
@@ -228,6 +239,12 @@ const BubbleChat = () => {
     ticket: (
       <SubmitTicketModal
         onClose={closeModal}
+
+        sessionId={sessionId}
+
+        requesterId={requesterId}
+
+        messages={messages}
       />
     ),
 
@@ -465,16 +482,20 @@ const BubbleChat = () => {
       </motion.div>
 
       {/* MODALS */}
-      <div
-        className="
-          pointer-events-auto
+      {activeModal && (
+        <div
+          className="
+            pointer-events-auto
 
-          relative
-          z-[120]
-        "
-      >
-        {modals[activeModal]}
-      </div>
+            fixed
+            inset-0
+
+            z-[10000]
+          "
+        >
+          {modals[activeModal]}
+        </div>
+      )}
     </div>
   )
 }

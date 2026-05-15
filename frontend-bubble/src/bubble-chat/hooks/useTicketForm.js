@@ -1,16 +1,25 @@
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react"
 
 import ticketService from "../services/ticketService"
 
-const MAX_TITLE = 36
 const MAX_WORDS = 150
 const LONGEST_WORD_LIMIT = 189
 
+/* ========================================
+   HOOK
+======================================== */
+
 export const useTicketForm =
-  (onSuccess) => {
+  ({
+    sessionId,
+    requesterId,
+    messages = [],
+    onSuccess,
+  }) => {
 
     const [loading, setLoading] =
       useState(false)
@@ -18,141 +27,304 @@ export const useTicketForm =
     const [success, setSuccess] =
       useState(false)
 
+    const [confirming, setConfirming] =
+      useState(false)
+
+    const [summaryLoading, setSummaryLoading] =
+      useState(true)
+
+    const [summaryError, setSummaryError] =
+      useState("")
+
+    const [aiSummary, setAiSummary] =
+      useState({
+        title: "",
+        summary: "",
+      })
+
     const [form, setForm] =
       useState({
         SessionID:
-          "CHAT_SESSION_PLACEHOLDER",
+          sessionId || "",
 
         RequesterUserID:
-          "USER_ID_PLACEHOLDER",
-
-        ChatTitle: "",
-
-        IssueSummary: "",
+          requesterId || "",
 
         Description: "",
-
-        PriorityLevel:
-          "Medium",
-
-        CategoryName:
-          "General",
       })
 
-    /* WORD COUNT */
-    const words = useMemo(
-      () =>
-        (
-          form.Description.match(
-            /\b\S+\b/g
-          ) || []
-        ).length,
+    /* ========================================
+       FETCH ESCALATION DRAFT
+    ======================================== */
 
-      [form.Description]
-    )
+    useEffect(() => {
 
-    /* UPDATE */
-    const update = (
-      name,
-      value
-    ) => {
+      let active = true
 
-      if (
-        name === "ChatTitle" &&
-        value.length > MAX_TITLE
-      ) {
-        return
-      }
+      const loadDraft =
+        async () => {
 
-      if (
-        name === "Description"
-      ) {
+          try {
 
-        const extracted =
-          value.match(
-            /\b\S+\b/g
-          ) || []
+            if (!sessionId) {
 
-        if (
-          extracted.length >
-          MAX_WORDS
-        ) {
-          return
+              return
+            }
+
+            setSummaryLoading(true)
+
+            setSummaryError("")
+
+            console.log(
+              "LOADING_ESCALATION_DRAFT",
+              sessionId
+            )
+
+            const response =
+              await ticketService.getEscalationDraft(
+                sessionId
+              )
+
+            console.log(
+              "ESCALATION_DRAFT_RESULT",
+              response
+            )
+
+            if (!active) {
+
+              return
+            }
+
+            setAiSummary({
+              title:
+                response?.summary ||
+                "Support Escalation",
+
+              summary:
+                response?.description ||
+                "Conversation escalation requested.",
+            })
+
+          } catch (error) {
+
+            console.error(
+              "ESCALATION_DRAFT_ERROR",
+              error
+            )
+
+            if (!active) {
+
+              return
+            }
+
+            setSummaryError(
+              error?.message ||
+              "Failed to generate escalation summary."
+            )
+
+            setAiSummary({
+              title:
+                "Support Escalation",
+
+              summary:
+                "Unable to generate AI escalation summary.",
+            })
+
+          } finally {
+
+            if (active) {
+
+              setSummaryLoading(false)
+            }
+          }
         }
 
-        if (
-          extracted.some(
-            (word) =>
-              word.length >
-              LONGEST_WORD_LIMIT
-          )
-        ) {
-          return
-        }
+      loadDraft()
+
+      return () => {
+
+        active = false
       }
 
-      setForm((prev) => ({
-        ...prev,
-        [name]: value,
-      }))
-    }
+    }, [sessionId])
 
-    /* SUBMIT */
-    const submit = async () => {
+    /* ========================================
+       SYNC SESSION
+    ======================================== */
 
-      if (
-        !form.ChatTitle ||
-        !form.Description
-      ) {
-        return
-      }
+    useEffect(() => {
 
-      setLoading(true)
+      setForm(
+        (previous) => ({
+          ...previous,
 
-      const payload = {
-        SessionID:
-          form.SessionID,
+          SessionID:
+            sessionId || "",
 
-        RequesterUserID:
-          form.RequesterUserID,
-
-        ChatTitle:
-          form.ChatTitle,
-
-        IssueSummary:
-          form.IssueSummary ||
-          form.Description,
-
-        Description:
-          form.Description,
-
-        PriorityLevel:
-          form.PriorityLevel,
-
-        CategoryName:
-          form.CategoryName,
-      }
-
-      const response =
-        await ticketService.createTicket(
-          payload
-        )
-
-      console.log(
-        "TICKET_RESPONSE",
-        response
+          RequesterUserID:
+            requesterId || "",
+        })
       )
 
-      setTimeout(() => {
+    }, [
+      sessionId,
+      requesterId,
+    ])
 
-        setLoading(false)
+    /* ========================================
+       WORD COUNT
+    ======================================== */
 
-        setSuccess(true)
+    const words =
+      useMemo(
+        () =>
+          (
+            form.Description.match(
+              /\b\S+\b/g
+            ) || []
+          ).length,
 
-        onSuccess?.()
+        [form.Description]
+      )
 
-      }, 900)
-    }
+    /* ========================================
+       UPDATE
+    ======================================== */
+
+    const update =
+      (
+        name,
+        value
+      ) => {
+
+        if (
+          name ===
+          "Description"
+        ) {
+
+          const extracted =
+            value.match(
+              /\b\S+\b/g
+            ) || []
+
+          if (
+            extracted.length >
+            MAX_WORDS
+          ) {
+
+            return
+          }
+
+          if (
+            extracted.some(
+              (
+                word
+              ) =>
+                word.length >
+                LONGEST_WORD_LIMIT
+            )
+          ) {
+
+            return
+          }
+        }
+
+        setForm(
+          (
+            previous
+          ) => ({
+            ...previous,
+            [name]: value,
+          })
+        )
+      }
+
+    /* ========================================
+       PREPARE ESCALATION
+    ======================================== */
+
+    const prepareSubmit =
+      () => {
+
+        setConfirming(true)
+      }
+
+    /* ========================================
+       CANCEL CONFIRMATION
+    ======================================== */
+
+    const cancelConfirmation =
+      () => {
+
+        setConfirming(false)
+      }
+
+    /* ========================================
+       FINAL SUBMIT
+    ======================================== */
+
+    const submit =
+      async () => {
+
+        try {
+
+          setLoading(true)
+
+          const payload = {
+            session_id:
+              form.SessionID,
+
+            requester_id:
+              Number(
+                form.RequesterUserID
+              ),
+
+            company_id: 1,
+
+            summary:
+              aiSummary.title,
+
+            description:
+              aiSummary.summary,
+          }
+
+          console.log(
+            "ESCALATION_SUBMIT_PAYLOAD",
+            payload
+          )
+
+          const response =
+            await ticketService.submitEscalation(
+              payload
+            )
+
+          console.log(
+            "ESCALATION_SUBMIT_RESPONSE",
+            response
+          )
+
+          setSuccess(true)
+
+          setTimeout(() => {
+
+            onSuccess?.(
+              response
+            )
+
+          }, 1000)
+
+        } catch (error) {
+
+          console.error(
+            "ESCALATION_SUBMIT_ERROR",
+            error
+          )
+
+        } finally {
+
+          setLoading(false)
+        }
+      }
 
     return {
       form,
@@ -167,7 +339,17 @@ export const useTicketForm =
 
       submit,
 
-      MAX_TITLE,
+      aiSummary,
+
+      confirming,
+
+      prepareSubmit,
+
+      cancelConfirmation,
+
+      summaryLoading,
+
+      summaryError,
 
       MAX_WORDS,
     }

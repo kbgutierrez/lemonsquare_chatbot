@@ -705,6 +705,10 @@ const chatbotService = {
   loadAISettings,
 
   verifyUserToken,
+
+  getUserToken,
+
+  resolveRequesterId,
 }
 
 export default chatbotService
