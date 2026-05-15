@@ -71,3 +71,22 @@ def update_active_settings(
     )
     logger.info("Settings updated: model=%s", new_settings.ActiveModel)
     return SettingsResponse.model_validate(config)
+
+
+
+@router.post(
+    "/default",
+    response_model=SettingsResponse,
+    summary="Restore AI settings to system defaults (from ID 2)",
+)
+def restore_settings_to_default(
+    db: Session = Depends(get_chatbot_db),
+) -> SettingsResponse:
+    """
+    Archives current settings and copies SettingID 2 to a new active row.
+    """
+    config = settings_service.restore_default_settings(
+        db,
+        updated_by=_PLACEHOLDER_ADMIN_ID,
+    )
+    return SettingsResponse.model_validate(config)

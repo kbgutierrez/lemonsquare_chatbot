@@ -26,6 +26,7 @@ from app.services.user_service import fetch_user_details
 from app.api.deps import get_chatbot_db, get_orchestrator, get_ingestion_service
 from app.services.ingestion_service import DocumentIngestionService
 from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse, ResolveChatResponse
+from app.schemas.tickets import TicketEscalateRequest, TicketEscalateResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -214,3 +215,25 @@ async def mark_chat_resolved(
     """
     result = await ingestion_service.process_resolved_chat(session_id, db)
     return result
+
+
+
+@router.post("/escalate", response_model=TicketEscalateResponse, summary="Escalate chat to a live agent ticket")
+async def escalate_chat(
+    request: TicketEscalateRequest,
+    db: Session = Depends(get_chatbot_db),
+):
+    try:
+        result = await chat_service.escalate_to_agent(
+            session_id=request.session_id,
+            requester_id=request.requester_id,
+            company_id=request.company_id,
+            db=db
+        )
+        return TicketEscalateResponse(**result)
+    except Exception as exc:
+        logger.error(f"Failed to escalate ticket: {exc}")
+        return TicketEscalateResponse(
+            status="error",
+            message=str(exc)
+        )
