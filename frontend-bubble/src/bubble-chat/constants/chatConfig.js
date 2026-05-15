@@ -1,0 +1,22 @@
+export const CHAT_CONFIG = {
+
+  BUBBLE_SIZE: 64,
+
+  BUBBLE_EXPANDED: 224,
+
+  CHAT_WIDTH: 380,
+
+  EDGE_PADDING: 20,
+
+  MOBILE_WIDTH:
+    '92vw',
+
+  DESKTOP_WIDTH:
+    '380px',
+
+  MOBILE_HEIGHT:
+    '72vh',
+
+  DESKTOP_HEIGHT:
+    '520px'
+}
