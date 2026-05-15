@@ -256,12 +256,18 @@ const BubbleChat = () => {
   return (
     <div
       className="
+        lemonsquare-chat-root
+
         pointer-events-none
 
         fixed
-        inset-0
+        bottom-0
+        left-0
 
-        z-[70]
+        h-0
+        w-0
+
+        z-[9999]
       "
     >
       {/* BACKDROP */}
@@ -283,7 +289,7 @@ const BubbleChat = () => {
             className="
               pointer-events-none
 
-              absolute
+              fixed
               inset-0
 
               bg-black/[0.02]
@@ -299,7 +305,7 @@ const BubbleChat = () => {
         className={`
           pointer-events-auto
 
-          absolute
+          fixed
 
           will-change-transform
 

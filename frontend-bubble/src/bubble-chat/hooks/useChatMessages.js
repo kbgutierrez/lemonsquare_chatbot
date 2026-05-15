@@ -54,6 +54,24 @@ export const useChatMessages =
     const activeLoadIdRef =
       useRef(null)
 
+    /*
+      Prevent stale closure issues
+      during async message sending.
+    */
+    const messagesRef =
+      useRef([])
+
+    /* ========================================
+       SYNC MESSAGE REF
+    ======================================== */
+
+    useEffect(() => {
+
+      messagesRef.current =
+        messages
+
+    }, [messages])
+
     /* ========================================
        TIME FORMAT
     ======================================== */
@@ -118,6 +136,12 @@ export const useChatMessages =
                   session.id ===
                   targetSessionId
               )
+
+            if (
+              !mountedRef.current
+            ) {
+              return
+            }
 
             setResolved(
               Boolean(
@@ -315,6 +339,9 @@ export const useChatMessages =
           requestLockRef.current =
             true
 
+          const currentMessages =
+            messagesRef.current
+
           const userMessage = {
             id:
               crypto.randomUUID(),
@@ -344,7 +371,7 @@ export const useChatMessages =
           }
 
           const optimisticMessages = [
-            ...messages,
+            ...currentMessages,
             userMessage,
           ]
 
@@ -421,9 +448,14 @@ export const useChatMessages =
               aiMessage,
             ]
 
-            setMessages(
-              finalMessages
-            )
+            if (
+              mountedRef.current
+            ) {
+
+              setMessages(
+                finalMessages
+              )
+            }
 
             console.log(
               "MESSAGE_SENT_SUCCESS",
@@ -457,10 +489,15 @@ export const useChatMessages =
               isError: true,
             }
 
-            setMessages([
-              ...optimisticMessages,
-              errorMessage,
-            ])
+            if (
+              mountedRef.current
+            ) {
+
+              setMessages([
+                ...optimisticMessages,
+                errorMessage,
+              ])
+            }
 
           } finally {
 
@@ -475,10 +512,7 @@ export const useChatMessages =
               false
           }
         },
-        [
-          messages,
-          resolved,
-        ]
+        [resolved]
       )
 
     /* ========================================
@@ -524,7 +558,12 @@ export const useChatMessages =
             /*
               Backend is source of truth.
             */
-            setResolved(true)
+            if (
+              mountedRef.current
+            ) {
+
+              setResolved(true)
+            }
 
             console.log(
               "BACKEND_CONVERSATION_RESOLVED",

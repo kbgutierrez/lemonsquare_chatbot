@@ -1,6 +1,8 @@
 /*
   CENTRALIZED APP CONFIG
 
+  SDK-SAFE CONFIGURATION LAYER
+
   Future-safe for:
   - SQL Server
   - REST API
@@ -8,6 +10,7 @@
   - RAG
   - AI Models
   - Admin Dashboard
+  - SDK Embedding
 */
 
 /* ========================================
@@ -29,15 +32,105 @@ const ENV = {
 }
 
 /* ========================================
+   SDK GLOBAL CONFIG
+======================================== */
+
+const resolveSdkGlobalConfig =
+  () => {
+
+    if (
+      typeof window ===
+        "undefined"
+    ) {
+
+      return {}
+    }
+
+    return (
+      window
+        .LemonSquareChatConfig ||
+      {}
+    )
+  }
+
+/* ========================================
+   SDK RUNTIME CONFIG
+======================================== */
+
+const SDK_RUNTIME_CONFIG = {
+  apiBaseUrl:
+    ENV.API_BASE_URL,
+
+  wsBaseUrl:
+    ENV.WS_BASE_URL,
+
+  userToken:
+    null,
+
+  environment:
+    ENV.APP_ENV,
+}
+
+/* ========================================
+   APPLY SDK CONFIG
+======================================== */
+
+const sdkGlobalConfig =
+  resolveSdkGlobalConfig()
+
+Object.assign(
+  SDK_RUNTIME_CONFIG,
+  sdkGlobalConfig
+)
+
+/* ========================================
+   GET RUNTIME CONFIG
+======================================== */
+
+export const getRuntimeConfig =
+  () => {
+
+    return {
+      ...SDK_RUNTIME_CONFIG,
+    }
+  }
+
+/* ========================================
+   UPDATE RUNTIME CONFIG
+======================================== */
+
+export const updateRuntimeConfig =
+  (
+    nextConfig = {}
+  ) => {
+
+    Object.assign(
+      SDK_RUNTIME_CONFIG,
+      nextConfig
+    )
+
+    console.log(
+      "[Bubble SDK] Runtime config updated",
+      SDK_RUNTIME_CONFIG
+    )
+  }
+
+/* ========================================
    API CONFIG
 ======================================== */
 
-export const        = {
-  BASE_URL:
-    ENV.API_BASE_URL.replace(
+export const API_CONFIG = {
+  get BASE_URL() {
+
+    return (
+      SDK_RUNTIME_CONFIG
+        .apiBaseUrl ||
+      "/api"
+    ).replace(
       /\/$/,
       ""
-    ),
+    )
+  },
 
   TIMEOUT: 30000,
 
@@ -52,11 +145,17 @@ export const        = {
 ======================================== */
 
 export const WS_CONFIG = {
-  BASE_URL:
-    ENV.WS_BASE_URL.replace(
+  get BASE_URL() {
+
+    return (
+      SDK_RUNTIME_CONFIG
+        .wsBaseUrl ||
+      "/ws"
+    ).replace(
       /\/$/,
       ""
-    ),
+    )
+  },
 }
 
 /* ========================================
@@ -112,6 +211,13 @@ export const API_ENDPOINTS = {
 
   CHAT_RESOLVE:
     "/chat/resolve/:sessionId",
+
+  /* ====================================
+     AUTH
+  ==================================== */
+
+  AUTH_VERIFY:
+    "/auth/verify",
 
   /* ====================================
      SELF KNOWLEDGE
@@ -217,7 +323,7 @@ export const buildApiUrl = (
 ) => {
 
   let url =
-    `${      .BASE_URL}${endpoint}`
+    `${API_CONFIG.BASE_URL}${endpoint}`
 
   Object.entries(params).forEach(
     ([key, value]) => {
@@ -235,6 +341,22 @@ export const buildApiUrl = (
 }
 
 /* ========================================
+   CHAT WIDGET CONFIG
+======================================== */
+
+export const CHAT_WIDGET_CONFIG = {
+  STORAGE_KEY:
+    "lemonsquare_chatbot",
+
+  DEFAULT_Z_INDEX: 9999,
+
+  DEFAULT_POSITION: {
+    bottom: 24,
+    right: 24,
+  },
+}
+
+/* ========================================
    DEBUG LOGGING
 ======================================== */
 
@@ -244,12 +366,17 @@ if (
 ) {
 
   console.log(
-    "API_BASE_URL:",
-          .BASE_URL
+    "[Bubble SDK] API_BASE_URL:",
+    API_CONFIG.BASE_URL
   )
 
   console.log(
-    "APP_ENV:",
+    "[Bubble SDK] APP_ENV:",
     ENV.APP_ENV
+  )
+
+  console.log(
+    "[Bubble SDK] SDK_RUNTIME_CONFIG:",
+    SDK_RUNTIME_CONFIG
   )
 }
