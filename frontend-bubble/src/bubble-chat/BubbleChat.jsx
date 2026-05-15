@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react"
 
@@ -16,6 +17,7 @@ import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
 import CallAgentModal from "./modals/CallAgentModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
+
 import chatbotService from "./services/chatbotService"
 
 import {
@@ -58,7 +60,19 @@ const BubbleChat = () => {
 
   const {
     messages,
+
+    /*
+      ONLY true while
+      sending a message.
+    */
     loading,
+
+    /*
+      Additional loading states.
+    */
+    isLoadingConversation,
+    isResolvingConversation,
+
     sessionId,
     resolved,
 
@@ -217,10 +231,27 @@ const BubbleChat = () => {
   ======================================== */
 
   const requesterId =
-    chatbotService.resolveRequesterId(
-      chatbotService.getUserToken()
-    )
+    useMemo(
+      () => {
 
+        try {
+
+          return chatbotService.resolveRequesterId(
+            chatbotService.getUserToken()
+          )
+
+        } catch (error) {
+
+          console.error(
+            "REQUESTER_ID_RESOLVE_ERROR",
+            error
+          )
+
+          return null
+        }
+      },
+      []
+    )
 
   /* ========================================
      MODALS
@@ -418,14 +449,34 @@ const BubbleChat = () => {
             >
               <ChatWindow
                 messages={messages}
+
+                /*
+                  ONLY disables input
+                  while AI is actively replying.
+                */
                 loading={loading}
+
+                /*
+                  Optional advanced states.
+                */
+                isLoadingConversation={
+                  isLoadingConversation
+                }
+
+                isResolvingConversation={
+                  isResolvingConversation
+                }
+
                 resolved={resolved}
+
                 onSendMessage={
                   sendMessage
                 }
+
                 onClose={() =>
                   setOpen(false)
                 }
+
                 onOpenModal={
                   handleOpenModal
                 }

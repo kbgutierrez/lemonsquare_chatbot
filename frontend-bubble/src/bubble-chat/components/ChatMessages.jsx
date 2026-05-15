@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
 } from "react"
 
@@ -17,6 +18,9 @@ const ChatMessages = ({
   const messagesEndRef =
     useRef(null)
 
+  const containerRef =
+    useRef(null)
+
   const previousLengthRef =
     useRef(0)
 
@@ -24,11 +28,57 @@ const ChatMessages = ({
     useRef(true)
 
   /* ========================================
+     DEDUPE MESSAGES
+  ======================================== */
+
+  const normalizedMessages =
+    useMemo(() => {
+
+      const seen =
+        new Set()
+
+      return messages.filter(
+        (
+          message,
+          index
+        ) => {
+
+          const key =
+            message?.id ||
+            `${message?.sender}-${index}-${message?.text}`
+
+          if (
+            seen.has(key)
+          ) {
+
+            return false
+          }
+
+          seen.add(key)
+
+          return true
+        }
+      )
+
+    }, [messages])
+
+  /* ========================================
      AUTO SCROLL
   ======================================== */
 
   useEffect(() => {
 
+    const container =
+      containerRef.current
+
+    if (!container) {
+      return
+    }
+
+    /*
+      Initial load:
+      instant scroll.
+    */
     if (
       initialLoadRef.current
     ) {
@@ -40,39 +90,52 @@ const ChatMessages = ({
         ?.scrollIntoView({
           behavior:
             "auto",
+          block:
+            "end",
         })
 
       previousLengthRef.current =
-        messages.length
+        normalizedMessages.length
 
       return
     }
 
+    /*
+      Detect new messages.
+    */
     const hasNewMessage =
-      messages.length >
+      normalizedMessages.length >
       previousLengthRef.current
 
     if (
       hasNewMessage
     ) {
 
-      messagesEndRef.current
-        ?.scrollIntoView({
-          behavior:
-            "smooth",
-        })
+      requestAnimationFrame(
+        () => {
 
-      previousLengthRef.current =
-        messages.length
+          messagesEndRef.current
+            ?.scrollIntoView({
+              behavior:
+                "smooth",
+              block:
+                "end",
+            })
+        }
+      )
     }
 
-  }, [messages])
+    previousLengthRef.current =
+      normalizedMessages.length
+
+  }, [normalizedMessages])
 
   const hasMessages =
-    messages.length > 0
+    normalizedMessages.length > 0
 
   return (
     <div
+      ref={containerRef}
       className="
         flex
         h-full
@@ -389,7 +452,7 @@ const ChatMessages = ({
             gap-4
           "
         >
-          {messages.map(
+          {normalizedMessages.map(
             (
               message,
               index
@@ -397,7 +460,7 @@ const ChatMessages = ({
               <ChatMessage
                 key={
                   message.id ||
-                  `${message.sender}-${index}`
+                  `${message.sender}-${index}-${message.text}`
                 }
                 message={
                   message

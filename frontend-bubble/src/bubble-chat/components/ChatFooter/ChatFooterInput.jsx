@@ -10,11 +10,29 @@ const ChatFooterInput = ({
   textareaRef,
   message,
   setMessage,
+
+  /*
+    IMPORTANT:
+    loading should ONLY
+    represent AI replying.
+  */
   loading,
+
   resolved,
+
   onKeyDown,
   onSend,
 }) => {
+
+  const isDisabled =
+    resolved
+
+  const canSend =
+    !loading &&
+    !resolved &&
+    Boolean(
+      message?.trim()
+    )
 
   return (
     <div
@@ -51,8 +69,7 @@ const ChatFooterInput = ({
         rows={1}
         value={message}
         disabled={
-          loading ||
-          resolved
+          isDisabled
         }
         maxLength={
           MAX_MESSAGE_LENGTH
@@ -110,13 +127,18 @@ const ChatFooterInput = ({
         type="button"
         aria-label="Send message"
         disabled={
-          loading ||
-          resolved ||
-          !message.trim()
+          !canSend
         }
-        onClick={
-          onSend
-        }
+        onClick={() => {
+
+          if (
+            !canSend
+          ) {
+            return
+          }
+
+          onSend()
+        }}
         className="
           group
           relative

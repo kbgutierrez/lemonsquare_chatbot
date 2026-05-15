@@ -22,8 +22,30 @@ export const useChatMessages =
     const [messages, setMessages] =
       useState([])
 
-    const [loading, setLoading] =
-      useState(false)
+    /*
+      ONLY for AI message sending.
+    */
+    const [
+      isSendingMessage,
+      setIsSendingMessage,
+    ] = useState(false)
+
+    /*
+      ONLY for loading/restoring
+      previous conversations.
+    */
+    const [
+      isLoadingConversation,
+      setIsLoadingConversation,
+    ] = useState(false)
+
+    /*
+      ONLY for resolving chat.
+    */
+    const [
+      isResolvingConversation,
+      setIsResolvingConversation,
+    ] = useState(false)
 
     const [sessionId, setSessionId] =
       useState(null)
@@ -187,7 +209,7 @@ export const useChatMessages =
           activeLoadIdRef.current =
             loadId
 
-          setLoading(true)
+          setIsLoadingConversation(true)
 
           try {
 
@@ -271,7 +293,7 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsLoadingConversation(false)
             }
           }
         },
@@ -383,7 +405,7 @@ export const useChatMessages =
             typingMessage,
           ])
 
-          setLoading(true)
+          setIsSendingMessage(true)
 
           try {
 
@@ -405,24 +427,38 @@ export const useChatMessages =
               response?.sessionId
             ) {
 
+              const isNewSession =
+                sessionIdRef.current !==
+                response.sessionId
+
               sessionIdRef.current =
                 response.sessionId
 
-              setSessionId(
-                (
-                  previous
-                ) => {
+              /*
+                IMPORTANT:
+                Avoid auto reload after
+                first message creation.
 
-                  if (
-                    previous ===
-                    response.sessionId
-                  ) {
-                    return previous
-                  }
+                Root cause:
+                The previous logic triggered
+                loadConversation() immediately
+                after the first AI response.
 
-                  return response.sessionId
-                }
-              )
+                That caused:
+                - message flicker
+                - send button weird state
+                - optimistic UI overwrite
+                - duplicate loading lifecycle
+              */
+
+              if (
+                isNewSession
+              ) {
+
+                setSessionId(
+                  response.sessionId
+                )
+              }
             }
 
             const aiMessage = {
@@ -505,7 +541,7 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsSendingMessage(false)
             }
 
             requestLockRef.current =
@@ -546,7 +582,7 @@ export const useChatMessages =
 
           try {
 
-            setLoading(true)
+            setIsResolvingConversation(true)
 
             /*
               REAL BACKEND RESOLVE
@@ -588,7 +624,7 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsResolvingConversation(false)
             }
           }
         },
@@ -662,7 +698,18 @@ export const useChatMessages =
     return {
       messages,
 
-      loading,
+      /*
+        Backward-compatible
+        loading prop.
+      */
+      loading:
+        isSendingMessage,
+
+      isSendingMessage,
+
+      isLoadingConversation,
+
+      isResolvingConversation,
 
       sessionId,
 

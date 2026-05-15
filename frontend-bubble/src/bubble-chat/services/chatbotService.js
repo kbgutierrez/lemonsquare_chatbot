@@ -95,8 +95,8 @@ const apiRequest =
 
         throw new Error(
           data?.detail ||
-            data?.message ||
-            "API request failed."
+          data?.message ||
+          "API request failed."
         )
       }
 
@@ -185,6 +185,7 @@ const getUserToken =
     */
 
     if (
+      DEV_MODE &&
       DEV_USER_TOKEN
     ) {
 
@@ -247,6 +248,11 @@ const resolveRequesterId =
       return authToken
     }
 
+    /*
+      DEV TOKEN:
+      TEST_USER_1
+    */
+
     if (
       DEV_MODE &&
       authToken.startsWith(
@@ -270,9 +276,15 @@ const resolveRequesterId =
         )
       ) {
 
-        return maybeId
+        return Number(
+          maybeId
+        )
       }
     }
+
+    /*
+      PURE NUMERIC TOKEN
+    */
 
     if (
       /^\d+$/.test(
@@ -280,8 +292,18 @@ const resolveRequesterId =
       )
     ) {
 
-      return authToken
+      return Number(
+        authToken
+      )
     }
+
+    /*
+      JWT / HASH / OTHER TOKEN
+
+      IMPORTANT:
+      Backend should resolve
+      real requester id.
+    */
 
     return authToken
   }
@@ -298,7 +320,7 @@ const validateChatResponse =
     if (
       !response ||
       typeof response !==
-        "object"
+      "object"
     ) {
 
       throw new Error(
@@ -426,20 +448,20 @@ const normalizeSession =
       messageCount:
         Number(
           session?.message_count ||
-            0
+          0
         ),
 
       resolved:
         String(
           session?.status ||
-            ""
+          ""
         ).toLowerCase() ===
         "resolved",
 
       resolvedAt:
         String(
           session?.status ||
-            ""
+          ""
         ).toLowerCase() ===
         "resolved"
           ? createdAt.toISOString()
@@ -605,7 +627,7 @@ const loadUserSessions =
       )
         ? response
         : response?.sessions ||
-          []
+        []
 
     return sessions.map(
       normalizeSession
@@ -706,6 +728,12 @@ const chatbotService = {
 
   verifyUserToken,
 
+  /*
+    REQUIRED FOR:
+    - BubbleChat
+    - Ticket escalation
+    - SDK integrations
+  */
   getUserToken,
 
   resolveRequesterId,
