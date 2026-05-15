@@ -309,7 +309,9 @@ class DocumentIngestionService:
         
         # 1. FETCH ALLOWED CATEGORIES FROM DB
         active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
-        raw_categories = getattr(active_config, 'AllowedCategories', "General_IT")
+        
+        # Safely handle NULL database values
+        raw_categories = active_config.AllowedCategories if active_config and active_config.AllowedCategories else "General_IT"
         allowed_categories = [c.strip() for c in raw_categories.split(',')]
 
         # 2. STRICT CATEGORY VALIDATION (Admin override vs AI Guess)
@@ -392,7 +394,9 @@ class DocumentIngestionService:
 
         # Fetch allowed categories dynamically for validation
         active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
-        raw_categories = getattr(active_config, 'AllowedCategories', "General_IT")
+        
+        # Safely handle NULL database values
+        raw_categories = active_config.AllowedCategories if active_config and active_config.AllowedCategories else "General"
         allowed_categories = [c.strip() for c in raw_categories.split(',')]
 
         if updates.get("title"): 

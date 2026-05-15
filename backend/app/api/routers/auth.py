@@ -23,6 +23,7 @@ async def verify_user(user_token: str):
             "email": user_data.get("email", ""),
             "department": user_data.get("department", "Unknown"),
             "department_acro": user_data.get("department_acro", ""),
+            "company_id": user_data.get("company", "1"),
             "raw_data": user_data  # Keep the full payload just in case
         }
         

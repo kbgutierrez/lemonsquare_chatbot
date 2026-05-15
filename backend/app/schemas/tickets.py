@@ -27,3 +27,14 @@ class TicketSyncResponse(BaseModel):
     ticket_number: str
     message: str
 
+
+class TicketEscalateRequest(BaseModel):
+    session_id: str
+    requester_id: int
+    company_id: int
+
+class TicketEscalateResponse(BaseModel):
+    status: str
+    message: str
+    bizportal_response: dict | str | None = None
+
