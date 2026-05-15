@@ -214,6 +214,13 @@ async def escalate_to_agent(session_id: str, requester_id: int, company_id: int,
     async with httpx.AsyncClient() as client:
         response = await client.post(url, json=payload, timeout=10.0)
         response.raise_for_status()
+
+        from app.models.chatbot import ChatSession
+        session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+        if session:
+            session.SessionStatus = "Escalated"
+            db.commit()
+
         
         return {
             "status": "success",
