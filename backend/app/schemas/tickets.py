@@ -38,3 +38,14 @@ class TicketEscalateResponse(BaseModel):
     message: str
     bizportal_response: dict | str | None = None
 
+class TicketDraftResponse(BaseModel):
+    status: str
+    summary: str
+    description: str
+
+class TicketSubmitRequest(BaseModel):
+    session_id: str
+    requester_id: int
+    company_id: int
+    summary: str
+    description: str
