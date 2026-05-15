@@ -224,25 +224,31 @@ async def mark_chat_resolved(
 
 
 
-@router.post("/escalate", response_model=TicketEscalateResponse, summary="Escalate chat to a live agent ticket")
-async def escalate_chat(
-    request: TicketEscalateRequest,
+from app.schemas.tickets import TicketDraftResponse, TicketSubmitRequest, TicketEscalateResponse
+
+@router.get("/escalate/draft/{session_id}", response_model=TicketDraftResponse, summary="Draft ticket summary for frontend review")
+async def draft_escalation(
+    session_id: str,
     db: Session = Depends(get_chatbot_db),
 ):
     try:
-        result = await chat_service.escalate_to_agent(
-            session_id=request.session_id,
-            requester_id=request.requester_id,
-            company_id=request.company_id,
-            db=db
-        )
+        result = await chat_service.draft_ticket_escalation(session_id, db)
+        return TicketDraftResponse(**result)
+    except Exception as exc:
+        logger.error(f"Failed to draft ticket: {exc}")
+        return TicketDraftResponse(status="error", summary="", description=str(exc))
+
+@router.post("/escalate/submit", response_model=TicketEscalateResponse, summary="Submit the reviewed ticket to live agents")
+async def submit_escalation(
+    request: TicketSubmitRequest,
+    db: Session = Depends(get_chatbot_db),
+):
+    try:
+        result = await chat_service.submit_ticket_escalation(request.model_dump(), db)
         return TicketEscalateResponse(**result)
     except Exception as exc:
-        logger.error(f"Failed to escalate ticket: {exc}")
-        return TicketEscalateResponse(
-            status="error",
-            message=str(exc)
-        )
+        logger.error(f"Failed to submit ticket: {exc}")
+        return TicketEscalateResponse(status="error", message=str(exc))
     
 
 @router.delete("/sessions/{session_id}", summary="Archive a chat session")
@@ -255,3 +261,19 @@ def delete_chat_session(
     """
     chat_service.archive_session(db, session_id)
     return {"status": "success", "message": f"Session {session_id} archived successfully."}
+
+
+@router.delete("/users/{requester_id}/sessions", summary="Archive all chats for a specific user")
+def clear_all_user_chats(
+    requester_id: int,
+    db: Session = Depends(get_chatbot_db)
+):
+    """
+    Instantly soft-deletes every active chat session belonging to this user.
+    """
+    count = chat_service.archive_all_user_sessions(db, requester_id)
+    
+    if count == 0:
+        return {"status": "skipped", "message": "No active chats to clear."}
+        
+    return {"status": "success", "message": f"Successfully cleared {count} chat sessions."}

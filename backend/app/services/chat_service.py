@@ -149,24 +149,25 @@ def get_all_messages(db: Session, session_id: str) -> list[ChatMessage]:
 
 
 
-async def escalate_to_agent(session_id: str, requester_id: int, company_id: int, db: Session) -> dict:
-    """Summarizes the chat and sends it to the BizPortal Ticket API."""
-    
-    # 1. Fetch Chat History
+import json
+import httpx
+from langchain_groq import ChatGroq
+from app.core.config import settings
+
+async def draft_ticket_escalation(session_id: str, db: Session) -> dict:
+    """Step 1: Uses the AI to summarize the chat and returns the draft to the frontend."""
     messages = get_all_messages(db, session_id)
     if not messages:
         raise ValueError("Chat session is empty. Nothing to escalate.")
 
     transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
 
-    # 2. Use LLM to Summarize
     llm = ChatGroq(
-        model="llama-3.1-8b-instant", # Fast model for simple JSON extraction
+        model="llama-3.1-8b-instant", 
         temperature=0.0,
         api_key=settings.GROQ_API_KEY,
     )
     
-
     prompt = (
         "You are an expert Helpdesk Dispatcher. Read the chat transcript and extract the details to create a ticket.\n"
         "You MUST output EXACTLY a valid JSON object with these two keys: 'summary' and 'description'.\n"
@@ -178,10 +179,9 @@ async def escalate_to_agent(session_id: str, requester_id: int, company_id: int,
         "- Keep it extremely concise and natural, like a technician's log (1 to 5 sentences maximum).\n"
         "- Use a neutral, third-person perspective. NEVER use first-person pronouns (do NOT use 'kami', 'namin', 'I', or 'we').\n"
         "- State exactly what the reported issue is and what the AI already attempted.\n"
-        "- Match the language of the transcript perfectly (e.g., Tagalog or English).\n"
-        "- Example of a good description: 'Hindi maayos ang agos ng drainage sa lababo. Na-check na kung may bara pero wala naman nakita kaya in-advise na ipa-check na sa Helpdesk staff.'\n"
+        "- Match the language of the transcript perfectly.\n"
         "\n"
-        "Do NOT include markdown formatting (like ```json). Output raw JSON only.\n\n"
+        "Do NOT include markdown formatting. Output raw JSON only.\n\n"
         f"Transcript:\n{transcript}\n\n"
         "JSON Output:"
     )
@@ -189,7 +189,6 @@ async def escalate_to_agent(session_id: str, requester_id: int, company_id: int,
     result = await llm.ainvoke(prompt)
     raw_output = result.content.strip()
     
-    # Clean up markdown if the LLM hallucinated it
     if raw_output.startswith("```json"):
         raw_output = raw_output[7:-3].strip()
     elif raw_output.startswith("```"):
@@ -200,28 +199,37 @@ async def escalate_to_agent(session_id: str, requester_id: int, company_id: int,
     except json.JSONDecodeError:
         raise ValueError("AI failed to generate a valid summary for the ticket.")
 
-    # 3. Send to BizPortal API
-    url = "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"    
-    payload = {
-        "description": extracted_data.get("description", "Escalated from AI Chatbot"),
+    return {
+        "status": "success",
+        "summary": extracted_data.get("summary", "AI Escalation Issue"),
+        "description": extracted_data.get("description", "Escalated from AI Chatbot")
+    }
+
+async def submit_ticket_escalation(payload: dict, db: Session) -> dict:
+    """Step 2: Takes the final (user-edited) text and sends it to BizPortal."""
+    url = "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
+    
+    # We use the text the frontend sent us (which might have been edited)
+    bizportal_payload = {
+        "description": payload["description"],
         "category_id": 29, 
         "subcategory_id": 11188,
-        "requester_id": requester_id,   
-        "company_id": company_id,
-        "summary": extracted_data.get("summary", "AI Escalation Issue")
+        "requester_id": payload["requester_id"],
+        "company_id": payload["company_id"],
+        "summary": payload["summary"]
     }
     
     async with httpx.AsyncClient() as client:
-        response = await client.post(url, json=payload, timeout=10.0)
+        response = await client.post(url, json=bizportal_payload, timeout=10.0)
         response.raise_for_status()
-
+        
+        # Update the database status to Escalated
         from app.models.chatbot import ChatSession
-        session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+        session = db.query(ChatSession).filter(ChatSession.SessionID == payload["session_id"]).first()
         if session:
             session.SessionStatus = "Escalated"
             db.commit()
-
-        
+            
         return {
             "status": "success",
             "message": "Ticket successfully sent to live agents.",
@@ -246,3 +254,27 @@ def archive_session(db: Session, session_id: str) -> None:
     session.IsActive = False
     db.commit()
     logger.info("Session %s archived (soft-deleted).", session_id)
+
+
+    def archive_all_user_sessions(db: Session, requester_id: int) -> int:
+        """
+        Soft-deletes all active chat sessions for a specific user.
+        Returns the number of sessions that were archived.
+        """
+        from app.models.chatbot import ChatSession
+
+        sessions = (
+            db.query(ChatSession)
+            .filter(ChatSession.RequesterUserID == requester_id)
+            .filter(ChatSession.IsActive == True)
+            .all()
+        )
+        
+        count = len(sessions)
+        if count > 0:
+            for session in sessions:
+                session.IsActive = False
+            db.commit()
+            logger.info("Archived %d sessions for user %d.", count, requester_id)
+            
+        return count
