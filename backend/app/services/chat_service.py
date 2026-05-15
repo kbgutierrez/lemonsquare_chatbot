@@ -220,3 +220,22 @@ async def escalate_to_agent(session_id: str, requester_id: int, company_id: int,
             "message": "Ticket successfully sent to live agents.",
             "bizportal_response": response.text
         }
+
+
+
+def archive_session(db: Session, session_id: str) -> None:
+    """
+    Soft-delete a chat session by setting IsActive to False.
+    Raises NotFoundError if the session doesn't exist.
+    """
+    session = (
+        db.query(ChatSession)
+        .filter(ChatSession.SessionID == session_id)
+        .first()
+    )
+    if not session:
+        raise NotFoundError(f"Chat session '{session_id}' not found.")
+
+    session.IsActive = False
+    db.commit()
+    logger.info("Session %s archived (soft-deleted).", session_id)

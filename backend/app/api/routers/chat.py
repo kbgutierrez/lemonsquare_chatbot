@@ -149,6 +149,7 @@ def get_user_chat_sessions(
     sessions = (
         db.query(ChatSession)
         .filter(ChatSession.RequesterUserID == requester_id)
+        .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
         .order_by(ChatSession.StartTime.desc())
         .limit(limit)
         .all()
@@ -177,7 +178,12 @@ def get_all_chat_sessions(
     """Admin-only endpoint to review all employee chats using ONLY available columns."""
     from app.models.chatbot import ChatSession
     
-    sessions = db.query(ChatSession).all()
+    # Change the basic .all() query to include the filter:
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
+        .all()
+    )
     
     result = []
     for s in sessions:
@@ -237,3 +243,15 @@ async def escalate_chat(
             status="error",
             message=str(exc)
         )
+    
+
+@router.delete("/sessions/{session_id}", summary="Archive a chat session")
+def delete_chat_session(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db)
+):
+    """
+    Soft-deletes a chat session so it disappears from user histories and admin views.
+    """
+    chat_service.archive_session(db, session_id)
+    return {"status": "success", "message": f"Session {session_id} archived successfully."}

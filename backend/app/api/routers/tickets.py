@@ -7,7 +7,7 @@ Extracted from main.py for proper separation of concerns.
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -204,4 +204,35 @@ async def whitelist_ticket(
     return {
         "status": "success", 
         "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI."
+    }
+
+
+def run_bulk_ingestion_background():
+    """
+    Wrapper to run the standalone script logic safely in a separate thread.
+    We import inside the function to avoid circular dependencies.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        from scripts.ingest_tickets import run_ingestion
+        logger.info("Starting background bulk ticket sync...")
+        run_ingestion()
+        logger.info("Background bulk ticket sync completed successfully.")
+    except Exception as e:
+        logger.error(f"Background bulk ingestion failed: {e}", exc_info=True)
+
+@router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")
+async def trigger_bulk_sync(background_tasks: BackgroundTasks):
+    """
+    Triggers the bulk ingestion script to find and embed any missed Helpdesk tickets.
+    Runs asynchronously in the background so the UI doesn't freeze.
+    """
+    # Hand the task off to FastAPI's background thread pool
+    background_tasks.add_task(run_bulk_ingestion_background)
+    
+    return {
+        "status": "success", 
+        "message": "Bulk sync initiated. The AI is currently updating its brain in the background."
     }

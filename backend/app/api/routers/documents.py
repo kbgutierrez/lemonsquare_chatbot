@@ -283,3 +283,18 @@ async def delete_manual_knowledge(
 
 
 
+@router.post("/manual/{entry_id}/restore", summary="Restore a deleted manual rule")
+async def restore_manual_knowledge(
+    entry_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """Restores the rule in SQL and completely rebuilds its vector in Qdrant."""
+    try:
+        result = await ingestion_service.restore_manual_entry(entry_id, db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+

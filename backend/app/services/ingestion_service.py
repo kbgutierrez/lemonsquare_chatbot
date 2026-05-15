@@ -806,3 +806,95 @@ class DocumentIngestionService:
         )
 
         return {"status": "success", "message": "AI forced to unlearn chat."}
+    
+
+
+    async def restore_manual_entry(self, entry_id: str, db: Session) -> dict:
+        """Restores a soft-deleted manual rule by re-embedding it into Qdrant."""
+        from app.models.chatbot import ManualKnowledgeEntry
+        from qdrant_client.http.models import PointStruct
+
+        # 1. Un-archive in SQL
+        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        if not entry:
+            raise ValueError("Manual entry not found in the database.")
+
+        if entry.IsActive:
+            return {"status": "skipped", "message": "Entry is already active."}
+
+        entry.IsActive = True
+        db.commit()
+
+        # 2. Re-embed the text
+        searchable_text = f"TITLE: {entry.Title}\nCONTENT: {entry.Content}"
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        
+        # 3. Push back to Qdrant's memory
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "document_id": entry.EntryID,
+                "source": entry.Title,
+                "category": entry.Category,
+                "doc_type": "general_text"
+            }
+        }
+        
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=entry.EntryID, vector=vector, payload=payload)]
+        )
+
+        return {"status": "success", "message": "Manual entry successfully restored to the AI Brain."}
+
+
+    async def restore_learned_chat(self, session_id: str, db: Session) -> dict:
+        """Restores a soft-deleted AI chat summary by re-embedding it into Qdrant."""
+        from app.models.chatbot import LearnedChat
+        from qdrant_client.http.models import PointStruct
+        import uuid
+
+        # 1. Un-archive in SQL
+        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        if not chat:
+            raise ValueError("Learned chat not found in the database.")
+
+        if chat.IsActive:
+            return {"status": "skipped", "message": "Chat is already active."}
+
+        chat.IsActive = True
+        db.commit()
+
+        # 2. Re-format the text block exactly as it was originally
+        searchable_text = (
+            f"ISSUE REPORTED: {chat.IssueReported}\n"
+            f"ACTUAL ISSUE FOUND: {chat.IssueFound}\n"
+            f"ROOT CAUSE: {chat.RootCause}\n"
+            f"RESOLUTION (WORK DONE): {chat.WorkDone}"
+        )
+
+        # 3. Re-embed and generate the deterministic UUID
+        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
+
+        payload = {
+            "page_content": searchable_text,
+            "metadata": {
+                "source_session": session_id,
+                "doc_type": "resolved_chat",
+                "sql_ready_data": {
+                    "issue_reported": chat.IssueReported,
+                    "issue_found": chat.IssueFound,
+                    "issue_cause": chat.RootCause,
+                    "work_done": chat.WorkDone
+                }
+            }
+        }
+        
+        # 4. Push back to Qdrant
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
+        )
+
+        return {"status": "success", "message": "Learned chat successfully restored to the AI Brain."}
