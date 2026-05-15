@@ -25,6 +25,7 @@ from app.api.routers import auth
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
+from app.api.routers import analytics  
 
 from app.api.routers import chat, documents, settings, tickets, explorer
 from app.core.config import settings as app_settings
@@ -129,6 +130,7 @@ def create_app() -> FastAPI:
     app.include_router(explorer.router, prefix=PREFIX)
     app.include_router(self_knowledge.router, prefix="/api")
     app.include_router(auth.router, prefix=PREFIX)
+    app.include_router(analytics.router, prefix=PREFIX)
 
     # ── Health Check ──────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])

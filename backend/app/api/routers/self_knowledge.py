@@ -33,3 +33,17 @@ async def remove_learned_chat(
     """Deletes the extracted chat from SQL and scrubs its vectors from Qdrant."""
     result = await ingestion_service.delete_learned_chat(session_id, db)
     return result
+
+
+@router.post("/chats/{session_id}/restore", summary="Restore a deleted AI chat summary")
+async def restore_learned_chat(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service = Depends(get_ingestion_service)
+):
+    """Restores the extracted chat in SQL and completely rebuilds its vector in Qdrant."""
+    try:
+        result = await ingestion_service.restore_learned_chat(session_id, db)
+        return result
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
