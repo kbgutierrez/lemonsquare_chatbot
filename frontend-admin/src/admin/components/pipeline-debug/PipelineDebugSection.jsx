@@ -15,6 +15,12 @@ import PipelinePromptBox
 import PipelineResults
   from "./components/PipelineResults"
 
+import ErrorState
+  from "../../../shared/components/ErrorState"
+
+import LoadingSpinner
+  from "../../../shared/components/LoadingSpinner"
+
 const PipelineDebugSection = () => {
 
   const [prompt, setPrompt] =
@@ -71,6 +77,8 @@ const PipelineDebugSection = () => {
 
         setError("")
 
+        setResult(null)
+
         if (!prompt.trim()) {
 
           throw new Error(
@@ -110,10 +118,14 @@ const PipelineDebugSection = () => {
 
       } catch (err) {
 
-        console.error(err)
+        console.error(
+          "PIPELINE_DEBUG_ERROR",
+          err
+        )
 
         setError(
-          err.message
+          err.message ||
+          "Pipeline debug failed."
         )
 
       } finally {
@@ -197,33 +209,28 @@ const PipelineDebugSection = () => {
         showConfig={showConfig}
       />
 
+      {/* LOADING */}
+      {loading && (
+        <LoadingSpinner
+          label="Running pipeline debug..."
+          size="sm"
+        />
+      )}
+
       {/* ERROR */}
-      {error && (
-        <div
-          className="
-            mb-4
-
-            rounded-2xl
-
-            border
-            border-red-500/30
-
-            bg-red-500/10
-
-            p-4
-
-            text-sm
-            text-red-300
-          "
-        >
-          {error}
-        </div>
+      {error && !loading && (
+        <ErrorState
+          title="Pipeline Debug Error"
+          message={error}
+        />
       )}
 
       {/* RESULTS */}
-      <PipelineResults
-        result={result}
-      />
+      {!loading && !error && (
+        <PipelineResults
+          result={result}
+        />
+      )}
     </section>
   )
 }
