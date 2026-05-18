@@ -1,6 +1,7 @@
 // FILE: frontend/src/bubble-chat/hooks/useBubbleDrag.js
 
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -366,18 +367,21 @@ export const useBubbleDrag =
     ======================================== */
 
     const repositionForWindow =
-      () => {
+      useCallback(
+        () => {
 
-        const snapped =
-          getCornerSnapPosition(
-            freePosition.current.x,
-            freePosition.current.y
+          const snapped =
+            getCornerSnapPosition(
+              freePosition.current.x,
+              freePosition.current.y
+            )
+
+          setPosition(
+            snapped
           )
-
-        setPosition(
-          snapped
-        )
-      }
+        },
+        []
+      )
 
     return {
       dragging,

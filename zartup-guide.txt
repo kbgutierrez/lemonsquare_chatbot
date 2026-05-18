@@ -1,0 +1,26 @@
+for starting up the bubble SDK
+
+1st terminal
+C:\CS-OJT\a3\lemonsquare_chatbot\frontend-bubble
+npm run build
+
+2nd terminal
+cd C:\CS-OJT\a3\lemonsquare_chatbot\frontend-bubble\dist
+python -m http.server 4173
+
+3rd terminal
+go to the root where you put the test-sdk.html
+and run
+python -m http.server 5500
+
+open in the browser
+http://localhost:5500/test-sdk.html
+
+npm run build if theres update in the UI and do ctrl shift R 
+
+
+starting the backend would be
+cd backend
+.\venv\Scripts\Activate  
+uvicorn app.main:app --reload
+

@@ -1,6 +1,8 @@
 import {
+  API_CONFIG,
   API_ENDPOINTS,
   buildApiUrl,
+  getRuntimeConfig,
 } from "../../config/sqlVariables"
 
 /*
@@ -17,247 +19,455 @@ import {
    CONFIG
 ======================================== */
 
-const REQUEST_TIMEOUT = 30000
+const REQUEST_TIMEOUT =
+  API_CONFIG.TIMEOUT
 
 /*
-  DEVELOPMENT MODE
+  SDK-SAFE DEVELOPMENT MODE
 
-  TEMPORARY:
-  Uses TEST_USER_1 until
-  real BizPortal auth exists.
+  IMPORTANT:
+  - Controlled by Vite env
+  - NOT hardcoded
+  - Safe for production builds
 */
-const DEV_MODE = true
+
+const DEV_MODE =
+  import.meta.env.DEV
+
+const DEV_USER_TOKEN =
+  import.meta.env
+    .VITE_DEV_USER_TOKEN ||
+  "TEST_USER_1"
+
+/* ========================================
+   API REQUEST
+======================================== */
+
+const apiRequest =
+  async ({
+    endpoint,
+    method = "GET",
+    body,
+    headers = {},
+  }) => {
+
+    const controller =
+      new AbortController()
+
+    const timeoutId =
+      setTimeout(
+        () =>
+          controller.abort(),
+        REQUEST_TIMEOUT
+      )
+
+    try {
+
+      const response =
+        await fetch(
+          endpoint,
+          {
+            method,
+
+            headers: {
+              ...API_CONFIG.HEADERS,
+              ...headers,
+            },
+
+            body:
+              body
+                ? JSON.stringify(
+                    body
+                  )
+                : undefined,
+
+            signal:
+              controller.signal,
+          }
+        )
+
+      const data =
+        await response.json()
+
+      if (
+        !response.ok
+      ) {
+
+        throw new Error(
+          data?.detail ||
+          data?.message ||
+          "API request failed."
+        )
+      }
+
+      return data
+
+    } catch (error) {
+
+      if (
+        error.name ===
+        "AbortError"
+      ) {
+
+        throw new Error(
+          "Request timeout exceeded."
+        )
+      }
+
+      throw error
+
+    } finally {
+
+      clearTimeout(
+        timeoutId
+      )
+    }
+  }
 
 /* ========================================
    GET USER TOKEN
 ======================================== */
 
-const getUserToken = () => {
+const getUserToken =
+  () => {
 
-  /*
-    DEVELOPMENT TOKEN
-  */
-  if (DEV_MODE) {
+    /*
+      1. RUNTIME CONFIG
+    */
 
-    return "TEST_USER_1"
-  }
+    const runtimeConfig =
+      getRuntimeConfig()
 
-  /*
-    PRODUCTION TOKEN
-  */
-  const token =
-    localStorage.getItem(
-      "user_token"
-    )
+    if (
+      runtimeConfig?.userToken
+    ) {
 
-  if (
-    !token ||
-    token === "null" ||
-    token === "undefined"
-  ) {
+      return runtimeConfig.userToken
+    }
+
+    /*
+      2. GLOBAL WINDOW CONFIG
+    */
+
+    if (
+      typeof window !==
+        "undefined" &&
+      window
+        ?.LemonSquareChatConfig
+        ?.userToken
+    ) {
+
+      return window
+        .LemonSquareChatConfig
+        .userToken
+    }
+
+    /*
+      3. LOCAL STORAGE
+    */
+
+    const localToken =
+      localStorage.getItem(
+        "user_token"
+      )
+
+    if (
+      localToken &&
+      localToken !== "null" &&
+      localToken !== "undefined"
+    ) {
+
+      return localToken
+    }
+
+    /*
+      4. DEV FALLBACK
+    */
+
+    if (
+      DEV_MODE &&
+      DEV_USER_TOKEN
+    ) {
+
+      return DEV_USER_TOKEN
+    }
 
     throw new Error(
       "User authentication token not found."
     )
   }
 
-  return token
-}
+/* ========================================
+   VERIFY USER TOKEN
+======================================== */
 
-const resolveRequesterId = (
-  authToken
-) => {
+const verifyUserToken =
+  async () => {
 
-  if (
-    typeof authToken !==
-    "string"
-  ) {
-    return authToken
-  }
+    const userToken =
+      getUserToken()
 
-  if (
-    DEV_MODE &&
-    authToken.startsWith(
-      "TEST_USER_"
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.AUTH_VERIFY
+      )
+
+    const finalUrl =
+      `${endpoint}?user_token=${encodeURIComponent(
+        userToken
+      )}`
+
+    console.log(
+      "VERIFY_USER_TOKEN",
+      {
+        endpoint:
+          finalUrl,
+      }
     )
-  ) {
-    const parts =
-      authToken.split("_")
 
-    const maybeId =
-      parts[parts.length - 1]
-
-    if (/^\d+$/.test(maybeId)) {
-      return maybeId
-    }
+    return await apiRequest({
+      endpoint:
+        finalUrl,
+    })
   }
 
-  if (/^\d+$/.test(authToken)) {
+/* ========================================
+   RESOLVE REQUESTER ID
+======================================== */
+
+const resolveRequesterId =
+  (
+    authToken
+  ) => {
+
+    if (
+      typeof authToken !==
+      "string"
+    ) {
+
+      return authToken
+    }
+
+    /*
+      DEV TOKEN:
+      TEST_USER_1
+    */
+
+    if (
+      DEV_MODE &&
+      authToken.startsWith(
+        "TEST_USER_"
+      )
+    ) {
+
+      const parts =
+        authToken.split(
+          "_"
+        )
+
+      const maybeId =
+        parts[
+          parts.length - 1
+        ]
+
+      if (
+        /^\d+$/.test(
+          maybeId
+        )
+      ) {
+
+        return Number(
+          maybeId
+        )
+      }
+    }
+
+    /*
+      PURE NUMERIC TOKEN
+    */
+
+    if (
+      /^\d+$/.test(
+        authToken
+      )
+    ) {
+
+      return Number(
+        authToken
+      )
+    }
+
+    /*
+      JWT / HASH / OTHER TOKEN
+
+      IMPORTANT:
+      Backend should resolve
+      real requester id.
+    */
+
     return authToken
   }
-
-  return authToken
-}
 
 /* ========================================
    RESPONSE VALIDATION
 ======================================== */
 
-const validateChatResponse = (
-  response
-) => {
+const validateChatResponse =
+  (
+    response
+  ) => {
 
-  if (
-    !response ||
-    typeof response !== "object"
-  ) {
+    if (
+      !response ||
+      typeof response !==
+      "object"
+    ) {
 
-    throw new Error(
-      "Invalid backend response."
-    )
-  }
-
-  if (
-    typeof response.session_id !==
-    "string"
-  ) {
-
-    throw new Error(
-      "Backend response missing session_id."
-    )
-  }
-
-  if (
-    typeof response.response !==
-    "string"
-  ) {
-
-    throw new Error(
-      "Backend response missing AI message."
-    )
-  }
-
-  return {
-    sessionId:
-      response.session_id,
-
-    message:
-      response.response,
-
-    ticketIds:
-      Array.isArray(
-        response.ticket_ids_used
+      throw new Error(
+        "Invalid backend response."
       )
-        ? response.ticket_ids_used
-        : [],
+    }
+
+    if (
+      typeof response.session_id !==
+      "string"
+    ) {
+
+      throw new Error(
+        "Backend response missing session_id."
+      )
+    }
+
+    if (
+      typeof response.response !==
+      "string"
+    ) {
+
+      throw new Error(
+        "Backend response missing AI message."
+      )
+    }
+
+    return {
+      sessionId:
+        response.session_id,
+
+      message:
+        response.response,
+
+      ticketIds:
+        Array.isArray(
+          response.ticket_ids_used
+        )
+          ? response.ticket_ids_used
+          : [],
+    }
   }
-}
 
 /* ========================================
    NORMALIZE HISTORY MESSAGE
 ======================================== */
 
-const normalizeHistoryMessage = (
-  message,
-  index
-) => {
+const normalizeHistoryMessage =
+  (
+    message,
+    index
+  ) => {
 
-  const createdAt =
-    message?.CreatedAt
-      ? new Date(
-          message.CreatedAt
-        )
-      : new Date()
+    const createdAt =
+      message?.CreatedAt
+        ? new Date(
+            message.CreatedAt
+          )
+        : new Date()
 
-  return {
-    id:
-      message?.MessageID ||
-      `${index}-${createdAt.toISOString()}`,
+    return {
+      id:
+        message?.MessageID ||
+        `${index}-${createdAt.toISOString()}`,
 
-    sender:
-      message?.SenderRole ===
-      "user"
-        ? "user"
-        : "agent",
+      sender:
+        message?.SenderRole ===
+        "user"
+          ? "user"
+          : "agent",
 
-    text:
-      message?.MessageContent || "",
+      text:
+        message?.MessageContent ||
+        "",
 
-    time:
-      createdAt.toLocaleTimeString(
-        [],
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      ),
+      time:
+        createdAt.toLocaleTimeString(
+          [],
+          {
+            hour:
+              "2-digit",
 
-    createdAt:
-      createdAt.toISOString(),
+            minute:
+              "2-digit",
+          }
+        ),
+
+      createdAt:
+        createdAt.toISOString(),
+    }
   }
-}
 
 /* ========================================
-   NORMALIZE SESSION METADATA
+   NORMALIZE SESSION
 ======================================== */
 
-const normalizeSession = (
-  session,
-  index
-) => {
+const normalizeSession =
+  (
+    session,
+    index
+  ) => {
 
-  const createdAt =
-    session?.created_at
-      ? new Date(
-          session.created_at
-        )
-      : new Date()
+    const createdAt =
+      session?.created_at
+        ? new Date(
+            session.created_at
+          )
+        : new Date()
 
-  return {
-    id:
-      session?.session_id ||
-      `session-${index}`,
+    return {
+      id:
+        session?.session_id ||
+        `session-${index}`,
 
-    /*
-      Backend does NOT provide
-      title/preview.
+      title: null,
 
-      These are hydrated later
-      from REAL backend history.
-    */
-    title: null,
+      preview: null,
 
-    preview: null,
+      createdAt:
+        createdAt.toISOString(),
 
-    createdAt:
-      createdAt.toISOString(),
+      updatedAt:
+        createdAt.toISOString(),
 
-    updatedAt:
-      createdAt.toISOString(),
+      messageCount:
+        Number(
+          session?.message_count ||
+          0
+        ),
 
-    messageCount:
-      Number(
-        session?.message_count || 0
-      ),
+      resolved:
+        String(
+          session?.status ||
+          ""
+        ).toLowerCase() ===
+        "resolved",
 
-    /*
-      BACKEND STATUS IS SOURCE OF TRUTH
-    */
-    resolved:
-      String(
-        session?.status || ""
-      ).toLowerCase() ===
-      "resolved",
-
-    resolvedAt:
-      String(
-        session?.status || ""
-      ).toLowerCase() ===
-      "resolved"
-        ? createdAt.toISOString()
-        : null,
+      resolvedAt:
+        String(
+          session?.status ||
+          ""
+        ).toLowerCase() ===
+        "resolved"
+          ? createdAt.toISOString()
+          : null,
+    }
   }
-}
 
 /* ========================================
    SEND MESSAGE
@@ -354,18 +564,6 @@ const loadSession =
           finalUrl,
       })
 
-    /*
-      IMPORTANT:
-      Backend history endpoint
-      is ONLY for messages.
-
-      Resolved state comes from:
-      GET /chat/user-sessions/:requesterId
-
-      Backend session registry
-      is the source of truth.
-    */
-
     return {
       sessionId:
         response?.session_id ||
@@ -428,7 +626,8 @@ const loadUserSessions =
         response
       )
         ? response
-        : response?.sessions || []
+        : response?.sessions ||
+        []
 
     return sessions.map(
       normalizeSession
@@ -453,6 +652,7 @@ const clearSession =
 
     return {
       success: true,
+
       message:
         "Clear session endpoint not yet connected.",
     }
@@ -467,10 +667,12 @@ const loadAISettings =
 
     return {
       success: true,
+
       message:
         "AI settings endpoint not yet connected.",
     }
   }
+
 /* ========================================
    RESOLVE CONVERSATION
 ======================================== */
@@ -507,7 +709,6 @@ const resolveConversation =
     })
   }
 
-
 /* ========================================
    EXPORT
 ======================================== */
@@ -524,6 +725,18 @@ const chatbotService = {
   resolveConversation,
 
   loadAISettings,
+
+  verifyUserToken,
+
+  /*
+    REQUIRED FOR:
+    - BubbleChat
+    - Ticket escalation
+    - SDK integrations
+  */
+  getUserToken,
+
+  resolveRequesterId,
 }
 
 export default chatbotService

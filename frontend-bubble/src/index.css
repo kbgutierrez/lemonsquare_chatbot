@@ -3,10 +3,10 @@
 @tailwind utilities;
 
 /* =========================================
-   ROOT
+   SDK ROOT SCOPE
 ========================================= */
 
-:root {
+.lemonsquare-chat-root {
   color-scheme: dark;
 
   --background: #08110f;
@@ -30,45 +30,6 @@
 
   --glass-border:
     rgba(255, 255, 255, 0.05);
-}
-
-/* =========================================
-   BASE RESET
-========================================= */
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-html {
-  height: 100%;
-  scroll-behavior: smooth;
-}
-
-body {
-  min-height: 100vh;
-  min-height: 100dvh;
-
-  margin: 0;
-
-  overflow: hidden;
-
-  background:
-    radial-gradient(
-      circle at top left,
-      rgba(245, 213, 71, 0.08),
-      transparent 28%
-    ),
-    radial-gradient(
-      circle at bottom right,
-      rgba(149, 193, 31, 0.08),
-      transparent 30%
-    ),
-    var(--background);
-
-  color: var(--text-primary);
 
   font-family:
     Inter,
@@ -79,83 +40,47 @@ body {
     sans-serif;
 
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
 
-#root {
-  min-height: 100vh;
-  min-height: 100dvh;
+  -webkit-font-smoothing:
+    antialiased;
+
+  -moz-osx-font-smoothing:
+    grayscale;
 }
 
 /* =========================================
-   APP FOUNDATION
+   SAFE RESET
 ========================================= */
 
-.app-shell {
-  position: relative;
+.lemonsquare-chat-root *,
+.lemonsquare-chat-root *::before,
+.lemonsquare-chat-root *::after {
+  box-sizing: border-box;
+}
 
-  min-height: 100vh;
-  min-height: 100dvh;
+/* =========================================
+   SDK CONTAINER
+========================================= */
 
-  overflow: hidden;
-
+.lemonsquare-chat-root {
   isolation: isolate;
-}
-
-.app-layout {
-  position: relative;
-  z-index: 2;
-
-  height: 100vh;
-  height: 100dvh;
-}
-
-.app-background {
-  position: fixed;
-  inset: 0;
-
-  z-index: 0;
-
-  pointer-events: none;
-
-  background-image:
-    linear-gradient(
-      rgba(255,255,255,0.02) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      90deg,
-      rgba(255,255,255,0.02) 1px,
-      transparent 1px
-    );
-
-  background-size: 40px 40px;
-
-  mask-image:
-    radial-gradient(
-      circle at center,
-      black,
-      transparent 90%
-    );
-
-  opacity: 0.4;
 }
 
 /* =========================================
    GLOBAL SCROLLBAR
 ========================================= */
 
-::-webkit-scrollbar {
+.lemonsquare-chat-root ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
 
-::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.03);
+.lemonsquare-chat-root ::-webkit-scrollbar-track {
+  background:
+    rgba(255,255,255,0.03);
 }
 
-::-webkit-scrollbar-thumb {
+.lemonsquare-chat-root ::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
@@ -166,7 +91,7 @@ body {
   border-radius: 999px;
 }
 
-::-webkit-scrollbar-thumb:hover {
+.lemonsquare-chat-root ::-webkit-scrollbar-thumb:hover {
   background:
     linear-gradient(
       180deg,
@@ -227,16 +152,8 @@ body {
 
 @media (max-width: 768px) {
 
-  body {
-    overflow: hidden;
-  }
-
-  html {
+  .lemonsquare-chat-root {
     font-size: 14px;
-  }
-
-  .app-background {
-    opacity: 0.22;
   }
 }
 
@@ -246,27 +163,40 @@ body {
 
 @media (prefers-reduced-motion: reduce) {
 
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+  .lemonsquare-chat-root *,
+  .lemonsquare-chat-root *::before,
+  .lemonsquare-chat-root *::after {
+    animation-duration:
+      0.01ms !important;
 
-    transition-duration: 0.01ms !important;
+    animation-iteration-count:
+      1 !important;
 
-    scroll-behavior: auto !important;
+    transition-duration:
+      0.01ms !important;
+
+    scroll-behavior:
+      auto !important;
   }
 }
 
+/* =========================================
+   ANIMATIONS
+========================================= */
 
 @keyframes fadeIn {
+
   from {
     opacity: 0;
-    transform: translateY(8px);
+
+    transform:
+      translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+
+    transform:
+      translateY(0);
   }
 }

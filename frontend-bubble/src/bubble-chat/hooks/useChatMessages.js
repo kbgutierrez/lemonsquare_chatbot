@@ -22,8 +22,30 @@ export const useChatMessages =
     const [messages, setMessages] =
       useState([])
 
-    const [loading, setLoading] =
-      useState(false)
+    /*
+      ONLY for AI message sending.
+    */
+    const [
+      isSendingMessage,
+      setIsSendingMessage,
+    ] = useState(false)
+
+    /*
+      ONLY for loading/restoring
+      previous conversations.
+    */
+    const [
+      isLoadingConversation,
+      setIsLoadingConversation,
+    ] = useState(false)
+
+    /*
+      ONLY for resolving chat.
+    */
+    const [
+      isResolvingConversation,
+      setIsResolvingConversation,
+    ] = useState(false)
 
     const [sessionId, setSessionId] =
       useState(null)
@@ -53,6 +75,24 @@ export const useChatMessages =
     */
     const activeLoadIdRef =
       useRef(null)
+
+    /*
+      Prevent stale closure issues
+      during async message sending.
+    */
+    const messagesRef =
+      useRef([])
+
+    /* ========================================
+       SYNC MESSAGE REF
+    ======================================== */
+
+    useEffect(() => {
+
+      messagesRef.current =
+        messages
+
+    }, [messages])
 
     /* ========================================
        TIME FORMAT
@@ -119,6 +159,12 @@ export const useChatMessages =
                   targetSessionId
               )
 
+            if (
+              !mountedRef.current
+            ) {
+              return
+            }
+
             setResolved(
               Boolean(
                 matchedSession?.resolved
@@ -163,7 +209,7 @@ export const useChatMessages =
           activeLoadIdRef.current =
             loadId
 
-          setLoading(true)
+          setIsLoadingConversation(true)
 
           try {
 
@@ -247,7 +293,7 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsLoadingConversation(false)
             }
           }
         },
@@ -315,6 +361,9 @@ export const useChatMessages =
           requestLockRef.current =
             true
 
+          const currentMessages =
+            messagesRef.current
+
           const userMessage = {
             id:
               crypto.randomUUID(),
@@ -344,7 +393,7 @@ export const useChatMessages =
           }
 
           const optimisticMessages = [
-            ...messages,
+            ...currentMessages,
             userMessage,
           ]
 
@@ -356,7 +405,7 @@ export const useChatMessages =
             typingMessage,
           ])
 
-          setLoading(true)
+          setIsSendingMessage(true)
 
           try {
 
@@ -378,24 +427,38 @@ export const useChatMessages =
               response?.sessionId
             ) {
 
+              const isNewSession =
+                sessionIdRef.current !==
+                response.sessionId
+
               sessionIdRef.current =
                 response.sessionId
 
-              setSessionId(
-                (
-                  previous
-                ) => {
+              /*
+                IMPORTANT:
+                Avoid auto reload after
+                first message creation.
 
-                  if (
-                    previous ===
-                    response.sessionId
-                  ) {
-                    return previous
-                  }
+                Root cause:
+                The previous logic triggered
+                loadConversation() immediately
+                after the first AI response.
 
-                  return response.sessionId
-                }
-              )
+                That caused:
+                - message flicker
+                - send button weird state
+                - optimistic UI overwrite
+                - duplicate loading lifecycle
+              */
+
+              if (
+                isNewSession
+              ) {
+
+                setSessionId(
+                  response.sessionId
+                )
+              }
             }
 
             const aiMessage = {
@@ -421,9 +484,14 @@ export const useChatMessages =
               aiMessage,
             ]
 
-            setMessages(
-              finalMessages
-            )
+            if (
+              mountedRef.current
+            ) {
+
+              setMessages(
+                finalMessages
+              )
+            }
 
             console.log(
               "MESSAGE_SENT_SUCCESS",
@@ -457,10 +525,15 @@ export const useChatMessages =
               isError: true,
             }
 
-            setMessages([
-              ...optimisticMessages,
-              errorMessage,
-            ])
+            if (
+              mountedRef.current
+            ) {
+
+              setMessages([
+                ...optimisticMessages,
+                errorMessage,
+              ])
+            }
 
           } finally {
 
@@ -468,17 +541,14 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsSendingMessage(false)
             }
 
             requestLockRef.current =
               false
           }
         },
-        [
-          messages,
-          resolved,
-        ]
+        [resolved]
       )
 
     /* ========================================
@@ -512,7 +582,7 @@ export const useChatMessages =
 
           try {
 
-            setLoading(true)
+            setIsResolvingConversation(true)
 
             /*
               REAL BACKEND RESOLVE
@@ -524,7 +594,12 @@ export const useChatMessages =
             /*
               Backend is source of truth.
             */
-            setResolved(true)
+            if (
+              mountedRef.current
+            ) {
+
+              setResolved(true)
+            }
 
             console.log(
               "BACKEND_CONVERSATION_RESOLVED",
@@ -549,7 +624,7 @@ export const useChatMessages =
               mountedRef.current
             ) {
 
-              setLoading(false)
+              setIsResolvingConversation(false)
             }
           }
         },
@@ -623,7 +698,18 @@ export const useChatMessages =
     return {
       messages,
 
-      loading,
+      /*
+        Backward-compatible
+        loading prop.
+      */
+      loading:
+        isSendingMessage,
+
+      isSendingMessage,
+
+      isLoadingConversation,
+
+      isResolvingConversation,
 
       sessionId,
 

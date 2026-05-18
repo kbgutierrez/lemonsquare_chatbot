@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useState,
 } from "react"
 
@@ -16,6 +17,8 @@ import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
 import CallAgentModal from "./modals/CallAgentModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
+
+import chatbotService from "./services/chatbotService"
 
 import {
   useBubbleDrag,
@@ -57,7 +60,19 @@ const BubbleChat = () => {
 
   const {
     messages,
+
+    /*
+      ONLY true while
+      sending a message.
+    */
     loading,
+
+    /*
+      Additional loading states.
+    */
+    isLoadingConversation,
+    isResolvingConversation,
+
     sessionId,
     resolved,
 
@@ -212,6 +227,33 @@ const BubbleChat = () => {
     }
 
   /* ========================================
+     REQUESTER ID
+  ======================================== */
+
+  const requesterId =
+    useMemo(
+      () => {
+
+        try {
+
+          return chatbotService.resolveRequesterId(
+            chatbotService.getUserToken()
+          )
+
+        } catch (error) {
+
+          console.error(
+            "REQUESTER_ID_RESOLVE_ERROR",
+            error
+          )
+
+          return null
+        }
+      },
+      []
+    )
+
+  /* ========================================
      MODALS
   ======================================== */
 
@@ -228,6 +270,12 @@ const BubbleChat = () => {
     ticket: (
       <SubmitTicketModal
         onClose={closeModal}
+
+        sessionId={sessionId}
+
+        requesterId={requesterId}
+
+        messages={messages}
       />
     ),
 
@@ -256,12 +304,18 @@ const BubbleChat = () => {
   return (
     <div
       className="
+        lemonsquare-chat-root
+
         pointer-events-none
 
         fixed
-        inset-0
+        bottom-0
+        left-0
 
-        z-[70]
+        h-0
+        w-0
+
+        z-[9999]
       "
     >
       {/* BACKDROP */}
@@ -283,7 +337,7 @@ const BubbleChat = () => {
             className="
               pointer-events-none
 
-              absolute
+              fixed
               inset-0
 
               bg-black/[0.02]
@@ -299,7 +353,7 @@ const BubbleChat = () => {
         className={`
           pointer-events-auto
 
-          absolute
+          fixed
 
           will-change-transform
 
@@ -395,14 +449,34 @@ const BubbleChat = () => {
             >
               <ChatWindow
                 messages={messages}
+
+                /*
+                  ONLY disables input
+                  while AI is actively replying.
+                */
                 loading={loading}
+
+                /*
+                  Optional advanced states.
+                */
+                isLoadingConversation={
+                  isLoadingConversation
+                }
+
+                isResolvingConversation={
+                  isResolvingConversation
+                }
+
                 resolved={resolved}
+
                 onSendMessage={
                   sendMessage
                 }
+
                 onClose={() =>
                   setOpen(false)
                 }
+
                 onOpenModal={
                   handleOpenModal
                 }
@@ -459,16 +533,20 @@ const BubbleChat = () => {
       </motion.div>
 
       {/* MODALS */}
-      <div
-        className="
-          pointer-events-auto
+      {activeModal && (
+        <div
+          className="
+            pointer-events-auto
 
-          relative
-          z-[120]
-        "
-      >
-        {modals[activeModal]}
-      </div>
+            fixed
+            inset-0
+
+            z-[10000]
+          "
+        >
+          {modals[activeModal]}
+        </div>
+      )}
     </div>
   )
 }
