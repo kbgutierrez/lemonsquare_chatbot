@@ -8,37 +8,21 @@ Handles:
   - Qdrant vector upsert.
   - SQL metadata persistence.
   - Document deletion (Qdrant + SQL).
+  - Canonical knowledge consolidation for manual entries, tickets, and chats.
 
-KEY CHANGES vs original:
-  1. No module-level instantiation.
-     `ingestion_service = DocumentIngestionService()` at import time loaded
-     the HuggingFace embedding model synchronously — could take 2+ minutes
-     and crashed on DB unavailability. The service is now created during
-     lifespan startup and stored in app.state.
-
-  2. DB session via parameter, not self-created.
-     Methods now accept `db: Session` from their caller (the route handler
-     via FastAPI DI), enabling clean testability and consistent transaction
-     management.
-
-  3. MIME-type file validation instead of filename extension check.
-     The original checked `file.filename.endswith(".pdf")`, which is trivially
-     bypassed with a file named `evil.exe.pdf`. We now read the first 5 bytes
-     and verify the PDF magic number (%PDF-).
-
-  4. Uses `pypdf` (already in requirements) instead of deprecated `PyPDF2`.
-     oldingestion.py used PyPDF2 which is unmaintained. ingestion.py used
-     the same deprecated import. Both are replaced with pypdf.
-
-  5. Async categorisation via ainvoke().
-     The original classify_llm.invoke() blocked the event loop.
+This version adds a shared consolidation layer so repeated knowledge does not
+explode into many near-identical Qdrant vectors.
 """
 
+from __future__ import annotations
+
 import asyncio
+import json
 import logging
 import os
 import tempfile
 import uuid
+from datetime import datetime
 
 from fastapi import UploadFile
 from langchain_groq import ChatGroq
@@ -46,13 +30,25 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pypdf import PdfReader
 from qdrant_client import QdrantClient
-from qdrant_client.http.models import FieldCondition, Filter, MatchValue, PointStruct
+from qdrant_client.http.models import (
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointStruct,
+)
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import ValidationError, VectorStoreError
-from app.models.chatbot import AIChatbotSetting, UploadedDocument, LearnedChat
-import json
+from app.models.chatbot import (
+    AIChatbotSetting,
+    BlacklistedTicket,
+    KnowledgeClusterMap,
+    LearnedChat,
+    ManualKnowledgeEntry,
+    UploadedDocument,
+)
+from app.services.consolidator import KnowledgeConsolidator
 
 logger = logging.getLogger(__name__)
 
@@ -69,20 +65,12 @@ _PDF_MAGIC = b"%PDF-"
 
 class DocumentIngestionService:
     """
-    Processes PDF uploads into the Qdrant vector store.
+    Processes knowledge sources into the Qdrant vector store.
 
     Instantiated once during app lifespan startup. Shared across requests.
     """
 
     def __init__(self, db: Session) -> None:
-        """
-        Load models and connect to Qdrant.
-
-        Args:
-            db: A short-lived DB session used only during __init__ to read
-                the active AIChatbotSetting. The caller is responsible for
-                closing this session after construction.
-        """
         logger.info("Initializing DocumentIngestionService...")
 
         active_config = (
@@ -102,9 +90,8 @@ class DocumentIngestionService:
             if active_config and active_config.ReformulatorModel
             else settings.CLASSIFIER_MODEL
         )
-        raw_categories = (
-            active_config.AllowedCategories if active_config else None
-        )
+
+        raw_categories = active_config.AllowedCategories if active_config else None
         self.allowed_categories: list[str] = (
             [c.strip() for c in raw_categories.split(",")]
             if raw_categories
@@ -123,35 +110,184 @@ class DocumentIngestionService:
             chunk_overlap=50,
             length_function=len,
         )
+        self.consolidator = KnowledgeConsolidator()
 
         logger.info("DocumentIngestionService ready (embed_model=%s).", self.embed_model)
 
     @staticmethod
     def _validate_pdf_bytes(data: bytes) -> None:
-        """
-        Verify the uploaded file is actually a PDF by checking its magic bytes.
-
-        Raises:
-            ValidationError: If the file is not a valid PDF.
-        """
         if not data[:5] == _PDF_MAGIC:
             raise ValidationError(
                 "Uploaded file is not a valid PDF. Only PDF files are supported."
             )
 
-    async def process_pdf_upload(self, file: UploadFile, db: Session, manual_category: str = None) -> dict:
-        """
-        Full ingestion pipeline for an uploaded PDF.
+    def _get_existing_payload(self, point_id: str) -> dict | None:
+        try:
+            records = self.qdrant.retrieve(
+                collection_name=self.collection_name,
+                ids=[point_id],
+                with_payload=True,
+                with_vectors=False,
+            )
+            if records:
+                payload = getattr(records[0], "payload", None)
+                if isinstance(payload, dict):
+                    return payload
+        except Exception as exc:
+            logger.warning("Could not retrieve existing Qdrant point %s: %s", point_id, exc)
+        return None
 
-        Args:
-            file: The uploaded file from FastAPI.
-            db: Active database session for persisting document metadata.
-            manual_category: Optional category provided by the Admin UI. If valid, uses it. Otherwise AI guesses.
+    @staticmethod
+    def _payload_metadata(payload: dict | None) -> dict:
+        if not isinstance(payload, dict):
+            return {}
+        meta = payload.get("metadata", {})
+        return meta if isinstance(meta, dict) else {}
 
-        Returns:
-            A dict with status, document_id, category, chunks_processed.
-        """
-        # 1. DUPLICATE PREVENTION: Check if file already exists in SQL
+    def _merge_cluster_payload(
+        self,
+        existing_payload: dict | None,
+        record_page_content: str,
+        record_metadata: dict,
+        source_id: str,
+        source_type: str,
+    ) -> dict:
+        existing_meta = self._payload_metadata(existing_payload)
+
+        source_ids = list(existing_meta.get("source_ids", []) or [])
+        source_already_present = source_id in source_ids
+        if not source_already_present:
+            source_ids.append(source_id)
+
+        source_types = list(existing_meta.get("source_types", []) or [])
+        if source_type not in source_types:
+            source_types.append(source_type)
+
+        existing_frequency = int(existing_meta.get("frequency", 0) or 0)
+        frequency = existing_frequency if source_already_present else existing_frequency + 1
+        if frequency <= 0:
+            frequency = 1
+
+        merged_meta = dict(existing_meta)
+        merged_meta.update(record_metadata)
+        merged_meta["source_id"] = source_id
+        merged_meta["source_ids"] = source_ids
+        merged_meta["source_types"] = source_types
+        merged_meta["frequency"] = frequency
+
+        return {
+            "page_content": record_page_content,
+            "metadata": merged_meta,
+        }
+
+    def _sync_cluster_map(
+        self,
+        db: Session,
+        source_id: str,
+        source_type: str,
+        cluster_id: str,
+        cluster_key: str,
+    ) -> None:
+        mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == source_id)
+            .first()
+        )
+        if mapping:
+            mapping.SourceType = source_type
+            mapping.ClusterID = cluster_id
+            mapping.ClusterKey = cluster_key
+            mapping.IsActive = True
+            mapping.UpdatedAt = datetime.utcnow()
+        else:
+            db.add(
+                KnowledgeClusterMap(
+                    SourceID=source_id,
+                    SourceType=source_type,
+                    ClusterID=cluster_id,
+                    ClusterKey=cluster_key,
+                    IsActive=True,
+                )
+            )
+
+    def _deactivate_source_mapping(self, db: Session, source_id: str) -> str | None:
+        mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == source_id)
+            .first()
+        )
+        if not mapping:
+            return None
+
+        mapping.IsActive = False
+        mapping.UpdatedAt = datetime.utcnow()
+        cluster_id = mapping.ClusterID
+        db.commit()
+        return cluster_id
+
+    def _maybe_delete_orphan_cluster(self, db: Session, cluster_id: str | None) -> None:
+        if not cluster_id:
+            return
+
+        active_count = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.ClusterID == cluster_id)
+            .filter(KnowledgeClusterMap.IsActive == True)
+            .count()
+        )
+        if active_count > 0:
+            return
+
+        try:
+            self.qdrant.delete(
+                collection_name=self.collection_name,
+                points_selector=[cluster_id],
+            )
+        except Exception as exc:
+            logger.warning("Could not delete orphan Qdrant cluster %s: %s", cluster_id, exc)
+
+    async def _upsert_canonical_point_async(
+        self,
+        *,
+        db: Session,
+        source_id: str,
+        source_type: str,
+        cluster_id: str,
+        cluster_key: str,
+        page_content: str,
+        metadata: dict,
+    ) -> None:
+        existing_payload = self._get_existing_payload(cluster_id)
+        payload = self._merge_cluster_payload(
+            existing_payload=existing_payload,
+            record_page_content=page_content,
+            record_metadata=metadata,
+            source_id=source_id,
+            source_type=source_type,
+        )
+
+        vector = await asyncio.to_thread(self.embeddings.embed_query, page_content)
+
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[
+                PointStruct(
+                    id=cluster_id,
+                    vector=vector,
+                    payload=payload,
+                )
+            ],
+        )
+
+        self._sync_cluster_map(db, source_id, source_type, cluster_id, cluster_key)
+        db.commit()
+
+    async def process_pdf_upload(
+        self,
+        file: UploadFile,
+        db: Session,
+        manual_category: str = None,
+    ) -> dict:
         existing_doc = (
             db.query(UploadedDocument)
             .filter(UploadedDocument.FileName == file.filename)
@@ -168,12 +304,10 @@ class DocumentIngestionService:
 
         temp_file_path: str | None = None
         try:
-            # Write to a named temp file for pypdf to read.
             with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            # 2. Extract text.
             pdf_reader = PdfReader(temp_file_path)
             raw_text = ""
             for page in pdf_reader.pages:
@@ -184,13 +318,8 @@ class DocumentIngestionService:
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 
-            # 3. CATEGORY ASSIGNMENT: Lock in the subcategory from database or AI
-            logger.info("Categorizing '%s'...", file.filename)
-            
-            # If Admin selected a valid category, use it. Otherwise, let AI guess.
             if manual_category and manual_category in self.allowed_categories:
                 ai_category = manual_category
-                logger.info("Using Admin-provided category: %s", ai_category)
             else:
                 if manual_category:
                     logger.warning(
@@ -198,36 +327,40 @@ class DocumentIngestionService:
                         manual_category,
                         self.allowed_categories,
                     )
-                logger.info("No valid category provided. AI is auto-categorizing...")
                 ai_category = await self._classify_document(raw_text)
-            
-            logger.info("Classified '%s' as: %s", file.filename, ai_category)
 
-            # 4. Chunk + embed (CPU-bound — run in thread).
+            cluster_key = self.consolidator.pdf_cluster_key(
+                file_name=file.filename,
+                raw_text=raw_text,
+                category=ai_category,
+            )
+            document_id = self.consolidator.cluster_id(cluster_key)
+
             chunks = self.text_splitter.split_text(raw_text)
-            document_id = str(uuid.uuid4())
 
             logger.info("Embedding %d chunks for document %s...", len(chunks), document_id)
             vectors = await asyncio.to_thread(self.embeddings.embed_documents, chunks)
 
-            # 5. Build Qdrant points with deterministic chunk IDs and locked taxonomy.
             points = []
             for i, chunk in enumerate(chunks):
-                # Deterministic chunk ID so we never duplicate vectors for the same file
                 chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{i}"))
                 payload = {
                     "page_content": chunk,
                     "metadata": {
                         "document_id": document_id,
                         "source": file.filename,
-                        "category": ai_category,              # The validated subcategory (database-driven)
+                        "category": ai_category,
                         "chunk_index": i,
-                        "doc_type": "official_document",      # The hardcoded main category
+                        "doc_type": "official_document",
+                        "knowledge_type": "pdf",
+                        "cluster_key": cluster_key,
+                        "source_id": document_id,
+                        "source_ids": [document_id],
+                        "frequency": 1,
                     },
                 }
                 points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
 
-            # 6. Upsert to Qdrant.
             try:
                 self.qdrant.upsert(
                     collection_name=self.collection_name,
@@ -236,7 +369,6 @@ class DocumentIngestionService:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
-            # 7. Persist metadata to SQL.
             db.add(
                 UploadedDocument(
                     DocumentID=document_id,
@@ -246,7 +378,6 @@ class DocumentIngestionService:
                 )
             )
             db.commit()
-            logger.info("Document %s ingested successfully (%d chunks).", document_id, len(chunks))
 
             return {
                 "status": "success",
@@ -259,259 +390,250 @@ class DocumentIngestionService:
             if temp_file_path and os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
 
-
-
     async def _classify_document(self, text: str) -> str:
-        """Uses the AI to read a snippet of the document and assign a category."""
-        from langchain_groq import ChatGroq
-        from app.core.config import settings
-        import logging
-        
-        logger = logging.getLogger(__name__)
-        
-        # We only need the first 3000 characters to figure out what the document is about.
-        # This saves tokens and makes the upload process much faster.
         snippet = text[:3000]
-        
         try:
             classify_llm = ChatGroq(
-                model="llama-3.1-8b-instant", 
-                temperature=0.0, 
-                api_key=settings.GROQ_API_KEY
+                model="llama-3.1-8b-instant",
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
             )
-            
+
             prompt = (
                 f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
                 f"Categorize it into EXACTLY ONE of these categories: {self.allowed_categories}. "
                 "Reply with ONLY the exact category name. Do not add punctuation or extra words."
             )
-            
-            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
-            
-            # The Lock: Fallback if the AI hallucinates a category that isn't allowed
+
+            ai_category = (await classify_llm.ainvoke(prompt)).content.strip(' "\'\n')
             if ai_category not in self.allowed_categories:
-                logger.warning(f"AI hallucinated category '{ai_category}'. Defaulting to 'General_IT'.")
-                return "General"
-                
+                logger.warning(
+                    "AI hallucinated category '%s'. Defaulting to 'General_IT'.",
+                    ai_category,
+                )
+                return "General_IT"
             return ai_category
-            
-        except Exception as e:
-            logger.error(f"Error during AI categorization: {e}")
-            return "General_IT"  # Safe fallback if the LLM call fails
 
+        except Exception as exc:
+            logger.error("Error during AI categorization: %s", exc)
+            return "General_IT"
 
-    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db: Session) -> dict:
-        """Embeds raw text into Qdrant, auto-guessing the category if none is provided."""
-        from app.models.chatbot import AIChatbotSetting, ManualKnowledgeEntry
-        from langchain_groq import ChatGroq
-        import uuid
-        from qdrant_client.http.models import PointStruct
-        
-        # 1. FETCH ALLOWED CATEGORIES FROM DB
-        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
-        
-        # Safely handle NULL database values
-        raw_categories = active_config.AllowedCategories if active_config and active_config.AllowedCategories else "General_IT"
-        allowed_categories = [c.strip() for c in raw_categories.split(',')]
+    async def process_manual_entry(
+        self,
+        title: str,
+        content: str,
+        manual_category: str | None,
+        db: Session,
+    ) -> dict:
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
 
-        # 2. STRICT CATEGORY VALIDATION (Admin override vs AI Guess)
+        raw_categories = (
+            active_config.AllowedCategories
+            if active_config and active_config.AllowedCategories
+            else "General_IT"
+        )
+        allowed_categories = [c.strip() for c in raw_categories.split(",")]
+
         if manual_category:
-            # If they provided a category, it MUST be valid. No silent fallback to AI.
             if manual_category not in allowed_categories:
-                raise ValueError(f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}")
-            
+                raise ValueError(
+                    f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}"
+                )
             ai_category = manual_category
-            logger.info("Using Admin-provided category: %s", ai_category)
         else:
-            logger.info("No category provided for manual entry. AI is auto-categorizing...")
-            
             classify_llm = ChatGroq(
-                model="llama-3.1-8b-instant", 
-                temperature=0.0, 
-                api_key=settings.GROQ_API_KEY
+                model="llama-3.1-8b-instant",
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
             )
-            
             prompt = (
                 f"You are an IT categorization AI. Read this text: '{title} - {content}'. "
                 f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
                 "Reply with ONLY the category name. Do not add punctuation."
             )
-            
-            ai_category = classify_llm.invoke(prompt).content.strip(' "\'\n')
-            
-            # The Lock: Fallback if the AI hallucinates
+            ai_category = (await classify_llm.ainvoke(prompt)).content.strip(' "\'\n')
             if ai_category not in allowed_categories:
-                logger.warning(f"AI hallucinated category '{ai_category}'. Overriding to 'General_IT'.")
+                logger.warning(
+                    "AI hallucinated category '%s'. Overriding to 'General_IT'.",
+                    ai_category,
+                )
                 ai_category = "General_IT"
 
-        # 3. FORMAT AND VECTORIZE
         document_id = str(uuid.uuid4())
-        searchable_text = f"TITLE: {title}\nCONTENT: {content}"
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
-        
-        # 4. PUSH TO QDRANT
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "document_id": document_id,
-                "source": title,
-                "category": ai_category,        
-                "doc_type": "general_text"      
-            }
-        }
-        
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[PointStruct(id=document_id, vector=vector, payload=payload)]
+        record = self.consolidator.build_manual_record(
+            entry_id=document_id,
+            title=title,
+            content=content,
+            category=ai_category,
         )
 
-        # 5. NEW: SAVE TO MS SQL
-        new_entry = ManualKnowledgeEntry(
-            EntryID=document_id,
-            Title=title,
-            Content=content,
-            Category=ai_category
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=document_id,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
         )
-        db.add(new_entry)
+
+        db.add(
+            ManualKnowledgeEntry(
+                EntryID=document_id,
+                Title=title,
+                Content=content,
+                Category=ai_category,
+            )
+        )
         db.commit()
-        
+
         return {
-            "status": "success", 
+            "status": "success",
             "entry_id": document_id,
-            "category": ai_category, 
-            "message": f"Manual entry added to AI Brain under '{ai_category}'."
+            "category": ai_category,
+            "message": f"Manual entry added to AI Brain under '{ai_category}'.",
         }
 
     async def update_manual_entry(self, entry_id: str, updates: dict, db: Session) -> dict:
-        from app.models.chatbot import AIChatbotSetting, ManualKnowledgeEntry
-        from qdrant_client.http.models import PointStruct
-        from datetime import datetime
-
-        # 1. Update SQL
-        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
         if not entry:
             raise ValueError("Manual entry not found.")
 
-        # Fetch allowed categories dynamically for validation
-        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
-        
-        # Safely handle NULL database values
-        raw_categories = active_config.AllowedCategories if active_config and active_config.AllowedCategories else "General"
-        allowed_categories = [c.strip() for c in raw_categories.split(',')]
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+        raw_categories = (
+            active_config.AllowedCategories
+            if active_config and active_config.AllowedCategories
+            else "General_IT"
+        )
+        allowed_categories = [c.strip() for c in raw_categories.split(",")]
 
-        if updates.get("title"): 
+        if updates.get("title"):
             entry.Title = updates["title"]
-        if updates.get("content"): 
+        if updates.get("content"):
             entry.Content = updates["content"]
-            
-        # STRICT VALIDATION ON UPDATE
-        if updates.get("category"): 
+        if updates.get("category"):
             new_category = updates["category"]
             if new_category not in allowed_categories:
-                raise ValueError(f"Invalid category: '{new_category}'. Must be one of {allowed_categories}")
+                raise ValueError(
+                    f"Invalid category: '{new_category}'. Must be one of {allowed_categories}"
+                )
             entry.Category = new_category
-            
+
         entry.UpdatedAt = datetime.utcnow()
         db.commit()
 
-        # 2. Re-embed and update Qdrant (Overwrites the old vector)
-        searchable_text = f"TITLE: {entry.Title}\nCONTENT: {entry.Content}"
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
-        
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "document_id": entry.EntryID,
-                "source": entry.Title,
-                "category": entry.Category,
-                "doc_type": "general_text"
-            }
-        }
-        
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[PointStruct(id=entry.EntryID, vector=vector, payload=payload)]
+        record = self.consolidator.build_manual_record(
+            entry_id=entry.EntryID,
+            title=entry.Title,
+            content=entry.Content,
+            category=entry.Category,
         )
+
+        old_mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == entry.EntryID)
+            .first()
+        )
+        old_cluster_id = old_mapping.ClusterID if old_mapping else None
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=entry.EntryID,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        if old_cluster_id and old_cluster_id != record.point_id:
+            self._maybe_delete_orphan_cluster(db, old_cluster_id)
+            db.commit()
 
         return {"status": "success", "message": "Entry updated successfully."}
 
     async def delete_manual_entry(self, entry_id: str, db: Session) -> dict:
-        from app.models.chatbot import ManualKnowledgeEntry
-
-        # 1. Soft Delete from SQL
-        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
         if entry:
             entry.IsActive = False
             db.commit()
 
-        # 2. Hard Delete from Qdrant by Exact ID (No index required)
-        # Because the EntryID in SQL is the exact same UUID used in Qdrant
-        self.qdrant.delete(
-            collection_name=self.collection_name,
-            points_selector=[entry_id]  # Pass the exact ID in a list
-        )
+        cluster_id = self._deactivate_source_mapping(db, entry_id)
+        self._maybe_delete_orphan_cluster(db, cluster_id)
+        db.commit()
 
         return {"status": "success", "message": "Manual entry deleted."}
 
     async def delete_document(self, document_id: str, db: Session) -> dict:
-        from app.models.chatbot import UploadedDocument
-        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-
-        # 1. SOFT DELETE FROM SQL
-        # We fetch the document and set IsActive = False instead of using db.delete()
-        doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        doc = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.DocumentID == document_id)
+            .first()
+        )
         if not doc:
             raise ValueError("Document not found in database.")
 
         doc.IsActive = False
         db.commit()
 
-        # 2. HARD DELETE FROM QDRANT
-        # Because a single PDF is split into many chunks, we use a Filter to find and 
-        # scrub every single vector chunk that belongs to this document_id.
         self.qdrant.delete(
             collection_name=self.collection_name,
             points_selector=Filter(
                 must=[
                     FieldCondition(
-                        key="metadata.document_id", 
-                        match=MatchValue(value=document_id)
+                        key="metadata.document_id",
+                        match=MatchValue(value=document_id),
                     )
                 ]
-            )
+            ),
         )
 
         return {
-            "status": "success", 
-            "message": f"Document '{doc.FileName}' has been archived and scrubbed from the AI's memory."
+            "status": "success",
+            "message": f"Document '{doc.FileName}' has been archived and scrubbed from the AI's memory.",
         }
-    
 
     async def update_document(self, document_id: str, updates: dict, db: Session) -> dict:
-        """
-        Updates a document's metadata in SQL and Qdrant without re-embedding text.
-        """
-        from app.models.chatbot import UploadedDocument
-        from qdrant_client.http.models import Filter, FieldCondition, MatchValue
-
-        # 1. Find the document in SQL
-        document = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
+        document = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.DocumentID == document_id)
+            .first()
+        )
         if not document:
             raise ValueError(f"Document {document_id} not found in database.")
 
         payload_updates = {}
-        
-        # 2. Apply updates conditionally
+
         if updates.get("file_name"):
             document.FileName = updates["file_name"]
             payload_updates["metadata"] = payload_updates.get("metadata", {})
-            payload_updates["metadata"]["source"] = updates["file_name"] # Note: source maps to file_name in your payload
+            payload_updates["metadata"]["source"] = updates["file_name"]
 
         if updates.get("category"):
             new_category = updates["category"]
             if new_category not in self.allowed_categories:
-                raise ValueError(f"Invalid category: {new_category}. Must be one of {self.allowed_categories}")
-            
+                raise ValueError(
+                    f"Invalid category: {new_category}. Must be one of {self.allowed_categories}"
+                )
+
             document.Category = new_category
             payload_updates["metadata"] = payload_updates.get("metadata", {})
             payload_updates["metadata"]["category"] = new_category
@@ -519,10 +641,8 @@ class DocumentIngestionService:
         if not payload_updates:
             return {"status": "skipped", "message": "No valid updates provided."}
 
-        # Save SQL changes
         db.commit()
 
-        # 3. Patch Qdrant metadata instantly across all chunks
         self.qdrant.set_payload(
             collection_name=self.collection_name,
             payload=payload_updates,
@@ -533,102 +653,82 @@ class DocumentIngestionService:
                         match=MatchValue(value=document_id),
                     )
                 ]
-            )
+            ),
         )
 
         logger.info("Successfully updated metadata for document %s", document_id)
         return {"status": "success", "message": "Document metadata updated successfully."}
-    
 
-    
     async def process_resolved_ticket(self, ticket_data: dict, db: Session) -> dict:
-        """
-        Takes raw helpdesk ticket notes and ingests them directly into Qdrant "as is" 
-        without LLM summarization.
-        """
         ticket_number = ticket_data["ticket_number"]
         logger.info("Processing raw resolved ticket for AI ingestion: %s", ticket_number)
 
-        # 1. Check if it's blacklisted
-        from app.models.chatbot import BlacklistedTicket
-        is_blacklisted = db.query(BlacklistedTicket).filter(BlacklistedTicket.TicketNumber == ticket_number).first()
+        is_blacklisted = (
+            db.query(BlacklistedTicket)
+            .filter(BlacklistedTicket.TicketNumber == ticket_number)
+            .first()
+        )
         if is_blacklisted:
             logger.warning("Ticket %s is blacklisted. Skipping AI ingestion.", ticket_number)
-            return {"status": "skipped", "ticket_number": ticket_number, "message": "Ticket is blacklisted."}
+            return {
+                "status": "skipped",
+                "ticket_number": ticket_number,
+                "message": "Ticket is blacklisted.",
+            }
 
-        # 2. Format the raw notes exactly as they came from the database
-        raw_ticket_text = (
-            f"TICKET NUMBER: {ticket_number}\n"
-            f"ISSUE REPORTED: {ticket_data.get('issue_reported', 'None')}\n"
-            f"ISSUE FOUND: {ticket_data.get('issue_found', 'None')}\n"
-            f"ROOT CAUSE: {ticket_data.get('issue_cause', 'None')}\n"
-            f"WORK DONE: {ticket_data.get('work_done', 'None')}"
+        record = self.consolidator.build_ticket_record(
+            ticket_number=ticket_number,
+            issue_reported=ticket_data.get("issue_reported"),
+            issue_found=ticket_data.get("issue_found"),
+            issue_cause=ticket_data.get("issue_cause"),
+            work_done=ticket_data.get("work_done"),
+            advanced_work_done=ticket_data.get("advanced_work_done"),
         )
 
-        # 3. Vectorize the RAW text directly (No LLM Car Wash!)
-        logger.info("Vectorizing raw ticket %s...", ticket_number)
-        vector = await asyncio.to_thread(self.embeddings.embed_query, raw_ticket_text)
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=str(ticket_number),
+            source_type="ticket",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
 
-        # 4. Deterministic UUID
-        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"ticket_{ticket_number}"))
-
-        payload = {
-            "page_content": raw_ticket_text,
-            "metadata": {
-                "ticket_number": ticket_number,
-                "doc_type": "ticket",
-            }
+        return {
+            "status": "success",
+            "ticket_number": ticket_number,
+            "message": "Resolved ticket clustered and added to AI.",
         }
 
-        # 5. Push to Qdrant
-        try:
-            self.qdrant.upsert(
-                collection_name=self.collection_name,
-                points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
-            )
-            logger.info("Raw ticket %s successfully ingested into Qdrant.", ticket_number)
-        except Exception as exc:
-            raise VectorStoreError(f"Failed to upsert raw ticket to Qdrant: {exc}") from exc
-
-        return {"status": "success", "ticket_number": ticket_number, "message": "Raw ticket vectorized and added to AI."}
-
-
-
     async def process_resolved_chat(self, session_id: str, db: Session) -> dict:
-        """
-        Reads a successful chat session, extracts the problem and solution via a 
-        database-configured LLM and custom Prompt as strict JSON, 
-        formats it for search, and pushes it to Qdrant.
-        """
-        from app.models.chatbot import ChatMessage, AIChatbotSetting
-        import json
-        
+        from app.models.chatbot import ChatMessage
+
         logger.info("Processing resolved chat session: %s", session_id)
 
-        # 1. Fetch the entire chat history from SQL
         messages = (
             db.query(ChatMessage)
             .filter(ChatMessage.SessionID == session_id)
             .order_by(ChatMessage.CreatedAt.asc())
             .all()
         )
-        
+
         if len(messages) < 2:
             return {"status": "skipped", "message": "Chat is too short to summarize."}
 
         transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
 
-        # ---------------------------------------------------------
-        # DYNAMIC CONFIGURATION (Model & Prompt)
-        # ---------------------------------------------------------
-        active_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.IsActive == True).order_by(AIChatbotSetting.SettingID.desc()).first()
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
 
-        # DYNAMIC MODEL: Get from DB, fallback to 8b-instant if empty
-        extraction_model = getattr(active_config, 'ReformulatorModel', None)
+        extraction_model = getattr(active_config, "ReformulatorModel", None)
         if not extraction_model or extraction_model.strip() == "":
-            extraction_model = "llama-3.1-8b-instant" 
+            extraction_model = "llama-3.1-8b-instant"
 
-        # DYNAMIC PROMPT: Define fallback, use DB if available
         default_prompt = (
             "You are a strict IT Data Extraction API. Read the chat transcript below and extract the details.\n"
             "You MUST output EXACTLY a valid JSON object with these four keys: "
@@ -640,182 +740,152 @@ class DocumentIngestionService:
             "JSON Output:"
         )
 
-        raw_prompt_template = getattr(active_config, 'ChatExtractionPrompt', None)
+        raw_prompt_template = getattr(active_config, "ChatExtractionPrompt", None)
         if not raw_prompt_template or raw_prompt_template.strip() == "":
             raw_prompt_template = default_prompt
 
-        # Safely inject the transcript without triggering JSON bracket errors
         if "{transcript}" in raw_prompt_template:
             prompt = raw_prompt_template.replace("{transcript}", transcript)
         else:
             logger.error("Missing {transcript} tag in custom ChatExtractionPrompt. Falling back to default.")
             prompt = default_prompt.replace("{transcript}", transcript)
-        # ---------------------------------------------------------
 
-        # 2. Call the LLM with the DYNAMIC model
-        logger.info("Extracting structured JSON using model [%s]...", extraction_model)
         cleaner_llm = ChatGroq(
-            model=extraction_model, 
+            model=extraction_model,
             temperature=0.0,
             api_key=settings.GROQ_API_KEY,
         )
-        
+
         result = await cleaner_llm.ainvoke(prompt)
         raw_output = result.content.strip()
 
-        # Clean up markdown if the LLM hallucinated it
         if raw_output.startswith("```json"):
             raw_output = raw_output[7:-3].strip()
         elif raw_output.startswith("```"):
             raw_output = raw_output[3:-3].strip()
 
-        # 3. Parse the JSON
         try:
             extracted_data = json.loads(raw_output)
-        except json.JSONDecodeError as exc:
+        except json.JSONDecodeError:
             logger.error("Failed to parse LLM JSON: %s", raw_output)
             return {"status": "error", "message": "AI failed to output valid JSON."}
 
         if "error" in extracted_data:
             return {"status": "skipped", "message": "No clear resolution found in transcript."}
 
-        # 4. Format the text block for Qdrant's semantic search
-        searchable_text = (
-            f"ISSUE REPORTED: {extracted_data.get('issue_reported', 'None')}\n"
-            f"ACTUAL ISSUE FOUND: {extracted_data.get('issue_found', 'None')}\n"
-            f"ROOT CAUSE: {extracted_data.get('issue_cause', 'None')}\n"
-            f"RESOLUTION (WORK DONE): {extracted_data.get('work_done', 'None')}"
+        record = self.consolidator.build_chat_record(
+            session_id=session_id,
+            issue_reported=extracted_data.get("issue_reported", "None"),
+            issue_found=extracted_data.get("issue_found", "None"),
+            issue_cause=extracted_data.get("issue_cause", "None"),
+            work_done=extracted_data.get("work_done", "None"),
         )
 
-        # 5. Embed the formatted text
-        logger.info("Vectorizing structured knowledge...")
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
 
-        # 6. Deterministic UUID
-        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
-
-        # 7. Payload: Searchable Text + SQL-Ready JSON Data
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "source_session": session_id,
-                "doc_type": "resolved_chat",
-                "sql_ready_data": extracted_data 
-            }
-        }
-
-        # 8. Push to Qdrant
-        try:
-            self.qdrant.upsert(
-                collection_name=self.collection_name,
-                points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
-            )
-            logger.info("Session %s successfully added to AI Brain as structured data.", session_id)
-            
-            print("\n" + "="*50)
-            print("NEW STRUCTURED AI KNOWLEDGE CREATED:")
-            print(json.dumps(extracted_data, indent=2))
-            print("="*50 + "\n")
-
-        except Exception as exc:
-            raise Exception(f"Failed to upsert chat to Qdrant: {exc}") from exc
-        
-        existing_learned = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        existing_learned = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
         if not existing_learned:
             learned_entry = LearnedChat(
                 SessionID=session_id,
-                IssueReported=extracted_data.get('issue_reported', 'None'),
-                IssueFound=extracted_data.get('issue_found', 'None'),
-                RootCause=extracted_data.get('issue_cause', 'None'),
-                WorkDone=extracted_data.get('work_done', 'None')
+                IssueReported=extracted_data.get("issue_reported", "None"),
+                IssueFound=extracted_data.get("issue_found", "None"),
+                RootCause=extracted_data.get("issue_cause", "None"),
+                WorkDone=extracted_data.get("work_done", "None"),
             )
             db.add(learned_entry)
             db.commit()
 
-        return {"status": "success", "session_id": session_id, "message": "Conversation extracted and learned!"}
-    
-    async def update_learned_chat(self, session_id: str, updates: dict, db: Session) -> dict:
-        from app.models.chatbot import LearnedChat
-        from qdrant_client.http.models import PointStruct
-        from datetime import datetime
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "message": "Conversation extracted, clustered, and learned!",
+        }
 
-        # 1. Update SQL
-        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+    async def update_learned_chat(self, session_id: str, updates: dict, db: Session) -> dict:
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
         if not chat:
             raise ValueError("Learned chat not found.")
 
-        if updates.get("issue_reported"): chat.IssueReported = updates["issue_reported"]
-        if updates.get("issue_found"): chat.IssueFound = updates["issue_found"]
-        if updates.get("issue_cause"): chat.RootCause = updates["issue_cause"]
-        if updates.get("work_done"): chat.WorkDone = updates["work_done"]
+        if updates.get("issue_reported"):
+            chat.IssueReported = updates["issue_reported"]
+        if updates.get("issue_found"):
+            chat.IssueFound = updates["issue_found"]
+        if updates.get("issue_cause"):
+            chat.RootCause = updates["issue_cause"]
+        if updates.get("work_done"):
+            chat.WorkDone = updates["work_done"]
         chat.UpdatedAt = datetime.utcnow()
         db.commit()
 
-        # 2. Re-format text block
-        searchable_text = (
-            f"ISSUE REPORTED: {chat.IssueReported}\n"
-            f"ACTUAL ISSUE FOUND: {chat.IssueFound}\n"
-            f"ROOT CAUSE: {chat.RootCause}\n"
-            f"RESOLUTION (WORK DONE): {chat.WorkDone}"
+        record = self.consolidator.build_chat_record(
+            session_id=chat.SessionID,
+            issue_reported=chat.IssueReported,
+            issue_found=chat.IssueFound,
+            issue_cause=chat.RootCause,
+            work_done=chat.WorkDone,
         )
 
-        # 3. Re-embed and update Qdrant
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
-        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
-
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "source_session": session_id,
-                "doc_type": "resolved_chat",
-                "sql_ready_data": {
-                    "issue_reported": chat.IssueReported,
-                    "issue_found": chat.IssueFound,
-                    "issue_cause": chat.RootCause,
-                    "work_done": chat.WorkDone
-                }
-            }
-        }
-        
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
+        old_mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == session_id)
+            .first()
         )
+        old_cluster_id = old_mapping.ClusterID if old_mapping else None
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        if old_cluster_id and old_cluster_id != record.point_id:
+            self._maybe_delete_orphan_cluster(db, old_cluster_id)
+            db.commit()
 
         return {"status": "success", "message": "AI knowledge corrected successfully."}
 
-
-    
-
     async def delete_learned_chat(self, session_id: str, db: Session) -> dict:
-        from app.models.chatbot import LearnedChat
-        import uuid
-
-        # 1. Soft Delete from SQL
-        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
         if chat:
             chat.IsActive = False
             db.commit()
 
-        # 2. Hard Delete from Qdrant by Exact ID (No index required)
-        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
-        
-        self.qdrant.delete(
-            collection_name=self.collection_name,
-            points_selector=[ticket_uuid]  # Pass the exact ID in a list
-        )
+        cluster_id = self._deactivate_source_mapping(db, session_id)
+        self._maybe_delete_orphan_cluster(db, cluster_id)
+        db.commit()
 
         return {"status": "success", "message": "AI forced to unlearn chat."}
-    
-
 
     async def restore_manual_entry(self, entry_id: str, db: Session) -> dict:
-        """Restores a soft-deleted manual rule by re-embedding it into Qdrant."""
-        from app.models.chatbot import ManualKnowledgeEntry
-        from qdrant_client.http.models import PointStruct
-
-        # 1. Un-archive in SQL
-        entry = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.EntryID == entry_id).first()
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
         if not entry:
             raise ValueError("Manual entry not found in the database.")
 
@@ -825,37 +895,31 @@ class DocumentIngestionService:
         entry.IsActive = True
         db.commit()
 
-        # 2. Re-embed the text
-        searchable_text = f"TITLE: {entry.Title}\nCONTENT: {entry.Content}"
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
-        
-        # 3. Push back to Qdrant's memory
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "document_id": entry.EntryID,
-                "source": entry.Title,
-                "category": entry.Category,
-                "doc_type": "general_text"
-            }
-        }
-        
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[PointStruct(id=entry.EntryID, vector=vector, payload=payload)]
+        record = self.consolidator.build_manual_record(
+            entry_id=entry.EntryID,
+            title=entry.Title,
+            content=entry.Content,
+            category=entry.Category,
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=entry.EntryID,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
         )
 
         return {"status": "success", "message": "Manual entry successfully restored to the AI Brain."}
 
-
     async def restore_learned_chat(self, session_id: str, db: Session) -> dict:
-        """Restores a soft-deleted AI chat summary by re-embedding it into Qdrant."""
-        from app.models.chatbot import LearnedChat
-        from qdrant_client.http.models import PointStruct
-        import uuid
-
-        # 1. Un-archive in SQL
-        chat = db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
         if not chat:
             raise ValueError("Learned chat not found in the database.")
 
@@ -865,36 +929,22 @@ class DocumentIngestionService:
         chat.IsActive = True
         db.commit()
 
-        # 2. Re-format the text block exactly as it was originally
-        searchable_text = (
-            f"ISSUE REPORTED: {chat.IssueReported}\n"
-            f"ACTUAL ISSUE FOUND: {chat.IssueFound}\n"
-            f"ROOT CAUSE: {chat.RootCause}\n"
-            f"RESOLUTION (WORK DONE): {chat.WorkDone}"
+        record = self.consolidator.build_chat_record(
+            session_id=chat.SessionID,
+            issue_reported=chat.IssueReported,
+            issue_found=chat.IssueFound,
+            issue_cause=chat.RootCause,
+            work_done=chat.WorkDone,
         )
 
-        # 3. Re-embed and generate the deterministic UUID
-        vector = await asyncio.to_thread(self.embeddings.embed_query, searchable_text)
-        ticket_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"chat_resolve_{session_id}"))
-
-        payload = {
-            "page_content": searchable_text,
-            "metadata": {
-                "source_session": session_id,
-                "doc_type": "resolved_chat",
-                "sql_ready_data": {
-                    "issue_reported": chat.IssueReported,
-                    "issue_found": chat.IssueFound,
-                    "issue_cause": chat.RootCause,
-                    "work_done": chat.WorkDone
-                }
-            }
-        }
-        
-        # 4. Push back to Qdrant
-        self.qdrant.upsert(
-            collection_name=self.collection_name,
-            points=[PointStruct(id=ticket_uuid, vector=vector, payload=payload)]
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
         )
 
         return {"status": "success", "message": "Learned chat successfully restored to the AI Brain."}

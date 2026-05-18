@@ -162,3 +162,22 @@ class LearnedChat(BaseChatbot):
     LearnedAt = Column(DateTime, default=datetime.utcnow)
     UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     IsActive = Column(Boolean, default=True)
+
+
+
+class KnowledgeClusterMap(BaseChatbot):
+    """
+    Maps a source record (ticket/manual/chat/pdf) to its canonical Qdrant cluster.
+    This keeps update/delete flows stable even when multiple SQL rows merge into
+    one semantic cluster in Qdrant.
+    """
+
+    __tablename__ = "tbl_knowledge_cluster_map"
+
+    SourceID = Column(String(64), primary_key=True)     # ticket number / entry id / session id / document id
+    SourceType = Column(String(50), nullable=False)     # ticket | manual | chat | pdf
+    ClusterID = Column(String(64), nullable=False, index=True)
+    ClusterKey = Column(String(128), nullable=False, index=True)
+    IsActive = Column(Boolean, default=True)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
