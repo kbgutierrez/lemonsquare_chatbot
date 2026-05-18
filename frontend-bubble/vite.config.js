@@ -1,7 +1,9 @@
 import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 
-// https://vite.dev/config/
+/*
+  SDK-READY VITE CONFIG
+*/
 
 export default defineConfig({
   plugins: [
@@ -21,6 +23,53 @@ export default defineConfig({
         changeOrigin: true,
 
         secure: false,
+      },
+    },
+  },
+
+  build: {
+    sourcemap: true,
+
+    minify: "esbuild",
+
+    target: "es2018",
+
+    cssCodeSplit: false,
+
+    lib: {
+      entry:
+        "./src/sdk/index.jsx",
+
+      name:
+        "LemonSquareChat",
+
+      fileName:
+        () =>
+          "lemonsquare-chat.js",
+
+      formats: ["iife"],
+    },
+
+    rollupOptions: {
+      output: {
+        inlineDynamicImports: true,
+      },
+    },
+  },
+
+  define: {
+    __LEMONSQUARE_WIDGET__:
+      true,
+
+    "process.env.NODE_ENV":
+      JSON.stringify(
+        "production"
+      ),
+
+    process: {
+      env: {
+        NODE_ENV:
+          "production",
       },
     },
   },

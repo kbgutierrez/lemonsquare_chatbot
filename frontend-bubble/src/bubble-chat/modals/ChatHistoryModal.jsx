@@ -1,10 +1,16 @@
 import {
+  useMemo,
+  useState,
+} from "react"
+
+import {
   History,
   MessageSquare,
   ChevronRight,
   Trash2,
   Lock,
   CheckCircle2,
+  ChevronLeft,
 } from "lucide-react"
 
 import ModalShell from "../components/ModalShell.jsx"
@@ -12,6 +18,8 @@ import ModalShell from "../components/ModalShell.jsx"
 import {
   useConversationHistory,
 } from "../hooks/useConversationHistory"
+
+const PAGE_SIZE = 3
 
 const formatDate = (
   dateString
@@ -52,6 +60,45 @@ const ChatHistoryModal = ({
     clearAllHistory,
   } =
     useConversationHistory()
+
+  const [page, setPage] =
+    useState(1)
+
+  /* ========================================
+     PAGINATION
+  ======================================== */
+
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        conversations.length /
+        PAGE_SIZE
+      )
+    )
+
+  const paginatedConversations =
+    useMemo(
+      () => {
+
+        const start =
+          (page - 1) *
+          PAGE_SIZE
+
+        const end =
+          start + PAGE_SIZE
+
+        return conversations.slice(
+          start,
+          end
+        )
+
+      },
+      [
+        conversations,
+        page,
+      ]
+    )
 
   /* ========================================
      LOAD CONVERSATION
@@ -261,157 +308,227 @@ const ChatHistoryModal = ({
               >
                 No conversation history yet.
               </p>
-
-              <p
-                className="
-                  mt-2
-
-                  max-w-xs
-
-                  text-sm
-
-                  text-slate-500
-                "
-              >
-                Your previous chats will
-                appear here automatically.
-              </p>
             </div>
           )}
 
         {/* LIST */}
         {!loading &&
           conversations.length > 0 && (
-            <div
-              className="
-                space-y-3
-              "
-            >
-              {conversations.map(
-                (
-                  conversation
-                ) => {
+            <>
+              <div
+                className="
+                  space-y-3
+                "
+              >
+                {paginatedConversations.map(
+                  (
+                    conversation
+                  ) => {
 
-                  const isResolved =
-                    Boolean(
-                      conversation.resolved
-                    )
+                    const isResolved =
+                      Boolean(
+                        conversation.resolved
+                      )
 
-                  return (
-                    <div
-                      key={
-                        conversation.id
-                      }
-                      role="button"
-                      tabIndex={0}
-                      onClick={() =>
-                        handleConversationClick(
-                          conversation
-                        )
-                      }
-                      onKeyDown={(event) => {
-
-                        if (
-                          event.key === "Enter" ||
-                          event.key === " "
-                        ) {
-
+                    return (
+                      <div
+                        key={
+                          conversation.id
+                        }
+                        role="button"
+                        tabIndex={0}
+                        onClick={() =>
                           handleConversationClick(
                             conversation
                           )
                         }
-                      }}
-                      className="
-                        group
-                        relative
-                        w-full
-
-                        cursor-pointer
-
-                        overflow-hidden
-
-                        rounded-3xl
-
-                        border
-                        border-violet-100/80
-
-                        bg-white/90
-
-                        p-4
-
-                        text-left
-
-                        shadow-sm
-
-                        transition-all
-                        duration-300
-
-                        hover:-translate-y-0.5
-                        hover:bg-violet-50/90
-                        hover:shadow-[0_12px_30px_rgba(124,58,237,0.10)]
-
-                        active:scale-[0.99]
-                      "
-                    >
-                      {/* DELETE */}
-                      <button
-                        type="button"
-                        onClick={(
-                          event
-                        ) =>
-                          handleDeleteConversation(
-                            event,
-                            conversation.id
-                          )
-                        }
                         className="
-                          absolute
-                          right-3
-                          top-3
+                          group
+                          relative
+                          w-full
 
-                          z-20
+                          cursor-pointer
 
-                          flex
-                          h-8
-                          w-8
-                          items-center
-                          justify-center
+                          overflow-hidden
 
-                          rounded-xl
+                          rounded-3xl
 
-                          text-slate-400
+                          border
+                          border-violet-100/80
+
+                          bg-white/90
+
+                          p-4
+
+                          text-left
+
+                          shadow-sm
 
                           transition-all
-                          duration-200
+                          duration-300
 
-                          hover:bg-red-50
-                          hover:text-red-500
+                          hover:-translate-y-0.5
+                          hover:bg-violet-50/90
+
+                          active:scale-[0.99]
                         "
                       >
-                        <Trash2
+                        {/* DELETE */}
+                        <button
+                          type="button"
+                          onClick={(
+                            event
+                          ) =>
+                            handleDeleteConversation(
+                              event,
+                              conversation.id
+                            )
+                          }
                           className="
-                            h-4
-                            w-4
-                          "
-                        />
-                      </button>
+                            absolute
+                            right-3
+                            top-3
 
-                      {/* CONTENT */}
-                      <div
-                        className="
-                          flex
-                          items-start
-                          justify-between
-                          gap-3
-                        "
-                      >
-                        <div
-                          className="
-                            min-w-0
-                            flex-1
+                            z-20
+
+                            flex
+                            h-8
+                            w-8
+                            items-center
+                            justify-center
+
+                            rounded-xl
+
+                            text-slate-400
+
+                            transition-all
+                            duration-200
+
+                            hover:bg-red-50
+                            hover:text-red-500
                           "
                         >
-                          {/* TITLE */}
+                          <Trash2
+                            className="
+                              h-4
+                              w-4
+                            "
+                          />
+                        </button>
+
+                        <div
+                          className="
+                            flex
+                            items-start
+                            justify-between
+                            gap-3
+                          "
+                        >
+                          <div
+                            className="
+                              min-w-0
+                              flex-1
+                            "
+                          >
+                            <div
+                              className="
+                                flex
+                                items-center
+                                gap-2
+                              "
+                            >
+                              {isResolved ? (
+                                <Lock
+                                  className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+
+                                    text-emerald-600
+                                  "
+                                />
+                              ) : (
+                                <MessageSquare
+                                  className="
+                                    h-4
+                                    w-4
+                                    shrink-0
+
+                                    text-violet-600
+                                  "
+                                />
+                              )}
+
+                              <p
+                                className="
+                                  truncate
+
+                                  text-sm
+                                  font-semibold
+
+                                  text-slate-900
+                                "
+                              >
+                                {
+                                  conversation.title
+                                }
+                              </p>
+                            </div>
+
+                            <p
+                              className="
+                                mt-2
+
+                                line-clamp-2
+
+                                text-xs
+                                leading-relaxed
+
+                                text-slate-500
+                              "
+                            >
+                              {
+                                conversation.preview
+                              }
+                            </p>
+                          </div>
+
+                          <ChevronRight
+                            className="
+                              mt-1
+                              h-5
+                              w-5
+                              shrink-0
+
+                              text-slate-400
+                            "
+                          />
+                        </div>
+
+                        <div
+                          className="
+                            mt-4
+
+                            flex
+                            flex-wrap
+                            items-center
+                            justify-between
+
+                            gap-3
+                          "
+                        >
+                          <p
+                            className="
+                              text-[10px]
+
+                              text-slate-400
+                            "
+                          >
+                            {formatDate(
+                              conversation.updatedAt
+                            )}
+                          </p>
+
                           <div
                             className="
                               flex
@@ -419,123 +536,31 @@ const ChatHistoryModal = ({
                               gap-2
                             "
                           >
-                            {isResolved ? (
-                              <Lock
+                            {isResolved && (
+                              <span
                                 className="
-                                  h-4
-                                  w-4
-                                  shrink-0
+                                  rounded-full
 
-                                  text-emerald-600
-                                "
-                              />
-                            ) : (
-                              <MessageSquare
-                                className="
-                                  h-4
-                                  w-4
-                                  shrink-0
+                                  bg-emerald-100
 
-                                  text-violet-600
+                                  px-2
+                                  py-1
+
+                                  text-[10px]
+                                  font-medium
+
+                                  text-emerald-700
                                 "
-                              />
+                              >
+                                Resolved
+                              </span>
                             )}
 
-                            <p
-                              className="
-                                truncate
-
-                                text-sm
-                                font-semibold
-
-                                text-slate-900
-                              "
-                            >
-                              {
-                                conversation.title
-                              }
-                            </p>
-                          </div>
-
-                          {/* PREVIEW */}
-                          <p
-                            className="
-                              mt-2
-
-                              line-clamp-2
-
-                              text-xs
-                              leading-relaxed
-
-                              text-slate-500
-                            "
-                          >
-                            {
-                              conversation.preview
-                            }
-                          </p>
-                        </div>
-
-                        <ChevronRight
-                          className="
-                            mt-1
-                            h-5
-                            w-5
-                            shrink-0
-
-                            text-slate-400
-
-                            transition-transform
-                            duration-300
-
-                            group-hover:translate-x-1
-                          "
-                        />
-                      </div>
-
-                      {/* FOOTER */}
-                      <div
-                        className="
-                          mt-4
-
-                          flex
-                          flex-wrap
-                          items-center
-                          justify-between
-
-                          gap-3
-                        "
-                      >
-                        <p
-                          className="
-                            text-[10px]
-
-                            text-slate-400
-                          "
-                        >
-                          {formatDate(
-                            conversation.updatedAt
-                          )}
-                        </p>
-
-                        <div
-                          className="
-                            flex
-                            flex-wrap
-                            items-center
-                            gap-2
-                          "
-                        >
-                          {isResolved && (
                             <span
                               className="
-                                flex
-                                items-center
-                                gap-1
-
                                 rounded-full
 
-                                bg-emerald-100
+                                bg-violet-100
 
                                 px-2
                                 py-1
@@ -543,47 +568,124 @@ const ChatHistoryModal = ({
                                 text-[10px]
                                 font-medium
 
-                                text-emerald-700
+                                text-violet-700
                               "
                             >
-                              <CheckCircle2
-                                className="
-                                  h-3
-                                  w-3
-                                "
-                              />
-
-                              Resolved
+                              {
+                                conversation.messageCount || 0
+                              }{" "}
+                              messages
                             </span>
-                          )}
-
-                          <span
-                            className="
-                              rounded-full
-
-                              bg-violet-100
-
-                              px-2
-                              py-1
-
-                              text-[10px]
-                              font-medium
-
-                              text-violet-700
-                            "
-                          >
-                            {
-                              conversation.messageCount || 0
-                            }{" "}
-                            messages
-                          </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                }
-              )}
-            </div>
+                    )
+                  }
+                )}
+              </div>
+
+              {/* PAGINATION */}
+              <div
+                className="
+                  mt-5
+
+                  flex
+                  items-center
+                  justify-between
+                "
+              >
+                <button
+                  type="button"
+                  disabled={page === 1}
+                  onClick={() =>
+                    setPage(
+                      (prev) =>
+                        Math.max(
+                          1,
+                          prev - 1
+                        )
+                    )
+                  }
+                  className="
+                    flex
+                    items-center
+                    gap-2
+
+                    rounded-2xl
+
+                    border
+                    border-slate-200
+
+                    px-4
+                    py-2
+
+                    text-sm
+
+                    disabled:opacity-40
+                  "
+                >
+                  <ChevronLeft
+                    className="
+                      h-4
+                      w-4
+                    "
+                  />
+
+                  Previous
+                </button>
+
+                <p
+                  className="
+                    text-xs
+                    text-slate-500
+                  "
+                >
+                  Page {page} of {totalPages}
+                </p>
+
+                <button
+                  type="button"
+                  disabled={
+                    page === totalPages
+                  }
+                  onClick={() =>
+                    setPage(
+                      (prev) =>
+                        Math.min(
+                          totalPages,
+                          prev + 1
+                        )
+                    )
+                  }
+                  className="
+                    flex
+                    items-center
+                    gap-2
+
+                    rounded-2xl
+
+                    border
+                    border-slate-200
+
+                    px-4
+                    py-2
+
+                    text-sm
+
+                    disabled:opacity-40
+                  "
+                >
+                  Next
+
+                  <ChevronRight
+                    className="
+                      h-4
+                      w-4
+                    "
+                  />
+                </button>
+              </div>
+            </>
           )}
       </div>
     </ModalShell>

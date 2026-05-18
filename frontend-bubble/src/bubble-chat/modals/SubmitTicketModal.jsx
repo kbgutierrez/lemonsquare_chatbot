@@ -1,107 +1,65 @@
 import {
-  Ticket,
-  CheckCircle2,
-  Flag,
-  FolderKanban,
-  User,
-  FileText,
+  Sparkles,
   SendHorizonal,
+  BrainCircuit,
+  MessageSquareWarning,
+  CheckCircle2,
+  ShieldAlert,
+  LoaderCircle,
 } from "lucide-react"
 
 import ModalShell from "../components/ModalShell.jsx"
 
-import TicketField from "../components/TicketField"
-import TicketTextarea from "../components/TicketTextarea"
-import TicketDropdown from "../components/TicketDropdown"
-
 import { useTicketForm } from "../hooks/useTicketForm"
-
-const priorities = [
-  "Low",
-  "Medium",
-  "High",
-  "Critical",
-]
-
-const categories = [
-  "General",
-  "Technical",
-  "Account",
-  "Billing",
-]
 
 const SubmitTicketModal = ({
   onClose,
+  sessionId,
+  requesterId,
+  messages = [],
 }) => {
 
   const {
-    form,
     loading,
     success,
-    words,
-    update,
+
     submit,
-    MAX_TITLE,
-    MAX_WORDS,
-  } = useTicketForm(() => {
 
-    setTimeout(() => {
+    aiSummary,
 
-      onClose?.()
+    summaryLoading,
+  } = useTicketForm({
+    sessionId,
+    requesterId,
+    messages,
 
-    }, 1200)
+    onSuccess: () => {
+
+      setTimeout(() => {
+
+        onClose?.()
+
+      }, 1200)
+    },
   })
 
   return (
     <ModalShell
       onClose={onClose}
-      title="Submit Ticket"
-      subtitle="Support Center"
-      size="lg"
+      title="Escalate to Human Agent"
+      subtitle="AI Generated Escalation Summary"
+      size="md"
       icon={
-        <Ticket
+        <MessageSquareWarning
           className="
             h-5
             w-5
           "
         />
       }
-      headerActions={
-        <>
-          <TicketDropdown
-            icon={Flag}
-            value={
-              form.PriorityLevel
-            }
-            items={priorities}
-            onChange={(value) =>
-              update(
-                "PriorityLevel",
-                value
-              )
-            }
-          />
-
-          <TicketDropdown
-            icon={FolderKanban}
-            value={
-              form.CategoryName
-            }
-            items={categories}
-            onChange={(value) =>
-              update(
-                "CategoryName",
-                value
-              )
-            }
-          />
-        </>
-      }
     >
       <div
         className="
-          min-w-0
-
           px-4
           py-4
 
@@ -116,7 +74,7 @@ const SubmitTicketModal = ({
               mb-5
 
               flex
-              items-center
+              items-start
               gap-3
 
               rounded-2xl
@@ -131,6 +89,7 @@ const SubmitTicketModal = ({
           >
             <CheckCircle2
               className="
+                mt-0.5
                 h-5
                 w-5
 
@@ -138,94 +97,303 @@ const SubmitTicketModal = ({
               "
             />
 
-            <p
-              className="
-                text-sm
-                font-medium
+            <div>
+              <p
+                className="
+                  text-sm
+                  font-semibold
 
-                text-emerald-700
-              "
-            >
-              Ticket submitted successfully.
-            </p>
+                  text-emerald-700
+                "
+              >
+                Escalation submitted successfully.
+              </p>
+
+              <p
+                className="
+                  mt-1
+
+                  text-xs
+
+                  text-emerald-600
+                "
+              >
+                Human support agents can now review this conversation.
+              </p>
+            </div>
           </div>
         )}
 
-        {/* SESSION */}
+        {/* AI SUMMARY */}
         <div
           className="
-            mb-5
+            overflow-hidden
 
-            grid
-            gap-4
+            rounded-3xl
 
-            sm:grid-cols-2
+            border
+            border-violet-100
+
+            bg-gradient-to-br
+            from-violet-50
+            to-indigo-50
           "
         >
-          <TicketField
-            label="Requester User ID"
-            icon={User}
-            value={
-              form.RequesterUserID
-            }
-            disabled
-          />
+          <div
+            className="
+              flex
+              items-start
+              gap-4
 
-          <TicketField
-            label="Session ID"
-            icon={FileText}
-            value={form.SessionID}
-            disabled
-          />
+              p-5
+            "
+          >
+            <div
+              className="
+                flex
+                h-12
+                w-12
+                shrink-0
+                items-center
+                justify-center
+
+                rounded-2xl
+
+                bg-white
+
+                shadow-sm
+              "
+            >
+              {summaryLoading ? (
+                <LoaderCircle
+                  className="
+                    h-6
+                    w-6
+
+                    animate-spin
+
+                    text-violet-600
+                  "
+                />
+              ) : (
+                <BrainCircuit
+                  className="
+                    h-6
+                    w-6
+
+                    text-violet-600
+                  "
+                />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div
+                className="
+                  flex
+                  items-center
+                  gap-2
+                "
+              >
+                <Sparkles
+                  className="
+                    h-4
+                    w-4
+
+                    text-violet-500
+                  "
+                />
+
+                <p
+                  className="
+                    text-xs
+                    font-semibold
+                    uppercase
+                    tracking-[0.18em]
+
+                    text-violet-600
+                  "
+                >
+                  AI Conversation Summary
+                </p>
+              </div>
+
+              {summaryLoading ? (
+                <div className="mt-4">
+                  <div
+                    className="
+                      h-4
+                      w-2/3
+
+                      animate-pulse
+
+                      rounded-full
+
+                      bg-violet-200
+                    "
+                  />
+
+                  <div className="mt-4 space-y-3">
+                    <div
+                      className="
+                        h-3
+                        w-full
+
+                        animate-pulse
+
+                        rounded-full
+
+                        bg-violet-100
+                      "
+                    />
+
+                    <div
+                      className="
+                        h-3
+                        w-11/12
+
+                        animate-pulse
+
+                        rounded-full
+
+                        bg-violet-100
+                      "
+                    />
+
+                    <div
+                      className="
+                        h-3
+                        w-4/5
+
+                        animate-pulse
+
+                        rounded-full
+
+                        bg-violet-100
+                      "
+                    />
+                  </div>
+
+                  <div
+                    className="
+                      mt-5
+
+                      flex
+                      items-center
+                      gap-2
+
+                      text-xs
+                      text-violet-600
+                    "
+                  >
+                    <LoaderCircle
+                      className="
+                        h-3.5
+                        w-3.5
+
+                        animate-spin
+                      "
+                    />
+
+                    Generating escalation summary...
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <h3
+                    className="
+                      mt-3
+
+                      text-sm
+                      font-semibold
+
+                      text-slate-900
+                    "
+                  >
+                    {aiSummary.title}
+                  </h3>
+
+                  <p
+                    className="
+                      mt-3
+
+                      whitespace-pre-wrap
+
+                      text-sm
+                      leading-relaxed
+
+                      text-slate-700
+                    "
+                  >
+                    {aiSummary.summary}
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* TITLE */}
-        <div className="mb-5">
-          <TicketField
-            label="Chat Title"
-            value={form.ChatTitle}
-            max={MAX_TITLE}
-            placeholder="Enter ticket title..."
-            onChange={(value) =>
-              update(
-                "ChatTitle",
-                value
-              )
-            }
-          />
-        </div>
+        {/* PIPELINE INFO */}
+        <div
+          className="
+            mt-5
 
-        {/* SUMMARY */}
-        <div className="mb-5">
-          <TicketField
-            label="Issue Summary"
-            value={
-              form.IssueSummary
-            }
-            placeholder="Short issue summary..."
-            onChange={(value) =>
-              update(
-                "IssueSummary",
-                value
-              )
-            }
-          />
-        </div>
+            rounded-3xl
 
-        {/* DESCRIPTION */}
-        <TicketTextarea
-          label="Description"
-          value={form.Description}
-          words={words}
-          maxWords={MAX_WORDS}
-          placeholder="Describe your issue..."
-          onChange={(value) =>
-            update(
-              "Description",
-              value
-            )
-          }
-        />
+            border
+            border-amber-100
+
+            bg-amber-50/70
+
+            p-4
+          "
+        >
+          <div
+            className="
+              flex
+              items-start
+              gap-3
+            "
+          >
+            <ShieldAlert
+              className="
+                mt-0.5
+                h-5
+                w-5
+                shrink-0
+
+                text-amber-600
+              "
+            />
+
+            <div>
+              <p
+                className="
+                  text-sm
+                  font-semibold
+
+                  text-amber-800
+                "
+              >
+                Escalation Preview
+              </p>
+
+              <p
+                className="
+                  mt-1
+
+                  text-xs
+                  leading-relaxed
+
+                  text-amber-700
+                "
+              >
+                The current conversation history and AI-generated
+                summary will be forwarded to the live support workflow.
+              </p>
+            </div>
+          </div>
+        </div>
 
         {/* FOOTER */}
         <div
@@ -243,6 +411,7 @@ const SubmitTicketModal = ({
           <button
             type="button"
             onClick={onClose}
+            disabled={loading}
             className="
               w-full
 
@@ -265,6 +434,9 @@ const SubmitTicketModal = ({
 
               hover:bg-slate-50
 
+              disabled:cursor-not-allowed
+              disabled:opacity-50
+
               sm:w-auto
             "
           >
@@ -276,8 +448,7 @@ const SubmitTicketModal = ({
             onClick={submit}
             disabled={
               loading ||
-              !form.ChatTitle ||
-              !form.Description
+              summaryLoading
             }
             className="
               flex
@@ -329,7 +500,20 @@ const SubmitTicketModal = ({
                   "
                 />
 
-                Submitting...
+                Escalating...
+              </>
+            ) : summaryLoading ? (
+              <>
+                <LoaderCircle
+                  className="
+                    h-4
+                    w-4
+
+                    animate-spin
+                  "
+                />
+
+                Preparing Summary...
               </>
             ) : (
               <>
@@ -340,7 +524,7 @@ const SubmitTicketModal = ({
                   "
                 />
 
-                Submit
+                Confirm Submit
               </>
             )}
           </button>

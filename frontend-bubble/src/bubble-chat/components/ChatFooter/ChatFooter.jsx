@@ -16,7 +16,12 @@ import ChatFooterResolved
 
 const ChatFooter = ({
   onSendMessage,
+
+  /*
+    ONLY AI reply state.
+  */
   loading = false,
+
   resolved = false,
 }) => {
 
@@ -30,6 +35,13 @@ const ChatFooter = ({
 
   const textareaRef =
     useRef(null)
+
+  /*
+    Prevent duplicate
+    manual sends.
+  */
+  const sendingRef =
+    useRef(false)
 
   /* ========================================
      AUTO RESIZE TEXTAREA
@@ -79,8 +91,22 @@ const ChatFooter = ({
         customMessage
       ) => {
 
+        /*
+          Hard block:
+          resolved chat
+        */
         if (
           resolved
+        ) {
+          return
+        }
+
+        /*
+          Prevent spam double click
+          while request in-flight.
+        */
+        if (
+          sendingRef.current
         ) {
           return
         }
@@ -89,22 +115,29 @@ const ChatFooter = ({
           (
             customMessage ??
             message
-          ).trim()
+          )
+            ?.trim?.()
 
         if (
-          !finalMessage ||
-          loading
+          !finalMessage
         ) {
           return
         }
 
         try {
 
+          sendingRef.current =
+            true
+
+          /*
+            Clear immediately
+            for smoother UX.
+          */
+          setMessage("")
+
           await onSendMessage(
             finalMessage
           )
-
-          setMessage("")
 
         } catch (error) {
 
@@ -112,11 +145,23 @@ const ChatFooter = ({
             "CHAT_SEND_ERROR",
             error
           )
+
+          /*
+            Restore message
+            if failed.
+          */
+          setMessage(
+            finalMessage
+          )
+
+        } finally {
+
+          sendingRef.current =
+            false
         }
       },
       [
         message,
-        loading,
         resolved,
         onSendMessage,
       ]
@@ -127,43 +172,50 @@ const ChatFooter = ({
   ======================================== */
 
   const handleKeyDown =
-    (
-      event
-    ) => {
+    useCallback(
+      (
+        event
+      ) => {
 
-      if (
-        event.key ===
-          "Enter" &&
-        !event.shiftKey
-      ) {
+        if (
+          event.key ===
+            "Enter" &&
+          !event.shiftKey
+        ) {
 
-        event.preventDefault()
+          event.preventDefault()
 
-        handleSend()
-      }
-    }
+          handleSend()
+        }
+      },
+      [handleSend]
+    )
 
   /* ========================================
      QUICK QUESTION
   ======================================== */
 
   const handleQuickQuestion =
-    async (
-      question
-    ) => {
-
-      if (
-        resolved
-      ) {
-        return
-      }
-
-      setMessage(question)
-
-      await handleSend(
+    useCallback(
+      async (
         question
-      )
-    }
+      ) => {
+
+        if (
+          resolved
+        ) {
+          return
+        }
+
+        await handleSend(
+          question
+        )
+      },
+      [
+        resolved,
+        handleSend,
+      ]
+    )
 
   return (
     <div

@@ -1,7 +1,66 @@
 import {
+  API_CONFIG,
   API_ENDPOINTS,
   buildApiUrl,
 } from "../../config/sqlVariables"
+
+/* ========================================
+   API REQUEST
+======================================== */
+
+const apiRequest =
+  async ({
+    endpoint,
+    method = "GET",
+    body,
+    headers = {},
+  }) => {
+
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method,
+
+          headers: {
+            ...API_CONFIG.HEADERS,
+            ...headers,
+          },
+
+          body:
+            body
+              ? JSON.stringify(
+                  body
+                )
+              : undefined,
+        }
+      )
+
+    let data = null
+
+    try {
+
+      data =
+        await response.json()
+
+    } catch {
+
+      data = null
+    }
+
+    if (
+      !response.ok
+    ) {
+
+      throw new Error(
+        data?.detail ||
+        data?.message ||
+        "Request failed."
+      )
+    }
+
+    return data
+  }
 
 /* ========================================
    GENERATE TICKET NUMBER
@@ -72,7 +131,8 @@ const extractConversationSummary =
 
           return (
             role === "assistant" ||
-            role === "agent"
+            role === "agent" ||
+            role === "ai"
           )
         }
       )
@@ -131,6 +191,7 @@ const resolveTicket =
       Backend schema typo:
       issue_resported
     */
+
     const payload = {
       ticket_number:
         generateTicketNumber(),
@@ -187,8 +248,100 @@ const resolveTicket =
     }
   }
 
+/* ========================================
+   GET ESCALATION DRAFT
+======================================== */
+
+const getEscalationDraft =
+  async (
+    sessionId
+  ) => {
+
+    const endpoint =
+      buildApiUrl(
+        `/chat/escalate/draft/${sessionId}`
+      )
+
+    console.log(
+      "ESCALATION_DRAFT_ENDPOINT",
+      endpoint
+    )
+
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "GET",
+      })
+
+    console.log(
+      "ESCALATION_DRAFT_RESPONSE",
+      response
+    )
+
+    return response
+  }
+
+/* ========================================
+   SUBMIT ESCALATION
+======================================== */
+
+const submitEscalation =
+  async ({
+    session_id,
+    requester_id,
+    company_id,
+    summary,
+    description,
+  }) => {
+
+    const payload = {
+      session_id,
+      requester_id,
+      company_id,
+      summary,
+      description,
+    }
+
+    console.log(
+      "ESCALATION_SUBMIT_PAYLOAD",
+      payload
+    )
+
+    const endpoint =
+      buildApiUrl(
+        "/chat/escalate/submit"
+      )
+
+    console.log(
+      "ESCALATION_SUBMIT_ENDPOINT",
+      endpoint
+    )
+
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "POST",
+        body: payload,
+      })
+
+    console.log(
+      "ESCALATION_SUBMIT_RESPONSE",
+      response
+    )
+
+    return response
+  }
+
+/* ========================================
+   EXPORT
+======================================== */
+
 const ticketService = {
   resolveTicket,
+
+  getEscalationDraft,
+
+  submitEscalation,
 }
 
 export default ticketService
