@@ -1,0 +1,36 @@
+{
+  "total_examples": 107,
+  "departments": {
+    "87::Line Maintenance Department": 53,
+    "40::TSD - Engineering Department": 4,
+    "85::Motorpool": 1,
+    "29::Information and Communications Technology Department": 42,
+    "28::Unknown": 1,
+    "2123::Unknown": 2,
+    "11::Unknown": 1,
+    "23::Unknown": 1,
+    "31::Unknown": 2
+  },
+  "subcategories": {
+    "87::11202::FAN MOTOR": 11,
+    "87::11203::OTHERS": 39,
+    "40::11195::LEAK": 1,
+    "40::11216::PARTS REPLACEMENT": 1,
+    "87::11201::TEMPERATURE": 1,
+    "40::11199::OTHERS": 1,
+    "85::11217::OTHERS": 1,
+    "40::11198::GLASS DOOR": 1,
+    "29::11213::SAP-FC": 1,
+    "29::11200::OTHERS": 1,
+    "29::11212::LAPTOP": 1,
+    "29::11218::POS": 5,
+    "29::11188::ONLINE ORDERING": 29,
+    "87::11188::Unknown": 2,
+    "29::11203::Unknown": 5,
+    "28::11203::Unknown": 1,
+    "2123::11203::Unknown": 2,
+    "11::11203::Unknown": 1,
+    "23::11203::Unknown": 1,
+    "31::11203::Unknown": 2
+  }
+}

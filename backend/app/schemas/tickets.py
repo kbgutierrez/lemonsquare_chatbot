@@ -42,6 +42,11 @@ class TicketDraftResponse(BaseModel):
     status: str
     summary: str
     description: str
+    department_id: int | None = None
+    subcategory_id: int | None = None
+    department_name: str | None = None
+    subcategory_name: str | None = None
+    routing_reasoning: str | None = None
 
 class TicketSubmitRequest(BaseModel):
     session_id: str
@@ -49,3 +54,5 @@ class TicketSubmitRequest(BaseModel):
     company_id: int
     summary: str
     description: str
+    department_id: int
+    subcategory_id: int

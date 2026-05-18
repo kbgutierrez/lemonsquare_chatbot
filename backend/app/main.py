@@ -35,7 +35,7 @@ from app.core.logging import configure_logging
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
 from app.api.routers import self_knowledge
-from app.api.routers import maintenance
+from app.api.routers import maintenance, routing
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -133,6 +133,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix=PREFIX)
     app.include_router(analytics.router, prefix=PREFIX)
     app.include_router(maintenance.router, prefix=PREFIX)
+    app.include_router(routing.router, prefix=PREFIX) 
 
     # ── Health Check ──────────────────────────────────────────────────────
     @app.get("/health", tags=["Health"])

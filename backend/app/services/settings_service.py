@@ -89,3 +89,45 @@ def update_settings(
         new_settings.ActiveModel,
     )
     return new_config
+
+
+def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
+    """
+    Fetches the baseline default configuration (SettingID = 2), 
+    archives the current active settings, and creates a new active row.
+    """
+    # 1. Fetch the baseline default (ID 2)
+    default_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.SettingID == 2).first()
+    
+    if not default_config:
+        raise NotFoundError("System default settings (ID 2) not found in the database.")
+
+    # 2. Deactivate all currently active rows
+    db.query(AIChatbotSetting).filter(
+        AIChatbotSetting.IsActive == True
+    ).update({"IsActive": False})
+
+    # 3. Insert a new active row copying everything from ID 2
+    new_config = AIChatbotSetting(
+        ActiveModel=default_config.ActiveModel,
+        ReformulatorModel=default_config.ReformulatorModel,
+        SystemPrompt=default_config.SystemPrompt,
+        ReformulatorPrompt=default_config.ReformulatorPrompt,
+        Temperature=default_config.Temperature,
+        ConfidenceThreshold=default_config.ConfidenceThreshold,
+        EmbeddingModel=default_config.EmbeddingModel,
+        RerankerModel=default_config.RerankerModel,
+        TopK_Tickets=default_config.TopK_Tickets,
+        UseReformulator=default_config.UseReformulator,
+        UseReranker=default_config.UseReranker,
+        AllowedCategories=default_config.AllowedCategories,
+        ChatExtractionPrompt=default_config.ChatExtractionPrompt,
+        IsActive=True,
+        UpdatedBy=updated_by,
+    )
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    logger.info("Settings reverted to system defaults (copied from ID 2) by user %d.", updated_by)
+    return new_config

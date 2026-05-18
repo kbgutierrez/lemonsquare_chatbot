@@ -154,66 +154,187 @@ import httpx
 from langchain_groq import ChatGroq
 from app.core.config import settings
 
-async def draft_ticket_escalation(session_id: str, db: Session) -> dict:
-    """Step 1: Uses the AI to summarize the chat and returns the draft to the frontend."""
-    messages = get_all_messages(db, session_id)
-    if not messages:
-        raise ValueError("Chat session is empty. Nothing to escalate.")
+async def draft_ticket_escalation(
+    session_id: str,
+    db: Session,
+    ingestion_service=None,
+) -> dict:
+    """
+    Step 1:
+    AI summarizes the chat into a structured ticket draft.
 
-    transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
+    Future-ready architecture:
+    - Supports routing-aware escalation
+    - Supports AI category prediction
+    - Supports confidence scoring
+    - Supports explainable routing metadata
+
+    Current state:
+    - Summary/description generation is active
+    - Routing fallback is static until routing_service is implemented
+    """
+
+    messages = get_all_messages(db, session_id)
+
+    if not messages:
+        raise ValueError(
+            "Chat session is empty. Nothing to escalate."
+        )
+
+    transcript = "\n".join(
+        [
+            f"{msg.SenderRole.upper()}: {msg.MessageContent}"
+            for msg in messages
+        ]
+    )
 
     llm = ChatGroq(
-        model="llama-3.1-8b-instant", 
+        model="llama-3.1-8b-instant",
         temperature=0.0,
         api_key=settings.GROQ_API_KEY,
     )
-    
+
     prompt = (
-        "You are an expert Helpdesk Dispatcher. Read the chat transcript and extract the details to create a ticket.\n"
-        "You MUST output EXACTLY a valid JSON object with these two keys: 'summary' and 'description'.\n"
-        "\n"
-        "Rules for 'summary':\n"
-        "- A short, 3 to 6 word title of the issue.\n"
-        "\n"
-        "Rules for 'description':\n"
-        "- Keep it extremely concise and natural, like a technician's log (1 to 5 sentences maximum).\n"
-        "- Use a neutral, third-person perspective. NEVER use first-person pronouns (do NOT use 'kami', 'namin', 'I', or 'we').\n"
-        "- State exactly what the reported issue is and what the AI already attempted.\n"
-        "- Match the language of the transcript perfectly.\n"
-        "\n"
-        "Do NOT include markdown formatting. Output raw JSON only.\n\n"
+        "You are an expert Helpdesk Dispatcher.\n"
+        "Read the chat transcript and extract the issue into a clean operational ticket.\n\n"
+
+        "You MUST output EXACTLY a valid JSON object with these keys:\n"
+        "- summary\n"
+        "- description\n\n"
+
+        "Rules for summary:\n"
+        "- 3 to 8 words only\n"
+        "- Operational issue title\n"
+        "- No punctuation spam\n\n"
+
+        "Rules for description:\n"
+        "- Extremely concise\n"
+        "- Neutral technician-style wording\n"
+        "- Mention reported issue\n"
+        "- Mention attempted troubleshooting if present\n"
+        "- 1 to 5 sentences maximum\n"
+        "- Match transcript language naturally\n"
+        "- NEVER use first-person pronouns\n\n"
+
+        "Do NOT include markdown.\n"
+        "Output RAW JSON ONLY.\n\n"
+
         f"Transcript:\n{transcript}\n\n"
+
         "JSON Output:"
     )
-    
+
     result = await llm.ainvoke(prompt)
+
     raw_output = result.content.strip()
-    
+
+    # Defensive cleanup for markdown-wrapped responses
     if raw_output.startswith("```json"):
         raw_output = raw_output[7:-3].strip()
+
     elif raw_output.startswith("```"):
         raw_output = raw_output[3:-3].strip()
 
     try:
         extracted_data = json.loads(raw_output)
-    except json.JSONDecodeError:
-        raise ValueError("AI failed to generate a valid summary for the ticket.")
+
+    except json.JSONDecodeError as exc:
+        logger.error(
+            "AI failed to generate valid escalation JSON: %s",
+            raw_output,
+        )
+
+        raise ValueError(
+            "AI failed to generate a valid escalation draft."
+        ) from exc
+
+    summary = (
+        extracted_data.get("summary")
+        or "AI Escalation Issue"
+    )
+
+    description = (
+        extracted_data.get("description")
+        or "Escalated from AI Chatbot"
+    )
+
+    # =========================================================
+    # FUTURE ROUTING-AWARE SECTION
+    # =========================================================
+    #
+    # Current temporary behavior:
+    # - static routing fallback
+    #
+    # Future behavior:
+    # routing_service.predict_route(
+    #     summary=summary,
+    #     description=description
+    # )
+    #
+    # Example future output:
+    #
+    # {
+    #     "department_id": "29",
+    #     "department_name": "ICT",
+    #     "subcategory_id": "11214",
+    #     "subcategory_name": "ASRS",
+    #     "confidence": 0.94
+    # }
+    #
+    # =========================================================
+
+    routing_prediction = {
+        "department_id": "29",
+        "department_name": "ICT",
+        "subcategory_id": "11200",
+        "subcategory_name": "OTHERS",
+        "confidence": 0.0,
+        "routing_source": "fallback_default",
+    }
+
+    logger.info(
+        "Drafted escalation for session=%s | summary=%s",
+        session_id,
+        summary,
+    )
 
     return {
         "status": "success",
-        "summary": extracted_data.get("summary", "AI Escalation Issue"),
-        "description": extracted_data.get("description", "Escalated from AI Chatbot")
+
+        "summary": summary,
+        "description": description,
+
+        # ============================================
+        # ROUTING-AWARE RESPONSE
+        # ============================================
+
+        "department_id":
+            routing_prediction["department_id"],
+
+        "department_name":
+            routing_prediction["department_name"],
+
+        "subcategory_id":
+            routing_prediction["subcategory_id"],
+
+        "subcategory_name":
+            routing_prediction["subcategory_name"],
+
+        "routing_confidence":
+            routing_prediction["confidence"],
+
+        "routing_source":
+            routing_prediction["routing_source"],
     }
 
 async def submit_ticket_escalation(payload: dict, db: Session) -> dict:
-    """Step 2: Takes the final (user-edited) text and sends it to BizPortal."""
+    """Step 2: Takes the final text AND routing data, and sends it to BizPortal."""
     url = "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
     
-    # We use the text the frontend sent us (which might have been edited)
     bizportal_payload = {
         "description": payload["description"],
-        "category_id": 29, 
-        "subcategory_id": 11188,
+        "category_id": payload["department_id"],   # <--- REPLACED HARDCODED 29
+        "subcategory_id": payload["subcategory_id"], # <--- REPLACED HARDCODED 11188
         "requester_id": payload["requester_id"],
         "company_id": payload["company_id"],
         "summary": payload["summary"]
@@ -239,42 +360,38 @@ async def submit_ticket_escalation(payload: dict, db: Session) -> dict:
 
 
 def archive_session(db: Session, session_id: str) -> None:
-    """
-    Soft-delete a chat session by setting IsActive to False.
-    Raises NotFoundError if the session doesn't exist.
-    """
-    session = (
+    """Soft-delete a chat session by setting IsActive to 0 (False)."""
+    from app.models.chatbot import ChatSession
+    
+    # Bulletproof direct SQL update (Using 0 ensures SQL Server BIT/INT compatibility)
+    updated_rows = (
         db.query(ChatSession)
         .filter(ChatSession.SessionID == session_id)
-        .first()
+        .update({"IsActive": 0}, synchronize_session=False) 
     )
-    if not session:
-        raise NotFoundError(f"Chat session '{session_id}' not found.")
-
-    session.IsActive = False
     db.commit()
-    logger.info("Session %s archived (soft-deleted).", session_id)
+
+    if updated_rows == 0:
+        logger.warning(f"Chat session '{session_id}' not found for archiving.")
+    else:
+        logger.info("Session %s archived (soft-deleted).", session_id)
 
 
-    def archive_all_user_sessions(db: Session, requester_id: int) -> int:
-        """
-        Soft-deletes all active chat sessions for a specific user.
-        Returns the number of sessions that were archived.
-        """
-        from app.models.chatbot import ChatSession
+def archive_all_user_sessions(db: Session, requester_id: int) -> int:
+    """Soft-deletes all active chat sessions for a specific user."""
+    from app.models.chatbot import ChatSession
 
-        sessions = (
-            db.query(ChatSession)
-            .filter(ChatSession.RequesterUserID == requester_id)
-            .filter(ChatSession.IsActive == True)
-            .all()
-        )
+    # Bulletproof direct SQL update for all user sessions at once
+    updated_count = (
+        db.query(ChatSession)
+        .filter(ChatSession.RequesterUserID == requester_id)
+        # Using == 1 to catch active sessions safely across all SQL Server types
+        .filter(ChatSession.IsActive == 1) 
+        .update({"IsActive": 0}, synchronize_session=False)
+    )
+    db.commit()
+    
+    if updated_count > 0:
+        logger.info("Archived %d sessions for user %d.", updated_count, requester_id)
         
-        count = len(sessions)
-        if count > 0:
-            for session in sessions:
-                session.IsActive = False
-            db.commit()
-            logger.info("Archived %d sessions for user %d.", count, requester_id)
-            
-        return count
+    return updated_count

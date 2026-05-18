@@ -181,3 +181,31 @@ class KnowledgeClusterMap(BaseChatbot):
     IsActive = Column(Boolean, default=True)
     CreatedAt = Column(DateTime, default=datetime.utcnow)
     UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+
+class TicketRoutingLog(BaseChatbot):
+    """
+    Telemetry log for the AI Routing Engine.
+    Tracks what the AI predicted, why it predicted it, and if a human had to fix it.
+    """
+    __tablename__ = "tbl_ticket_routing_log"
+
+    LogID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # The raw input
+    InputSummary = Column(String(500), nullable=False)
+    InputDescription = Column(Text, nullable=False)
+    
+    # The AI's Prediction
+    PredictedDepartment = Column(String(100))
+    PredictedSubcategory = Column(String(100))
+    ConfidenceScore = Column(Numeric(4, 3)) # e.g., 0.985
+    LLMReasoning = Column(Text)             # The explainability payload
+    
+    # The "Continuous Learning" Loop
+    IsHumanOverridden = Column(Boolean, default=False)
+    FinalDepartment = Column(String(100))   # Filled in later if a human corrects it
+    FinalSubcategory = Column(String(100))
+    
+    CreatedAt = Column(DateTime, default=datetime.utcnow)

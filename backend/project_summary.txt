@@ -1,935 +1,77 @@
 ================================================
 PROJECT DIRECTORY TREE
 ================================================
-Earl/
-├── .env.example
-├── .gitignore
-├── Results.csv
-├── SUBCATEGORY.sql
-├── backend
-│   ├── .ticket_cluster_state.json
-│   ├── app
+backend/
+├── .ticket_cluster_state.json
+├── app
+│   ├── __init__.py
+│   ├── api
 │   │   ├── __init__.py
-│   │   ├── api
-│   │   │   ├── __init__.py
-│   │   │   ├── deps.py
-│   │   │   └── routers
-│   │   │       ├── __init__.py
-│   │   │       ├── analytics.py
-│   │   │       ├── auth.py
-│   │   │       ├── chat.py
-│   │   │       ├── documents.py
-│   │   │       ├── explorer.py
-│   │   │       ├── maintenance.py
-│   │   │       ├── routing.py
-│   │   │       ├── self_knowledge.py
-│   │   │       ├── settings.py
-│   │   │       └── tickets.py
-│   │   ├── core
-│   │   │   ├── __init__.py
-│   │   │   ├── config.py
-│   │   │   ├── database.py
-│   │   │   ├── exceptions.py
-│   │   │   └── logging.py
-│   │   ├── main.py
-│   │   ├── models
-│   │   │   ├── __init__.py
-│   │   │   ├── chatbot.py
-│   │   │   └── helpdesk.py
-│   │   ├── schemas
-│   │   │   ├── __init__.py
-│   │   │   ├── chat.py
-│   │   │   ├── documents.py
-│   │   │   ├── knowledge.py
-│   │   │   ├── routing.py
-│   │   │   ├── self_knowledge.py
-│   │   │   ├── settings.py
-│   │   │   └── tickets.py
-│   │   ├── services
-│   │   │   ├── __init__.py
-│   │   │   ├── chat_service.py
-│   │   │   ├── consolidator.py
-│   │   │   ├── ingestion_service.py
-│   │   │   ├── maintenance.py
-│   │   │   ├── orchestrator.py
-│   │   │   ├── routing_service.py
-│   │   │   ├── settings_service.py
-│   │   │   ├── taxonomy_service.py
-│   │   │   └── user_service.py
-│   │   └── {api
-│   ├── data
-│   │   └── routing
-│   │       ├── routing_dataset.csv
-│   │       ├── routing_dataset.jsonl
-│   │       └── routing_dataset_stats.json
-│   ├── package-lock.json
-│   ├── project_summary.txt
-│   ├── requirements.txt
-│   ├── scripts
+│   │   ├── deps.py
+│   │   └── routers
+│   │       ├── __init__.py
+│   │       ├── analytics.py
+│   │       ├── auth.py
+│   │       ├── chat.py
+│   │       ├── documents.py
+│   │       ├── explorer.py
+│   │       ├── maintenance.py
+│   │       ├── routing.py
+│   │       ├── self_knowledge.py
+│   │       ├── settings.py
+│   │       └── tickets.py
+│   ├── core
 │   │   ├── __init__.py
-│   │   ├── build_routing_dataset.py
-│   │   ├── ingest_routing.py
-│   │   ├── ingest_tickets.py
-│   │   └── sync_routing_data.py
-│   └── wipe_qdrant.py
-├── ch.py
-├── erd.png
-├── frontend-admin
-│   ├── .gitignore
-│   ├── README.md
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── src
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── admin
-│   │   │   ├── components
-│   │   │   │   ├── KnowledgeFiles
-│   │   │   │   │   ├── FileTable.jsx
-│   │   │   │   │   ├── KnowledgeFilesSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ActionButtons.jsx
-│   │   │   │   │   │   ├── CategoryBadge.jsx
-│   │   │   │   │   │   ├── FileTableEmpty.jsx
-│   │   │   │   │   │   ├── FileTableHeader.jsx
-│   │   │   │   │   │   └── FileTableRow.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useKnowledgeFiles.js
-│   │   │   │   │   ├── index.js
-│   │   │   │   │   ├── modals
-│   │   │   │   │   │   └── EditFileModal.jsx
-│   │   │   │   │   └── services
-│   │   │   │   │       └── knowledgeFilesService.js
-│   │   │   │   ├── MobileSidebar.jsx
-│   │   │   │   ├── SidebarMenu.jsx
-│   │   │   │   ├── manual-entries
-│   │   │   │   │   ├── ManualEntriesSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ManualEntriesHeader.jsx
-│   │   │   │   │   │   ├── ManualEntriesPagination.jsx
-│   │   │   │   │   │   ├── ManualEntryCard.jsx
-│   │   │   │   │   │   ├── ManualEntryModal.jsx
-│   │   │   │   │   │   └── ManualEntryTabs.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useManualEntries.js
-│   │   │   │   │   ├── services
-│   │   │   │   │   │   └── manualEntriesService.js
-│   │   │   │   │   └── utils
-│   │   │   │   │       └── normalizeManualEntry.js
-│   │   │   │   ├── pipeline-debug
-│   │   │   │   │   ├── PipelineDebugSection.jsx
-│   │   │   │   │   └── components
-│   │   │   │   │       ├── ContextItem.jsx
-│   │   │   │   │       ├── DebugCard.jsx
-│   │   │   │   │       ├── DropdownCard.jsx
-│   │   │   │   │       ├── PipelineControls.jsx
-│   │   │   │   │       ├── PipelinePromptBox.jsx
-│   │   │   │   │       └── PipelineResults.jsx
-│   │   │   │   ├── resolved-chats
-│   │   │   │   │   ├── ResolvedChatsSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ResolvedChatCard.jsx
-│   │   │   │   │   │   ├── ResolvedChatEditModal.jsx
-│   │   │   │   │   │   ├── ResolvedChatsEmpty.jsx
-│   │   │   │   │   │   ├── ResolvedChatsHeader.jsx
-│   │   │   │   │   │   └── ResolvedChatsPagination.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useResolvedChats.js
-│   │   │   │   │   └── utils
-│   │   │   │   │       └── parseResolvedChat.js
-│   │   │   │   ├── settings
-│   │   │   │   │   ├── AISettingsPanel.jsx
-│   │   │   │   │   ├── SettingsActions.jsx
-│   │   │   │   │   ├── SettingsHeader.jsx
-│   │   │   │   │   ├── SettingsInput.jsx
-│   │   │   │   │   ├── SettingsSelect.jsx
-│   │   │   │   │   ├── SettingsTextarea.jsx
-│   │   │   │   │   └── SettingsToggle.jsx
-│   │   │   │   ├── tickets
-│   │   │   │   │   ├── TicketPagination.jsx
-│   │   │   │   │   ├── TicketSearch.jsx
-│   │   │   │   │   ├── TicketStatusBadge.jsx
-│   │   │   │   │   ├── TicketTable.jsx
-│   │   │   │   │   └── TicketsSection.jsx
-│   │   │   │   └── upload
-│   │   │   │       ├── UploadDropzone.jsx
-│   │   │   │       ├── UploadMobileCard.jsx
-│   │   │   │       ├── UploadPagination.jsx
-│   │   │   │       ├── UploadSection.jsx
-│   │   │   │       ├── UploadStatusBadge.jsx
-│   │   │   │       ├── UploadTable.jsx
-│   │   │   │       └── UploadTableRow.jsx
-│   │   │   ├── constants
-│   │   │   │   ├── adminSections.js
-│   │   │   │   └── navigation.js
-│   │   │   ├── data
-│   │   │   │   └── aiModels.js
-│   │   │   ├── hooks
-│   │   │   │   ├── useAISettings.js
-│   │   │   │   ├── useFileUpload.js
-│   │   │   │   └── useTickets.js
-│   │   │   ├── layouts
-│   │   │   │   └── AdminLayout.jsx
-│   │   │   ├── pages
-│   │   │   │   ├── AdminDashboard.jsx
-│   │   │   │   └── LoginPage.jsx
-│   │   │   └── services
-│   │   │       ├── aiSettingsService.js
-│   │   │       ├── pipelineDebugService.js
-│   │   │       ├── ticketAdminService.js
-│   │   │       └── uploadService.js
-│   │   ├── assets
-│   │   │   ├── hero.png
-│   │   │   ├── react.svg
-│   │   │   └── vite.svg
-│   │   ├── index.css
-│   │   ├── main.jsx
-│   │   └── shared
-│   │       ├── api
-│   │       │   ├── client.js
-│   │       │   └── endpoints.js
-│   │       ├── components
-│   │       │   ├── EmptyState.jsx
-│   │       │   ├── ErrorState.jsx
-│   │       │   └── LoadingSpinner.jsx
-│   │       ├── config
-│   │       │   └── sqlVariables.js
-│   │       └── hooks
-│   │           └── useHorizontalDragScroll.js
-│   ├── tailwind.config.js
-│   └── vite.config.js
-├── frontend-bubble
-│   ├── .gitignore
-│   ├── README.md
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── src
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── assets
-│   │   │   ├── hero.png
-│   │   │   ├── react.svg
-│   │   │   └── vite.svg
-│   │   ├── bubble-chat
-│   │   │   ├── BubbleChat.jsx
-│   │   │   ├── components
-│   │   │   │   ├── ChatBubble.jsx
-│   │   │   │   ├── ChatFooter
-│   │   │   │   │   ├── ChatFooter.jsx
-│   │   │   │   │   ├── ChatFooterFAQ.jsx
-│   │   │   │   │   ├── ChatFooterInput.jsx
-│   │   │   │   │   └── ChatFooterResolved.jsx
-│   │   │   │   ├── ChatHeader.jsx
-│   │   │   │   ├── ChatMenu.jsx
-│   │   │   │   ├── ChatMessage.jsx
-│   │   │   │   ├── ChatMessages.jsx
-│   │   │   │   ├── ChatWindow.jsx
-│   │   │   │   ├── ModalShell.jsx
-│   │   │   │   ├── TicketDropdown.jsx
-│   │   │   │   ├── TicketField.jsx
-│   │   │   │   └── TicketTextarea.jsx
-│   │   │   ├── constants
-│   │   │   │   └── chatConfig.js
-│   │   │   ├── hooks
-│   │   │   │   ├── useBubbleDrag.js
-│   │   │   │   ├── useChatMessages.js
-│   │   │   │   ├── useConversationHistory.js
-│   │   │   │   ├── useHorizontalDragScroll.js
-│   │   │   │   └── useTicketForm.js
-│   │   │   ├── modals
-│   │   │   │   ├── AboutHelpDeskModal.jsx
-│   │   │   │   ├── CallAgentModal.jsx
-│   │   │   │   ├── ChatHistoryModal.jsx
-│   │   │   │   ├── ClearConversationModal.jsx
-│   │   │   │   ├── ResolveConversationModal.jsx
-│   │   │   │   └── SubmitTicketModal.jsx
-│   │   │   ├── services
-│   │   │   │   ├── chatbotService.js
-│   │   │   │   └── ticketService.js
-│   │   │   └── utils
-│   │   │       └── snapPosition.js
-│   │   ├── config
-│   │   │   └── sqlVariables.js
-│   │   ├── index.css
-│   │   └── main.jsx
-│   ├── tailwind.config.js
-│   └── vite.config.js
+│   │   ├── config.py
+│   │   ├── database.py
+│   │   ├── exceptions.py
+│   │   └── logging.py
+│   ├── main.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── chatbot.py
+│   │   └── helpdesk.py
+│   ├── schemas
+│   │   ├── __init__.py
+│   │   ├── chat.py
+│   │   ├── documents.py
+│   │   ├── knowledge.py
+│   │   ├── routing.py
+│   │   ├── self_knowledge.py
+│   │   ├── settings.py
+│   │   └── tickets.py
+│   ├── services
+│   │   ├── __init__.py
+│   │   ├── chat_service.py
+│   │   ├── consolidator.py
+│   │   ├── ingestion_service.py
+│   │   ├── maintenance.py
+│   │   ├── orchestrator.py
+│   │   ├── routing_service.py
+│   │   ├── settings_service.py
+│   │   ├── taxonomy_service.py
+│   │   └── user_service.py
+│   └── {api
+├── data
+│   └── routing
+│       ├── routing_dataset.csv
+│       ├── routing_dataset.jsonl
+│       └── routing_dataset_stats.json
+├── package-lock.json
 ├── project_summary.txt
 ├── requirements.txt
-├── sample.py
-├── sql
-│   ├── chatbot.sql
-│   ├── chatbot_gantt_chart.xlsx
-│   ├── chatbotmessage.sql
-│   ├── chatbotsession.sql
-│   ├── chatbotsettings.sql
-│   ├── createtablecbot.sql
-│   ├── helpdeskdev.sql
-│   └── helpdeskdevaluation.sql
-├── src
-│   └── admin
-│       └── components
-│           ├── manual-entries
-│           │   └── ManualEntriesSection.jsx
-│           └── resolved-chats
-│               └── ResolvedChatsSection.jsx
-├── streamlit_app.py
-├── streamlit_chat_history.py
-├── subcat.csv
-└── webhook.txt
+├── scripts
+│   ├── __init__.py
+│   ├── build_routing_dataset.py
+│   ├── ingest_routing.py
+│   └── ingest_tickets.py
+└── wipe_qdrant.py
 
 ================================================
 FILE CONTENTS
 ================================================
 
---- FILE: ch.py ---
-import os
-from pathlib import Path
-
-# --- Configuration ---
-OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode'}
-EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
-
-def generate_tree(root_dir, prefix=""):
-    """Recursively generates a visual directory tree."""
-    tree = []
-    items = sorted([item for item in os.listdir(root_dir) if item not in EXCLUDE_DIRS])
-    
-    for i, item in enumerate(items):
-        path = os.path.join(root_dir, item)
-        is_last = (i == len(items) - 1)
-        connector = "└── " if is_last else "├── "
-        
-        tree.append(f"{prefix}{connector}{item}")
-        
-        if os.path.isdir(path):
-            extension = "    " if is_last else "│   "
-            tree.extend(generate_tree(path, prefix + extension))
-    return tree
-
-def pack_project():
-    root_path = Path.cwd()
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        # 1. Write the Directory Tree
-        f.write("================================================\n")
-        f.write(f"PROJECT DIRECTORY TREE\n")
-        f.write("================================================\n")
-        tree_lines = generate_tree(root_path)
-        f.write(f"{root_path.name}/\n" + "\n".join(tree_lines) + "\n\n")
-
-        # 2. Write File Contents
-        f.write("================================================\n")
-        f.write("FILE CONTENTS\n")
-        f.write("================================================\n\n")
-        
-        for root, dirs, files in os.walk(root_path):
-            # Prune excluded directories in-place
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            
-            for file in files:
-                if file in EXCLUDE_FILES:
-                    continue
-                
-                file_path = Path(root) / file
-                relative_path = file_path.relative_to(root_path)
-                
-                f.write(f"--- FILE: {relative_path} ---\n")
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as code_file:
-                        f.write(code_file.read())
-                except Exception as e:
-                    f.write(f"[Error reading file: {e}]")
-                
-                f.write("\n\n")
-
-    print(f"Successfully packed project into {OUTPUT_FILE}")
-
-if __name__ == "__main__":
-    pack_project()
-
---- FILE: sample.py ---
-import os
-from pathlib import Path
-
-# --- Configuration ---
-OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend'}
-EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
-
-# Add a set of allowed extensions for text/code files
-ALLOWED_EXTENSIONS = {'.py'}
-
-def generate_tree(root_dir, prefix=""):
-    """Recursively generates a visual directory tree."""
-    tree = []
-    items = sorted([item for item in os.listdir(root_dir) if item not in EXCLUDE_DIRS])
-    
-    for i, item in enumerate(items):
-        path = os.path.join(root_dir, item)
-        is_last = (i == len(items) - 1)
-        connector = "└── " if is_last else "├── "
-        
-        tree.append(f"{prefix}{connector}{item}")
-        
-        if os.path.isdir(path):
-            extension = "    " if is_last else "│   "
-            tree.extend(generate_tree(path, prefix + extension))
-    return tree
-
-def pack_project():
-    root_path = Path.cwd()
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        # 1. Write the Directory Tree
-        f.write("================================================\n")
-        f.write(f"PROJECT DIRECTORY TREE\n")
-        f.write("================================================\n")
-        tree_lines = generate_tree(root_path)
-        f.write(f"{root_path.name}/\n" + "\n".join(tree_lines) + "\n\n")
-
-        # 2. Write File Contents
-        f.write("================================================\n")
-        f.write("FILE CONTENTS\n")
-        f.write("================================================\n\n")
-        
-        for root, dirs, files in os.walk(root_path):
-            # Prune excluded directories in-place
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            
-            for file in files:
-                file_path = Path(root) / file
-                
-                # Check 1: Is it in the explicit exclude list?
-                if file in EXCLUDE_FILES:
-                    continue
-                
-                # Check 2: Does it have an allowed text/code extension?
-                if file_path.suffix.lower() not in ALLOWED_EXTENSIONS:
-                    continue
-                
-                relative_path = file_path.relative_to(root_path)
-                
-                f.write(f"--- FILE: {relative_path} ---\n")
-                try:
-                    # 'errors=ignore' is safer now, but you could even remove it 
-                    # since we are only targeting text files.
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as code_file:
-                        f.write(code_file.read())
-                except Exception as e:
-                    f.write(f"[Error reading file: {e}]")
-                
-                f.write("\n\n")
-
-    print(f"Successfully packed project into {OUTPUT_FILE}")
-
-if __name__ == "__main__":
-    pack_project()
-
---- FILE: streamlit_app.py ---
-import streamlit as st
-import requests
-import pandas as pd
-import json
-import time
-
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Lemon Square IT AI", page_icon="🍋", layout="wide")
-API_BASE = "http://localhost:8000/api"
-
-# --- API HELPER FUNCTIONS ---
-def api_request(method, endpoint, params=None, json_data=None, files=None, data=None):
-    url = f"{API_BASE}{endpoint}"
-
-    try:
-        if method == "GET":
-            res = requests.get(url, params=params)
-
-        elif method == "POST":
-            res = requests.post(
-                url,
-                params=params,
-                json=json_data,
-                files=files,
-                data=data
-            )
-
-        elif method == "PUT":
-            res = requests.put(url, params=params, json=json_data)
-
-        elif method == "DELETE":
-            res = requests.delete(url, params=params)
-
-        res.raise_for_status()
-        return res.json()
-
-    except requests.exceptions.HTTPError as e:
-        err_msg = (
-            e.response.json().get('error', str(e))
-            if e.response else str(e)
-        )
-
-        st.error(f"API Error: {err_msg}")
-        return None
-
-    except Exception as e:
-        st.error(f"Connection Error: {e}")
-        return None
-
-
-# --- SESSION STATE INITIALIZATION ---
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-# BACKEND OWNS SESSION CREATION
-if "session_id" not in st.session_state:
-    st.session_state.session_id = None
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "ticket_draft" not in st.session_state:
-    st.session_state.ticket_draft = None
-
-if "system_categories" not in st.session_state:
-    st.session_state.system_categories = ["General_IT"]
-
-
-# ==========================================
-# 🔐 AUTHENTICATION
-# ==========================================
-if not st.session_state.user:
-
-    st.title("🍋 Lemon Square IT Helpdesk")
-
-    st.markdown(
-        "Please log in using your Employee ID "
-        "(Try `TEST_USER_1` for local dev)."
-    )
-
-    with st.form("login_form"):
-
-        user_id = st.text_input("User Token")
-
-        if st.form_submit_button("Login"):
-
-            with st.spinner("Authenticating..."):
-
-                auth_data = api_request(
-                    "GET",
-                    "/auth/verify",
-                    params={"user_token": user_id}
-                )
-
-                if auth_data and auth_data.get("is_valid"):
-
-                    st.session_state.user = auth_data
-
-                    st.success(
-                        f"Welcome, {auth_data['name']}!"
-                    )
-
-                    # Fetch active categories on login
-                    settings = api_request("GET", "/settings")
-
-                    if settings:
-                        st.session_state.system_categories = [
-                            c.strip()
-                            for c in settings.get(
-                                "AllowedCategories",
-                                "General_IT"
-                            ).split(",")
-                        ]
-
-                    st.rerun()
-
-                else:
-                    st.error(
-                        auth_data.get(
-                            "error",
-                            "Authentication failed."
-                        )
-                    )
-
-    st.stop()
-
-
-# ==========================================
-# 🧭 SIDEBAR NAVIGATION
-# ==========================================
-with st.sidebar:
-
-    st.subheader(
-        f"👤 {st.session_state.user['name']}"
-    )
-
-    st.caption(
-        f"{st.session_state.user.get('department', 'Unknown Dept')} "
-        f"| ID: {st.session_state.user.get('user_id')}"
-    )
-
-    st.markdown("---")
-
-    view = st.radio(
-        "Navigation",
-        [
-            "💬 IT Support Chat",
-            "📊 Admin: Dashboard",
-            "📚 Admin: Knowledge Explorer",
-            "📄 Admin: Documents & Rules",
-            "🧠 Admin: Self-Knowledge & Tickets",
-            "⚙️ Admin: System Settings",
-            "🧪 Admin: Pipeline Debugger"
-        ]
-    )
-
-    st.markdown("---")
-
-    if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
-
-
-# ==========================================
-# VIEW 1: IT SUPPORT CHAT
-# ==========================================
-if view == "💬 IT Support Chat":
-
-    st.title("IT Support Assistant")
-
-    # Header actions
-    col1, col2, col3, col4 = st.columns([4, 2, 2, 2])
-
-    with col2:
-
-        if st.button("✨ New Chat"):
-
-            # CLEAR SESSION
-            # BACKEND WILL GENERATE NEW ID
-            st.session_state.session_id = None
-
-            st.session_state.chat_history = []
-            st.session_state.ticket_draft = None
-
-            st.rerun()
-
-    with col3:
-
-        if st.button(
-            "✅ Mark Resolved",
-            type="secondary",
-            use_container_width=True
-        ):
-
-            if not st.session_state.session_id:
-                st.warning("No active chat session yet.")
-
-            else:
-                with st.spinner(
-                    "Extracting resolution to AI Brain..."
-                ):
-
-                    res = api_request(
-                        "POST",
-                        f"/chat/resolve/{st.session_state.session_id}"
-                    )
-
-                    if res:
-                        st.success(
-                            "Chat learned successfully!"
-                        )
-
-    with col4:
-
-        if st.button(
-            "🚨 Escalate to Agent",
-            type="primary",
-            use_container_width=True
-        ):
-
-            if not st.session_state.session_id:
-                st.warning("No active chat session yet.")
-
-            else:
-                with st.spinner(
-                    "Drafting ticket & routing..."
-                ):
-
-                    res = api_request(
-                        "GET",
-                        f"/chat/escalate/draft/{st.session_state.session_id}"
-                    )
-
-                    if (
-                        res and
-                        res.get("status") == "success"
-                    ):
-                        st.session_state.ticket_draft = res
-                        st.rerun()
-
-    # Escalation Draft UI
-    if st.session_state.ticket_draft:
-
-        st.warning("### 📝 Review Ticket Draft")
-
-        draft = st.session_state.ticket_draft
-
-        if draft.get("routing_reasoning"):
-            st.info(
-                f"🧠 **AI Routing Reasoning:** "
-                f"{draft['routing_reasoning']}"
-            )
-
-        with st.form("escalate_form"):
-
-            summary = st.text_input(
-                "Summary",
-                value=draft.get("summary", "")
-            )
-
-            desc = st.text_area(
-                "Description",
-                value=draft.get("description", ""),
-                height=150
-            )
-
-            c1, c2 = st.columns(2)
-
-            c1.text_input(
-                "Predicted Dept",
-                value=draft.get(
-                    "department_name",
-                    "Unknown"
-                ),
-                disabled=True
-            )
-
-            c2.text_input(
-                "Predicted Subcategory",
-                value=draft.get(
-                    "subcategory_name",
-                    "Unknown"
-                ),
-                disabled=True
-            )
-
-            if st.form_submit_button(
-                "Submit Ticket to Helpdesk",
-                type="primary"
-            ):
-
-                payload = {
-                    "session_id": st.session_state.session_id,
-                    "requester_id": int(
-                        st.session_state.user.get(
-                            "user_id",
-                            1
-                        )
-                    ),
-                    "company_id": int(
-                        st.session_state.user.get(
-                            "company_id",
-                            1
-                        )
-                    ),
-                    "summary": summary,
-                    "description": desc,
-                    "department_id": draft.get(
-                        "department_id",
-                        29
-                    ),
-                    "subcategory_id": draft.get(
-                        "subcategory_id",
-                        11200
-                    )
-                }
-
-                with st.spinner("Submitting..."):
-
-                    submit_res = api_request(
-                        "POST",
-                        "/chat/escalate/submit",
-                        json_data=payload
-                    )
-
-                    if submit_res:
-                        st.success(
-                            "Ticket escalated successfully!"
-                        )
-
-                        st.session_state.ticket_draft = None
-                        st.rerun()
-
-    st.markdown("---")
-
-    # Chat History Display
-    for msg in st.session_state.chat_history:
-
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # ==========================================
-    # CHAT INPUT
-    # ==========================================
-    if prompt := st.chat_input(
-        "Describe your IT issue here..."
-    ):
-
-        st.session_state.chat_history.append({
-            "role": "user",
-            "content": prompt
-        })
-
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-
-            with st.spinner("AI is thinking..."):
-
-                # BUILD PAYLOAD
-                payload = {
-                    "message": prompt,
-                    "user_token": str(
-                        st.session_state.user.get(
-                            "user_id",
-                            "TEST_USER_1"
-                        )
-                    )
-                }
-
-                # ONLY SEND SESSION ID
-                # IF BACKEND ALREADY CREATED ONE
-                if st.session_state.session_id:
-                    payload["session_id"] = (
-                        st.session_state.session_id
-                    )
-
-                # SEND REQUEST
-                res = api_request(
-                    "POST",
-                    "/chat",
-                    json_data=payload
-                )
-
-                if res and "response" in res:
-
-                    # CAPTURE BACKEND SESSION ID
-                    if (
-                        not st.session_state.session_id and
-                        "session_id" in res
-                    ):
-                        st.session_state.session_id = (
-                            res["session_id"]
-                        )
-
-                    ai_reply = res["response"]
-
-                    st.markdown(ai_reply)
-
-                    if res.get("ticket_ids_used"):
-
-                        st.caption(
-                            f"Context used: "
-                            f"Tickets {res['ticket_ids_used']}"
-                        )
-
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": ai_reply
-                    })
-
---- FILE: streamlit_chat_history.py ---
-import streamlit as st
-import requests
-from typing import Dict, Any, List
-
-API_BASE_URL = "http://localhost:8000/api"
-
-st.set_page_config(page_title="Chat History Viewer", layout="wide")
-st.title("Chat History Viewer")
-st.markdown("Enter a user ID to load that user's chat sessions and inspect session history.")
-
-
-def make_request(method: str, endpoint: str, params: Dict[str, Any] = None) -> Any:
-    url = f"{API_BASE_URL}{endpoint}"
-    try:
-        if method == "GET":
-            response = requests.get(url, params=params)
-        else:
-            raise ValueError("Unsupported method")
-
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as exc:
-        st.error(f"Request error: {exc}")
-        return None
-
-
-with st.form(key="chat_history_form"):
-    st.subheader("Load chat history for a user")
-    user_id = st.text_input("User ID", help="Enter the numeric or string user identifier.")
-    user_token = st.text_input(
-        "User Token",
-        value="TEST_USER_1",
-        help="Provide a valid auth token for the history endpoint. Use TEST_USER_1 if your backend allows it.",
-    )
-    session_limit = st.number_input("Max sessions to fetch", min_value=1, max_value=100, value=20, step=1)
-    fetch = st.form_submit_button("Load Chat Sessions")
-
-if fetch:
-    if not user_id:
-        st.error("Please enter a User ID.")
-    elif not user_token:
-        st.error("Please enter a User Token.")
-    else:
-        sessions = make_request("GET", f"/chat/user-sessions/{user_id}", {"limit": session_limit})
-        if sessions is None:
-            st.error("Unable to fetch sessions.")
-        elif len(sessions) == 0:
-            st.info("No chat sessions found for that user.")
-        else:
-            st.success(f"Found {len(sessions)} sessions for user {user_id}.")
-
-            session_options = [f"{item['session_id']} ({item['message_count']} msgs)" for item in sessions]
-            selected = st.selectbox("Select session to inspect", session_options)
-            selected_index = session_options.index(selected)
-            selected_session = sessions[selected_index]["session_id"]
-
-            st.markdown(f"### Session details for `{selected_session}`")
-            st.write(sessions[selected_index])
-
-            history = make_request(
-                "GET",
-                f"/chat/history/{selected_session}",
-                {"user_token": user_token},
-            )
-            if history is None:
-                st.error("Unable to fetch chat history for the selected session.")
-            else:
-                st.markdown("#### Messages")
-                messages = history.get("messages", [])
-                if not messages:
-                    st.info("This session has no messages.")
-                else:
-                    for msg in messages:
-                        align = "left" if msg["SenderRole"] == "user" else "right"
-                        with st.container():
-                            st.markdown(
-                                f"**{msg['SenderRole'].title()}** — {msg['CreatedAt']}"
-                            )
-                            st.write(msg["MessageContent"])
-                            st.markdown("---")
-
-
---- FILE: backend\wipe_qdrant.py ---
+--- FILE: wipe_qdrant.py ---
 """
 DESTRUCTIVE: Completely wipe and rebuild the Qdrant vector database.
 
@@ -1024,7 +166,7 @@ if __name__ == "__main__":
     wipe_and_rebuild()
 
 
---- FILE: backend\app\main.py ---
+--- FILE: app\main.py ---
 """
 FastAPI application factory.
 
@@ -1177,11 +319,11 @@ if __name__ == "__main__":
     uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
 
 
---- FILE: backend\app\__init__.py ---
+--- FILE: app\__init__.py ---
 # app/__init__.py
 
 
---- FILE: backend\app\api\deps.py ---
+--- FILE: app\api\deps.py ---
 """
 FastAPI dependency providers.
 
@@ -1232,10 +374,10 @@ __all__ = [
 ]
 
 
---- FILE: backend\app\api\__init__.py ---
+--- FILE: app\api\__init__.py ---
 
 
---- FILE: backend\app\api\routers\analytics.py ---
+--- FILE: app\api\routers\analytics.py ---
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -1293,7 +435,7 @@ def get_analytics_summary(
         }
     }
 
---- FILE: backend\app\api\routers\auth.py ---
+--- FILE: app\api\routers\auth.py ---
 import logging
 from fastapi import APIRouter
 from app.services.user_service import fetch_user_details
@@ -1331,7 +473,7 @@ async def verify_user(user_token: str):
         logger.error(f"Unexpected auth error: {exc}")
         return {"is_valid": False, "error": "Internal authentication error."}
 
---- FILE: backend\app\api\routers\chat.py ---
+--- FILE: app\api\routers\chat.py ---
 """
 Chat endpoints.
 
@@ -1515,6 +657,7 @@ def get_all_chat_sessions(
     # Change the basic .all() query to include the filter:
     sessions = (
         db.query(ChatSession)
+        .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
         .all()
     )
     
@@ -1614,7 +757,7 @@ def clear_all_user_chats(
     return {"status": "success", "message": f"Successfully cleared {count} chat sessions."}
 
 
---- FILE: backend\app\api\routers\documents.py ---
+--- FILE: app\api\routers\documents.py ---
 """
 Document management endpoints.
 
@@ -1917,7 +1060,7 @@ async def restore_manual_knowledge(
 
 
 
---- FILE: backend\app\api\routers\explorer.py ---
+--- FILE: app\api\routers\explorer.py ---
 """
 Knowledge Base Explorer endpoints.
 
@@ -2030,7 +1173,7 @@ async def explore_knowledge_base(
 
     return results
 
---- FILE: backend\app\api\routers\maintenance.py ---
+--- FILE: app\api\routers\maintenance.py ---
 import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
@@ -2072,7 +1215,7 @@ def get_consolidation_status():
     """Returns the live, real-time status of the background deduplication job."""
     return LIVE_STATUS
 
---- FILE: backend\app\api\routers\routing.py ---
+--- FILE: app\api\routers\routing.py ---
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -2106,7 +1249,7 @@ async def predict_ticket_route(
     
     return response
 
---- FILE: backend\app\api\routers\self_knowledge.py ---
+--- FILE: app\api\routers\self_knowledge.py ---
 from fastapi import APIRouter, Depends, Query, HTTPException
 from qdrant_client.http.models import Filter, FieldCondition, MatchValue
 from app.api.deps import get_ingestion_service, get_chatbot_db
@@ -2157,7 +1300,7 @@ async def restore_learned_chat(
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 
---- FILE: backend\app\api\routers\settings.py ---
+--- FILE: app\api\routers\settings.py ---
 """
 AI settings endpoints.
 
@@ -2251,7 +1394,7 @@ def restore_settings_to_default(
     )
     return SettingsResponse.model_validate(config)
 
---- FILE: backend\app\api\routers\tickets.py ---
+--- FILE: app\api\routers\tickets.py ---
 """
 Ticket management endpoints.
 
@@ -2491,10 +1634,10 @@ async def trigger_bulk_sync(background_tasks: BackgroundTasks):
         "message": "Bulk sync initiated. The AI is currently updating its brain in the background."
     }
 
---- FILE: backend\app\api\routers\__init__.py ---
+--- FILE: app\api\routers\__init__.py ---
 
 
---- FILE: backend\app\core\config.py ---
+--- FILE: app\core\config.py ---
 """
 Application configuration via pydantic-settings.
 
@@ -2517,8 +1660,7 @@ class Settings(BaseSettings):
     CHATBOT_DB_CONN: str
 
     # ─── Qdrant ───────────────────────────────────────────────────────────
-    QDRANT_COLLECTION: str = "LemonSquareQdrant"  # <-- Default collection name for ticket ingestion
-    QDRANT_ROUTING_COLLECTION: str = "LemonSquareRouting"  # <-- Separate collection for routing data
+    QDRANT_COLLECTION: str = "helpdesk_multilingual_v1"
     QDRANT_TIMEOUT: float = 60.0
 
     # ─── Default ML Model Names (overridden by DB settings at runtime) ────
@@ -2551,7 +1693,7 @@ class Settings(BaseSettings):
 settings = Settings()
 
 
---- FILE: backend\app\core\database.py ---
+--- FILE: app\core\database.py ---
 """
 Database engine and session factory configuration.
 
@@ -2624,7 +1766,7 @@ def get_helpdesk_db() -> Session:
         db.close()
 
 
---- FILE: backend\app\core\exceptions.py ---
+--- FILE: app\core\exceptions.py ---
 """
 Custom exception hierarchy and FastAPI exception handlers.
 
@@ -2750,7 +1892,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
 
---- FILE: backend\app\core\logging.py ---
+--- FILE: app\core\logging.py ---
 """
 Logging configuration for the application.
 
@@ -2805,10 +1947,10 @@ def configure_logging(level: str = "INFO") -> None:
     logging.getLogger("transformers").setLevel(logging.WARNING)
 
 
---- FILE: backend\app\core\__init__.py ---
+--- FILE: app\core\__init__.py ---
 
 
---- FILE: backend\app\models\chatbot.py ---
+--- FILE: app\models\chatbot.py ---
 """
 SQLAlchemy ORM models for the Chatbot (read/write) database.
 
@@ -3021,7 +2163,7 @@ class TicketRoutingLog(BaseChatbot):
     
     CreatedAt = Column(DateTime, default=datetime.utcnow)
 
---- FILE: backend\app\models\helpdesk.py ---
+--- FILE: app\models\helpdesk.py ---
 """
 SQLAlchemy ORM models for the Helpdesk (read-only) database.
 
@@ -3050,7 +2192,7 @@ class TicketEvaluation(BaseHelpdesk):
 
 
 class TicketHeader(BaseHelpdesk):
-    """Ground truth routing data from the live Helpdesk system."""
+    """Ground truth routing data from the Helpdesk system."""
     __tablename__ = "tbl_ticket_header"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -3059,12 +2201,11 @@ class TicketHeader(BaseHelpdesk):
     description = Column(Text)
     department_id = Column(Integer)
     subcategory_id = Column(Integer)
-    status_code = Column(String(50)) # Good to have for filtering
 
---- FILE: backend\app\models\__init__.py ---
+--- FILE: app\models\__init__.py ---
 
 
---- FILE: backend\app\schemas\chat.py ---
+--- FILE: app\schemas\chat.py ---
 """Pydantic schemas for the /chat endpoints."""
 
 from pydantic import BaseModel, Field
@@ -3115,7 +2256,7 @@ class ResolveChatResponse(BaseModel):
     message: str
 
 
---- FILE: backend\app\schemas\documents.py ---
+--- FILE: app\schemas\documents.py ---
 """Pydantic schemas for document management endpoints."""
 
 from datetime import datetime
@@ -3196,7 +2337,7 @@ class ManualEntryUpdateRequest(BaseModel):
 
 
 
---- FILE: backend\app\schemas\knowledge.py ---
+--- FILE: app\schemas\knowledge.py ---
 """
 Schemas for Knowledge Base Explorer API.
 """
@@ -3214,7 +2355,7 @@ class KnowledgeExplorerResponse(BaseModel):
     content: str | dict[str, Any]  # Can be raw text or extracted JSON
 
 
---- FILE: backend\app\schemas\routing.py ---
+--- FILE: app\schemas\routing.py ---
 from pydantic import BaseModel, Field
 
 class RoutingRequest(BaseModel):
@@ -3234,7 +2375,7 @@ class RoutingResponse(BaseModel):
     log_id: str
     suggestion: RoutingSuggestion
 
---- FILE: backend\app\schemas\self_knowledge.py ---
+--- FILE: app\schemas\self_knowledge.py ---
 from pydantic import BaseModel
 from typing import Any
 
@@ -3252,7 +2393,7 @@ class LearnedChatUpdateRequest(BaseModel):
     issue_cause: str | None = None
     work_done: str | None = None
 
---- FILE: backend\app\schemas\settings.py ---
+--- FILE: app\schemas\settings.py ---
 """
 Pydantic schemas for AI settings endpoints.
 
@@ -3303,7 +2444,7 @@ class SettingsResponse(BaseModel):
         from_attributes = True
 
 
---- FILE: backend\app\schemas\tickets.py ---
+--- FILE: app\schemas\tickets.py ---
 """Pydantic schemas for ticket management endpoints."""
 
 from pydantic import BaseModel
@@ -3363,10 +2504,10 @@ class TicketSubmitRequest(BaseModel):
     department_id: int
     subcategory_id: int
 
---- FILE: backend\app\schemas\__init__.py ---
+--- FILE: app\schemas\__init__.py ---
 
 
---- FILE: backend\app\services\chat_service.py ---
+--- FILE: app\services\chat_service.py ---
 """
 Chat session and message persistence service.
 
@@ -3607,44 +2748,47 @@ async def submit_ticket_escalation(payload: dict, db: Session) -> dict:
 
 
 def archive_session(db: Session, session_id: str) -> None:
-    """Soft-delete a chat session by setting IsActive to 0 (False)."""
-    from app.models.chatbot import ChatSession
-    
-    # Bulletproof direct SQL update (Using 0 ensures SQL Server BIT/INT compatibility)
-    updated_rows = (
+    """
+    Soft-delete a chat session by setting IsActive to False.
+    Raises NotFoundError if the session doesn't exist.
+    """
+    session = (
         db.query(ChatSession)
         .filter(ChatSession.SessionID == session_id)
-        .update({"IsActive": 0}, synchronize_session=False) 
+        .first()
     )
+    if not session:
+        raise NotFoundError(f"Chat session '{session_id}' not found.")
+
+    session.IsActive = False
     db.commit()
-
-    if updated_rows == 0:
-        logger.warning(f"Chat session '{session_id}' not found for archiving.")
-    else:
-        logger.info("Session %s archived (soft-deleted).", session_id)
+    logger.info("Session %s archived (soft-deleted).", session_id)
 
 
-def archive_all_user_sessions(db: Session, requester_id: int) -> int:
-    """Soft-deletes all active chat sessions for a specific user."""
-    from app.models.chatbot import ChatSession
+    def archive_all_user_sessions(db: Session, requester_id: int) -> int:
+        """
+        Soft-deletes all active chat sessions for a specific user.
+        Returns the number of sessions that were archived.
+        """
+        from app.models.chatbot import ChatSession
 
-    # Bulletproof direct SQL update for all user sessions at once
-    updated_count = (
-        db.query(ChatSession)
-        .filter(ChatSession.RequesterUserID == requester_id)
-        # Using == 1 to catch active sessions safely across all SQL Server types
-        .filter(ChatSession.IsActive == 1) 
-        .update({"IsActive": 0}, synchronize_session=False)
-    )
-    db.commit()
-    
-    if updated_count > 0:
-        logger.info("Archived %d sessions for user %d.", updated_count, requester_id)
+        sessions = (
+            db.query(ChatSession)
+            .filter(ChatSession.RequesterUserID == requester_id)
+            .filter(ChatSession.IsActive == True)
+            .all()
+        )
         
-    return updated_count
+        count = len(sessions)
+        if count > 0:
+            for session in sessions:
+                session.IsActive = False
+            db.commit()
+            logger.info("Archived %d sessions for user %d.", count, requester_id)
+            
+        return count
 
-
---- FILE: backend\app\services\consolidator.py ---
+--- FILE: app\services\consolidator.py ---
 from __future__ import annotations
 
 import hashlib
@@ -3801,7 +2945,7 @@ class KnowledgeConsolidator:
         }
         return CanonicalRecord(cluster_key, point_id, page_content, metadata)
 
---- FILE: backend\app\services\ingestion_service.py ---
+--- FILE: app\services\ingestion_service.py ---
 """
 Document ingestion service.
 
@@ -4753,7 +3897,7 @@ class DocumentIngestionService:
 
         return {"status": "success", "message": "Learned chat successfully restored to the AI Brain."}
 
---- FILE: backend\app\services\maintenance.py ---
+--- FILE: app\services\maintenance.py ---
 import uuid
 import asyncio
 import logging
@@ -4914,7 +4058,7 @@ async def consolidate_similar_tickets(db: Session, qdrant: QdrantClient, embeddi
     finally:
         LIVE_STATUS["is_running"] = False
 
---- FILE: backend\app\services\orchestrator.py ---
+--- FILE: app\services\orchestrator.py ---
 """
 AI RAG Orchestrator.
 
@@ -5375,7 +4519,7 @@ class SupportOrchestrator:
         return final_answer_msg.content, ticket_ids
 
 
---- FILE: backend\app\services\routing_service.py ---
+--- FILE: app\services\routing_service.py ---
 import logging
 import json
 import asyncio
@@ -5396,19 +4540,20 @@ async def suggest_route(request: RoutingRequest, db: Session, qdrant, embeddings
     # ---------------------------------------------------------
     # PHASE 1: RETRIEVAL (Vector Search)
     # ---------------------------------------------------------
-    # ---------------------------------------------------------
-    # PHASE 1: RETRIEVAL (Vector Search)
-    # ---------------------------------------------------------
     search_text = f"ISSUE: {request.summary}\nDETAILS: {request.description}"
     query_vector = await asyncio.to_thread(embeddings.embed_query, search_text)
     
-    # Grab the new collection name from settings
-    routing_collection = getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
-    
-    # Notice we removed the query_filter completely! Much faster.
     search_results = qdrant.query_points(
-        collection_name=routing_collection,
+        collection_name=collection_name,
         query=query_vector,
+        query_filter=qdrant_models.Filter(
+            must=[
+                qdrant_models.FieldCondition(
+                    key="metadata.doc_type",
+                    match=qdrant_models.MatchValue(value="routing_example")
+                )
+            ]
+        ),
         with_payload=True,
         limit=5, 
     )
@@ -5518,7 +4663,7 @@ async def suggest_route(request: RoutingRequest, db: Session, qdrant, embeddings
         )
     )
 
---- FILE: backend\app\services\settings_service.py ---
+--- FILE: app\services\settings_service.py ---
 """
 AI settings management service.
 
@@ -5653,7 +4798,7 @@ def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
     logger.info("Settings reverted to system defaults (copied from ID 2) by user %d.", updated_by)
     return new_config
 
---- FILE: backend\app\services\taxonomy_service.py ---
+--- FILE: app\services\taxonomy_service.py ---
 import httpx
 import logging
 import json
@@ -5708,7 +4853,7 @@ async def get_live_taxonomy() -> str:
         # Fallback to empty if BizPortal is down
         return "[]"
 
---- FILE: backend\app\services\user_service.py ---
+--- FILE: app\services\user_service.py ---
 """
 External user authentication service.
 
@@ -5811,10 +4956,10 @@ async def fetch_user_details(auth_token: str) -> dict:
                 "User authentication service returned an error."
             )
 
---- FILE: backend\app\services\__init__.py ---
+--- FILE: app\services\__init__.py ---
 
 
---- FILE: backend\scripts\build_routing_dataset.py ---
+--- FILE: scripts\build_routing_dataset.py ---
 """
 Build routing dataset.
 """
@@ -6083,7 +5228,7 @@ def main() -> None:
 if __name__ == "__main__":
     main()
 
---- FILE: backend\scripts\ingest_routing.py ---
+--- FILE: scripts\ingest_routing.py ---
 """
 Standalone routing ingestion script.
 Syncs ground-truth ticket headers into Qdrant to power the RAC Routing Engine.
@@ -6184,7 +5329,7 @@ def run_routing_ingestion() -> None:
 if __name__ == "__main__":
     run_routing_ingestion()
 
---- FILE: backend\scripts\ingest_tickets.py ---
+--- FILE: scripts\ingest_tickets.py ---
 """
 Standalone ticket ingestion script.
 
@@ -6618,97 +5763,6 @@ if __name__ == "__main__":
     args = parse_args()
     run_ingestion(batch_size=max(1, args.batch_size))
 
---- FILE: backend\scripts\sync_routing_data.py ---
-import logging
-import sys
-import uuid
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-from langchain_core.documents import Document
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_qdrant import QdrantVectorStore
-
-from app.core.config import settings
-from app.core.database import SessionHelpdesk
-from app.core.logging import configure_logging
-from app.models.helpdesk import TicketHeader
-
-configure_logging()
-logger = logging.getLogger(__name__)
-
-def run_sync() -> None:
-    # USE THE NEW ROUTING COLLECTION!
-    routing_collection = getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
-    
-    logger.info("Connecting to SQL Helpdesk Database...")
-    db_helpdesk = SessionHelpdesk()
-
-    try:
-        real_tickets = (
-            db_helpdesk.query(TicketHeader)
-            .filter(TicketHeader.department_id.isnot(None))
-            .filter(TicketHeader.subcategory_id.isnot(None))
-            .filter(TicketHeader.summary.isnot(None))
-            .all()
-        )
-
-        logger.info(f"📥 Fetched {len(real_tickets)} real historical tickets from SQL.")
-        if not real_tickets: return
-
-        docs: list[Document] = []
-        ids: list[str] = []
-
-        for ticket in real_tickets:
-            summary_text = str(ticket.summary).strip()
-            if len(summary_text) < 5: continue
-
-            content = f"SUMMARY: {summary_text}\nDESCRIPTION: {ticket.description or 'None'}"
-            
-            metadata = {
-                "ticket_number": ticket.ticket_number,
-                "department_id": ticket.department_id,
-                "subcategory_id": ticket.subcategory_id,
-            }
-            
-            docs.append(Document(page_content=content, metadata=metadata))
-            ids.append(str(uuid.uuid5(uuid.NAMESPACE_DNS, f"routing_{ticket.id}")))
-
-        logger.info("🧠 Loading HuggingFace Embedding Model...")
-        embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
-
-        BATCH_SIZE = 50
-        total_docs = len(docs)
-        
-        logger.info(f"🚀 Starting vector upload to '{routing_collection}'...")
-        
-        for i in range(0, total_docs, BATCH_SIZE):
-            batch_docs = docs[i : i + BATCH_SIZE]
-            batch_ids = ids[i : i + BATCH_SIZE]
-            
-            # force_recreate=True on the VERY FIRST batch will wipe the collection clean.
-            # We set it to False for subsequent batches so we don't delete what we just uploaded!
-            is_first_batch = (i == 0)
-            
-            QdrantVectorStore.from_documents(
-                batch_docs,
-                embeddings,
-                ids=batch_ids,
-                url=settings.QDRANT_URL,
-                api_key=settings.QDRANT_API_KEY,
-                collection_name=routing_collection, # USING NEW COLLECTION
-                force_recreate=is_first_batch,      # WIPES IT CLEAN SAFELY!
-            )
-            
-        logger.info(f"🎉 SUCCESS! The dedicated Routing Brain is now loaded!")
-
-    finally:
-        db_helpdesk.close()
-
-if __name__ == "__main__":
-    run_sync()
-
---- FILE: backend\scripts\__init__.py ---
+--- FILE: scripts\__init__.py ---
 
 

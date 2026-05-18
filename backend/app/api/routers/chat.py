@@ -181,7 +181,6 @@ def get_all_chat_sessions(
     # Change the basic .all() query to include the filter:
     sessions = (
         db.query(ChatSession)
-        .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
         .all()
     )
     
@@ -230,9 +229,11 @@ from app.schemas.tickets import TicketDraftResponse, TicketSubmitRequest, Ticket
 async def draft_escalation(
     session_id: str,
     db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service) # <-- NEW
 ):
     try:
-        result = await chat_service.draft_ticket_escalation(session_id, db)
+        # Pass the ingestion_service into the chat service
+        result = await chat_service.draft_ticket_escalation(session_id, db, ingestion_service) 
         return TicketDraftResponse(**result)
     except Exception as exc:
         logger.error(f"Failed to draft ticket: {exc}")

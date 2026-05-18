@@ -23,3 +23,16 @@ class TicketEvaluation(BaseHelpdesk):
     issue_cause = Column(Text)
     work_done = Column(Text)
     advanced_work_done = Column(Text)
+
+
+class TicketHeader(BaseHelpdesk):
+    """Ground truth routing data from the live Helpdesk system."""
+    __tablename__ = "tbl_ticket_header"
+
+    id = Column(Integer, primary_key=True, index=True)
+    ticket_number = Column(String(50), index=True)
+    summary = Column(String(500))
+    description = Column(Text)
+    department_id = Column(Integer)
+    subcategory_id = Column(Integer)
+    status_code = Column(String(50)) # Good to have for filtering

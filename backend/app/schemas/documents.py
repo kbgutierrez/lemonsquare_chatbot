@@ -4,6 +4,8 @@ from datetime import datetime
 from pydantic import BaseModel
 
 
+
+
 class DocumentResponse(BaseModel):
     document_id: str
     file_name: str
@@ -53,3 +55,24 @@ class ManualEntryUpdateRequest(BaseModel):
 class DocumentUpdateRequest(BaseModel):
     file_name: str | None = None
     category: str | None = None
+
+
+class ManualEntryResponse(BaseModel):
+    EntryID: str
+    Title: str
+    Content: str
+    Category: str
+    CreatedAt: datetime
+    UpdatedAt: datetime
+    IsActive: bool
+
+    class Config:
+        from_attributes = True
+
+class ManualEntryUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+
+
+

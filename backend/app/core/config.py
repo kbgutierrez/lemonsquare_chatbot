@@ -20,7 +20,8 @@ class Settings(BaseSettings):
     CHATBOT_DB_CONN: str
 
     # ─── Qdrant ───────────────────────────────────────────────────────────
-    QDRANT_COLLECTION: str = "helpdesk_multilingual_v1"
+    QDRANT_COLLECTION: str = "LemonSquareQdrant"  # <-- Default collection name for ticket ingestion
+    QDRANT_ROUTING_COLLECTION: str = "LemonSquareRouting"  # <-- Separate collection for routing data
     QDRANT_TIMEOUT: float = 60.0
 
     # ─── Default ML Model Names (overridden by DB settings at runtime) ────
