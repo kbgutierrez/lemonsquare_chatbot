@@ -1,8 +1,5 @@
 import {
   useCallback,
-  useEffect,
-  useRef,
-  useState,
 } from "react"
 
 import apiClient, {
@@ -13,130 +10,69 @@ import {
   API_ENDPOINTS,
 } from "../../../../shared/api/endpoints"
 
+import useLiveQuery
+  from "../../../../shared/hooks/useLiveQuery"
+
+import {
+  invalidateCache,
+  setCachedData,
+} from "../../../../shared/cache/liveQueryCache"
+
+const CACHE_KEY =
+  "resolved_chats"
+
 export const useResolvedChats =
   () => {
 
     /* ========================================
-       REFS
+       FETCHER
     ======================================== */
 
-    const mountedRef =
-      useRef(true)
-
-    /* ========================================
-       STATE
-    ======================================== */
-
-    const [items, setItems] =
-      useState([])
-
-    const [loading, setLoading] =
-      useState(true)
-
-    const [error, setError] =
-      useState("")
-
-    /* ========================================
-       CLEANUP
-    ======================================== */
-
-    useEffect(() => {
-
-      mountedRef.current =
-        true
-
-      return () => {
-
-        mountedRef.current =
-          false
-      }
-
-    }, [])
-
-    /* ========================================
-       LOAD CHATS
-    ======================================== */
-
-    const loadChats =
+    const fetchResolvedChats =
       useCallback(
         async () => {
 
-          try {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(true)
-
-              setError("")
-            }
-
-            const endpoint =
-              buildApiUrl(
-                API_ENDPOINTS.KNOWLEDGE_EXPLORE
-              )
-
-            const response =
-              await apiClient.get(
-                `${endpoint}?doc_type=resolved_chat`
-              )
-
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            setItems(
-              Array.isArray(
-                response
-              )
-                ? response
-                : []
+          const endpoint =
+            buildApiUrl(
+              API_ENDPOINTS.KNOWLEDGE_EXPLORE
             )
 
-          } catch (error) {
-
-            console.error(
-              "RESOLVED_CHATS_ERROR",
-              error
+          const response =
+            await apiClient.get(
+              `${endpoint}?doc_type=resolved_chat`
             )
 
-            if (
-              mountedRef.current
-            ) {
-
-              setItems([])
-
-              setError(
-                error.message ||
-                "Failed to load resolved chats."
-              )
-            }
-
-          } finally {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(false)
-            }
-          }
+          return Array.isArray(
+            response
+          )
+            ? response
+            : []
         },
         []
       )
 
     /* ========================================
-       INITIAL LOAD
+       LIVE QUERY
     ======================================== */
 
-    useEffect(() => {
+    const {
+      data: items = [],
+      loading,
+      error,
+      refresh,
+    } = useLiveQuery({
+      queryKey:
+        CACHE_KEY,
 
-      loadChats()
+      queryFn:
+        fetchResolvedChats,
 
-    }, [loadChats])
+      staleWhileRevalidate:
+        true,
+
+      refetchInterval:
+        15000,
+    })
 
     /* ========================================
        UPDATE CHAT
@@ -149,22 +85,77 @@ export const useResolvedChats =
           payload
         ) => {
 
-          const endpoint =
-            buildApiUrl(
-              API_ENDPOINTS.SELF_KNOWLEDGE_UPDATE,
-              {
-                sessionId,
-              }
+          const previous =
+            [...items]
+
+          try {
+
+            const optimistic =
+              items.map(
+                (item) => {
+
+                  if (
+                    item.session_id ===
+                    sessionId
+                  ) {
+
+                    return {
+                      ...item,
+                      ...payload,
+                    }
+                  }
+
+                  return item
+                }
+              )
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
             )
 
-          await apiClient.put(
-            endpoint,
-            payload
-          )
+            const endpoint =
+              buildApiUrl(
+                API_ENDPOINTS.SELF_KNOWLEDGE_UPDATE,
+                {
+                  sessionId,
+                }
+              )
 
-          await loadChats()
+            await apiClient.put(
+              endpoint,
+              payload
+            )
+
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
+
+          } catch (error) {
+
+            console.error(
+              "UPDATE_RESOLVED_CHAT_ERROR",
+              error
+            )
+
+            /* ROLLBACK */
+
+            setCachedData(
+              CACHE_KEY,
+              previous
+            )
+
+            throw error
+          }
         },
-        [loadChats]
+        [
+          items,
+          refresh,
+        ]
       )
 
     /* ========================================
@@ -177,21 +168,64 @@ export const useResolvedChats =
           sessionId
         ) => {
 
-          const endpoint =
-            buildApiUrl(
-              API_ENDPOINTS.SELF_KNOWLEDGE_DELETE,
-              {
-                sessionId,
-              }
+          const previous =
+            [...items]
+
+          try {
+
+            const optimistic =
+              items.filter(
+                (item) =>
+                  item.session_id !==
+                  sessionId
+              )
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
             )
 
-          await apiClient.delete(
-            endpoint
-          )
+            const endpoint =
+              buildApiUrl(
+                API_ENDPOINTS.SELF_KNOWLEDGE_DELETE,
+                {
+                  sessionId,
+                }
+              )
 
-          await loadChats()
+            await apiClient.delete(
+              endpoint
+            )
+
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
+
+          } catch (error) {
+
+            console.error(
+              "DELETE_RESOLVED_CHAT_ERROR",
+              error
+            )
+
+            /* ROLLBACK */
+
+            setCachedData(
+              CACHE_KEY,
+              previous
+            )
+
+            throw error
+          }
         },
-        [loadChats]
+        [
+          items,
+          refresh,
+        ]
       )
 
     return {
@@ -199,7 +233,8 @@ export const useResolvedChats =
       loading,
       error,
 
-      loadChats,
+      loadChats:
+        refresh,
 
       updateChat,
       deleteChat,

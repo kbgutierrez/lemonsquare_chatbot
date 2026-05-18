@@ -212,6 +212,12 @@ export const API_ENDPOINTS = {
   CHAT_RESOLVE:
     "/chat/resolve/:sessionId",
 
+  CHAT_DELETE_SESSION:
+    "/chat/sessions/:sessionId",
+
+  CHAT_CLEAR_ALL:
+    "/chat/users/:requesterId/sessions",
+
   /* ====================================
      AUTH
   ==================================== */

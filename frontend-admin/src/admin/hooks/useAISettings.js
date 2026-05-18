@@ -17,15 +17,71 @@ import {
 import aiSettingsService
   from "../services/aiSettingsService"
 
+import useLiveQuery
+  from "../../shared/hooks/useLiveQuery"
+
+import {
+  invalidateCache,
+  setCachedData,
+} from "../../shared/cache/liveQueryCache"
+
+const CACHE_KEY =
+  "ai_settings"
+
+/* ========================================
+   SAFE DEFAULT SETTINGS
+======================================== */
+
+const DEFAULT_SETTINGS = {
+  ActiveModel:
+    AI_DEFAULTS.ActiveModel,
+
+  ReformulatorModel:
+    AI_DEFAULTS.ReformulatorModel,
+
+  EmbeddingModel:
+    AI_DEFAULTS.EmbeddingModel,
+
+  RerankerModel:
+    AI_DEFAULTS.RerankerModel,
+
+  Temperature:
+    AI_DEFAULTS.Temperature,
+
+  TopK_Tickets:
+    AI_DEFAULTS.TopK_Tickets,
+
+  ConfidenceThreshold:
+    AI_DEFAULTS.ConfidenceThreshold,
+
+  UseReformulator:
+    AI_DEFAULTS.UseReformulator,
+
+  UseReranker:
+    AI_DEFAULTS.UseReranker,
+
+  SystemPrompt: "",
+
+  ReformulatorPrompt: "",
+
+  AllowedCategories: "",
+
+  ChatExtractionPrompt: "",
+}
+
 export const useAISettings =
   () => {
 
     /* ========================================
-       STATE
+       REFS
     ======================================== */
 
-    const [loading, setLoading] =
-      useState(true)
+    const mountedRef =
+      useRef(true)
+
+    /* ========================================
+       LOCAL UI STATE
+    ======================================== */
 
     const [saving, setSaving] =
       useState(false)
@@ -35,51 +91,6 @@ export const useAISettings =
 
     const [error, setError] =
       useState("")
-
-    const [settings, setSettings] =
-      useState({
-        ActiveModel:
-          AI_DEFAULTS.ActiveModel,
-
-        ReformulatorModel:
-          AI_DEFAULTS.ReformulatorModel,
-
-        EmbeddingModel:
-          AI_DEFAULTS.EmbeddingModel,
-
-        RerankerModel:
-          AI_DEFAULTS.RerankerModel,
-
-        Temperature:
-          AI_DEFAULTS.Temperature,
-
-        TopK_Tickets:
-          AI_DEFAULTS.TopK_Tickets,
-
-        ConfidenceThreshold:
-          AI_DEFAULTS.ConfidenceThreshold,
-
-        UseReformulator:
-          AI_DEFAULTS.UseReformulator,
-
-        UseReranker:
-          AI_DEFAULTS.UseReranker,
-
-        SystemPrompt: "",
-
-        ReformulatorPrompt: "",
-
-        AllowedCategories: "",
-
-        ChatExtractionPrompt: "",
-      })
-
-    /* ========================================
-       REFS
-    ======================================== */
-
-    const mountedRef =
-      useRef(true)
 
     /* ========================================
        CLEANUP
@@ -99,127 +110,141 @@ export const useAISettings =
     }, [])
 
     /* ========================================
-       LOAD SETTINGS
+       FETCHER
     ======================================== */
 
-    const loadSettings =
+    const fetchSettings =
       useCallback(
         async () => {
 
-          try {
+          const response =
+            await aiSettingsService.getSettings()
 
-            setLoading(true)
-
-            setError("")
-
-            const data =
-              await aiSettingsService.getSettings()
-
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            const cleaned = {
-              ActiveModel:
-                data.ActiveModel ||
-                AI_DEFAULTS.ActiveModel,
-
-              ReformulatorModel:
-                data.ReformulatorModel ||
-                AI_DEFAULTS.ReformulatorModel,
-
-              EmbeddingModel:
-                data.EmbeddingModel ||
-                AI_DEFAULTS.EmbeddingModel,
-
-              RerankerModel:
-                data.RerankerModel ||
-                AI_DEFAULTS.RerankerModel,
-
-              Temperature:
-                Number(
-                  data.Temperature ??
-                  AI_DEFAULTS.Temperature
-                ),
-
-              TopK_Tickets:
-                Number(
-                  data.TopK_Tickets ??
-                  AI_DEFAULTS.TopK_Tickets
-                ),
-
-              ConfidenceThreshold:
-                Number(
-                  data.ConfidenceThreshold ??
-                  AI_DEFAULTS.ConfidenceThreshold
-                ),
-
-              UseReformulator:
-                Boolean(
-                  data.UseReformulator
-                ),
-
-              UseReranker:
-                Boolean(
-                  data.UseReranker
-                ),
-
-              SystemPrompt:
-                data.SystemPrompt || "",
-
-              ReformulatorPrompt:
-                data.ReformulatorPrompt || "",
-
-              AllowedCategories:
-                data.AllowedCategories || "",
-
-              ChatExtractionPrompt:
-                data.ChatExtractionPrompt || "",
-            }
-
-            setSettings(
-              cleaned
-            )
-
-          } catch (err) {
-
-            console.error(
-              "LOAD_SETTINGS_ERROR",
-              err
-            )
-
-            if (
-              mountedRef.current
-            ) {
-
-              setError(
-                err.message ||
-                "Failed to load settings."
+          const data =
+            (
+              response &&
+              typeof response ===
+                "object" &&
+              !Array.isArray(
+                response
               )
-            }
+            )
+              ? response
+              : {}
 
-          } finally {
+          return {
+            ActiveModel:
+              data.ActiveModel ||
+              AI_DEFAULTS.ActiveModel,
 
-            if (
-              mountedRef.current
-            ) {
+            ReformulatorModel:
+              data.ReformulatorModel ||
+              AI_DEFAULTS.ReformulatorModel,
 
-              setLoading(
-                false
-              )
-            }
+            EmbeddingModel:
+              data.EmbeddingModel ||
+              AI_DEFAULTS.EmbeddingModel,
+
+            RerankerModel:
+              data.RerankerModel ||
+              AI_DEFAULTS.RerankerModel,
+
+            Temperature:
+              Number(
+                data.Temperature ??
+                AI_DEFAULTS.Temperature
+              ),
+
+            TopK_Tickets:
+              Number(
+                data.TopK_Tickets ??
+                AI_DEFAULTS.TopK_Tickets
+              ),
+
+            ConfidenceThreshold:
+              Number(
+                data.ConfidenceThreshold ??
+                AI_DEFAULTS.ConfidenceThreshold
+              ),
+
+            UseReformulator:
+              Boolean(
+                data.UseReformulator
+              ),
+
+            UseReranker:
+              Boolean(
+                data.UseReranker
+              ),
+
+            SystemPrompt:
+              data.SystemPrompt || "",
+
+            ReformulatorPrompt:
+              data.ReformulatorPrompt || "",
+
+            AllowedCategories:
+              data.AllowedCategories || "",
+
+            ChatExtractionPrompt:
+              data.ChatExtractionPrompt || "",
           }
         },
         []
       )
 
-    useEffect(() => {
+    /* ========================================
+       LIVE QUERY
+    ======================================== */
 
-      loadSettings()
+    const {
+      data: settings,
 
-    }, [loadSettings])
+      loading,
+      refresh,
+    } = useLiveQuery({
+      queryKey:
+        CACHE_KEY,
+
+      queryFn:
+        fetchSettings,
+
+      initialData:
+        DEFAULT_SETTINGS,
+
+      staleWhileRevalidate:
+        true,
+    })
+
+    /* ========================================
+       SAFE SETTINGS
+    ======================================== */
+
+    const safeSettings =
+      useMemo(
+        () => {
+
+          if (
+            !settings ||
+            typeof settings !==
+              "object" ||
+            Array.isArray(
+              settings
+            )
+          ) {
+
+            return {
+              ...DEFAULT_SETTINGS,
+            }
+          }
+
+          return {
+            ...DEFAULT_SETTINGS,
+            ...settings,
+          }
+        },
+        [settings]
+      )
 
     /* ========================================
        UPDATE FIELD
@@ -235,12 +260,18 @@ export const useAISettings =
           setSuccess("")
           setError("")
 
-          setSettings((prev) => ({
-            ...prev,
-            [key]: value,
-          }))
+          const updated =
+            {
+              ...safeSettings,
+              [key]: value,
+            }
+
+          setCachedData(
+            CACHE_KEY,
+            updated
+          )
         },
-        []
+        [safeSettings]
       )
 
     /* ========================================
@@ -254,26 +285,32 @@ export const useAISettings =
           setSuccess("")
           setError("")
 
-          setSettings((prev) => ({
-            ...prev,
+          const updated =
+            {
+              ...safeSettings,
 
-            ActiveModel:
-              model.ActiveModel,
+              ActiveModel:
+                model.ActiveModel,
 
-            ReformulatorModel:
-              model.ReformulatorModel,
+              ReformulatorModel:
+                model.ReformulatorModel,
 
-            EmbeddingModel:
-              model.EmbeddingModel,
+              EmbeddingModel:
+                model.EmbeddingModel,
 
-            RerankerModel:
-              model.RerankerModel,
+              RerankerModel:
+                model.RerankerModel,
 
-            Temperature:
-              model.RecommendedTemperature,
-          }))
+              Temperature:
+                model.RecommendedTemperature,
+            }
+
+          setCachedData(
+            CACHE_KEY,
+            updated
+          )
         },
-        []
+        [safeSettings]
       )
 
     /* ========================================
@@ -286,11 +323,11 @@ export const useAISettings =
         return aiModels.find(
           (model) =>
             model.name ===
-            settings.ActiveModel
+            safeSettings.ActiveModel
         )
 
       }, [
-        settings.ActiveModel,
+        safeSettings.ActiveModel,
       ])
 
     /* ========================================
@@ -314,12 +351,8 @@ export const useAISettings =
             setSuccess("")
             setError("")
 
-            /* ========================================
-               FRONTEND VALIDATION
-            ======================================== */
-
             if (
-              !settings.SystemPrompt?.trim()
+              !safeSettings.SystemPrompt?.trim()
             ) {
 
               setError(
@@ -330,7 +363,7 @@ export const useAISettings =
             }
 
             if (
-              !settings.ReformulatorPrompt?.trim()
+              !safeSettings.ReformulatorPrompt?.trim()
             ) {
 
               setError(
@@ -341,7 +374,7 @@ export const useAISettings =
             }
 
             if (
-              !settings.AllowedCategories?.trim()
+              !safeSettings.AllowedCategories?.trim()
             ) {
 
               setError(
@@ -353,53 +386,53 @@ export const useAISettings =
 
             const payload = {
               ActiveModel:
-                settings.ActiveModel,
+                safeSettings.ActiveModel,
 
               ReformulatorModel:
-                settings.ReformulatorModel,
+                safeSettings.ReformulatorModel,
 
               EmbeddingModel:
-                settings.EmbeddingModel,
+                safeSettings.EmbeddingModel,
 
               RerankerModel:
-                settings.RerankerModel,
+                safeSettings.RerankerModel,
 
               Temperature:
                 Number(
-                  settings.Temperature
+                  safeSettings.Temperature
                 ),
 
               TopK_Tickets:
                 Number(
-                  settings.TopK_Tickets
+                  safeSettings.TopK_Tickets
                 ),
 
               ConfidenceThreshold:
                 Number(
-                  settings.ConfidenceThreshold
+                  safeSettings.ConfidenceThreshold
                 ),
 
               UseReformulator:
                 Boolean(
-                  settings.UseReformulator
+                  safeSettings.UseReformulator
                 ),
 
               UseReranker:
                 Boolean(
-                  settings.UseReranker
+                  safeSettings.UseReranker
                 ),
 
               SystemPrompt:
-                settings.SystemPrompt.trim(),
+                safeSettings.SystemPrompt.trim(),
 
               ReformulatorPrompt:
-                settings.ReformulatorPrompt.trim(),
+                safeSettings.ReformulatorPrompt.trim(),
 
               AllowedCategories:
-                settings.AllowedCategories.trim(),
+                safeSettings.AllowedCategories.trim(),
 
               ChatExtractionPrompt:
-                settings.ChatExtractionPrompt?.trim() || null,
+                safeSettings.ChatExtractionPrompt?.trim() || null,
             }
 
             console.log(
@@ -410,6 +443,12 @@ export const useAISettings =
             await aiSettingsService.updateSettings(
               payload
             )
+
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
 
             if (
               mountedRef.current
@@ -451,7 +490,8 @@ export const useAISettings =
         },
         [
           saving,
-          settings,
+          safeSettings,
+          refresh,
         ]
       )
 
@@ -462,7 +502,8 @@ export const useAISettings =
       success,
       error,
 
-      settings,
+      settings:
+        safeSettings,
 
       activeModel,
 

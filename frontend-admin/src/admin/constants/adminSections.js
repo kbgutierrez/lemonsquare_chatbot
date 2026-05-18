@@ -19,7 +19,13 @@ import PipelineDebugSection
 import AISettingsPanel
   from "../components/settings/AISettingsPanel"
 
+import AnalyticsSection
+  from "../components/analytics/AnalyticsSection"
+
 export const adminSections = {
+  analytics:
+    AnalyticsSection,
+
   upload:
     UploadSection,
 

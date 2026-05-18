@@ -7,6 +7,14 @@ import {
   Loader2,
 } from "lucide-react"
 
+import {
+  apiClient,
+  buildApiUrl,
+} from "../../shared/api/client"
+
+import API_ENDPOINTS
+  from "../../shared/api/endpoints"
+
 const LoginPage = ({
   onLogin,
 }) => {
@@ -53,15 +61,25 @@ const LoginPage = ({
 
         setError("")
 
-        /*
-          SIMPLE TOKEN SESSION
+        const endpoint =
+          buildApiUrl(
+            `${API_ENDPOINTS.AUTH_VERIFY}?user_token=${encodeURIComponent(trimmedToken)}`
+          )
 
-          No authentication.
-          No backend validation.
+        const response =
+          await apiClient.get(
+            endpoint
+          )
 
-          Only persist the
-          user_token locally.
-        */
+        if (
+          !response?.is_valid
+        ) {
+
+          throw new Error(
+            response?.error ||
+            "Authentication failed."
+          )
+        }
 
         localStorage.setItem(
           "admin_auth",
@@ -73,15 +91,21 @@ const LoginPage = ({
           trimmedToken
         )
 
-        await new Promise(
-          (resolve) =>
-            setTimeout(
-              resolve,
-              400
-            )
+        localStorage.setItem(
+          "admin_user",
+          JSON.stringify(
+            response
+          )
         )
 
-        onLogin()
+        onLogin(response)
+
+      } catch (err) {
+
+        setError(
+          err.message ||
+          "Login failed."
+        )
 
       } finally {
 
@@ -106,7 +130,6 @@ const LoginPage = ({
         p-4
       "
     >
-      {/* GLOW */}
       <div
         className="
           absolute
@@ -141,7 +164,6 @@ const LoginPage = ({
         "
       />
 
-      {/* CARD */}
       <form
         onSubmit={handleLogin}
         className="
@@ -165,7 +187,6 @@ const LoginPage = ({
           backdrop-blur-xl
         "
       >
-        {/* LOGO */}
         <div
           className="
             mb-8
@@ -224,7 +245,6 @@ const LoginPage = ({
           </p>
         </div>
 
-        {/* USER TOKEN */}
         <div className="mb-6">
           <label
             className="
@@ -288,7 +308,6 @@ const LoginPage = ({
           )}
         </div>
 
-        {/* LOGIN BUTTON */}
         <button
           type="submit"
           disabled={loading}

@@ -10,7 +10,26 @@ const SidebarMenu = ({
   activeView,
   setActiveView,
   onLogout,
+  adminUser,
+  isMobile = false,
 }) => {
+
+  /* ========================================
+     USER INFO
+  ======================================== */
+
+  const displayName =
+    adminUser?.name ||
+    "Authenticated User"
+
+  const department =
+    adminUser?.department ||
+    "Admin Panel"
+
+  const initials =
+    displayName
+      ?.charAt(0)
+      ?.toUpperCase() || "A"
 
   return (
     <aside
@@ -38,43 +57,54 @@ const SidebarMenu = ({
     >
       {/* HEADER */}
       <div
-        className="
+        className={`
           mb-6
           shrink-0
 
-          flex
-          items-center
-          justify-between
-          gap-3
-
-          rounded-2xl
+          rounded-3xl
 
           border
           border-[#27342e]
 
           bg-[#161f1d]
 
-          px-3
-          py-3
-          sm:px-4
-          sm:py-4
-        "
+          ${
+            isMobile
+              ? `
+                flex
+                flex-col
+                items-stretch
+                gap-4
+
+                p-4
+              `
+              : `
+                flex
+                items-center
+                gap-3
+
+                px-4
+                py-4
+              `
+          }
+        `}
       >
-        {/* LEFT */}
+        {/* PROFILE */}
         <div
           className="
             flex
             min-w-0
+            flex-1
             items-center
             gap-3
           "
         >
-          {/* LOGO */}
+          {/* AVATAR */}
           <div
             className="
               flex
-              h-10
-              w-10
+              h-11
+              w-11
               shrink-0
               items-center
               justify-center
@@ -88,60 +118,109 @@ const SidebarMenu = ({
               className="
                 text-sm
                 font-black
-                tracking-wide
 
                 text-[#111917]
               "
             >
-              LS
+              {initials}
             </span>
           </div>
 
-          {/* TEXT */}
-          <div className="min-w-0 flex-1">
-            <h2
-              className="
-                truncate
+          {/* USER DETAILS */}
+          <div
+            className="
+              min-w-0
+              flex-1
+            "
+          >
+            <div className="group relative w-full">
+              {/* NAME */}
+              <h2
+                className="
+                  overflow-hidden
+                  text-ellipsis
+                  whitespace-nowrap
 
-                text-sm
-                font-bold
+                  text-[15px]
+                  font-semibold
 
-                tracking-wide
+                  text-white
+                "
+              >
+                {displayName}
+              </h2>
 
-                text-white
-              "
-            >
-              Lemon Square
-            </h2>
+              {/* HOVER TOOLTIP */}
+              <div
+                className="
+                  pointer-events-none
 
+                  absolute
+                  left-0
+                  top-full
+                  z-50
+
+                  mt-2
+
+                  w-max
+                  max-w-[260px]
+
+                  rounded-xl
+
+                  border
+                  border-[#33433d]
+
+                  bg-[#18211e]
+
+                  px-3
+                  py-2
+
+                  text-xs
+                  font-medium
+
+                  text-[#d8e0dc]
+
+                  opacity-0
+
+                  shadow-[0_10px_30px_rgba(0,0,0,0.35)]
+
+                  transition-all
+                  duration-200
+
+                  group-hover:opacity-100
+                "
+              >
+                {department}
+              </div>
+            </div>
+
+            {/* SHORT SUBTEXT */}
             <p
               className="
                 mt-0.5
-
-                truncate
 
                 text-xs
 
                 text-[#8ea59b]
               "
             >
-              Admin Panel
+              
             </p>
           </div>
         </div>
 
         {/* LOGOUT */}
         <button
+          type="button"
           onClick={onLogout}
-          className="
+          className={`
             flex
-            h-10
-            w-10
             shrink-0
             items-center
             justify-center
+            gap-2
 
-            rounded-xl
+            rounded-2xl
 
             border
             border-[#2d3b35]
@@ -156,7 +235,21 @@ const SidebarMenu = ({
             hover:border-red-500/40
             hover:bg-red-500/10
             hover:text-red-300
-          "
+
+            ${
+              isMobile
+                ? `
+                  w-full
+
+                  px-4
+                  py-3
+                `
+                : `
+                  h-11
+                  w-11
+                `
+            }
+          `}
         >
           <LogOut
             className="
@@ -164,6 +257,17 @@ const SidebarMenu = ({
               w-4
             "
           />
+
+          {isMobile && (
+            <span
+              className="
+                text-sm
+                font-medium
+              "
+            >
+              Logout
+            </span>
+          )}
         </button>
       </div>
 

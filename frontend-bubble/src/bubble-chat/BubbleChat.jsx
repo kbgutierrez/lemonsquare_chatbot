@@ -40,6 +40,15 @@ const BubbleChat = () => {
   const [activeModal, setActiveModal] =
     useState(null)
 
+  /*
+    HISTORY REFRESH TRIGGER
+  */
+
+  const [
+    historyRefreshKey,
+    setHistoryRefreshKey,
+  ] = useState(0)
+
   /* ========================================
      DRAG
   ======================================== */
@@ -61,15 +70,8 @@ const BubbleChat = () => {
   const {
     messages,
 
-    /*
-      ONLY true while
-      sending a message.
-    */
     loading,
 
-    /*
-      Additional loading states.
-    */
     isLoadingConversation,
     isResolvingConversation,
 
@@ -84,6 +86,28 @@ const BubbleChat = () => {
 
     resolveConversation,
   } = useChatMessages()
+
+  /* ========================================
+     AUTO REFRESH HISTORY
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!sessionId) {
+      return
+    }
+
+    /*
+      IMPORTANT:
+      Whenever a valid session exists,
+      notify history modal to reload.
+    */
+
+    setHistoryRefreshKey(
+      (prev) => prev + 1
+    )
+
+  }, [sessionId])
 
   /* ========================================
      SMART REPOSITION
@@ -165,6 +189,14 @@ const BubbleChat = () => {
         }
 
         await resolveConversation()
+
+        /*
+          REFRESH HISTORY
+        */
+
+        setHistoryRefreshKey(
+          (prev) => prev + 1
+        )
 
         setActiveModal(null)
 
@@ -260,6 +292,12 @@ const BubbleChat = () => {
   const modals = {
     history: (
       <ChatHistoryModal
+        key={
+          historyRefreshKey
+        }
+        refreshKey={
+          historyRefreshKey
+        }
         onClose={closeModal}
         onLoadConversation={
           handleLoadConversation
@@ -450,15 +488,8 @@ const BubbleChat = () => {
               <ChatWindow
                 messages={messages}
 
-                /*
-                  ONLY disables input
-                  while AI is actively replying.
-                */
                 loading={loading}
 
-                /*
-                  Optional advanced states.
-                */
                 isLoadingConversation={
                   isLoadingConversation
                 }

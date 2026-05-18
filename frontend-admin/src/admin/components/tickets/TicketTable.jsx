@@ -319,9 +319,6 @@ const TicketRow = ({
             "
           >
             <ActionButton
-              disabled={
-                ticket.is_blacklisted
-              }
               onClick={() =>
                 blockTicket(
                   ticket.ticket_number
@@ -336,6 +333,8 @@ const TicketRow = ({
                     bg-emerald-500/10
 
                     text-emerald-400
+
+                    hover:bg-emerald-500/20
                   `
                   : `
                     border
@@ -354,7 +353,7 @@ const TicketRow = ({
                   <ShieldCheck className="h-4 w-4" />
 
                   <span className="hidden xl:inline">
-                    Blocked
+                    Unblock Ticket
                   </span>
                 </>
               ) : (

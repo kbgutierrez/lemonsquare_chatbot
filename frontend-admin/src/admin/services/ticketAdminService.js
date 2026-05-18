@@ -95,12 +95,49 @@ const deleteTicket =
   }
 
 /* ========================================
+   TOGGLE WHITELIST / BLACKLIST
+======================================== */
+
+const toggleTicketWhitelist =
+  async (
+    ticketNumber
+  ) => {
+
+    if (
+      !ticketNumber
+    ) {
+
+      throw new Error(
+        "Ticket number is required."
+      )
+    }
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.TICKET_WHITELIST,
+        {
+          ticketNumber,
+        }
+      )
+
+    console.log(
+      "TOGGLE_TICKET_WHITELIST_URL",
+      endpoint
+    )
+
+    return apiClient.post(
+      endpoint
+    )
+  }
+
+/* ========================================
    EXPORT
 ======================================== */
 
 const ticketAdminService = {
   getTickets,
   deleteTicket,
+  toggleTicketWhitelist,
 }
 
 export default ticketAdminService
