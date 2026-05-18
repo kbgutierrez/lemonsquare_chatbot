@@ -199,7 +199,10 @@ async def whitelist_ticket(
     )
 
     # 4. Push it back to Qdrant (The AI's Brain)
-    await ingestion_service.process_resolved_ticket(ticket_payload)
+    await ingestion_service.process_resolved_ticket(
+        ticket_payload.model_dump(),
+        db_chatbot
+    )
     
     return {
         "status": "success", 

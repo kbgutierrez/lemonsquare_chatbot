@@ -1,10 +1,18 @@
 import {
   useCallback,
-  useEffect,
   useMemo,
-  useRef,
   useState,
 } from "react"
+
+import { API_CONFIG } from "../../../../shared/config/sqlVariables"
+
+import useLiveQuery
+  from "../../../../shared/hooks/useLiveQuery"
+
+import {
+  invalidateCache,
+  setCachedData,
+} from "../../../../shared/cache/liveQueryCache"
 
 import {
   deleteKnowledgeFile,
@@ -19,11 +27,14 @@ export const useKnowledgeFiles =
   () => {
 
     /* ========================================
-       REFS
+       CONSTANTS
     ======================================== */
 
-    const mountedRef =
-      useRef(true)
+    const CACHE_KEY =
+      "knowledge_files"
+
+    const POLLING_INTERVAL =
+      API_CONFIG.POLLING_INTERVAL
 
     /* ========================================
        STATE
@@ -34,144 +45,86 @@ export const useKnowledgeFiles =
       setSelectedCategory,
     ] = useState("all")
 
-    const [files, setFiles] =
-      useState([])
-
-    const [loading, setLoading] =
-      useState(true)
-
-    const [error, setError] =
-      useState("")
-
     const [search, setSearch] =
       useState("")
 
-    const [
-      allowedCategories,
-      setAllowedCategories,
-    ] = useState([])
-
     /* ========================================
-       CLEANUP
+       FETCHER
     ======================================== */
 
-    useEffect(() => {
-
-      mountedRef.current =
-        true
-
-      return () => {
-
-        mountedRef.current =
-          false
-      }
-
-    }, [])
-
-    /* ========================================
-       LOAD FILES
-    ======================================== */
-
-    const loadFiles =
+    const fetchKnowledgeFiles =
       useCallback(
         async () => {
 
-          try {
+          const [
+            documents,
+            settings,
+          ] = await Promise.all([
+            getKnowledgeFiles(),
 
-            if (
-              mountedRef.current
-            ) {
+            aiSettingsService.getSettings(),
+          ])
 
-              setLoading(true)
+          const normalized =
+            Array.isArray(
+              documents
+            )
+              ? documents
+              : []
 
-              setError("")
-            }
+          const parsedCategories =
+            settings?.AllowedCategories
+              ?.split(",")
 
-            const [
-              documents,
-              settings,
-            ] = await Promise.all([
-              getKnowledgeFiles(),
-
-              aiSettingsService.getSettings(),
-            ])
-
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            setFiles(
-              Array.isArray(
-                documents
+              ?.map(
+                (
+                  category
+                ) =>
+                  category.trim()
               )
-                ? documents
-                : []
-            )
 
-            /* ========================================
-               SETTINGS CATEGORIES
-            ======================================== */
+              ?.filter(Boolean) || []
 
-            const parsedCategories =
-              settings?.AllowedCategories
-                ?.split(",")
+          return {
+            files:
+              normalized,
 
-                ?.map(
-                  (
-                    category
-                  ) =>
-                    category.trim()
-                )
-
-                ?.filter(Boolean) || []
-
-            setAllowedCategories(
-              parsedCategories
-            )
-
-          } catch (error) {
-
-            console.error(
-              "LOAD_DOCUMENTS_ERROR",
-              error
-            )
-
-            if (
-              mountedRef.current
-            ) {
-
-              setFiles([])
-
-              setError(
-                error.message ||
-                "Failed to load knowledge files."
-              )
-            }
-
-          } finally {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(false)
-            }
+            categories:
+              parsedCategories,
           }
         },
         []
       )
 
     /* ========================================
-       INITIAL LOAD
+       LIVE QUERY
     ======================================== */
 
-    useEffect(() => {
+    const {
+      data,
+      loading,
+      refreshing,
+      error,
+      refresh,
+    } = useLiveQuery({
+      queryKey:
+        CACHE_KEY,
 
-      loadFiles()
+      queryFn:
+        fetchKnowledgeFiles,
 
-    }, [loadFiles])
+      refetchInterval:
+        POLLING_INTERVAL,
+
+      staleWhileRevalidate:
+        true,
+    })
+
+    const files =
+      data?.files || []
+
+    const allowedCategories =
+      data?.categories || []
 
     /* ========================================
        DELETE FILE
@@ -188,19 +141,45 @@ export const useKnowledgeFiles =
               "Are you sure you want to permanently delete this document?"
             )
 
-          if (!confirmed) {
+          if (
+            !confirmed
+          ) {
             return
           }
 
+          const previous =
+            data
+
           try {
 
-            setError("")
+            const optimistic =
+              {
+                ...data,
+
+                files:
+                  files.filter(
+                    (file) =>
+                      file.document_id !==
+                      documentId
+                  ),
+              }
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
+            )
 
             await deleteKnowledgeFile(
               documentId
             )
 
-            await loadFiles()
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
 
           } catch (error) {
 
@@ -209,18 +188,19 @@ export const useKnowledgeFiles =
               error
             )
 
-            if (
-              mountedRef.current
-            ) {
+            /* ROLLBACK */
 
-              setError(
-                error.message ||
-                "Failed to delete document."
-              )
-            }
+            setCachedData(
+              CACHE_KEY,
+              previous
+            )
           }
         },
-        [loadFiles]
+        [
+          data,
+          files,
+          refresh,
+        ]
       )
 
     /* ========================================
@@ -234,16 +214,52 @@ export const useKnowledgeFiles =
           payload
         ) => {
 
+          const previous =
+            data
+
           try {
 
-            setError("")
+            const optimistic =
+              {
+                ...data,
+
+                files:
+                  files.map(
+                    (file) => {
+
+                      if (
+                        file.document_id ===
+                        documentId
+                      ) {
+
+                        return {
+                          ...file,
+                          ...payload,
+                        }
+                      }
+
+                      return file
+                    }
+                  ),
+              }
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
+            )
 
             await updateKnowledgeFile(
               documentId,
               payload
             )
 
-            await loadFiles()
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
 
           } catch (error) {
 
@@ -252,20 +268,21 @@ export const useKnowledgeFiles =
               error
             )
 
-            if (
-              mountedRef.current
-            ) {
+            /* ROLLBACK */
 
-              setError(
-                error.message ||
-                "Failed to update document."
-              )
-            }
+            setCachedData(
+              CACHE_KEY,
+              previous
+            )
 
             throw error
           }
         },
-        [loadFiles]
+        [
+          data,
+          files,
+          refresh,
+        ]
       )
 
     /* ========================================
@@ -345,6 +362,9 @@ export const useKnowledgeFiles =
       useMemo(
         () => {
 
+          const query =
+            search.toLowerCase()
+
           return files.filter(
             (file) => {
 
@@ -358,7 +378,7 @@ export const useKnowledgeFiles =
                 file.file_name
                   ?.toLowerCase()
                   .includes(
-                    search.toLowerCase()
+                    query
                   )
 
               return (
@@ -378,7 +398,10 @@ export const useKnowledgeFiles =
 
     return {
       files,
+
       loading,
+      refreshing,
+
       error,
 
       search,
@@ -393,7 +416,8 @@ export const useKnowledgeFiles =
 
       filteredFiles,
 
-      loadFiles,
+      loadFiles:
+        refresh,
 
       handleDelete,
       handleUpdate,

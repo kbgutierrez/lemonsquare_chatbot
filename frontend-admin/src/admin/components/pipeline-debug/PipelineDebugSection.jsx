@@ -21,28 +21,85 @@ import ErrorState
 import LoadingSpinner
   from "../../../shared/components/LoadingSpinner"
 
+import {
+  getCachedData,
+  setCachedData,
+} from "../../../shared/cache/liveQueryCache"
+
+const CACHE_KEY =
+  "pipeline_debug_state"
+
 const PipelineDebugSection = () => {
 
+  /* ========================================
+     CACHE HYDRATION
+  ======================================== */
+
+  const cached =
+    getCachedData(
+      CACHE_KEY
+    ) || {}
+
+  /* ========================================
+     STATE
+  ======================================== */
+
   const [prompt, setPrompt] =
-    useState("")
+    useState(
+      cached.prompt || ""
+    )
 
   const [userToken, setUserToken] =
-    useState("")
+    useState(
+      cached.userToken || ""
+    )
 
   const [sessionId, setSessionId] =
-    useState("")
+    useState(
+      cached.sessionId || ""
+    )
 
   const [loading, setLoading] =
     useState(false)
 
   const [result, setResult] =
-    useState(null)
+    useState(
+      cached.result || null
+    )
 
   const [error, setError] =
     useState("")
 
   const [showConfig, setShowConfig] =
-    useState(true)
+    useState(
+      cached.showConfig ??
+      true
+    )
+
+  /* ========================================
+     PERSIST STATE
+  ======================================== */
+
+  useEffect(() => {
+
+    setCachedData(
+      CACHE_KEY,
+      {
+        prompt,
+        userToken,
+        sessionId,
+        result,
+        showConfig,
+      }
+    )
+
+  }, [
+    prompt,
+    userToken,
+    sessionId,
+    result,
+    showConfig,
+  ])
 
   /* ========================================
      LOAD ADMIN TOKEN
@@ -55,14 +112,17 @@ const PipelineDebugSection = () => {
         "admin_user_token"
       )
 
-    if (storedToken) {
+    if (
+      storedToken &&
+      !userToken
+    ) {
 
       setUserToken(
         storedToken
       )
     }
 
-  }, [])
+  }, [userToken])
 
   /* ========================================
      RUN PIPELINE

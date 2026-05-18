@@ -1,4 +1,5 @@
 import {
+  useRef,
   useState,
 } from "react"
 
@@ -13,6 +14,10 @@ import EditFileModal
 
 import EmptyState
   from "../../../shared/components/EmptyState"
+
+import {
+  useHorizontalDragScroll,
+} from "../../../shared/hooks/useHorizontalDragScroll"
 
 const FileTable = ({
   files = [],
@@ -29,12 +34,29 @@ const FileTable = ({
   const hasFiles =
     files.length > 0
 
+  /* ========================================
+     DRAG SCROLL
+  ======================================== */
+
+  const tableRef =
+    useRef(null)
+
+  useHorizontalDragScroll(
+    tableRef
+  )
+
   return (
     <>
       <div
+        ref={tableRef}
+
         className="
           h-full
+
+          cursor-grab
           overflow-auto
+
+          active:cursor-grabbing
 
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
@@ -43,7 +65,7 @@ const FileTable = ({
         <table
           className="
             w-full
-            min-w-[900px]
+            min-w-[1100px]
 
             border-separate
             border-spacing-0

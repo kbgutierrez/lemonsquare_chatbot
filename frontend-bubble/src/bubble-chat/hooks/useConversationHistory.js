@@ -107,8 +107,10 @@ export const useConversationHistory =
     const [conversations, setConversations] =
       useState([])
 
-    const [selectedConversationId, setSelectedConversationId] =
-      useState(null)
+    const [
+      selectedConversationId,
+      setSelectedConversationId,
+    ] = useState(null)
 
     /* ========================================
        FETCH HISTORY
@@ -287,6 +289,8 @@ export const useConversationHistory =
               []
             )
 
+          } finally {
+
             setLoading(
               false
             )
@@ -348,16 +352,72 @@ export const useConversationHistory =
 
     const deleteConversation =
       useCallback(
-        (
+        async (
           sessionId
         ) => {
 
-          console.warn(
-            "DELETE_CONVERSATION_NOT_IMPLEMENTED",
-            sessionId
-          )
+          if (
+            !sessionId
+          ) {
+            return
+          }
+
+          try {
+
+            /*
+              OPTIMISTIC UI REMOVE
+            */
+
+            setConversations(
+              (
+                previous
+              ) =>
+                previous.filter(
+                  (
+                    conversation
+                  ) =>
+                    conversation.id !==
+                    sessionId
+                )
+            )
+
+            /*
+              RESET ACTIVE SELECTION
+            */
+
+            setSelectedConversationId(
+              (
+                previous
+              ) =>
+                previous ===
+                sessionId
+                  ? null
+                  : previous
+            )
+
+            /*
+              BACKEND DELETE
+            */
+
+            await chatbotService.deleteConversation(
+              sessionId
+            )
+
+          } catch (error) {
+
+            console.error(
+              "DELETE_CONVERSATION_ERROR",
+              error
+            )
+
+            /*
+              REFETCH TO RECOVER
+            */
+
+            await fetchHistory()
+          }
         },
-        []
+        [fetchHistory]
       )
 
     /* ========================================
@@ -366,13 +426,43 @@ export const useConversationHistory =
 
     const clearAllHistory =
       useCallback(
-        () => {
+        async () => {
 
-          console.warn(
-            "CLEAR_ALL_NOT_IMPLEMENTED"
-          )
+          try {
+
+            /*
+              OPTIMISTIC RESET
+            */
+
+            setConversations(
+              []
+            )
+
+            setSelectedConversationId(
+              null
+            )
+
+            /*
+              BACKEND CLEAR
+            */
+
+            await chatbotService.clearAllSessions()
+
+          } catch (error) {
+
+            console.error(
+              "CLEAR_ALL_HISTORY_ERROR",
+              error
+            )
+
+            /*
+              RECOVER STATE
+            */
+
+            await fetchHistory()
+          }
         },
-        []
+        [fetchHistory]
       )
 
     /* ========================================

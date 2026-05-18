@@ -16,11 +16,13 @@
 
 const ENV = {
   API_BASE_URL:
-    import.meta.env.VITE_API_BASE_URL ||
+    import.meta.env
+      .VITE_API_BASE_URL ||
     "/api",
 
   WS_BASE_URL:
-    import.meta.env.VITE_WS_BASE_URL ||
+    import.meta.env
+      .VITE_WS_BASE_URL ||
     "/ws",
 
   APP_ENV:
@@ -41,6 +43,28 @@ export const API_CONFIG = {
 
   TIMEOUT: 30000,
 
+  /* ========================================
+     REALTIME / CACHE
+  ======================================== */
+
+  CACHE_DURATION:
+    1000 * 20,
+
+  POLLING_INTERVAL:
+    1000 * 15,
+
+  SILENT_REFRESH:
+    true,
+
+  ENABLE_CACHE:
+    true,
+
+  ENABLE_REQUEST_DEDUPE:
+    true,
+
+  ENABLE_BACKGROUND_SYNC:
+    true,
+
   HEADERS: {
     "Content-Type":
       "application/json",
@@ -57,6 +81,11 @@ export const WS_CONFIG = {
       /\/$/,
       ""
     ),
+
+  RECONNECT_INTERVAL:
+    3000,
+
+  MAX_RETRIES: 10,
 }
 
 /* ========================================
@@ -120,6 +149,31 @@ export const SESSION_DEFAULTS = {
 }
 
 /* ========================================
+   PERFORMANCE FLAGS
+======================================== */
+
+export const PERFORMANCE_CONFIG =
+  {
+    ENABLE_MEMOIZATION:
+      true,
+
+    ENABLE_PERSISTENCE:
+      true,
+
+    ENABLE_OPTIMISTIC_UPDATES:
+      true,
+
+    ENABLE_SILENT_REFRESH:
+      true,
+
+    ENABLE_BACKGROUND_SYNC:
+      true,
+
+    LIST_VIRTUALIZATION_THRESHOLD:
+      100,
+  }
+
+/* ========================================
    DEBUG LOGGING
 ======================================== */
 
@@ -136,5 +190,15 @@ if (
   console.log(
     "APP_ENV:",
     ENV.APP_ENV
+  )
+
+  console.log(
+    "CACHE_DURATION:",
+    API_CONFIG.CACHE_DURATION
+  )
+
+  console.log(
+    "POLLING_INTERVAL:",
+    API_CONFIG.POLLING_INTERVAL
   )
 }

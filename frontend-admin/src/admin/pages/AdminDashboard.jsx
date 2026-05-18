@@ -20,7 +20,24 @@ import {
   adminSections,
 } from "../constants/adminSections"
 
+import {
+  getCachedData,
+  setCachedData,
+} from "../../shared/cache/liveQueryCache"
+
+const DASHBOARD_UI_CACHE_KEY =
+  "admin_dashboard_ui"
+
 const AdminDashboard = () => {
+
+  /* ========================================
+     CACHE HYDRATION
+  ======================================== */
+
+  const cachedUI =
+    getCachedData(
+      DASHBOARD_UI_CACHE_KEY
+    ) || {}
 
   /* ========================================
      AUTH
@@ -31,6 +48,11 @@ const AdminDashboard = () => {
     setIsAuthenticated,
   ] = useState(false)
 
+  const [
+    adminUser,
+    setAdminUser,
+  ] = useState(null)
+
   /* ========================================
      UI STATE
   ======================================== */
@@ -38,12 +60,18 @@ const AdminDashboard = () => {
   const [
     activeView,
     setActiveView,
-  ] = useState("upload")
+  ] = useState(
+    cachedUI.activeView ||
+    "upload"
+  )
 
   const [
     sidebarWidth,
     setSidebarWidth,
-  ] = useState(280)
+  ] = useState(
+    cachedUI.sidebarWidth ||
+    280
+  )
 
   const [
     isResizing,
@@ -53,7 +81,31 @@ const AdminDashboard = () => {
   const [
     mobileSidebarOpen,
     setMobileSidebarOpen,
-  ] = useState(false)
+  ] = useState(
+    cachedUI.mobileSidebarOpen ||
+    false
+  )
+
+  /* ========================================
+     PERSIST UI STATE
+  ======================================== */
+
+  useEffect(() => {
+
+    setCachedData(
+      DASHBOARD_UI_CACHE_KEY,
+      {
+        activeView,
+        sidebarWidth,
+        mobileSidebarOpen,
+      }
+    )
+
+  }, [
+    activeView,
+    sidebarWidth,
+    mobileSidebarOpen,
+  ])
 
   /* ========================================
      ACTIVE COMPONENT
@@ -82,11 +134,34 @@ const AdminDashboard = () => {
         "admin_auth"
       )
 
+    const storedUser =
+      localStorage.getItem(
+        "admin_user"
+      )
+
     if (auth === "true") {
 
       setIsAuthenticated(
         true
       )
+
+      if (storedUser) {
+
+        try {
+
+          setAdminUser(
+            JSON.parse(
+              storedUser
+            )
+          )
+
+        } catch {
+
+          localStorage.removeItem(
+            "admin_user"
+          )
+        }
+      }
     }
 
   }, [])
@@ -96,7 +171,11 @@ const AdminDashboard = () => {
   ======================================== */
 
   const handleLogin =
-    () => {
+    (userData) => {
+
+      setAdminUser(
+        userData
+      )
 
       setIsAuthenticated(
         true
@@ -113,6 +192,16 @@ const AdminDashboard = () => {
       localStorage.removeItem(
         "admin_auth"
       )
+
+      localStorage.removeItem(
+        "admin_user"
+      )
+
+      localStorage.removeItem(
+        "admin_user_token"
+      )
+
+      setAdminUser(null)
 
       setIsAuthenticated(
         false
@@ -195,11 +284,6 @@ const AdminDashboard = () => {
     <AdminLayout>
       {/* MOBILE SIDEBAR */}
       <MobileSidebar
-
-        onLogout={
-          handleLogout
-        }
-
         open={mobileSidebarOpen}
 
         setOpen={
@@ -212,6 +296,14 @@ const AdminDashboard = () => {
 
         setActiveView={
           setActiveView
+        }
+
+        adminUser={
+          adminUser
+        }
+
+        onLogout={
+          handleLogout
         }
       />
 
@@ -255,6 +347,10 @@ const AdminDashboard = () => {
 
             setActiveView={
               setActiveView
+            }
+
+            adminUser={
+              adminUser
             }
 
             onLogout={

@@ -17,6 +17,7 @@ const MobileSidebar = ({
   activeView,
   setActiveView,
   onLogout,
+  adminUser,
 }) => {
 
   /* ========================================
@@ -199,6 +200,12 @@ const MobileSidebar = ({
                   onLogout={
                     onLogout
                   }
+
+                  adminUser={
+                    adminUser
+                  }
+
+                  isMobile
                 />
               </div>
             </motion.div>

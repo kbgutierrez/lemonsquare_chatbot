@@ -37,7 +37,7 @@ const DEV_MODE =
 const DEV_USER_TOKEN =
   import.meta.env
     .VITE_DEV_USER_TOKEN ||
-  "TEST_USER_1"
+  "11318"
 
 /* ========================================
    API REQUEST
@@ -299,10 +299,6 @@ const resolveRequesterId =
 
     /*
       JWT / HASH / OTHER TOKEN
-
-      IMPORTANT:
-      Backend should resolve
-      real requester id.
     */
 
     return authToken
@@ -498,16 +494,6 @@ const sendMessage =
         API_ENDPOINTS.CHAT_SEND
       )
 
-    console.log(
-      "SEND_MESSAGE_PAYLOAD",
-      payload
-    )
-
-    console.log(
-      "API_ENDPOINT",
-      endpoint
-    )
-
     const response =
       await apiRequest({
         endpoint,
@@ -545,18 +531,6 @@ const loadSession =
       `${endpoint}?user_token=${encodeURIComponent(
         userToken
       )}`
-
-    console.log(
-      "LOAD_SESSION",
-      {
-        SessionID,
-      }
-    )
-
-    console.log(
-      "API_ENDPOINT",
-      finalUrl
-    )
 
     const response =
       await apiRequest({
@@ -603,19 +577,6 @@ const loadUserSessions =
         }
       )
 
-    console.log(
-      "LOAD_USER_SESSIONS",
-      {
-        userToken,
-        requesterId,
-      }
-    )
-
-    console.log(
-      "API_ENDPOINT",
-      endpoint
-    )
-
     const response =
       await apiRequest({
         endpoint,
@@ -635,27 +596,56 @@ const loadUserSessions =
   }
 
 /* ========================================
-   CLEAR SESSION
+   DELETE SESSION
 ======================================== */
 
-const clearSession =
+const deleteConversation =
   async (
     SessionID
   ) => {
 
-    console.log(
-      "CLEAR_SESSION",
-      {
-        SessionID,
-      }
-    )
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.CHAT_DELETE_SESSION,
+        {
+          sessionId:
+            SessionID,
+        }
+      )
 
-    return {
-      success: true,
+    return await apiRequest({
+      endpoint,
+      method: "DELETE",
+    })
+  }
 
-      message:
-        "Clear session endpoint not yet connected.",
-    }
+/* ========================================
+   CLEAR ALL SESSIONS
+======================================== */
+
+const clearAllSessions =
+  async () => {
+
+    const userToken =
+      getUserToken()
+
+    const requesterId =
+      resolveRequesterId(
+        userToken
+      )
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.CHAT_CLEAR_ALL,
+        {
+          requesterId,
+        }
+      )
+
+    return await apiRequest({
+      endpoint,
+      method: "DELETE",
+    })
   }
 
 /* ========================================
@@ -691,18 +681,6 @@ const resolveConversation =
         }
       )
 
-    console.log(
-      "RESOLVE_CONVERSATION",
-      {
-        SessionID,
-      }
-    )
-
-    console.log(
-      "API_ENDPOINT",
-      endpoint
-    )
-
     return await apiRequest({
       endpoint,
       method: "POST",
@@ -720,7 +698,9 @@ const chatbotService = {
 
   loadUserSessions,
 
-  clearSession,
+  deleteConversation,
+
+  clearAllSessions,
 
   resolveConversation,
 
@@ -728,12 +708,6 @@ const chatbotService = {
 
   verifyUserToken,
 
-  /*
-    REQUIRED FOR:
-    - BubbleChat
-    - Ticket escalation
-    - SDK integrations
-  */
   getUserToken,
 
   resolveRequesterId,

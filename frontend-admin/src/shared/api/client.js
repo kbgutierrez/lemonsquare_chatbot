@@ -2,8 +2,25 @@ import {
   API_CONFIG,
 } from "../config/sqlVariables"
 
+/* ========================================
+   CONFIG
+======================================== */
+
 const REQUEST_TIMEOUT =
   API_CONFIG.TIMEOUT || 30000
+
+const CACHE_DURATION =
+  1000 * 20
+
+/* ========================================
+   GLOBAL MEMORY CACHE
+======================================== */
+
+const responseCache =
+  new Map()
+
+const pendingRequests =
+  new Map()
 
 /* ========================================
    BUILD URL
@@ -31,6 +48,95 @@ export const buildApiUrl = (
 
   return url
 }
+
+/* ========================================
+   CACHE HELPERS
+======================================== */
+
+const buildCacheKey =
+  ({
+    endpoint,
+    method,
+    body,
+  }) => {
+
+    return JSON.stringify({
+      endpoint,
+      method,
+      body,
+    })
+  }
+
+const getCachedResponse =
+  (cacheKey) => {
+
+    const cached =
+      responseCache.get(
+        cacheKey
+      )
+
+    if (!cached) {
+      return null
+    }
+
+    const isExpired =
+      Date.now() -
+        cached.timestamp >
+      CACHE_DURATION
+
+    if (isExpired) {
+
+      responseCache.delete(
+        cacheKey
+      )
+
+      return null
+    }
+
+    return cached.data
+  }
+
+const setCachedResponse =
+  (
+    cacheKey,
+    data
+  ) => {
+
+    responseCache.set(
+      cacheKey,
+      {
+        data,
+        timestamp:
+          Date.now(),
+      }
+    )
+  }
+
+/* ========================================
+   INVALIDATE CACHE
+======================================== */
+
+export const invalidateApiCache =
+  (
+    partialKey = ""
+  ) => {
+
+    Array.from(
+      responseCache.keys()
+    ).forEach((key) => {
+
+      if (
+        key.includes(
+          partialKey
+        )
+      ) {
+
+        responseCache.delete(
+          key
+        )
+      }
+    })
+  }
 
 /* ========================================
    PARSE RESPONSE
@@ -96,7 +202,55 @@ const request =
     body = null,
     headers = {},
     isFormData = false,
+    skipCache = false,
   }) => {
+
+    const cacheKey =
+      buildCacheKey({
+        endpoint,
+        method,
+        body,
+      })
+
+    /* ========================================
+       CACHE HIT
+    ======================================== */
+
+    if (
+      method === "GET" &&
+      !skipCache
+    ) {
+
+      const cached =
+        getCachedResponse(
+          cacheKey
+        )
+
+      if (cached) {
+
+        console.log(
+          "CACHE_HIT",
+          endpoint
+        )
+
+        return cached
+      }
+    }
+
+    /* ========================================
+       DEDUPE REQUESTS
+    ======================================== */
+
+    if (
+      pendingRequests.has(
+        cacheKey
+      )
+    ) {
+
+      return pendingRequests.get(
+        cacheKey
+      )
+    }
 
     const controller =
       new AbortController()
@@ -108,116 +262,160 @@ const request =
 
       }, REQUEST_TIMEOUT)
 
-    try {
+    const requestPromise =
+      (async () => {
 
-      console.log(
-        "API_REQUEST",
-        {
-          method,
-          endpoint,
+        try {
+
+          console.log(
+            "API_REQUEST",
+            {
+              method,
+              endpoint,
+            }
+          )
+
+          const requestOptions =
+            {
+              method,
+
+              signal:
+                controller.signal,
+
+              headers:
+                isFormData
+                  ? headers
+                  : {
+                      ...API_CONFIG.HEADERS,
+                      ...headers,
+                    },
+            }
+
+          /* BODY */
+
+          if (body) {
+
+            requestOptions.body =
+              isFormData
+                ? body
+                : JSON.stringify(
+                    body
+                  )
+          }
+
+          const response =
+            await fetch(
+              endpoint,
+              requestOptions
+            )
+
+          console.log(
+            "API_STATUS",
+            response.status
+          )
+
+          const responseData =
+            await parseResponse(
+              response
+            )
+
+          /* HTTP ERROR */
+
+          if (
+            !response.ok
+          ) {
+
+            const errorMessage =
+              responseData?.error ||
+              responseData?.detail ||
+              responseData?.message ||
+              (
+                typeof responseData ===
+                "string"
+                  ? responseData
+                  : null
+              ) ||
+              `Request failed with status ${response.status}`
+
+            throw new Error(
+              errorMessage
+            )
+          }
+
+          /* ========================================
+             CACHE GET RESPONSES
+          ======================================== */
+
+          if (
+            method === "GET"
+          ) {
+
+            setCachedResponse(
+              cacheKey,
+              responseData
+            )
+          }
+
+          /* ========================================
+             INVALIDATE MUTATIONS
+          ======================================== */
+
+          if (
+            method !== "GET"
+          ) {
+
+            invalidateApiCache()
+          }
+
+          return responseData
+
+        } catch (error) {
+
+          /* TIMEOUT */
+
+          if (
+            error.name ===
+            "AbortError"
+          ) {
+
+            throw new Error(
+              "Request timeout. Backend took too long to respond."
+            )
+          }
+
+          /* NETWORK ERROR */
+
+          if (
+            error instanceof
+            TypeError
+          ) {
+
+            throw new Error(
+              "Unable to connect to backend server."
+            )
+          }
+
+          throw error
+
+        } finally {
+
+          clearTimeout(
+            timeout
+          )
+
+          pendingRequests.delete(
+            cacheKey
+          )
         }
-      )
 
-      const requestOptions = {
-        method,
+      })()
 
-        signal:
-          controller.signal,
+    pendingRequests.set(
+      cacheKey,
+      requestPromise
+    )
 
-        headers:
-          isFormData
-            ? headers
-            : {
-                ...API_CONFIG.HEADERS,
-                ...headers,
-              },
-      }
-
-      /* BODY */
-
-      if (body) {
-
-        requestOptions.body =
-          isFormData
-            ? body
-            : JSON.stringify(
-                body
-              )
-      }
-
-      const response =
-        await fetch(
-          endpoint,
-          requestOptions
-        )
-
-      console.log(
-        "API_STATUS",
-        response.status
-      )
-
-      const responseData =
-        await parseResponse(
-          response
-        )
-
-      /* HTTP ERROR */
-
-      if (!response.ok) {
-
-        const errorMessage =
-          responseData?.error ||
-          responseData?.detail ||
-          responseData?.message ||
-          (
-            typeof responseData ===
-            "string"
-              ? responseData
-              : null
-          ) ||
-          `Request failed with status ${response.status}`
-
-        throw new Error(
-          errorMessage
-        )
-      }
-
-      return responseData
-
-    } catch (error) {
-
-      /* TIMEOUT */
-
-      if (
-        error.name ===
-        "AbortError"
-      ) {
-
-        throw new Error(
-          "Request timeout. Backend took too long to respond."
-        )
-      }
-
-      /* NETWORK ERROR */
-
-      if (
-        error instanceof
-        TypeError
-      ) {
-
-        throw new Error(
-          "Unable to connect to backend server."
-        )
-      }
-
-      throw error
-
-    } finally {
-
-      clearTimeout(
-        timeout
-      )
-    }
+    return requestPromise
   }
 
 /* ========================================
@@ -225,57 +423,73 @@ const request =
 ======================================== */
 
 export const apiClient = {
-  get: (endpoint) =>
+  get: (
+    endpoint,
+    options = {}
+  ) =>
     request({
       endpoint,
       method: "GET",
+      ...options,
     }),
 
   post: (
     endpoint,
-    body
+    body,
+    options = {}
   ) =>
     request({
       endpoint,
       method: "POST",
       body,
+      ...options,
     }),
 
   put: (
     endpoint,
-    body
+    body,
+    options = {}
   ) =>
     request({
       endpoint,
       method: "PUT",
       body,
+      ...options,
     }),
 
   patch: (
     endpoint,
-    body
+    body,
+    options = {}
   ) =>
     request({
       endpoint,
       method: "PATCH",
       body,
+      ...options,
     }),
 
-  delete: (endpoint) =>
+  delete: (
+    endpoint,
+    options = {}
+  ) =>
     request({
       endpoint,
       method: "DELETE",
+      ...options,
     }),
 
   upload: (
     endpoint,
-    formData
+    formData,
+    options = {}
   ) =>
     request({
       endpoint,
       method: "POST",
       body: formData,
       isFormData: true,
+      ...options,
     }),
 }
 

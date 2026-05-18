@@ -6,9 +6,16 @@ import {
   FileText,
   MessagesSquare,
   Bug,
+  LayoutDashboard,
 } from "lucide-react"
 
 export const navigationItems = [
+  {
+    id: "analytics",
+    label: "Analytics",
+    icon: LayoutDashboard,
+  },
+
   {
     id: "upload",
     label: "Upload",

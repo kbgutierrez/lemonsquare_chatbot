@@ -7,6 +7,18 @@ import {
 } from "react"
 
 import {
+  API_CONFIG,
+} from "../../../../shared/config/sqlVariables"
+
+import useLiveQuery
+  from "../../../../shared/hooks/useLiveQuery"
+
+import {
+  invalidateCache,
+  setCachedData,
+} from "../../../../shared/cache/liveQueryCache"
+
+import {
   fetchManualEntries,
   createManualEntry,
   updateManualEntry,
@@ -21,6 +33,16 @@ const useManualEntries =
   () => {
 
     /* ========================================
+       CONSTANTS
+    ======================================== */
+
+    const CACHE_KEY =
+      "manual_entries"
+
+    const POLLING_INTERVAL =
+      API_CONFIG.POLLING_INTERVAL
+
+    /* ========================================
        REFS
     ======================================== */
 
@@ -33,12 +55,6 @@ const useManualEntries =
     /* ========================================
        STATE
     ======================================== */
-
-    const [items, setItems] =
-      useState([])
-
-    const [loading, setLoading] =
-      useState(true)
 
     const [submitting, setSubmitting] =
       useState(false)
@@ -89,81 +105,89 @@ const useManualEntries =
     }, [])
 
     /* ========================================
-       LOAD DATA
+       FETCHER
     ======================================== */
 
-    const loadData =
+    const safeFetchManualEntries =
       useCallback(
         async () => {
 
-          try {
+          const response =
+            await fetchManualEntries()
 
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(true)
-
-              setError("")
-            }
-
-            const data =
-              await fetchManualEntries()
-
-            console.log(
-              "MANUAL_ENTRIES_LOADED",
-              data
+          if (
+            Array.isArray(
+              response
             )
+          ) {
 
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            setItems(
-              Array.isArray(data)
-                ? data
-                : []
-            )
-
-          } catch (error) {
-
-            console.error(
-              "MANUAL_ENTRIES_ERROR",
-              error
-            )
-
-            if (
-              mountedRef.current
-            ) {
-
-              setError(
-                error.message ||
-                "Failed to load manual entries."
-              )
-
-              setItems([])
-            }
-
-          } finally {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(false)
-            }
+            return response
           }
+
+          /* SAFE OBJECT FALLBACK */
+
+          if (
+            Array.isArray(
+              response?.data
+            )
+          ) {
+
+            return response.data
+          }
+
+          console.warn(
+            "INVALID_MANUAL_ENTRIES_RESPONSE",
+            response
+          )
+
+          return []
         },
         []
       )
 
-    useEffect(() => {
+    /* ========================================
+       LIVE QUERY
+    ======================================== */
 
-      loadData()
+    const {
+      data: items,
 
-    }, [loadData])
+      loading,
+      refreshing,
+
+      refresh,
+    } = useLiveQuery({
+      queryKey:
+        CACHE_KEY,
+
+      queryFn:
+        safeFetchManualEntries,
+
+      initialData: [],
+
+      refetchInterval:
+        POLLING_INTERVAL,
+
+      staleWhileRevalidate:
+        true,
+    })
+
+    /* ========================================
+       SAFE ARRAY
+    ======================================== */
+
+    const safeItems =
+      useMemo(
+        () => {
+
+          return Array.isArray(
+            items
+          )
+            ? items
+            : []
+        },
+        [items]
+      )
 
     /* ========================================
        AUTO HIDE SUCCESS
@@ -226,7 +250,7 @@ const useManualEntries =
         const unique =
           [
             ...new Set(
-              items
+              safeItems
                 .map(
                   (item) =>
                     item.category
@@ -240,7 +264,7 @@ const useManualEntries =
           ...unique,
         ]
 
-      }, [items])
+      }, [safeItems])
 
     /* ========================================
        FILTERED ITEMS
@@ -252,7 +276,7 @@ const useManualEntries =
         const query =
           search.toLowerCase()
 
-        return items.filter(
+        return safeItems.filter(
           (item) => {
 
             const searchable =
@@ -284,7 +308,7 @@ const useManualEntries =
         )
 
       }, [
-        items,
+        safeItems,
         search,
         activeCategory,
       ])
@@ -352,9 +376,30 @@ const useManualEntries =
 
             setSubmitting(true)
 
-            console.log(
-              "CREATE_ENTRY_FORM",
-              form
+            const optimistic =
+              {
+                id:
+                  `temp-${Date.now()}`,
+
+                title:
+                  form.title,
+
+                content:
+                  form.content,
+
+                category:
+                  form.category ||
+                  "General",
+              }
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              [
+                optimistic,
+                ...safeItems,
+              ]
             )
 
             const response =
@@ -362,12 +407,11 @@ const useManualEntries =
                 form
               )
 
-            console.log(
-              "CREATE_ENTRY_RESPONSE",
-              response
+            invalidateCache(
+              CACHE_KEY
             )
 
-            await loadData()
+            await refresh()
 
             if (
               mountedRef.current
@@ -393,6 +437,12 @@ const useManualEntries =
               error
             )
 
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
+
             if (
               mountedRef.current
             ) {
@@ -413,7 +463,10 @@ const useManualEntries =
             }
           }
         },
-        [loadData]
+        [
+          safeItems,
+          refresh,
+        ]
       )
 
     /* ========================================
@@ -430,42 +483,56 @@ const useManualEntries =
 
           setError("")
 
-          if (
-            entryId === undefined ||
-            entryId === null ||
-            entryId === ""
-          ) {
-
-            setError(
-              "Missing manual entry ID."
-            )
-
-            return
-          }
+          const previous =
+            [...safeItems]
 
           try {
 
             setSubmitting(true)
 
-            const response =
-              await updateManualEntry(
-                entryId,
-                form
+            const optimistic =
+              safeItems.map(
+                (item) => {
+
+                  if (
+                    item.id ===
+                    entryId
+                  ) {
+
+                    return {
+                      ...item,
+                      ...form,
+                    }
+                  }
+
+                  return item
+                }
               )
 
-            console.log(
-              "UPDATE_ENTRY_RESPONSE",
-              response
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
             )
 
-            await loadData()
+            await updateManualEntry(
+              entryId,
+              form
+            )
+
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
 
             if (
               mountedRef.current
             ) {
 
               setSuccessMessage(
-                "✅ Entry updated successfully"
+                "Entry updated successfully"
               )
 
               onFinish?.()
@@ -476,6 +543,13 @@ const useManualEntries =
             console.error(
               "UPDATE_ENTRY_ERROR",
               error
+            )
+
+            /* ROLLBACK */
+
+            setCachedData(
+              CACHE_KEY,
+              previous
             )
 
             if (
@@ -498,7 +572,10 @@ const useManualEntries =
             }
           }
         },
-        [loadData]
+        [
+          safeItems,
+          refresh,
+        ]
       )
 
     /* ========================================
@@ -513,45 +590,36 @@ const useManualEntries =
 
           setError("")
 
-          if (
-            entryId === undefined ||
-            entryId === null ||
-            entryId === ""
-          ) {
-
-            setError(
-              "Missing manual entry ID."
-            )
-
-            return
-          }
-
-          const confirmed =
-            window.confirm(
-              "Delete this manual entry?"
-            )
-
-          if (
-            !confirmed
-          ) {
-            return
-          }
+          const previous =
+            [...safeItems]
 
           try {
 
             setSubmitting(true)
 
-            const response =
-              await deleteManualEntry(
-                entryId
+            const optimistic =
+              safeItems.filter(
+                (item) =>
+                  item.id !==
+                  entryId
               )
 
-            console.log(
-              "DELETE_ENTRY_RESPONSE",
-              response
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
             )
 
-            await loadData()
+            await deleteManualEntry(
+              entryId
+            )
+
+            invalidateCache(
+              CACHE_KEY
+            )
+
+            await refresh()
 
             if (
               mountedRef.current
@@ -567,6 +635,13 @@ const useManualEntries =
             console.error(
               "DELETE_ENTRY_ERROR",
               error
+            )
+
+            /* ROLLBACK */
+
+            setCachedData(
+              CACHE_KEY,
+              previous
             )
 
             if (
@@ -589,13 +664,21 @@ const useManualEntries =
             }
           }
         },
-        [loadData]
+        [
+          safeItems,
+          refresh,
+        ]
       )
 
     return {
-      items,
+      items:
+        safeItems,
+
       loading,
+      refreshing,
+
       submitting,
+
       error,
       successMessage,
 
@@ -620,8 +703,9 @@ const useManualEntries =
       setError,
 
       reloadEntries:
-        loadData,
+        refresh,
     }
+
   }
 
 export default useManualEntries
