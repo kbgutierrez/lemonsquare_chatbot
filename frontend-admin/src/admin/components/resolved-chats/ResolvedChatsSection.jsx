@@ -39,24 +39,35 @@ const ResolvedChatsSection =
     } =
       useResolvedChats()
 
+    const safeItems =
+      Array.isArray(items)
+        ? items
+        : []
+
     const [search, setSearch] =
       useState("")
 
     const [page, setPage] =
       useState(1)
 
-    const [selectedItem,
-      setSelectedItem] =
-      useState(null)
+    const [
+      selectedItem,
+      setSelectedItem,
+    ] = useState(null)
 
-    const [modalOpen,
-      setModalOpen] =
-      useState(false)
+    const [
+      modalOpen,
+      setModalOpen,
+    ] = useState(false)
 
     const filtered =
       useMemo(() => {
 
-        return items.filter(
+        const query =
+          String(search || "")
+            .toLowerCase()
+
+        return safeItems.filter(
           (item) => {
 
             const content =
@@ -71,9 +82,6 @@ const ResolvedChatsSection =
                 ""
               ).toLowerCase()
 
-            const query =
-              search.toLowerCase()
-
             return (
               content.includes(
                 query
@@ -85,12 +93,18 @@ const ResolvedChatsSection =
           }
         )
 
-      }, [items, search])
+      }, [
+        safeItems,
+        search,
+      ])
 
     const totalPages =
-      Math.ceil(
-        filtered.length /
-          ITEMS_PER_PAGE
+      Math.max(
+        1,
+        Math.ceil(
+          filtered.length /
+            ITEMS_PER_PAGE
+        )
       )
 
     const paginatedItems =
@@ -203,17 +217,22 @@ const ResolvedChatsSection =
                     ) => (
                       <ResolvedChatCard
                         key={
-                          item.id
+                          item?.id ||
+                          index
                         }
+
                         item={
                           item
                         }
+
                         index={
                           index
                         }
+
                         onEdit={
                           handleEdit
                         }
+
                         onDelete={
                           handleDelete
                         }
@@ -228,9 +247,11 @@ const ResolvedChatsSection =
 
           <ResolvedChatsPagination
             page={page}
+
             setPage={
               setPage
             }
+
             totalPages={
               totalPages
             }
@@ -239,12 +260,15 @@ const ResolvedChatsSection =
 
         <ResolvedChatEditModal
           open={modalOpen}
+
           item={selectedItem}
+
           onClose={() =>
             setModalOpen(
               false
             )
           }
+
           onSave={
             updateChat
           }

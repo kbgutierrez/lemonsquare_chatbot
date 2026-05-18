@@ -13,7 +13,16 @@ import {
 import aiSettingsService
   from "../services/aiSettingsService"
 
+import {
+  getCachedData,
+  setCachedData,
+  subscribeCache,
+} from "../../shared/cache/liveQueryCache"
+
 const ITEMS_PER_PAGE = 5
+
+const UPLOAD_CACHE_KEY =
+  "global_upload_queue"
 
 export const useFileUpload =
   () => {
@@ -28,18 +37,38 @@ export const useFileUpload =
     const uploadLockRef =
       useRef(false)
 
+    const mountedRef =
+      useRef(true)
+
+    /* =========================================
+       INITIAL CACHE HYDRATION
+    ========================================= */
+
+    const initialUploads =
+      getCachedData(
+        UPLOAD_CACHE_KEY
+      ) || []
+
     /* =========================================
        STATE
     ========================================= */
 
     const [uploadedFiles, setUploadedFiles] =
-      useState([])
+      useState(
+        initialUploads
+      )
 
     const [currentPage, setCurrentPage] =
       useState(1)
 
     const [hasPendingUploads, setHasPendingUploads] =
-      useState(false)
+      useState(() =>
+        initialUploads.some(
+          (file) =>
+            file.statusType ===
+            "pending"
+        )
+      )
 
     const [
       selectedCategory,
@@ -48,6 +77,73 @@ export const useFileUpload =
 
     const [categories, setCategories] =
       useState([])
+
+    /* =========================================
+       CACHE SYNC
+    ========================================= */
+
+    const syncCache =
+      useCallback(
+        (files) => {
+
+          setCachedData(
+            UPLOAD_CACHE_KEY,
+            files
+          )
+        },
+        []
+      )
+
+    /* =========================================
+       CACHE SUBSCRIPTION
+    ========================================= */
+
+    useEffect(() => {
+
+      mountedRef.current =
+        true
+
+      const unsubscribe =
+        subscribeCache(
+          UPLOAD_CACHE_KEY,
+          (updatedFiles) => {
+
+            if (
+              !mountedRef.current
+            ) {
+              return
+            }
+
+            const safe =
+              Array.isArray(
+                updatedFiles
+              )
+                ? updatedFiles
+                : []
+
+            setUploadedFiles(
+              safe
+            )
+
+            setHasPendingUploads(
+              safe.some(
+                (file) =>
+                  file.statusType ===
+                  "pending"
+              )
+            )
+          }
+        )
+
+      return () => {
+
+        mountedRef.current =
+          false
+
+        unsubscribe?.()
+      }
+
+    }, [])
 
     /* =========================================
        LOAD CATEGORIES
@@ -115,19 +211,28 @@ export const useFileUpload =
         ) => {
 
           setUploadedFiles(
-            (prev) =>
-              prev.map(
-                (file) =>
-                  file.id === id
-                    ? {
-                        ...file,
-                        ...updates,
-                      }
-                    : file
+            (prev) => {
+
+              const updated =
+                prev.map(
+                  (file) =>
+                    file.id === id
+                      ? {
+                          ...file,
+                          ...updates,
+                        }
+                      : file
+                )
+
+              syncCache(
+                updated
               )
+
+              return updated
+            }
           )
         },
-        []
+        [syncCache]
       )
 
     /* =========================================
@@ -162,13 +267,15 @@ export const useFileUpload =
 
           setUploadedFiles([])
 
+          syncCache([])
+
           setHasPendingUploads(
             false
           )
 
           setCurrentPage(1)
         },
-        []
+        [syncCache]
       )
 
     /* =========================================
@@ -298,6 +405,8 @@ export const useFileUpload =
 
                 refreshPendingState(prev)
 
+                syncCache(prev)
+
                 return prev
               }
             )
@@ -308,6 +417,7 @@ export const useFileUpload =
           uploadFile,
           updateFile,
           refreshPendingState,
+          syncCache,
         ]
       )
 
@@ -406,6 +516,10 @@ export const useFileUpload =
                 updated
               )
 
+              syncCache(
+                updated
+              )
+
               return updated
             }
           )
@@ -414,6 +528,7 @@ export const useFileUpload =
           formatSize,
           refreshPendingState,
           selectedCategory,
+          syncCache,
         ]
       )
 
@@ -462,11 +577,18 @@ export const useFileUpload =
                 updated
               )
 
+              syncCache(
+                updated
+              )
+
               return updated
             }
           )
         },
-        [refreshPendingState]
+        [
+          refreshPendingState,
+          syncCache,
+        ]
       )
 
     const showTable =

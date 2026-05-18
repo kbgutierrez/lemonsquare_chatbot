@@ -16,14 +16,22 @@ export const useHorizontalDragScroll =
 
       let isDown = false
 
+      let isDragging = false
+
       let startX = 0
 
       let scrollLeft = 0
+
+      /* ========================================
+         MOUSE DOWN
+      ======================================== */
 
       const handleMouseDown =
         (event) => {
 
           isDown = true
+
+          isDragging = false
 
           startX =
             event.pageX -
@@ -33,17 +41,41 @@ export const useHorizontalDragScroll =
             container.scrollLeft
         }
 
+      /* ========================================
+         MOUSE LEAVE
+      ======================================== */
+
       const handleMouseLeave =
         () => {
 
           isDown = false
         }
 
+      /* ========================================
+         MOUSE UP
+      ======================================== */
+
       const handleMouseUp =
         () => {
 
           isDown = false
+
+          /*
+            Small timeout prevents
+            immediate click firing
+            after drag release.
+          */
+
+          setTimeout(() => {
+
+            isDragging = false
+
+          }, 0)
         }
+
+      /* ========================================
+         MOUSE MOVE
+      ======================================== */
 
       const handleMouseMove =
         (event) => {
@@ -52,8 +84,6 @@ export const useHorizontalDragScroll =
             return
           }
 
-          event.preventDefault()
-
           const x =
             event.pageX -
             container.offsetLeft
@@ -61,9 +91,47 @@ export const useHorizontalDragScroll =
           const walk =
             (x - startX) * 1.2
 
+          /*
+            Only activate drag mode
+            after minimum movement.
+          */
+
+          if (
+            Math.abs(walk) > 6
+          ) {
+
+            isDragging = true
+          }
+
+          if (!isDragging) {
+            return
+          }
+
+          event.preventDefault()
+
           container.scrollLeft =
             scrollLeft - walk
         }
+
+      /* ========================================
+         PREVENT CLICK AFTER DRAG
+      ======================================== */
+
+      const handleClickCapture =
+        (event) => {
+
+          if (!isDragging) {
+            return
+          }
+
+          event.preventDefault()
+
+          event.stopPropagation()
+        }
+
+      /* ========================================
+         EVENTS
+      ======================================== */
 
       container.addEventListener(
         "mousedown",
@@ -85,6 +153,16 @@ export const useHorizontalDragScroll =
         handleMouseMove
       )
 
+      container.addEventListener(
+        "click",
+        handleClickCapture,
+        true
+      )
+
+      /* ========================================
+         CLEANUP
+      ======================================== */
+
       return () => {
 
         container.removeEventListener(
@@ -105,6 +183,12 @@ export const useHorizontalDragScroll =
         container.removeEventListener(
           "mousemove",
           handleMouseMove
+        )
+
+        container.removeEventListener(
+          "click",
+          handleClickCapture,
+          true
         )
       }
 

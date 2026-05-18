@@ -9,16 +9,26 @@ import {
 import ticketAdminService
   from "../services/ticketAdminService"
 
+import useLiveQuery
+  from "../../shared/hooks/useLiveQuery"
+
+import {
+  invalidateCache,
+  setCachedData,
+} from "../../shared/cache/liveQueryCache"
+
 const ITEMS_PER_PAGE = 10
 
 const SEARCH_DEBOUNCE = 400
 
+const CACHE_KEY =
+  "tickets_cache"
+
+const POLL_INTERVAL =
+  15000
+
 export const useTickets =
   () => {
-
-    /* ========================================
-       REFS
-    ======================================== */
 
     const mountedRef =
       useRef(true)
@@ -26,17 +36,10 @@ export const useTickets =
     const debounceRef =
       useRef(null)
 
-    /* ========================================
-       STATE
-    ======================================== */
-
-    const [tickets, setTickets] =
-      useState([])
-
-    const [loading, setLoading] =
-      useState(true)
-
     const [search, setSearch] =
+      useState("")
+
+    const [debouncedSearch, setDebouncedSearch] =
       useState("")
 
     const [currentPage, setCurrentPage] =
@@ -56,137 +59,134 @@ export const useTickets =
         mountedRef.current =
           false
 
-        if (
+        clearTimeout(
           debounceRef.current
-        ) {
-
-          clearTimeout(
-            debounceRef.current
-          )
-        }
+        )
       }
 
     }, [])
 
     /* ========================================
-       FETCH TICKETS
-    ======================================== */
-
-    const fetchTickets =
-      useCallback(
-        async (
-          searchValue =
-            ""
-        ) => {
-
-          try {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(
-                true
-              )
-            }
-
-            const data =
-              await ticketAdminService.getTickets({
-                search:
-                  searchValue,
-              })
-
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            const normalized =
-              Array.isArray(
-                data
-              )
-                ? data
-                : []
-
-            setTickets(
-              normalized
-            )
-
-          } catch (error) {
-
-            console.error(
-              "FETCH_TICKETS_ERROR",
-              error
-            )
-
-            if (
-              mountedRef.current
-            ) {
-
-              setTickets([])
-            }
-
-          } finally {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setLoading(
-                false
-              )
-            }
-          }
-        },
-        []
-      )
-
-    /* ========================================
-       SEARCH EFFECT
+       SEARCH DEBOUNCE
     ======================================== */
 
     useEffect(() => {
 
       setCurrentPage(1)
 
-      if (
+      clearTimeout(
         debounceRef.current
-      ) {
-
-        clearTimeout(
-          debounceRef.current
-        )
-      }
+      )
 
       debounceRef.current =
         setTimeout(() => {
 
-          fetchTickets(
-            search
-          )
+          if (
+            mountedRef.current
+          ) {
+
+            setDebouncedSearch(
+              search
+            )
+          }
 
         }, SEARCH_DEBOUNCE)
 
-      return () => {
-
-        if (
-          debounceRef.current
-        ) {
-
-          clearTimeout(
-            debounceRef.current
-          )
-        }
-      }
-
-    }, [
-      search,
-      fetchTickets,
-    ])
+    }, [search])
 
     /* ========================================
-       BLOCK TICKET
+       QUERY KEY
+    ======================================== */
+
+    const queryKey =
+      `${CACHE_KEY}_${debouncedSearch}`
+
+    /* ========================================
+       FETCHER
+    ======================================== */
+
+    const fetchTickets =
+      useCallback(
+        async () => {
+
+          const response =
+            await ticketAdminService.getTickets({
+              search:
+                debouncedSearch,
+            })
+
+          if (
+            Array.isArray(
+              response
+            )
+          ) {
+
+            return response
+          }
+
+          /* SAFE OBJECT FALLBACK */
+
+          if (
+            Array.isArray(
+              response?.data
+            )
+          ) {
+
+            return response.data
+          }
+
+          console.warn(
+            "INVALID_TICKETS_RESPONSE",
+            response
+          )
+
+          return []
+        },
+        [debouncedSearch]
+      )
+
+    /* ========================================
+       LIVE QUERY
+    ======================================== */
+
+    const {
+      data: tickets,
+      loading,
+      refresh,
+    } = useLiveQuery({
+      queryKey,
+
+      queryFn:
+        fetchTickets,
+
+      initialData: [],
+
+      refetchInterval:
+        POLL_INTERVAL,
+
+      staleWhileRevalidate:
+        true,
+    })
+
+    /* ========================================
+       SAFE ARRAY
+    ======================================== */
+
+    const safeTickets =
+      useMemo(
+        () => {
+
+          return Array.isArray(
+            tickets
+          )
+            ? tickets
+            : []
+        },
+        [tickets]
+      )
+
+    /* ========================================
+       TOGGLE STATUS
     ======================================== */
 
     const blockTicket =
@@ -195,68 +195,115 @@ export const useTickets =
           ticketNumber
         ) => {
 
-          const previousTickets =
-            [...tickets]
+          const previous =
+            [...safeTickets]
+
+          const target =
+            safeTickets.find(
+              (
+                ticket
+              ) =>
+                ticket.ticket_number ===
+                ticketNumber
+            )
+
+          if (!target) {
+            return
+          }
+
+          const nextStatus =
+            !target.is_blacklisted
+
+          const optimistic =
+            safeTickets.map(
+              (
+                ticket
+              ) => {
+
+                if (
+                  ticket.ticket_number ===
+                  ticketNumber
+                ) {
+
+                  return {
+                    ...ticket,
+
+                    is_blacklisted:
+                      nextStatus,
+                  }
+                }
+
+                return ticket
+              }
+            )
+
+          /* OPTIMISTIC CACHE UPDATE */
+
+          setCachedData(
+            queryKey,
+            optimistic
+          )
 
           try {
 
-            console.log(
-              "BLOCK_TICKET",
+            await ticketAdminService.toggleTicketWhitelist(
               ticketNumber
             )
 
-            /* OPTIMISTIC UPDATE */
-
-            setTickets(
-              (prev) =>
-                prev.map(
-                  (
-                    ticket
-                  ) => {
-
-                    if (
-                      ticket.ticket_number ===
-                      ticketNumber
-                    ) {
-
-                      return {
-                        ...ticket,
-
-                        is_blacklisted:
-                          true,
-                      }
-                    }
-
-                    return ticket
-                  }
-                )
+            invalidateCache(
+              queryKey
             )
 
-            await ticketAdminService.deleteTicket(
-              ticketNumber
-            )
+            await refresh()
 
           } catch (error) {
 
             console.error(
-              "BLOCK_TICKET_ERROR",
+              "TOGGLE_TICKET_ERROR",
               error
             )
 
             /* ROLLBACK */
 
-            if (
-              mountedRef.current
-            ) {
-
-              setTickets(
-                previousTickets
-              )
-            }
+            setCachedData(
+              queryKey,
+              previous
+            )
           }
         },
-        [tickets]
+        [
+          safeTickets,
+          queryKey,
+          refresh,
+        ]
       )
+
+    /* ========================================
+       WINDOW FOCUS REFRESH
+    ======================================== */
+
+    useEffect(() => {
+
+      const handleFocus =
+        () => {
+
+          refresh()
+        }
+
+      window.addEventListener(
+        "focus",
+        handleFocus
+      )
+
+      return () => {
+
+        window.removeEventListener(
+          "focus",
+          handleFocus
+        )
+      }
+
+    }, [refresh])
 
     /* ========================================
        PAGINATION
@@ -268,11 +315,11 @@ export const useTickets =
           Math.max(
             1,
             Math.ceil(
-              tickets.length /
+              safeTickets.length /
               ITEMS_PER_PAGE
             )
           ),
-        [tickets]
+        [safeTickets]
       )
 
     const paginatedTickets =
@@ -286,7 +333,7 @@ export const useTickets =
             ) *
             ITEMS_PER_PAGE
 
-          return tickets.slice(
+          return safeTickets.slice(
             start,
             start +
               ITEMS_PER_PAGE
@@ -294,7 +341,7 @@ export const useTickets =
 
         },
         [
-          tickets,
+          safeTickets,
           currentPage,
         ]
       )
@@ -305,7 +352,8 @@ export const useTickets =
       search,
       setSearch,
 
-      tickets,
+      tickets:
+        safeTickets,
 
       paginatedTickets,
 
@@ -315,6 +363,9 @@ export const useTickets =
       totalPages,
 
       blockTicket,
+
+      refreshTickets:
+        refresh,
     }
 
   }
