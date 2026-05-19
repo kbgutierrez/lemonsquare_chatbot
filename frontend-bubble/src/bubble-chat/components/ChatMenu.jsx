@@ -7,7 +7,6 @@ import {
 import {
   EllipsisVertical,
   History,
-  MessageSquare,
   Plus,
   Ticket,
   Phone,
@@ -15,6 +14,9 @@ import {
   Info,
   Lock,
 } from "lucide-react"
+
+import menuBarBackground
+  from "../../assets/menubar-background.png"
 
 const options = [
   {
@@ -153,327 +155,283 @@ const ChatMenu = ({
       ref={menuRef}
       className="
         relative
-        z-[200]
+        z-[9999]
       "
     >
-      {/* BUTTON */}
+
+      {/* ====================================
+          BUTTON
+      ==================================== */}
+
       <button
         type="button"
-
         aria-label="Chat menu"
-
         onClick={() =>
-          setOpen(
-            (prev) => !prev
-          )
+          setOpen(prev => !prev)
         }
-
         className={`
           flex
-          h-10
-          w-10
+          h-8
+          w-8
           items-center
           justify-center
 
-          rounded-xl
+          rounded-lg
 
-          text-violet-700
+          text-white
 
           transition-all
-          duration-300
+          duration-200
 
-          hover:bg-violet-100/70
-          hover:scale-105
-
+          hover:bg-white/12
           active:scale-95
 
           ${
             open
-              ? `
-                rotate-90
-
-                bg-violet-100
-              `
+              ? "bg-white/14 rotate-90"
               : ""
           }
         `}
       >
         <EllipsisVertical
           className="
-            h-5
-            w-5
+            h-4.5
+            w-4.5
           "
         />
       </button>
 
-      {/* DROPDOWN */}
+      {/* ====================================
+          DROPDOWN
+      ==================================== */}
+
       <div
         className={`
           absolute
-          right-0
-          top-12
+          right-1
+          top-10
 
-          z-[250]
+          z-[10000]
 
-          w-72
-          max-w-[calc(100vw-24px)]
+          w-[210px]
 
           origin-top-right
 
           overflow-hidden
 
-          rounded-[24px]
+          rounded-2xl
 
           border
-          border-violet-100/80
+          border-emerald-200/60
 
-          bg-white/95
+          bg-white/12
 
-          shadow-[0_25px_70px_rgba(139,92,246,0.22)]
+          shadow-[0_18px_40px_rgba(16,24,40,0.18)]
 
-          backdrop-blur-2xl
+          backdrop-blur-md
 
           transition-all
-          duration-300
-          ease-out
+          duration-200
 
           ${
             open
               ? `
                 pointer-events-auto
-
                 translate-y-0
                 scale-100
                 opacity-100
               `
               : `
                 pointer-events-none
-
                 -translate-y-2
-                scale-95
+                scale-[0.97]
                 opacity-0
               `
           }
         `}
       >
-        {/* BACKGROUND GLOW */}
+
+        {/* ====================================
+            BACKGROUND IMAGE (SOFTENED)
+        ==================================== */}
+
         <div
           className="
             pointer-events-none
-
             absolute
             inset-0
-
             overflow-hidden
           "
         >
+
+          <img
+            src={menuBarBackground}
+            alt=""
+            draggable={false}
+            className="
+              absolute
+              left-1/2
+              top-1/2
+              h-[115%]
+              w-[115%]
+              -translate-x-1/2
+              -translate-y-1/2
+              object-cover
+              opacity-[0.85]
+              blur-[0.6px]
+            "
+          />
+
           <div
             className="
               absolute
-              right-[-40px]
-              top-[-40px]
+              inset-0
 
-              h-36
-              w-36
-
-              rounded-full
-
-              bg-violet-200/20
-
-              blur-3xl
+              bg-gradient-to-b
+              from-white/20
+              via-white/10
+              to-white/25
             "
           />
+
+          <div
+            className="
+              absolute
+              inset-0
+              ring-1
+              ring-white/15
+              rounded-2xl
+            "
+          />
+
         </div>
 
-        {/* HEADER */}
+        {/* ====================================
+            HEADER (SIMPLIFIED)
+        ==================================== */}
+
         <div
           className="
             relative
             z-10
 
+            px-3
+            py-2
+
             border-b
-            border-violet-100/80
-
-            bg-gradient-to-r
-            from-violet-50/90
-            to-purple-50/70
-
-            px-4
-            py-3
+            border-white/15
           "
         >
+
           <p
             className="
               text-[10px]
               font-semibold
               uppercase
-
-              tracking-[0.22em]
-
-              text-violet-600
+              tracking-[0.18em]
+              text-emerald-950
             "
           >
             Chat Options
           </p>
+
         </div>
 
-        {/* OPTIONS */}
+        {/* ====================================
+            OPTIONS
+        ==================================== */}
+
         <div
           className="
             relative
             z-10
-
-            p-2
+            p-1.5
           "
         >
-          {options.map(
-            (
-              {
-                id,
-                label,
-                icon: Icon,
-              }
-            ) => {
 
-              const isResolveOption =
-                id === "resolve"
+          {options.map(
+            ({
+              id,
+              label,
+              icon: Icon,
+            }) => {
 
               const isDisabled =
-                resolved &&
-                isResolveOption
+                resolved && id === "resolve"
 
               return (
                 <button
                   key={id}
-
                   type="button"
-
-                  disabled={
-                    isDisabled
-                  }
-
-                  onClick={() =>
-                    handleSelect(id)
-                  }
-
+                  disabled={isDisabled}
+                  onClick={() => handleSelect(id)}
                   className={`
                     group
+                    mb-1
 
                     flex
                     w-full
                     items-center
-                    gap-3
+                    gap-2.5
 
-                    rounded-2xl
+                    rounded-xl
 
-                    px-3
-                    py-3
+                    px-2.5
+                    py-2
 
                     text-left
-                    text-sm
 
                     transition-all
-                    duration-200
+                    duration-150
 
                     ${
                       isDisabled
-                        ? `
-                          cursor-not-allowed
-                          opacity-60
-                        `
-                        : `
-                          text-slate-700
-
-                          hover:bg-violet-50
-                          hover:translate-x-1
-                        `
+                        ? "opacity-60 cursor-not-allowed"
+                        : "hover:bg-white/20 active:scale-[0.99]"
                     }
                   `}
                 >
+
                   {/* ICON */}
+
                   <div
-                    className={`
+                    className="
                       flex
-                      h-10
-                      w-10
-                      shrink-0
+                      h-7
+                      w-7
                       items-center
                       justify-center
-
-                      rounded-2xl
-
-                      transition-all
-                      duration-200
-
-                      ${
-                        isDisabled
-                          ? `
-                            bg-emerald-100
-                          `
-                          : `
-                            bg-violet-100
-
-                            group-hover:bg-violet-200
-                          `
-                      }
-                    `}
+                      rounded-lg
+                      bg-white/15
+                    "
                   >
                     {isDisabled ? (
-                      <Lock
-                        className="
-                          h-4
-                          w-4
-
-                          text-emerald-700
-                        "
-                      />
+                      <Lock className="h-3.5 w-3.5 text-emerald-950" />
                     ) : (
-                      <Icon
-                        className="
-                          h-4
-                          w-4
-
-                          text-violet-700
-                        "
-                      />
+                      <Icon className="h-3.5 w-3.5 text-emerald-950" />
                     )}
                   </div>
 
                   {/* TEXT */}
-                  <div
+
+                  <span
                     className="
-                      flex
-                      min-w-0
-                      flex-col
+                      text-[12px]
+                      font-medium
+                      text-emerald-950
+                      truncate
                     "
                   >
-                    <span
-                      className="
-                        truncate
+                    {label}
+                  </span>
 
-                        font-medium
-                      "
-                    >
-                      {label}
-                    </span>
-
-                    {isDisabled && (
-                      <span
-                        className="
-                          text-[10px]
-
-                          text-emerald-600
-                        "
-                      >
-                        Already resolved
-                      </span>
-                    )}
-                  </div>
                 </button>
               )
             }
           )}
+
         </div>
+
       </div>
     </div>
   )

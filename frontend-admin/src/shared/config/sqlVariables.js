@@ -1,29 +1,19 @@
 /*
   CENTRALIZED APP CONFIG
 
-  Future-safe for:
-  - SQL Server
-  - REST API
-  - WebSockets
-  - RAG
-  - AI Models
-  - Admin Dashboard
+  Production-safe configuration layer
 */
 
-/* ========================================
-   ENVIRONMENT
-======================================== */
-
 const ENV = {
+  // 🚨 IMPORTANT FIX:
+  // REMOVE /api from BASE URL to prevent /api/api duplication
   API_BASE_URL:
-    import.meta.env
-      .VITE_API_BASE_URL ||
-    "/api",
+    import.meta.env.VITE_API_BASE_URL ||
+    "http://localhost:8000", // ✅ FIXED (NO /api HERE)
 
   WS_BASE_URL:
-    import.meta.env
-      .VITE_WS_BASE_URL ||
-    "/ws",
+    import.meta.env.VITE_WS_BASE_URL ||
+    "ws://localhost:8000/ws",
 
   APP_ENV:
     import.meta.env.MODE ||
@@ -35,40 +25,69 @@ const ENV = {
 ======================================== */
 
 export const API_CONFIG = {
-  BASE_URL:
-    ENV.API_BASE_URL.replace(
-      /\/$/,
-      ""
-    ),
+  BASE_URL: ENV.API_BASE_URL.replace(/\/$/, ""),
 
   TIMEOUT: 30000,
 
-  /* ========================================
-     REALTIME / CACHE
-  ======================================== */
+  CACHE_DURATION: 1000 * 20,
+  POLLING_INTERVAL: 1000 * 15,
 
-  CACHE_DURATION:
-    1000 * 20,
-
-  POLLING_INTERVAL:
-    1000 * 15,
-
-  SILENT_REFRESH:
-    true,
-
-  ENABLE_CACHE:
-    true,
-
-  ENABLE_REQUEST_DEDUPE:
-    true,
-
-  ENABLE_BACKGROUND_SYNC:
-    true,
+  SILENT_REFRESH: true,
+  ENABLE_CACHE: true,
+  ENABLE_REQUEST_DEDUPE: true,
+  ENABLE_BACKGROUND_SYNC: true,
 
   HEADERS: {
-    "Content-Type":
-      "application/json",
+    "Content-Type": "application/json",
   },
+}
+
+/* ========================================
+   API ENDPOINTS
+======================================== */
+
+export const API_ENDPOINTS = {
+  /* AUTH */
+  AUTH_VERIFY: "/auth/verify",
+
+  // Admin login (FastAPI proxy → /api/admin/login)
+  LSBIZPORTAL_LOGIN: "/admin/login",
+
+  /* ANALYTICS */
+  ANALYTICS_SUMMARY: "/analytics/summary",
+
+  /* DOCUMENTS */
+  DOCUMENTS: "/documents",
+  DOCUMENT_UPLOAD: "/documents/upload",
+  DOCUMENT_DELETE: "/documents/:documentId",
+  DOCUMENT_DEBUG_PIPELINE: "/documents/debug/full-pipeline",
+  DOCUMENT_MANUAL_ENTRY: "/documents/manual",
+  DOCUMENT_MANUAL_ENTRY_UPDATE: "/documents/manual/:entryId",
+  DOCUMENT_MANUAL_ENTRY_DELETE: "/documents/manual/:entryId",
+
+  /* KNOWLEDGE */
+  KNOWLEDGE_EXPLORE: "/knowledge/explore",
+
+  /* CHAT */
+  CHAT_SEND: "/chat",
+  CHAT_HISTORY: "/chat/history/:sessionId",
+  CHAT_USER_SESSIONS: "/chat/user-sessions/:requesterId",
+  CHAT_RESOLVE: "/chat/resolve/:sessionId",
+  CHAT_DELETE_SESSION: "/chat/sessions/:sessionId",
+  CHAT_CLEAR_ALL: "/chat/users/:requesterId/sessions",
+
+  /* SELF KNOWLEDGE */
+  SELF_KNOWLEDGE_UPDATE: "/self_knowledge/chats/:sessionId",
+  SELF_KNOWLEDGE_DELETE: "/self_knowledge/chats/:sessionId",
+
+  /* TICKETS */
+  TICKETS: "/tickets",
+  TICKET_DELETE: "/tickets/:ticketNumber",
+  TICKET_SYNC: "/tickets/sync",
+  TICKET_WHITELIST: "/tickets/:ticketNumber/whitelist",
+
+  /* AI SETTINGS */
+  AI_SETTINGS: "/settings",
 }
 
 /* ========================================
@@ -77,36 +96,10 @@ export const API_CONFIG = {
 
 export const WS_CONFIG = {
   BASE_URL:
-    ENV.WS_BASE_URL.replace(
-      /\/$/,
-      ""
-    ),
+    ENV.WS_BASE_URL.replace(/\/$/, ""),
 
-  RECONNECT_INTERVAL:
-    3000,
-
+  RECONNECT_INTERVAL: 3000,
   MAX_RETRIES: 10,
-}
-
-/* ========================================
-   SQL TABLES
-======================================== */
-
-export const SQL_TABLES = {
-  CHAT_SESSION:
-    "ChatSession",
-
-  CHAT_MESSAGE:
-    "ChatMessage",
-
-  KNOWLEDGE_FILE:
-    "KnowledgeFile",
-
-  KNOWLEDGE_CATEGORY:
-    "KnowledgeCategory",
-
-  AI_SETTINGS:
-    "AIChatbot_Settings",
 }
 
 /* ========================================
@@ -114,26 +107,16 @@ export const SQL_TABLES = {
 ======================================== */
 
 export const AI_DEFAULTS = {
-  ActiveModel:
-    "llama-3.3-70b-versatile",
-
-  EmbeddingModel:
-    "multilingual-e5-large",
-
-  ReformulatorModel:
-    "llama-3.1-8b-instruct",
-
-  RerankerModel:
-    "bge-reranker-large",
+  ActiveModel: "llama-3.3-70b-versatile",
+  EmbeddingModel: "multilingual-e5-large",
+  ReformulatorModel: "llama-3.1-8b-instruct",
+  RerankerModel: "bge-reranker-large",
 
   Temperature: 0.7,
-
   TopK_Tickets: 5,
-
   ConfidenceThreshold: 0.75,
 
   UseReformulator: true,
-
   UseReranker: true,
 }
 
@@ -142,63 +125,15 @@ export const AI_DEFAULTS = {
 ======================================== */
 
 export const SESSION_DEFAULTS = {
-  SessionStatus:
-    "active",
-
+  SessionStatus: "active",
   IsActive: true,
 }
 
 /* ========================================
-   PERFORMANCE FLAGS
+   DEBUG
 ======================================== */
 
-export const PERFORMANCE_CONFIG =
-  {
-    ENABLE_MEMOIZATION:
-      true,
-
-    ENABLE_PERSISTENCE:
-      true,
-
-    ENABLE_OPTIMISTIC_UPDATES:
-      true,
-
-    ENABLE_SILENT_REFRESH:
-      true,
-
-    ENABLE_BACKGROUND_SYNC:
-      true,
-
-    LIST_VIRTUALIZATION_THRESHOLD:
-      100,
-  }
-
-/* ========================================
-   DEBUG LOGGING
-======================================== */
-
-if (
-  ENV.APP_ENV ===
-  "development"
-) {
-
-  console.log(
-    "API_BASE_URL:",
-    API_CONFIG.BASE_URL
-  )
-
-  console.log(
-    "APP_ENV:",
-    ENV.APP_ENV
-  )
-
-  console.log(
-    "CACHE_DURATION:",
-    API_CONFIG.CACHE_DURATION
-  )
-
-  console.log(
-    "POLLING_INTERVAL:",
-    API_CONFIG.POLLING_INTERVAL
-  )
+if (ENV.APP_ENV === "development") {
+  console.log("API_BASE_URL:", API_CONFIG.BASE_URL)
+  console.log("APP_ENV:", ENV.APP_ENV)
 }

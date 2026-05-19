@@ -1,8 +1,21 @@
 export const CHAT_CONFIG = {
 
+  /*
+    FIXED FLOATING ICON
+  */
+
   BUBBLE_SIZE: 64,
 
-  BUBBLE_EXPANDED: 224,
+  /*
+    NO LONGER USED
+    (kept temporarily for compatibility)
+  */
+
+  BUBBLE_EXPANDED: 64,
+
+  /*
+    CHAT WINDOW
+  */
 
   CHAT_WIDTH: 380,
 

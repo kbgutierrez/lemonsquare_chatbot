@@ -1,496 +1,127 @@
-import {
-  API_CONFIG,
-} from "../config/sqlVariables"
+import { API_CONFIG } from "../config/sqlVariables"
+
+/*
+  FINAL ARCHITECTURE RULE:
+  - VITE PROXY handles /api → backend
+  - frontend ONLY sends /api/xxx
+  - NO double prefixing anywhere
+*/
+
+const REQUEST_TIMEOUT = API_CONFIG.TIMEOUT || 30000
+
+const responseCache = new Map()
+const pendingRequests = new Map()
 
 /* ========================================
-   CONFIG
+   BUILD URL (FIXED — NO DOUBLE /api)
 ======================================== */
 
-const REQUEST_TIMEOUT =
-  API_CONFIG.TIMEOUT || 30000
+export const buildApiUrl = (endpoint, params = {}) => {
+  let url = endpoint // ✅ IMPORTANT: DO NOT prepend /api again
 
-const CACHE_DURATION =
-  1000 * 20
-
-/* ========================================
-   GLOBAL MEMORY CACHE
-======================================== */
-
-const responseCache =
-  new Map()
-
-const pendingRequests =
-  new Map()
-
-/* ========================================
-   BUILD URL
-======================================== */
-
-export const buildApiUrl = (
-  endpoint,
-  params = {}
-) => {
-
-  let url =
-    `${API_CONFIG.BASE_URL}${endpoint}`
-
-  Object.entries(params).forEach(
-    ([key, value]) => {
-
-      url = url.replace(
-        `:${key}`,
-        encodeURIComponent(
-          value
-        )
-      )
-    }
-  )
+  Object.entries(params).forEach(([key, value]) => {
+    url = url.replace(`:${key}`, encodeURIComponent(value))
+  })
 
   return url
 }
 
 /* ========================================
-   CACHE HELPERS
+   CORE REQUEST
 ======================================== */
 
-const buildCacheKey =
-  ({
-    endpoint,
-    method,
-    body,
-  }) => {
+const request = async ({
+  endpoint,
+  method = "GET",
+  body,
+  headers = {},
+  isFormData = false,
+}) => {
+  const controller = new AbortController()
 
-    return JSON.stringify({
-      endpoint,
+  const timeout = setTimeout(
+    () => controller.abort(),
+    REQUEST_TIMEOUT
+  )
+
+  try {
+    console.log("API_REQUEST:", method, endpoint)
+
+    // ✅ FINAL FIX: use endpoint directly (VITE handles /api)
+    const url = buildApiUrl(endpoint)
+
+    const response = await fetch(url, {
       method,
-      body,
+      signal: controller.signal,
+
+      headers: isFormData
+        ? headers
+        : {
+            ...API_CONFIG.HEADERS,
+            ...headers,
+          },
+
+      body: body
+        ? isFormData
+          ? body
+          : JSON.stringify(body)
+        : undefined,
     })
-  }
 
-const getCachedResponse =
-  (cacheKey) => {
+    const text = await response.text()
 
-    const cached =
-      responseCache.get(
-        cacheKey
-      )
-
-    if (!cached) {
-      return null
+    let data = null
+    try {
+      data = text ? JSON.parse(text) : null
+    } catch {
+      data = text
     }
 
-    const isExpired =
-      Date.now() -
-        cached.timestamp >
-      CACHE_DURATION
-
-    if (isExpired) {
-
-      responseCache.delete(
-        cacheKey
+    if (!response.ok) {
+      throw new Error(
+        data?.detail ||
+        data?.message ||
+        `Request failed (${response.status})`
       )
-
-      return null
     }
 
-    return cached.data
-  }
+    return data
 
-const setCachedResponse =
-  (
-    cacheKey,
-    data
-  ) => {
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Request timeout")
+    }
 
-    responseCache.set(
-      cacheKey,
-      {
-        data,
-        timestamp:
-          Date.now(),
-      }
-    )
+    if (err instanceof TypeError) {
+      throw new Error("Unable to connect to backend server")
+    }
+
+    throw err
+
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
 /* ========================================
-   INVALIDATE CACHE
-======================================== */
-
-export const invalidateApiCache =
-  (
-    partialKey = ""
-  ) => {
-
-    Array.from(
-      responseCache.keys()
-    ).forEach((key) => {
-
-      if (
-        key.includes(
-          partialKey
-        )
-      ) {
-
-        responseCache.delete(
-          key
-        )
-      }
-    })
-  }
-
-/* ========================================
-   PARSE RESPONSE
-======================================== */
-
-const parseResponse =
-  async (response) => {
-
-    const contentType =
-      response.headers.get(
-        "content-type"
-      ) || ""
-
-    const rawText =
-      await response.text()
-
-    console.log(
-      "API_RESPONSE",
-      rawText
-    )
-
-    /* EMPTY RESPONSE */
-
-    if (!rawText) {
-      return null
-    }
-
-    /* JSON */
-
-    if (
-      contentType.includes(
-        "application/json"
-      )
-    ) {
-
-      try {
-
-        return JSON.parse(
-          rawText
-        )
-
-      } catch {
-
-        throw new Error(
-          "Backend returned invalid JSON."
-        )
-      }
-    }
-
-    /* TEXT FALLBACK */
-
-    return rawText
-  }
-
-/* ========================================
-   REQUEST
-======================================== */
-
-const request =
-  async ({
-    endpoint,
-    method = "GET",
-    body = null,
-    headers = {},
-    isFormData = false,
-    skipCache = false,
-  }) => {
-
-    const cacheKey =
-      buildCacheKey({
-        endpoint,
-        method,
-        body,
-      })
-
-    /* ========================================
-       CACHE HIT
-    ======================================== */
-
-    if (
-      method === "GET" &&
-      !skipCache
-    ) {
-
-      const cached =
-        getCachedResponse(
-          cacheKey
-        )
-
-      if (cached) {
-
-        console.log(
-          "CACHE_HIT",
-          endpoint
-        )
-
-        return cached
-      }
-    }
-
-    /* ========================================
-       DEDUPE REQUESTS
-    ======================================== */
-
-    if (
-      pendingRequests.has(
-        cacheKey
-      )
-    ) {
-
-      return pendingRequests.get(
-        cacheKey
-      )
-    }
-
-    const controller =
-      new AbortController()
-
-    const timeout =
-      setTimeout(() => {
-
-        controller.abort()
-
-      }, REQUEST_TIMEOUT)
-
-    const requestPromise =
-      (async () => {
-
-        try {
-
-          console.log(
-            "API_REQUEST",
-            {
-              method,
-              endpoint,
-            }
-          )
-
-          const requestOptions =
-            {
-              method,
-
-              signal:
-                controller.signal,
-
-              headers:
-                isFormData
-                  ? headers
-                  : {
-                      ...API_CONFIG.HEADERS,
-                      ...headers,
-                    },
-            }
-
-          /* BODY */
-
-          if (body) {
-
-            requestOptions.body =
-              isFormData
-                ? body
-                : JSON.stringify(
-                    body
-                  )
-          }
-
-          const response =
-            await fetch(
-              endpoint,
-              requestOptions
-            )
-
-          console.log(
-            "API_STATUS",
-            response.status
-          )
-
-          const responseData =
-            await parseResponse(
-              response
-            )
-
-          /* HTTP ERROR */
-
-          if (
-            !response.ok
-          ) {
-
-            const errorMessage =
-              responseData?.error ||
-              responseData?.detail ||
-              responseData?.message ||
-              (
-                typeof responseData ===
-                "string"
-                  ? responseData
-                  : null
-              ) ||
-              `Request failed with status ${response.status}`
-
-            throw new Error(
-              errorMessage
-            )
-          }
-
-          /* ========================================
-             CACHE GET RESPONSES
-          ======================================== */
-
-          if (
-            method === "GET"
-          ) {
-
-            setCachedResponse(
-              cacheKey,
-              responseData
-            )
-          }
-
-          /* ========================================
-             INVALIDATE MUTATIONS
-          ======================================== */
-
-          if (
-            method !== "GET"
-          ) {
-
-            invalidateApiCache()
-          }
-
-          return responseData
-
-        } catch (error) {
-
-          /* TIMEOUT */
-
-          if (
-            error.name ===
-            "AbortError"
-          ) {
-
-            throw new Error(
-              "Request timeout. Backend took too long to respond."
-            )
-          }
-
-          /* NETWORK ERROR */
-
-          if (
-            error instanceof
-            TypeError
-          ) {
-
-            throw new Error(
-              "Unable to connect to backend server."
-            )
-          }
-
-          throw error
-
-        } finally {
-
-          clearTimeout(
-            timeout
-          )
-
-          pendingRequests.delete(
-            cacheKey
-          )
-        }
-
-      })()
-
-    pendingRequests.set(
-      cacheKey,
-      requestPromise
-    )
-
-    return requestPromise
-  }
-
-/* ========================================
-   METHODS
+   API CLIENT
 ======================================== */
 
 export const apiClient = {
-  get: (
-    endpoint,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "GET",
-      ...options,
-    }),
+  get: (e, o) =>
+    request({ endpoint: e, method: "GET", ...o }),
 
-  post: (
-    endpoint,
-    body,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "POST",
-      body,
-      ...options,
-    }),
+  post: (e, b, o) =>
+    request({ endpoint: e, method: "POST", body: b, ...o }),
 
-  put: (
-    endpoint,
-    body,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "PUT",
-      body,
-      ...options,
-    }),
+  put: (e, b, o) =>
+    request({ endpoint: e, method: "PUT", body: b, ...o }),
 
-  patch: (
-    endpoint,
-    body,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "PATCH",
-      body,
-      ...options,
-    }),
+  patch: (e, b, o) =>
+    request({ endpoint: e, method: "PATCH", body: b, ...o }),
 
-  delete: (
-    endpoint,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "DELETE",
-      ...options,
-    }),
-
-  upload: (
-    endpoint,
-    formData,
-    options = {}
-  ) =>
-    request({
-      endpoint,
-      method: "POST",
-      body: formData,
-      isFormData: true,
-      ...options,
-    }),
+  delete: (e, o) =>
+    request({ endpoint: e, method: "DELETE", ...o }),
 }
 
 export default apiClient

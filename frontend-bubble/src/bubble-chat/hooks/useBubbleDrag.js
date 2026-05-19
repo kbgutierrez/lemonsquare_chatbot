@@ -1,5 +1,3 @@
-// FILE: frontend/src/bubble-chat/hooks/useBubbleDrag.js
-
 import {
   useCallback,
   useEffect,
@@ -61,7 +59,7 @@ export const useBubbleDrag =
       })
 
     /* ========================================
-       POINTER
+       POINTER STATE
     ======================================== */
 
     const pointerDown =
@@ -105,13 +103,14 @@ export const useBubbleDrag =
       )
 
     /* ========================================
-       CLAMP
+       CLAMP POSITION
     ======================================== */
 
     const clampPosition = (
       x,
       y
     ) => ({
+
       x: Math.min(
         Math.max(
           EDGE_PADDING,
@@ -136,16 +135,50 @@ export const useBubbleDrag =
     })
 
     /* ========================================
+       STOP DRAG
+    ======================================== */
+
+    const stopDrag =
+      useCallback(
+        () => {
+
+          pointerDown.current =
+            false
+
+          if (
+            moved.current
+          ) {
+
+            const snapped =
+              getSideSnapPosition(
+                position.x,
+                position.y
+              )
+
+            freePosition.current =
+              snapped
+
+            setPosition(
+              snapped
+            )
+          }
+
+          moved.current =
+            false
+
+          setDragging(false)
+        },
+        [position]
+      )
+
+    /* ========================================
        EVENTS
     ======================================== */
 
     useEffect(() => {
 
-      const move =
-        (
-          clientX,
-          clientY
-        ) => {
+      const handlePointerMove =
+        (event) => {
 
           if (
             !pointerDown.current
@@ -154,11 +187,11 @@ export const useBubbleDrag =
           }
 
           const dx =
-            clientX -
+            event.clientX -
             startPoint.current.x
 
           const dy =
-            clientY -
+            event.clientY -
             startPoint.current.y
 
           /*
@@ -194,55 +227,16 @@ export const useBubbleDrag =
 
           const nextPosition =
             clampPosition(
-              clientX -
+              event.clientX -
                 dragOffset.current.x,
 
-              clientY -
+              event.clientY -
                 dragOffset.current.y
             )
 
           setPosition(
             nextPosition
           )
-        }
-
-      const pointerMove =
-        (event) => {
-
-          move(
-            event.clientX,
-            event.clientY
-          )
-        }
-
-      const stopDrag =
-        () => {
-
-          pointerDown.current =
-            false
-
-          if (
-            moved.current
-          ) {
-
-            const snapped =
-              getSideSnapPosition(
-                position.x,
-                position.y
-              )
-
-            freePosition.current =
-              snapped
-
-            setPosition(
-              snapped
-            )
-          }
-
-          moved.current =
-            false
-
-          setDragging(false)
         }
 
       /* ========================================
@@ -268,7 +262,7 @@ export const useBubbleDrag =
 
       window.addEventListener(
         "pointermove",
-        pointerMove
+        handlePointerMove
       )
 
       window.addEventListener(
@@ -290,7 +284,7 @@ export const useBubbleDrag =
 
         window.removeEventListener(
           "pointermove",
-          pointerMove
+          handlePointerMove
         )
 
         window.removeEventListener(
@@ -310,7 +304,7 @@ export const useBubbleDrag =
       }
 
     }, [
-      position,
+      stopDrag,
       BUBBLE_SIZE,
       EDGE_PADDING,
     ])
@@ -322,6 +316,10 @@ export const useBubbleDrag =
     const startDrag =
       (event) => {
 
+        /*
+          RESET POINTER STATE
+        */
+
         pointerDown.current =
           true
 
@@ -329,13 +327,13 @@ export const useBubbleDrag =
           false
 
         /*
-          FIX MOBILE DRAG
-        */
+          DO NOT USE
+          setPointerCapture()
 
-        event.currentTarget
-          ?.setPointerCapture?.(
-            event.pointerId
-          )
+          It causes sticky pointer
+          lifecycle bugs after reopen
+          on some browsers/devices.
+        */
 
         startPoint.current = {
           x: event.clientX,
@@ -343,6 +341,7 @@ export const useBubbleDrag =
         }
 
         dragOffset.current = {
+
           x:
             event.clientX -
             position.x,
@@ -362,8 +361,8 @@ export const useBubbleDrag =
         moved.current
 
     /* ========================================
-       OPEN CHAT
-       SNAP TO CORNER ONLY
+       SNAP TO CORNER
+       WHEN WINDOW OPENS
     ======================================== */
 
     const repositionForWindow =
@@ -384,6 +383,7 @@ export const useBubbleDrag =
       )
 
     return {
+
       dragging,
 
       position,
