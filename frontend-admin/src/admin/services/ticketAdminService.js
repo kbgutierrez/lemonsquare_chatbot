@@ -7,14 +7,14 @@ import {
 } from "../../shared/api/endpoints"
 
 /* ========================================
-   GET TICKETS
+   GET ALL TICKETS (AUTO PAGINATED)
 ======================================== */
+
+const PAGE_SIZE = 50
 
 const getTickets =
   async ({
     search = "",
-    skip = 0,
-    limit = 50,
   } = {}) => {
 
     const endpoint =
@@ -22,40 +22,85 @@ const getTickets =
         API_ENDPOINTS.TICKETS
       )
 
-    const params =
-      new URLSearchParams()
+    let skip = 0
 
-    if (
-      search?.trim()
-    ) {
+    let hasMore = true
+
+    let allTickets = []
+
+    while (hasMore) {
+
+      const params =
+        new URLSearchParams()
+
+      if (
+        search?.trim()
+      ) {
+
+        params.append(
+          "search",
+          search.trim()
+        )
+      }
 
       params.append(
-        "search",
-        search.trim()
+        "skip",
+        String(skip)
       )
+
+      params.append(
+        "limit",
+        String(PAGE_SIZE)
+      )
+
+      const finalUrl =
+        `${endpoint}?${params.toString()}`
+
+      console.log(
+        "GET_TICKETS_BATCH_URL",
+        finalUrl
+      )
+
+      const batch =
+        await apiClient.get(
+          finalUrl
+        )
+
+      const safeBatch =
+        Array.isArray(batch)
+          ? batch
+          : []
+
+      allTickets = [
+        ...allTickets,
+        ...safeBatch,
+      ]
+
+      /*
+        If returned rows are smaller
+        than requested limit,
+        we reached the end.
+      */
+
+      if (
+        safeBatch.length <
+        PAGE_SIZE
+      ) {
+
+        hasMore = false
+
+      } else {
+
+        skip += PAGE_SIZE
+      }
     }
 
-    params.append(
-      "skip",
-      String(skip)
-    )
-
-    params.append(
-      "limit",
-      String(limit)
-    )
-
-    const finalUrl =
-      `${endpoint}?${params.toString()}`
-
     console.log(
-      "GET_TICKETS_URL",
-      finalUrl
+      "TOTAL_TICKETS_FETCHED",
+      allTickets.length
     )
 
-    return apiClient.get(
-      finalUrl
-    )
+    return allTickets
   }
 
 /* ========================================
