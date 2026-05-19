@@ -15,6 +15,160 @@ const widgetRoots =
 const DEFAULT_ROOT_ID =
   "lemonsquare-chat-root"
 
+const DEFAULT_FALLBACK_USER =
+  "11318"
+
+/* ========================================
+   AUTO USER DETECTION
+======================================== */
+
+const resolveUserToken =
+  (
+    incomingConfig = {}
+  ) => {
+
+    /*
+      PRIORITY 1:
+      MANUAL CONFIG OVERRIDE
+    */
+
+    if (
+      incomingConfig?.userToken
+    ) {
+      return String(
+        incomingConfig.userToken
+      )
+    }
+
+    /*
+      PRIORITY 2:
+      CUSTOM GLOBAL USER
+    */
+
+    if (
+      window?.CURRENT_USER_ID
+    ) {
+      return String(
+        window.CURRENT_USER_ID
+      )
+    }
+
+    /*
+      PRIORITY 3:
+      COMMON AUTH OBJECTS
+    */
+
+    if (
+      window?.currentUser?.id
+    ) {
+      return String(
+        window.currentUser.id
+      )
+    }
+
+    if (
+      window?.user?.id
+    ) {
+      return String(
+        window.user.id
+      )
+    }
+
+    if (
+      window?.authUser?.id
+    ) {
+      return String(
+        window.authUser.id
+      )
+    }
+
+    /*
+      PRIORITY 4:
+      LOCAL STORAGE
+    */
+
+    const localStorageKeys =
+      [
+        "userToken",
+        "user_id",
+        "userid",
+        "employee_id",
+        "employeeId",
+        "currentUserId",
+      ]
+
+    for (
+      const key
+      of localStorageKeys
+    ) {
+
+      const value =
+        localStorage.getItem(
+          key
+        )
+
+      if (
+        value &&
+        value !== "null" &&
+        value !== "undefined"
+      ) {
+        return String(
+          value
+        )
+      }
+    }
+
+    /*
+      PRIORITY 5:
+      SESSION STORAGE
+    */
+
+    for (
+      const key
+      of localStorageKeys
+    ) {
+
+      const value =
+        sessionStorage.getItem(
+          key
+        )
+
+      if (
+        value &&
+        value !== "null" &&
+        value !== "undefined"
+      ) {
+        return String(
+          value
+        )
+      }
+    }
+
+    /*
+      PRIORITY 6:
+      META TAG
+    */
+
+    const metaUser =
+      document.querySelector(
+        'meta[name="user-id"]'
+      )
+
+    if (
+      metaUser?.content
+    ) {
+      return String(
+        metaUser.content
+      )
+    }
+
+    /*
+      FINAL FALLBACK
+    */
+
+    return DEFAULT_FALLBACK_USER
+  }
+
 /* ========================================
    CREATE ROOT ELEMENT
 ======================================== */
@@ -84,13 +238,29 @@ const updateConfig =
   ) => {
 
     /*
+      AUTO-RESOLVE USER TOKEN
+    */
+
+    const resolvedUserToken =
+      resolveUserToken(
+        nextConfig
+      )
+
+    const finalConfig =
+      {
+        ...nextConfig,
+        userToken:
+          resolvedUserToken,
+      }
+
+    /*
       GLOBAL WINDOW CONFIG
     */
 
     window.LemonSquareChatConfig =
       {
         ...(window.LemonSquareChatConfig || {}),
-        ...nextConfig,
+        ...finalConfig,
       }
 
     /*
@@ -99,7 +269,7 @@ const updateConfig =
     */
 
     updateRuntimeConfig(
-      nextConfig
+      finalConfig
     )
 
     console.log(

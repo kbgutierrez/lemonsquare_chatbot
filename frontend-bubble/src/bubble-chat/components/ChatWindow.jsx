@@ -1,8 +1,10 @@
 import ChatHeader from "./ChatHeader.jsx"
 import ChatMessages from "./ChatMessages.jsx"
 
-import ChatFooter
-  from "./ChatFooter/ChatFooter.jsx"
+import ChatFooter from "./ChatFooter/ChatFooter.jsx"
+
+import chatWindowBackground
+  from "../../assets/Chatwindow-background.png"
 
 const ChatWindow = ({
   messages = [],
@@ -11,10 +13,17 @@ const ChatWindow = ({
   onSendMessage,
   onClose,
   onOpenModal,
+
+  /*
+    NEW: optional session reset key
+    (safe addition, backward compatible)
+  */
+  sessionKey,
 }) => {
 
   return (
     <section
+      key={sessionKey || "active-chat"}
       aria-label="Chat Window"
       className="
         relative
@@ -24,157 +33,163 @@ const ChatWindow = ({
         min-h-0
         flex-col
 
-        overflow-hidden
-
         rounded-[28px]
 
-        bg-white
+        bg-[#f6fff7]
 
         shadow-[0_10px_40px_rgba(0,0,0,0.08)]
       "
     >
-      {/* INNER CLIPPING LAYER */}
+
+      {/* BACKGROUND IMAGE */}
+      <img
+        src={chatWindowBackground}
+        alt="Chat Background"
+        draggable={false}
+        className="
+          pointer-events-none
+
+          absolute
+          inset-0
+
+          h-full
+          w-full
+
+          object-cover
+
+          select-none
+
+          opacity-100
+        "
+      />
+
+      {/* OVERLAY */}
       <div
         className="
+          pointer-events-none
+
+          absolute
+          inset-0
+
+          bg-gradient-to-b
+          from-[#f3fff4]/90
+          via-[#f7fff8]/88
+          to-white/96
+        "
+      />
+
+      {/* INNER */}
+      <div
+        className="
+          relative
+          z-10
+
           flex
           h-full
           min-h-0
           flex-col
 
-          overflow-hidden
-
           rounded-[28px]
         "
       >
+
         {/* HEADER */}
-        <div className="relative z-[300]">
+        <div className="relative z-[5000]">
           <ChatHeader
-            resolved={
-              resolved
-            }
-            onClose={
-              onClose
-            }
-            onOpenModal={
-              onOpenModal
-            }
+            resolved={resolved}
+            onClose={onClose}
+            onOpenModal={onOpenModal}
           />
         </div>
 
         {/* CHAT AREA */}
-        <main
-          className="
-            relative
+        <main className="relative flex-1 min-h-0 overflow-hidden">
 
-            flex-1
-            min-h-0
+          {/* TOP GLOW */}
+          <div className="
+            pointer-events-none
 
-            overflow-hidden
+            absolute
+            inset-x-0
+            top-0
 
-            bg-gradient-to-b
-            from-violet-50/50
-            via-white
-            to-white
-          "
-        >
-          {/* BACKGROUND GLOW */}
-          <div
-            className="
-              pointer-events-none
+            h-40
 
-              absolute
-              inset-0
+            bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_72%)]
 
-              bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.10),transparent_55%)]
-            "
-          />
+            z-0
+          " />
 
-          {/* SECONDARY DECORATION */}
-          <div
-            className="
-              pointer-events-none
+          {/* BOTTOM GLOW */}
+          <div className="
+            pointer-events-none
 
-              absolute
-              bottom-0
-              right-0
+            absolute
+            bottom-0
+            right-0
 
-              h-48
-              w-48
+            h-52
+            w-52
 
-              rounded-full
+            rounded-full
 
-              bg-violet-100/30
+            bg-emerald-200/20
 
-              blur-3xl
-            "
-          />
+            blur-3xl
+
+            z-0
+          " />
 
           {/* RESOLVED BANNER */}
           {resolved && (
-            <div
-              className="
-                absolute
-                left-1/2
-                top-3
-                z-20
+            <div className="
+              absolute
+              left-1/2
+              top-3
+              z-20
 
-                -translate-x-1/2
+              -translate-x-1/2
 
-                rounded-full
+              rounded-full
 
-                border
-                border-emerald-200
+              border
+              border-emerald-200
 
-                bg-emerald-50
+              bg-emerald-50
 
-                px-4
-                py-2
+              px-4
+              py-2
 
-                text-xs
-                font-medium
+              text-xs
+              font-medium
 
-                text-emerald-700
+              text-emerald-700
 
-                shadow-sm
-              "
-            >
+              shadow-sm
+            ">
               This conversation has been resolved.
             </div>
           )}
 
           {/* MESSAGES */}
-          <div
-            className="
-              relative
-              z-10
-
-              h-full
-            "
-          >
+          <div className="relative z-10 h-full">
             <ChatMessages
-              messages={
-                messages
-              }
-              loading={
-                loading
-              }
+              messages={messages}
+              loading={loading}
             />
           </div>
+
         </main>
 
         {/* FOOTER */}
         <ChatFooter
-          loading={
-            loading
-          }
-          resolved={
-            resolved
-          }
-          onSendMessage={
-            onSendMessage
-          }
+          loading={loading}
+          resolved={resolved}
+          onSendMessage={onSendMessage}
         />
+
       </div>
+
     </section>
   )
 }

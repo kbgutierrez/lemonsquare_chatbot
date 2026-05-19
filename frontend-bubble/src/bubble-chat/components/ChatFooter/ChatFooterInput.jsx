@@ -4,6 +4,9 @@ import {
   SendHorizonal,
 } from "lucide-react"
 
+import chatWindowBackground
+  from "../../../assets/Chatwindow-background.png"
+
 const MAX_MESSAGE_LENGTH = 4000
 
 const ChatFooterInput = ({
@@ -40,30 +43,88 @@ const ChatFooterInput = ({
         relative
 
         flex
-        items-end
+        items-center
         gap-2
 
-        rounded-[24px]
+        overflow-hidden
+
+        rounded-[22px]
 
         border
-        border-violet-200/80
+        border-[#d7f5dc]
 
-        bg-white/90
+        bg-white/55
 
         px-3
         py-2
 
-        shadow-[0_4px_20px_rgba(124,58,237,0.06)]
+        shadow-[0_6px_18px_rgba(34,197,94,0.05)]
 
         backdrop-blur-xl
 
         transition-all
         duration-300
 
-        focus-within:border-violet-300
-        focus-within:shadow-[0_8px_30px_rgba(124,58,237,0.12)]
+        focus-within:border-[#9be7a7]
+        focus-within:bg-white/62
       "
     >
+
+      {/* ====================================
+          BACKGROUND IMAGE LAYER
+      ==================================== */}
+
+      <div
+        className="
+          pointer-events-none
+
+          absolute
+          inset-0
+
+          overflow-hidden
+        "
+      >
+
+        {/* IMAGE */}
+
+        <img
+          src={chatWindowBackground}
+          alt=""
+          draggable={false}
+          className="
+            absolute
+            inset-0
+
+            h-full
+            w-full
+
+            scale-[1.7]
+
+            object-cover
+
+            opacity-[0.18]
+
+            blur-lg
+          "
+        />
+
+        {/* SOFT OVERLAY */}
+
+        <div
+          className="
+            absolute
+            inset-0
+
+            bg-[#fffdf9]/55
+          "
+        />
+
+      </div>
+
+      {/* ====================================
+          TEXTAREA
+      ==================================== */}
+
       <textarea
         ref={textareaRef}
         rows={1}
@@ -91,12 +152,16 @@ const ChatFooterInput = ({
             ? "Resolved conversations are read-only."
             : loading
               ? "AI is replying..."
-              : "Ask something..."
+              : "Ask LemonSquare AI..."
         }
         className="
-          max-h-40
-          min-h-[24px]
-          w-full
+          relative
+          z-10
+
+          flex-1
+
+          max-h-32
+          min-h-[22px]
 
           resize-none
 
@@ -104,16 +169,16 @@ const ChatFooterInput = ({
 
           bg-transparent
 
-          py-1
+          pt-[2px]
 
-          text-sm
-          leading-relaxed
+          text-[13px]
+          leading-[1.45]
 
-          text-slate-700
+          text-[#3c4a3f]
 
           outline-none
 
-          placeholder:text-slate-400
+          placeholder:text-[#8ca193]
 
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
@@ -122,6 +187,10 @@ const ChatFooterInput = ({
           disabled:opacity-70
         "
       />
+
+      {/* ====================================
+          SEND BUTTON
+      ==================================== */}
 
       <button
         type="button"
@@ -144,52 +213,104 @@ const ChatFooterInput = ({
           relative
 
           flex
-          h-10
-          w-10
+          h-9
+          w-9
           shrink-0
           items-center
           justify-center
 
           overflow-hidden
 
-          rounded-2xl
+          rounded-[18px]
 
-          bg-gradient-to-r
-          from-violet-600
-          to-purple-500
+          border
+          border-white/20
 
-          text-white
-
-          shadow-[0_8px_20px_rgba(124,58,237,0.28)]
+          shadow-[0_8px_18px_rgba(34,197,94,0.12)]
 
           transition-all
           duration-300
 
           hover:scale-[1.04]
-          hover:shadow-[0_12px_30px_rgba(124,58,237,0.36)]
 
-          active:scale-[0.98]
+          active:scale-[0.97]
 
           disabled:cursor-not-allowed
           disabled:opacity-60
           disabled:hover:scale-100
         "
       >
+
+        {/* ====================================
+            BUTTON BACKGROUND IMAGE
+        ==================================== */}
+
         <div
           className="
             absolute
             inset-0
 
-            bg-white/10
-
-            opacity-0
-
-            transition-opacity
-            duration-300
-
-            group-hover:opacity-100
+            overflow-hidden
           "
-        />
+        >
+
+          {/* IMAGE */}
+
+          <img
+            src={chatWindowBackground}
+            alt=""
+            draggable={false}
+            className="
+              absolute
+              inset-0
+
+              h-full
+              w-full
+
+              scale-[2.1]
+
+              object-cover
+
+              opacity-95
+
+              blur-[2px]
+            "
+          />
+
+          {/* COLOR OVERLAY */}
+
+          <div
+            className="
+              absolute
+              inset-0
+
+              bg-[#8ee89a]/42
+            "
+          />
+
+          {/* HOVER GLOSS */}
+
+          <div
+            className="
+              absolute
+              inset-0
+
+              bg-white/12
+
+              opacity-0
+
+              transition-opacity
+              duration-300
+
+              group-hover:opacity-100
+            "
+          />
+
+        </div>
+
+        {/* ====================================
+            ICON
+        ==================================== */}
 
         {loading ? (
           <LoaderCircle
@@ -201,6 +322,8 @@ const ChatFooterInput = ({
               w-4
 
               animate-spin
+
+              text-white
             "
           />
         ) : resolved ? (
@@ -211,6 +334,8 @@ const ChatFooterInput = ({
 
               h-4
               w-4
+
+              text-white
             "
           />
         ) : (
@@ -221,10 +346,14 @@ const ChatFooterInput = ({
 
               h-4
               w-4
+
+              text-white
             "
           />
         )}
+
       </button>
+
     </div>
   )
 }

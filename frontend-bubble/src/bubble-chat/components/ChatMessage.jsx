@@ -3,48 +3,17 @@ import {
   User,
 } from "lucide-react"
 
+import {
+  useState,
+} from "react"
+
 const TypingDots = () => {
 
   return (
-    <div
-      className="
-        flex
-        items-center
-        gap-1
-        py-1
-      "
-    >
-      <span
-        className="
-          h-2
-          w-2
-          rounded-full
-          bg-violet-400
-          animate-bounce
-        "
-      />
-
-      <span
-        className="
-          h-2
-          w-2
-          rounded-full
-          bg-violet-400
-          animate-bounce
-          [animation-delay:0.15s]
-        "
-      />
-
-      <span
-        className="
-          h-2
-          w-2
-          rounded-full
-          bg-violet-400
-          animate-bounce
-          [animation-delay:0.3s]
-        "
-      />
+    <div className="flex items-center gap-1 py-0.5">
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" />
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.15s]" />
+      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.3s]" />
     </div>
   )
 }
@@ -53,12 +22,14 @@ const ChatMessage = ({
   message = {},
 }) => {
 
+  const [showTime, setShowTime] =
+    useState(false)
+
   const sender =
     message?.sender || "agent"
 
   const text =
-    typeof message?.text ===
-    "string"
+    typeof message?.text === "string"
       ? message.text
       : ""
 
@@ -73,61 +44,55 @@ const ChatMessage = ({
 
   const config = isAgent
     ? {
-        wrapper:
-          "justify-start",
+        wrapper: "justify-start",
 
         bubble: `
-          rounded-bl-lg
+          rounded-xl
 
           border
-          border-violet-100/80
+          border-emerald-100/60
 
-          bg-white/95
+          bg-white/85
 
           text-slate-800
 
-          shadow-[0_4px_20px_rgba(139,92,246,0.08)]
+          shadow-[0_3px_10px_rgba(16,185,129,0.06)]
         `,
 
-        time:
-          "text-slate-400",
+        time: "text-slate-400",
 
         avatar: `
-          bg-violet-100
-          text-violet-700
-
-          ring-4
-          ring-violet-50
+          bg-emerald-100
+          text-emerald-700
+          ring-2
+          ring-emerald-50
         `,
 
         Icon: Bot,
       }
     : {
-        wrapper:
-          "justify-end",
+        wrapper: "justify-end",
 
         bubble: `
-          rounded-br-lg
+          rounded-xl
 
-          bg-gradient-to-br
-          from-violet-600
-          via-violet-500
-          to-purple-500
+          bg-white/70
 
-          text-white
+          border
+          border-emerald-200/50
 
-          shadow-[0_8px_24px_rgba(139,92,246,0.25)]
+          text-slate-800
+
+          shadow-[0_3px_10px_rgba(16,185,129,0.08)]
         `,
 
-        time:
-          "text-violet-100/80",
+        time: "text-slate-400",
 
         avatar: `
-          bg-violet-600
+          bg-emerald-500
           text-white
-
-          ring-4
-          ring-violet-100
+          ring-2
+          ring-emerald-100
         `,
 
         Icon: User,
@@ -143,6 +108,9 @@ const ChatMessage = ({
 
   return (
     <div
+      onClick={() =>
+        setShowTime(prev => !prev)
+      }
       className={`
         group
 
@@ -150,66 +118,55 @@ const ChatMessage = ({
         items-end
 
         gap-2
-        sm:gap-3
 
-        animate-[fadeIn_.25s_ease-out]
+        animate-[fadeIn_.15s_ease-out]
 
-        transition-all
-        duration-200
+        cursor-pointer
 
         ${wrapper}
       `}
     >
-      {/* AGENT AVATAR */}
+
+      {/* AVATAR */}
       {isAgent && (
         <div
           className={`
             flex
-            h-8
-            w-8
+            h-7
+            w-7
             shrink-0
             items-center
             justify-center
 
             rounded-full
 
-            transition-transform
-            duration-300
-
-            group-hover:scale-105
-
             ${avatar}
           `}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-3.5 w-3.5" />
         </div>
       )}
 
-      {/* MESSAGE */}
+      {/* BUBBLE */}
       <div
         className={`
-          max-w-[85%]
-          sm:max-w-[80%]
-          lg:max-w-[72%]
+          max-w-[75%]
 
-          rounded-3xl
+          rounded-xl
 
-          px-4
-          py-3
+          px-3
+          py-2
 
-          sm:px-5
-
-          backdrop-blur-sm
+          backdrop-blur-md
 
           transition-all
-          duration-300
-
-          group-hover:-translate-y-[1px]
+          duration-150
 
           ${bubble}
         `}
       >
-        {/* TYPING */}
+
+        {/* TEXT */}
         {isTyping ? (
           <TypingDots />
         ) : (
@@ -218,33 +175,39 @@ const ChatMessage = ({
               whitespace-pre-wrap
               break-words
 
-              text-[13px]
-              leading-relaxed
-
-              sm:text-sm
+              text-[12px]
+              leading-snug
             "
           >
             {text}
           </p>
         )}
 
-        {/* TIME */}
-        {!!timestamp &&
-          !isTyping && (
-            <p
-              className={`
-                mt-2
+        {/* TIME (TOGGLE) */}
+        {!!timestamp && !isTyping && (
+          <div
+            className={`
+              mt-1
 
-                text-right
-                text-[10px]
-                sm:text-[11px]
+              text-right
+              text-[9px]
 
-                ${time}
-              `}
-            >
-              {timestamp}
-            </p>
-          )}
+              transition-all
+              duration-150
+
+              ${time}
+
+              ${
+                showTime
+                  ? "opacity-100"
+                  : "opacity-0 h-0"
+              }
+            `}
+          >
+            {timestamp}
+          </div>
+        )}
+
       </div>
 
       {/* USER AVATAR */}
@@ -252,25 +215,21 @@ const ChatMessage = ({
         <div
           className={`
             flex
-            h-8
-            w-8
+            h-7
+            w-7
             shrink-0
             items-center
             justify-center
 
             rounded-full
 
-            transition-transform
-            duration-300
-
-            group-hover:scale-105
-
             ${avatar}
           `}
         >
-          <Icon className="h-4 w-4" />
+          <Icon className="h-3.5 w-3.5" />
         </div>
       )}
+
     </div>
   )
 }

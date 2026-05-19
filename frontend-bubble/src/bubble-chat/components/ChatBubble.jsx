@@ -1,174 +1,159 @@
 import {
-  MessageCircleMore,
-  X
-} from 'lucide-react'
+  motion,
+} from "framer-motion"
+
+import bubblePillIcon
+  from "../../assets/bubble-pill-icon.png"
+
+import expandedPillIcon
+  from "../../assets/expanded-pill-icon.png"
 
 const ChatBubble = ({
   isOpen,
-  expandDirection
 }) => {
-  const expandRight =
-    expandDirection === 'right'
+
+  const currentIcon =
+    isOpen
+      ? expandedPillIcon
+      : bubblePillIcon
 
   return (
     <div
-      className={`
+      className="
         relative
+
         h-16
+        w-16
 
-        ${
-          isOpen
-            ? 'w-56'
-            : 'w-16'
-        }
-      `}
+        pointer-events-none
+      "
     >
-
-      <button
+      <motion.button
         type="button"
-        className={`
-          absolute
-          top-0
+
+        aria-label={
+          isOpen
+            ? "Close chat"
+            : "Open chat"
+        }
+
+        initial={false}
+
+        whileHover={{
+          y: -5,
+
+          rotate: 1.2,
+
+          transition: {
+            duration: 0.18,
+            ease: "easeOut",
+          },
+        }}
+
+        whileTap={{
+          y: 1,
+
+          rotate: -1,
+
+          transition: {
+            duration: 0.08,
+          },
+        }}
+
+        transition={{
+          type: "spring",
+          stiffness: 340,
+          damping: 22,
+        }}
+
+        className="
+          relative
+
+          flex
+          items-center
+          justify-center
 
           h-16
+          w-16
 
-          overflow-hidden
+          bg-transparent
 
-          rounded-full
+          focus:outline-none
 
-          bg-gradient-to-r
-          from-violet-600
-          to-purple-500
-
-          text-white
-
-          shadow-2xl
-
-          transition-all
-          duration-300
-
-          hover:scale-[1.03]
-
-          ${
-            isOpen
-              ? 'w-56'
-              : 'w-16'
-          }
-
-          ${
-            expandRight
-              ? 'left-0'
-              : 'right-0'
-          }
-        `}
+          pointer-events-auto
+        "
       >
 
-        {/* LEFT SCREEN -> EXPAND RIGHT */}
-        {expandRight && (
-          <>
-            {/* ICON */}
-            <div
-              className="
-                absolute
-                left-5
-                top-1/2
-                -translate-y-1/2
-                z-10
-              "
-            >
-              {isOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <MessageCircleMore className="h-6 w-6" />
-              )}
-            </div>
+        {/* GLOW */}
 
-            {/* TEXT */}
-            {isOpen && (
-              <div
-                className="
-                  absolute
-                  left-14
-                  top-1/2
-                  -translate-y-1/2
+        <motion.div
+          className="
+            absolute
+            inset-0
 
-                  whitespace-nowrap
-                  text-left
-                "
-              >
-                <p className="text-sm font-semibold">
-                  Help Desk AI
-                </p>
+            rounded-full
 
-                <p className="text-xs text-violet-100">
-                  Virtual Assistant
-                </p>
-              </div>
-            )}
-          </>
-        )}
+            bg-violet-500/20
 
-        {/* RIGHT SCREEN -> EXPAND LEFT */}
-        {!expandRight && (
-          <>
-            {/* TEXT */}
-            {isOpen && (
-              <div
-                className="
-                  absolute
-                  right-14
-                  top-1/2
-                  -translate-y-1/2
+            blur-xl
+          "
 
-                  whitespace-nowrap
-                  text-right
-                "
-              >
-                <p className="text-sm font-semibold">
-                  Help Desk AI
-                </p>
+          initial={{
+            opacity: 0,
+          }}
 
-                <p className="text-xs text-violet-100">
-                  Virtual Assistant
-                </p>
-              </div>
-            )}
+          whileHover={{
+            opacity: 1,
+          }}
 
-            {/* ICON */}
-            <div
-              className="
-                absolute
-                right-5
-                top-1/2
-                -translate-y-1/2
-                z-10
-              "
-            >
-              {isOpen ? (
-                <X className="h-6 w-6" />
-              ) : (
-                <MessageCircleMore className="h-6 w-6" />
-              )}
-            </div>
-          </>
-        )}
+          transition={{
+            duration: 0.2,
+          }}
+        />
 
-        {/* CLOSED STATE */}
-        {!isOpen && (
-          <div
-            className="
-              absolute
-              inset-0
+        {/* ICON */}
 
-              flex
-              items-center
-              justify-center
-            "
-          >
-            <MessageCircleMore className="h-6 w-6" />
-          </div>
-        )}
-      </button>
+        <motion.img
+          key={currentIcon}
+
+          src={currentIcon}
+
+          alt="LemonSquare Chat Bubble"
+
+          draggable={false}
+
+          initial={{
+            opacity: 0,
+            scale: 0.92,
+          }}
+
+          animate={{
+            opacity: 1,
+            scale: 1,
+          }}
+
+          transition={{
+            duration: 0.18,
+            ease: "easeOut",
+          }}
+
+          className="
+            relative
+            z-10
+
+            h-16
+            w-16
+
+            object-contain
+
+            select-none
+            pointer-events-none
+
+            drop-shadow-[0_10px_25px_rgba(139,92,246,0.28)]
+          "
+        />
+
+      </motion.button>
     </div>
   )
 }

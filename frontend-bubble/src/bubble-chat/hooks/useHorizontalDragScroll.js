@@ -3,6 +3,8 @@ import {
   useRef,
 } from "react"
 
+const DRAG_THRESHOLD = 5
+
 const useHorizontalDragScroll =
   () => {
 
@@ -10,6 +12,9 @@ const useHorizontalDragScroll =
       useRef(null)
 
     const isDragging =
+      useRef(false)
+
+    const hasDragged =
       useRef(false)
 
     const startX =
@@ -23,38 +28,38 @@ const useHorizontalDragScroll =
       const container =
         scrollRef.current
 
-      if (!container)
+      if (!container) {
         return
+      }
 
-      const handleMouseDown =
+      /* ========================================
+         POINTER DOWN
+      ======================================== */
+
+      const handlePointerDown =
         (event) => {
 
           isDragging.current =
             true
 
+          hasDragged.current =
+            false
+
           startX.current =
-            event.pageX -
-            container.offsetLeft
+            event.clientX
 
           scrollLeft.current =
             container.scrollLeft
+
+          container.style.cursor =
+            "grabbing"
         }
 
-      const handleMouseLeave =
-        () => {
+      /* ========================================
+         POINTER MOVE
+      ======================================== */
 
-          isDragging.current =
-            false
-        }
-
-      const handleMouseUp =
-        () => {
-
-          isDragging.current =
-            false
-        }
-
-      const handleMouseMove =
+      const handlePointerMove =
         (event) => {
 
           if (
@@ -63,70 +68,133 @@ const useHorizontalDragScroll =
             return
           }
 
+          const dx =
+            event.clientX -
+            startX.current
+
+          /*
+            DETECT REAL DRAG
+          */
+
+          if (
+            Math.abs(dx) >
+            DRAG_THRESHOLD
+          ) {
+
+            hasDragged.current =
+              true
+          }
+
+          /*
+            PREVENT TEXT SELECT
+          */
+
           event.preventDefault()
 
-          const x =
-            event.pageX -
-            container.offsetLeft
-
-          const walk =
-            (
-              x -
-              startX.current
-            ) * 1.1
-
           container.scrollLeft =
-            scrollLeft.current -
-            walk
+            scrollLeft.current - dx
         }
 
+      /* ========================================
+         STOP DRAG
+      ======================================== */
+
+      const stopDragging =
+        () => {
+
+          isDragging.current =
+            false
+
+          container.style.cursor =
+            "grab"
+        }
+
+      /* ========================================
+         BLOCK CLICK AFTER DRAG
+      ======================================== */
+
+      const handleClick =
+        (event) => {
+
+          if (
+            hasDragged.current
+          ) {
+
+            event.preventDefault()
+
+            event.stopPropagation()
+          }
+        }
+
+      /* ========================================
+         EVENTS
+      ======================================== */
+
       container.addEventListener(
-        "mousedown",
-        handleMouseDown
+        "pointerdown",
+        handlePointerDown
+      )
+
+      window.addEventListener(
+        "pointermove",
+        handlePointerMove,
+        {
+          passive: false,
+        }
+      )
+
+      window.addEventListener(
+        "pointerup",
+        stopDragging
+      )
+
+      window.addEventListener(
+        "pointercancel",
+        stopDragging
       )
 
       container.addEventListener(
-        "mouseleave",
-        handleMouseLeave
+        "click",
+        handleClick,
+        true
       )
 
-      container.addEventListener(
-        "mouseup",
-        handleMouseUp
-      )
-
-      container.addEventListener(
-        "mousemove",
-        handleMouseMove
-      )
+      /* ========================================
+         CLEANUP
+      ======================================== */
 
       return () => {
 
         container.removeEventListener(
-          "mousedown",
-          handleMouseDown
+          "pointerdown",
+          handlePointerDown
+        )
+
+        window.removeEventListener(
+          "pointermove",
+          handlePointerMove
+        )
+
+        window.removeEventListener(
+          "pointerup",
+          stopDragging
+        )
+
+        window.removeEventListener(
+          "pointercancel",
+          stopDragging
         )
 
         container.removeEventListener(
-          "mouseleave",
-          handleMouseLeave
-        )
-
-        container.removeEventListener(
-          "mouseup",
-          handleMouseUp
-        )
-
-        container.removeEventListener(
-          "mousemove",
-          handleMouseMove
+          "click",
+          handleClick,
+          true
         )
       }
 
-    }, [])
+    })
 
     return scrollRef
   }
 
-export default
-useHorizontalDragScroll
+export default useHorizontalDragScroll

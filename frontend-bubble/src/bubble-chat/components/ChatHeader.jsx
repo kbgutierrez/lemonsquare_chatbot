@@ -13,16 +13,16 @@ const ChatHeader = ({
   return (
     <div
       className="
+        relative
+
         flex
         items-center
         justify-between
 
         border-b
-        border-violet-200
+        border-emerald-200/60
 
-        bg-gradient-to-r
-        from-violet-600
-        to-purple-500
+        bg-[#7BE38E]
 
         px-4
         py-3
@@ -31,23 +31,48 @@ const ChatHeader = ({
       "
     >
 
-      {/* LEFT */}
-      <div className="min-w-0">
+      {/* ====================================
+          SOFT LIGHT OVERLAY
+      ==================================== */}
 
-        <p
+      <div
+        className="
+          pointer-events-none
+
+          absolute
+          inset-0
+
+          bg-white/[0.04]
+        "
+      />
+
+      {/* ====================================
+          LEFT
+      ==================================== */}
+
+      <div
+        className="
+          relative
+          z-10
+
+          min-w-0
+
+          pl-1
+        "
+      >
+
+        {/* TITLE ROW */}
+
+        <div
           className="
-            text-[10px]
-            uppercase
-            tracking-[0.22em]
-            text-violet-100
+            flex
+            items-center
+            gap-2
           "
         >
-          Help Desk AI
-        </p>
 
-        <div className="mt-1 flex items-center gap-2">
+          {/* STATUS */}
 
-          {/* STATUS ICON */}
           {resolved ? (
             <Lock
               className="
@@ -55,34 +80,46 @@ const ChatHeader = ({
                 w-3.5
                 shrink-0
 
-                text-emerald-200
+                text-white
               "
             />
           ) : (
             <div
               className="
-                h-2
-                w-2
+                h-2.5
+                w-2.5
+
                 rounded-full
-                bg-emerald-300
+
+                bg-white
+
+                shadow-[0_0_8px_rgba(255,255,255,0.75)]
               "
             />
           )}
 
           {/* TITLE */}
+
           <h2
             className="
               truncate
-              text-sm
-              font-semibold
+
+              text-[15px]
+              font-extrabold
+              tracking-[0.01em]
+
+              text-white
+
+              drop-shadow-[0_1px_2px_rgba(0,0,0,0.18)]
             "
           >
             {resolved
               ? "Resolved Conversation"
-              : "Virtual Support Assistant"}
+              : "AI Assistance"}
           </h2>
 
           {/* RESOLVED BADGE */}
+
           {resolved && (
             <span
               className="
@@ -92,46 +129,67 @@ const ChatHeader = ({
 
                 rounded-full
 
-                bg-emerald-400/20
+                border
+                border-white/20
 
-                px-2
-                py-0.5
+                bg-white/15
 
-                text-[9px]
+                px-1.5
+                py-[2px]
+
+                text-[8px]
                 font-semibold
                 uppercase
-                tracking-[0.08em]
+                tracking-[0.06em]
 
-                text-emerald-100
+                text-white
+
+                backdrop-blur-sm
               "
             >
               <CheckCircle2
                 className="
-                  h-3
-                  w-3
+                  h-2.5
+                  w-2.5
                 "
               />
 
               Resolved
             </span>
           )}
+
         </div>
+
       </div>
 
-      {/* RIGHT */}
-      <div className="flex items-center">
+      {/* ====================================
+          RIGHT
+      ==================================== */}
+
+      <div
+        className="
+          relative
+          z-[9999]
+
+          flex
+          items-center
+        "
+      >
 
         {/* MENU */}
+
         <div
           className="
             rounded-xl
 
-            bg-white
+            border
+            border-white/20
+
+            bg-white/15
 
             shadow-sm
 
-            ring-1
-            ring-black/5
+            backdrop-blur-md
           "
         >
           <ChatMenu
@@ -144,7 +202,9 @@ const ChatHeader = ({
             }
           />
         </div>
+
       </div>
+
     </div>
   )
 }

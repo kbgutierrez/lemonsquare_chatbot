@@ -4,62 +4,70 @@ export const API_ENDPOINTS = {
   ==================================== */
 
   AUTH_VERIFY:
-    "/auth/verify",
+    "/api/auth/verify",
+
+  // ✅ FIXED
+  // Backend route:
+  // app.include_router(admin_auth.router, prefix="/api")
+  // router.prefix("/admin")
+  // final => /api/admin/login
+  LSBIZPORTAL_LOGIN:
+    "/api/admin/login",
 
   /* ====================================
      ANALYTICS
   ==================================== */
 
   ANALYTICS_SUMMARY:
-    "/analytics/summary",
+    "/api/analytics/summary",
 
   /* ====================================
      DOCUMENTS
   ==================================== */
 
   DOCUMENTS:
-    "/documents",
+    "/api/documents",
 
   DOCUMENT_UPLOAD:
-    "/documents/upload",
+    "/api/documents/upload",
 
   DOCUMENT_DELETE:
-    "/documents/:documentId",
+    "/api/documents/:documentId",
 
   DOCUMENT_DEBUG_PIPELINE:
-    "/documents/debug/full-pipeline",
+    "/api/documents/debug/full-pipeline",
 
   DOCUMENT_MANUAL_ENTRY:
-    "/documents/manual",
+    "/api/documents/manual",
 
   DOCUMENT_MANUAL_ENTRY_UPDATE:
-    "/documents/manual/:entryId",
+    "/api/documents/manual/:entryId",
 
   DOCUMENT_MANUAL_ENTRY_DELETE:
-    "/documents/manual/:entryId",
+    "/api/documents/manual/:entryId",
 
   /* ====================================
      KNOWLEDGE EXPLORER
   ==================================== */
 
   KNOWLEDGE_EXPLORE:
-    "/knowledge/explore",
+    "/api/knowledge/explore",
 
   /* ====================================
      CHAT
   ==================================== */
 
   CHAT_SEND:
-    "/chat",
+    "/api/chat",
 
   CHAT_HISTORY:
-    "/chat/history/:sessionId",
+    "/api/chat/history/:sessionId",
 
   CHAT_USER_SESSIONS:
-    "/chat/user-sessions/:requesterId",
+    "/api/chat/user-sessions/:requesterId",
 
   CHAT_RESOLVE:
-    "/chat/resolve/:sessionId",
+    "/api/chat/resolve/:sessionId",
 
   /* ====================================
      SELF KNOWLEDGE
@@ -76,23 +84,23 @@ export const API_ENDPOINTS = {
   ==================================== */
 
   TICKETS:
-    "/tickets",
+    "/api/tickets",
 
   TICKET_DELETE:
-    "/tickets/:ticketNumber",
+    "/api/tickets/:ticketNumber",
 
   TICKET_SYNC:
-    "/tickets/sync",
+    "/api/tickets/sync",
 
   TICKET_WHITELIST:
-    "/tickets/:ticketNumber/whitelist",
+    "/api/tickets/:ticketNumber/whitelist",
 
   /* ====================================
      AI SETTINGS
   ==================================== */
 
   AI_SETTINGS:
-    "/settings",
+    "/api/settings",
 }
 
 export default API_ENDPOINTS

@@ -40,6 +40,7 @@ const ChatFooter = ({
     Prevent duplicate
     manual sends.
   */
+
   const sendingRef =
     useRef(false)
 
@@ -95,6 +96,7 @@ const ChatFooter = ({
           Hard block:
           resolved chat
         */
+
         if (
           resolved
         ) {
@@ -105,6 +107,7 @@ const ChatFooter = ({
           Prevent spam double click
           while request in-flight.
         */
+
         if (
           sendingRef.current
         ) {
@@ -133,6 +136,7 @@ const ChatFooter = ({
             Clear immediately
             for smoother UX.
           */
+
           setMessage("")
 
           await onSendMessage(
@@ -150,6 +154,7 @@ const ChatFooter = ({
             Restore message
             if failed.
           */
+
           setMessage(
             finalMessage
           )
@@ -223,55 +228,31 @@ const ChatFooter = ({
         relative
 
         border-t
-        border-violet-100/80
+        border-emerald-100/40
 
-        bg-white/95
+        bg-transparent
 
         px-3
-        py-3
-
-        backdrop-blur-xl
+        py-2
 
         sm:px-4
       "
     >
-      {/* BACKGROUND GLOW */}
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
-
-          overflow-hidden
-        "
-      >
-        <div
-          className="
-            absolute
-            bottom-[-80px]
-            right-[-40px]
-
-            h-40
-            w-40
-
-            rounded-full
-
-            bg-violet-200/20
-
-            blur-3xl
-          "
-        />
-      </div>
 
       <div className="relative z-10">
 
-        {/* RESOLVED */}
+        {/* ====================================
+            RESOLVED
+        ==================================== */}
+
         {resolved && (
           <ChatFooterResolved />
         )}
 
-        {/* FAQ */}
+        {/* ====================================
+            FAQ
+        ==================================== */}
+
         {!resolved && (
           <ChatFooterFAQ
             loading={
@@ -289,7 +270,10 @@ const ChatFooter = ({
           />
         )}
 
-        {/* INPUT */}
+        {/* ====================================
+            INPUT
+        ==================================== */}
+
         <ChatFooterInput
           textareaRef={
             textareaRef
@@ -313,7 +297,9 @@ const ChatFooter = ({
             handleSend
           }
         />
+
       </div>
+
     </div>
   )
 }
