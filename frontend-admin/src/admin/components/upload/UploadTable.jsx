@@ -33,117 +33,26 @@ const UploadTable = ({
         overflow-hidden
 
         rounded-[24px]
-        md:rounded-[30px]
 
         border
         border-[#26332d]
 
         bg-[#121a18]
-
-        shadow-[0_10px_40px_rgba(0,0,0,0.28)]
       "
     >
-      {/* HEADER */}
+      {/* =====================================
+          CONTENT
+      ===================================== */}
       <div
         className="
-          flex
-          flex-col
-          gap-4
-
-          border-b
-          border-[#24312b]
-
-          px-4
-          py-4
-
-          sm:flex-row
-          sm:items-center
-          sm:justify-between
-
-          md:px-5
-        "
-      >
-        {/* LEFT */}
-        <div>
-          <h3
-            className="
-              text-base
-              font-semibold
-
-              tracking-tight
-
-              text-white
-            "
-          >
-            Uploaded Files
-          </h3>
-
-          <p
-            className="
-              mt-1
-
-              text-xs
-
-              text-[#7f948b]
-            "
-          >
-            {uploadedFiles.length} file(s)
-            uploaded
-          </p>
-        </div>
-
-        {/* STATUS */}
-        <div
-          className="
-            inline-flex
-            w-fit
-            items-center
-            gap-2
-
-            rounded-2xl
-
-            border
-            border-[#2f3b36]
-
-            bg-[#18211f]
-
-            px-3
-            py-2
-          "
-        >
-          <div
-            className="
-              h-2
-              w-2
-
-              rounded-full
-
-              bg-[#f5d547]
-            "
-          />
-
-          <span
-            className="
-              text-xs
-              font-medium
-
-              text-[#c7d3ce]
-            "
-          >
-            Knowledge Storage
-          </span>
-        </div>
-      </div>
-
-      {/* CONTENT */}
-      <div
-        className="
-          min-h-0
           flex-1
+          min-h-0
           overflow-hidden
         "
       >
-        {/* EMPTY */}
+        {/* =====================================
+            EMPTY STATE
+        ===================================== */}
         {!hasFiles && (
           <EmptyState
             title="No uploaded files"
@@ -153,14 +62,13 @@ Uploaded documents will appear here once added to the knowledge base.
           />
         )}
 
-        {/* MOBILE CARDS */}
+        {/* =====================================
+            MOBILE CARDS
+        ===================================== */}
         {hasFiles && (
           <div
             className="
-              flex
               h-full
-              flex-col
-
               overflow-y-auto
 
               p-3
@@ -184,13 +92,14 @@ Uploaded documents will appear here once added to the knowledge base.
           </div>
         )}
 
-        {/* DESKTOP TABLE */}
+        {/* =====================================
+            DESKTOP TABLE
+        ===================================== */}
         {hasFiles && (
           <div
             className="
               hidden
               h-full
-
               overflow-auto
 
               md:block
@@ -198,53 +107,87 @@ Uploaded documents will appear here once added to the knowledge base.
           >
             <table
               className="
-                min-w-full
+                w-full
+                min-w-[900px]
                 border-collapse
               "
             >
-              {/* HEAD */}
+              {/* =====================================
+                  TABLE HEAD
+              ===================================== */}
               <thead
                 className="
                   sticky
                   top-0
                   z-10
 
+                  border-b
+                  border-[#24312b]
+
                   bg-[#161f1d]/95
 
                   backdrop-blur-xl
                 "
               >
-                <tr className="text-left">
+                <tr>
                   {[
-                    "File",
-                    "Size",
-                    "Category",
-                    "Status",
-                    "Uploaded",
-                    "Action",
-                  ].map((label) => (
-                    <th
-                      key={label}
-                      className="
-                        px-5
-                        py-4
+                    {
+                      label: "File",
+                      width: "w-[40%]",
+                    },
+                    {
+                      label: "Size",
+                      width: "w-[12%]",
+                    },
+                    {
+                      label: "Category",
+                      width: "w-[18%]",
+                    },
+                    {
+                      label: "Status",
+                      width: "w-[16%]",
+                    },
+                    {
+                      label: "Uploaded",
+                      width: "w-[10%]",
+                    },
+                    {
+                      label: "",
+                      width: "w-[4%]",
+                    },
+                  ].map(
+                    ({
+                      label,
+                      width,
+                    }) => (
+                      <th
+                        key={label}
+                        className={`
+                          ${width}
 
-                        text-[11px]
-                        font-semibold
-                        uppercase
+                          px-4
+                          py-3
 
-                        tracking-[0.18em]
+                          text-left
+                          text-[10px]
+                          font-semibold
+                          uppercase
 
-                        text-[#73867d]
-                      "
-                    >
-                      {label}
-                    </th>
-                  ))}
+                          tracking-[0.16em]
+
+                          text-[#70837a]
+                        `}
+                      >
+                        {label}
+                      </th>
+                    )
+                  )}
                 </tr>
               </thead>
 
-              {/* BODY */}
+              {/* =====================================
+                  TABLE BODY
+              ===================================== */}
               <tbody>
                 {paginatedFiles.map(
                   (file) => (
@@ -263,29 +206,35 @@ Uploaded documents will appear here once added to the knowledge base.
         )}
       </div>
 
-      {/* PAGINATION */}
-      <div
-        className="
-          shrink-0
+      {/* =====================================
+          PAGINATION
+      ===================================== */}
+      {uploadedFiles.length > 0 && (
+        <div
+          className="
+            shrink-0
 
-          border-t
-          border-[#24312b]
-        "
-      >
-        <UploadPagination
-          currentPage={
-            currentPage
-          }
+            border-t
+            border-[#24312b]
 
-          totalPages={
-            totalPages
-          }
+            bg-[#141c1a]
+          "
+        >
+          <UploadPagination
+            currentPage={
+              currentPage
+            }
 
-          setCurrentPage={
-            setCurrentPage
-          }
-        />
-      </div>
+            totalPages={
+              totalPages
+            }
+
+            setCurrentPage={
+              setCurrentPage
+            }
+          />
+        </div>
+      )}
     </div>
   )
 }

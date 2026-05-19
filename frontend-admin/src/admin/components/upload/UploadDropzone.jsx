@@ -1,6 +1,4 @@
 import {
-  useEffect,
-  useRef,
   useState,
 } from "react"
 
@@ -9,22 +7,24 @@ import {
   FileUp,
   Plus,
   X,
-  Sparkles,
-  ChevronDown,
-  Check,
 } from "lucide-react"
+
+import UploadCategorySelector
+  from "./components/UploadCategorySelector"
 
 const UploadDropzone = ({
   uploadedFiles,
   inputRef,
   handleDrop,
   handleInputChange,
+
   clearFiles,
   confirmUpload,
-  hasPendingUploads,
 
-  uploading = false,
-  uploadProgress = 0,
+  uploading,
+  uploadProgress,
+
+  hasPendingUploads,
 
   categories = [],
   selectedCategory = "",
@@ -33,14 +33,6 @@ const UploadDropzone = ({
 
   const [isDragging, setIsDragging] =
     useState(false)
-
-  const [
-    dropdownOpen,
-    setDropdownOpen,
-  ] = useState(false)
-
-  const dropdownRef =
-    useRef(null)
 
   const hasFiles =
     uploadedFiles.length > 0
@@ -70,274 +62,6 @@ const UploadDropzone = ({
     }
 
   /* =========================================
-     OUTSIDE CLICK
-  ========================================= */
-
-  useEffect(() => {
-
-    const handleClickOutside =
-      (event) => {
-
-        if (
-          dropdownRef.current &&
-          !dropdownRef.current.contains(
-            event.target
-          )
-        ) {
-
-          setDropdownOpen(
-            false
-          )
-        }
-      }
-
-    document.addEventListener(
-      "mousedown",
-      handleClickOutside
-    )
-
-    return () => {
-
-      document.removeEventListener(
-        "mousedown",
-        handleClickOutside
-      )
-    }
-
-  }, [])
-
-  const categoryLabel =
-    selectedCategory ||
-    "Auto Detect Category"
-
-  /* =========================================
-     CATEGORY SELECTOR
-  ========================================= */
-
-  const CategorySelector =
-    () => (
-      <div
-        ref={dropdownRef}
-        className="
-          relative
-          w-full
-          max-w-[280px]
-        "
-      >
-        <button
-          type="button"
-          onClick={() =>
-            setDropdownOpen(
-              (prev) =>
-                !prev
-            )
-          }
-          className="
-            flex
-            h-11
-            w-full
-            items-center
-            justify-between
-
-            rounded-2xl
-
-            border
-            border-[#2f3c36]
-
-            bg-[#1a2320]
-
-            px-4
-
-            text-left
-            text-sm
-            text-white
-
-            transition-all
-            duration-300
-
-            hover:border-[#46544e]
-          "
-        >
-          <span
-            className={
-              selectedCategory
-                ? "text-white"
-                : "text-[#8ea59b]"
-            }
-          >
-            {categoryLabel}
-          </span>
-
-          <ChevronDown
-            className={`
-              h-4
-              w-4
-
-              text-[#8ea59b]
-
-              transition-transform
-              duration-300
-
-              ${
-                dropdownOpen
-                  ? "rotate-180"
-                  : ""
-              }
-            `}
-          />
-        </button>
-
-        {/* DROPDOWN */}
-        <div
-          className={`
-            absolute
-            left-0
-            right-0
-            top-[calc(100%+10px)]
-            z-50
-
-            overflow-hidden
-
-            rounded-2xl
-
-            border
-            border-[#2d3b35]
-
-            bg-[#18211f]
-
-            shadow-[0_20px_60px_rgba(0,0,0,0.45)]
-
-            transition-all
-            duration-300
-
-            ${
-              dropdownOpen
-                ? `
-                  pointer-events-auto
-                  translate-y-0
-                  opacity-100
-                `
-                : `
-                  pointer-events-none
-                  -translate-y-2
-                  opacity-0
-                `
-            }
-          `}
-        >
-
-          {/* AUTO DETECT */}
-          <button
-            type="button"
-            onClick={() => {
-
-              setSelectedCategory(
-                ""
-              )
-
-              setDropdownOpen(
-                false
-              )
-            }}
-            className="
-              flex
-              w-full
-              items-center
-              justify-between
-
-              border-b
-              border-[#22302b]
-
-              px-4
-              py-3
-
-              text-sm
-              text-white
-
-              hover:bg-[#202b27]
-            "
-          >
-            <span>
-              Auto Detect Category
-            </span>
-
-            {!selectedCategory && (
-              <Check
-                className="
-                  h-4
-                  w-4
-                  text-[#f5d547]
-                "
-              />
-            )}
-          </button>
-
-          {/* CATEGORIES */}
-          <div
-            className="
-              max-h-[220px]
-              overflow-y-auto
-            "
-          >
-            {categories.map(
-              (category) => {
-
-                const active =
-                  selectedCategory ===
-                  category
-
-                return (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => {
-
-                      setSelectedCategory(
-                        category
-                      )
-
-                      setDropdownOpen(
-                        false
-                      )
-                    }}
-                    className="
-                      flex
-                      w-full
-                      items-center
-                      justify-between
-
-                      px-4
-                      py-3
-
-                      text-sm
-                      text-white
-
-                      hover:bg-[#202b27]
-                    "
-                  >
-                    <span>
-                      {category}
-                    </span>
-
-                    {active && (
-                      <Check
-                        className="
-                          h-4
-                          w-4
-                          text-[#f5d547]
-                        "
-                      />
-                    )}
-                  </button>
-                )
-              }
-            )}
-          </div>
-        </div>
-      </div>
-    )
-
-  /* =========================================
      COMPACT MODE
   ========================================= */
 
@@ -346,7 +70,10 @@ const UploadDropzone = ({
     return (
       <div
         className="
-          relative
+          flex
+          h-full
+          flex-col
+
           overflow-hidden
 
           rounded-[24px]
@@ -354,260 +81,117 @@ const UploadDropzone = ({
           border
           border-[#26332d]
 
-          bg-[#121a18]
-
-          p-4
+          bg-[#141c1a]
         "
       >
+        {/* =====================================
+            TOP
+        ===================================== */}
         <div
           className="
-            pointer-events-none
-            absolute
-            inset-0
+            shrink-0
+
+            border-b
+            border-[#24312b]
+
+            p-4
           "
         >
           <div
             className="
-              absolute
-              right-[-40px]
-              top-[-40px]
-
-              h-36
-              w-36
-
-              rounded-full
-
-              bg-[#d8b93d]/[0.04]
-
-              blur-3xl
-            "
-          />
-        </div>
-
-        <div className="relative z-10">
-
-          {/* TOP */}
-          <div
-            className="
               flex
-              flex-col
-              gap-4
+              items-center
+              justify-between
 
-              lg:flex-row
-              lg:items-start
-              lg:justify-between
+              gap-3
             "
           >
-            <div
-              className="
-                flex
-                items-start
-                gap-3
-              "
-            >
-              <div
+            <div>
+              <h3
                 className="
-                  flex
-                  h-12
-                  w-12
-                  shrink-0
-                  items-center
-                  justify-center
-
-                  rounded-2xl
-
-                  border
-                  border-[#2f3c36]
-
-                  bg-[#1a2320]
-                "
-              >
-                <FileUp
-                  className="
-                    h-5
-                    w-5
-                    text-[#d8b93d]
-                  "
-                />
-              </div>
-
-              <div className="min-w-0">
-
-                <div
-                  className="
-                    flex
-                    flex-wrap
-                    items-center
-                    gap-2
-                  "
-                >
-                  <h3
-                    className="
-                      text-base
-                      font-semibold
-                      text-white
-                    "
-                  >
-                    Files Ready
-                  </h3>
-
-                  <div
-                    className="
-                      inline-flex
-                      items-center
-                      gap-1
-
-                      rounded-full
-
-                      border
-                      border-[#3b4b44]
-
-                      bg-[#1b2522]
-
-                      px-2
-                      py-1
-
-                      text-[10px]
-                      font-semibold
-                      uppercase
-
-                      tracking-[0.16em]
-
-                      text-[#cbd7d2]
-                    "
-                  >
-                    <Sparkles className="h-3 w-3" />
-
-                    Queue Active
-                  </div>
-                </div>
-
-                <p
-                  className="
-                    mt-1
-
-                    text-sm
-                    leading-relaxed
-
-                    text-[#8ea59b]
-                  "
-                >
-                  {uploadedFiles.length} file(s)
-                  selected for upload into the
-                  AI knowledge base.
-                </p>
-              </div>
-            </div>
-
-            <div
-              className="
-                inline-flex
-                w-fit
-                flex-col
-
-                rounded-2xl
-
-                border
-                border-[#2f3c36]
-
-                bg-[#1a2320]
-
-                px-4
-                py-2
-              "
-            >
-              <p
-                className="
-                  text-[10px]
-                  font-semibold
-                  uppercase
-
-                  tracking-[0.18em]
-
-                  text-[#73867d]
-                "
-              >
-                Upload Queue
-              </p>
-
-              <p
-                className="
-                  mt-1
-
                   text-sm
                   font-semibold
 
                   text-white
                 "
               >
-                Pending Files
-              </p>
-            </div>
-          </div>
+                Upload Controls
+              </h3>
 
-          {/* CATEGORY */}
-          <div className="mt-4">
-            <CategorySelector />
-          </div>
-
-          {/* ACTIONS */}
-          <div
-            className="
-              mt-4
-
-              flex
-              flex-col
-              gap-3
-
-              sm:flex-row
-              sm:flex-wrap
-            "
-          >
-            {hasPendingUploads && (
-              <button
-                disabled={
-                  uploading
-                }
-
-                onClick={
-                  confirmUpload
-                }
-
+              <p
                 className="
-                  disabled:cursor-not-allowed
-                  disabled:opacity-60
+                  mt-0.5
 
-                  flex
-                  h-11
-                  items-center
-                  justify-center
+                  text-[11px]
 
-                  rounded-2xl
-
-                  border
-                  border-[#d8b93d]/20
-
-                  bg-[#d8b93d]
-
-                  px-5
-
-                  text-sm
-                  font-semibold
-
-                  text-[#111917]
-
-                  transition-all
-                  duration-300
-
-                  hover:bg-[#e6c84c]
+                  text-[#7f948b]
                 "
               >
-                {uploading
-                  ? `Uploading ${uploadProgress}%`
-                  : "Confirm Upload"}
-              </button>
-            )}
+                {
+                  uploadedFiles.length
+                }{" "}
+                file(s) selected
+              </p>
+            </div>
 
+            {hasPendingUploads && (
+              <div
+                className="
+                  inline-flex
+                  items-center
+
+                  rounded-lg
+
+                  border
+                  border-amber-500/20
+
+                  bg-amber-500/10
+
+                  px-2.5
+                  py-1
+
+                  text-[10px]
+                  font-semibold
+
+                  uppercase
+
+                  tracking-[0.12em]
+
+                  text-amber-300
+                "
+              >
+                Pending
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* =====================================
+            MIDDLE
+        ===================================== */}
+        <div
+          className="
+            flex-1
+
+            p-4
+          "
+        >
+          <div className="space-y-3">
+            <UploadCategorySelector
+              categories={
+                categories
+              }
+
+              selectedCategory={
+                selectedCategory
+              }
+
+              setSelectedCategory={
+                setSelectedCategory
+              }
+            />
+
+            {/* ADD MORE FILES */}
             <button
               onClick={() =>
                 inputRef.current.click()
@@ -615,65 +199,143 @@ const UploadDropzone = ({
               className="
                 flex
                 h-11
+                w-full
                 items-center
                 justify-center
                 gap-2
 
-                rounded-2xl
+                rounded-xl
 
                 border
-                border-[#2f3c36]
+                border-[#2d3b35]
 
-                bg-[#1a2320]
+                bg-[#18211f]
 
-                px-5
+                px-4
 
                 text-sm
                 font-medium
 
-                text-[#d4dfda]
+                text-white
 
                 transition-all
-                duration-300
+                duration-200
 
-                hover:border-[#46544e]
                 hover:bg-[#202b27]
               "
             >
               <Plus className="h-4 w-4" />
 
-              Add Files
+              Add More Files
             </button>
 
-            <button
-              onClick={
-                clearFiles
+            <input
+              ref={inputRef}
+              type="file"
+              multiple
+              accept=".pdf"
+              hidden
+              onChange={
+                handleInputChange
               }
+            />
+          </div>
+        </div>
+
+        {/* =====================================
+            BOTTOM
+        ===================================== */}
+        <div
+          className="
+            shrink-0
+
+            border-t
+            border-[#24312b]
+
+            p-4
+          "
+        >
+          <div className="space-y-2">
+            {/* UPLOAD */}
+            <button
+              disabled={
+                uploading
+              }
+
+              onClick={
+                confirmUpload
+              }
+
               className="
                 flex
                 h-11
+                w-full
                 items-center
                 justify-center
                 gap-2
 
-                rounded-2xl
+                rounded-xl
+
+                bg-[#f5d547]
+
+                text-sm
+                font-semibold
+
+                text-[#111917]
+
+                transition-all
+                duration-200
+
+                hover:bg-[#e6c84c]
+
+                disabled:cursor-not-allowed
+                disabled:opacity-60
+              "
+            >
+              <Upload className="h-4 w-4" />
+
+              {uploading
+                ? `Uploading ${uploadProgress}%`
+                : "Upload Files"}
+            </button>
+
+            {/* CANCEL */}
+            <button
+              disabled={
+                uploading
+              }
+
+              onClick={
+                clearFiles
+              }
+
+              className="
+                flex
+                h-10
+                w-full
+                items-center
+                justify-center
+                gap-2
+
+                rounded-xl
 
                 border
-                border-[#432828]
+                border-red-500/20
 
-                bg-[#231818]
-
-                px-5
+                bg-red-500/10
 
                 text-sm
                 font-medium
 
-                text-[#ffb4b4]
+                text-red-400
 
                 transition-all
-                duration-300
+                duration-200
 
-                hover:bg-[#2d1d1d]
+                hover:bg-red-500/20
+
+                disabled:cursor-not-allowed
+                disabled:opacity-50
               "
             >
               <X className="h-4 w-4" />
@@ -682,17 +344,6 @@ const UploadDropzone = ({
             </button>
           </div>
         </div>
-
-        <input
-          ref={inputRef}
-          type="file"
-          multiple
-          accept=".pdf"
-          hidden
-          onChange={
-            handleInputChange
-          }
-        />
       </div>
     )
   }
@@ -718,16 +369,16 @@ const UploadDropzone = ({
 
         overflow-hidden
 
-        rounded-[28px]
+        rounded-[24px]
 
         border-2
         border-dashed
 
         px-6
-        py-7
+        py-8
 
         sm:px-8
-        sm:py-8
+        sm:py-10
 
         transition-all
         duration-300
@@ -802,17 +453,18 @@ const UploadDropzone = ({
           text-center
         "
       >
+        {/* ICON */}
         <div
           className={`
             mb-4
 
             flex
-            h-14
-            w-14
+            h-12
+            w-12
             items-center
             justify-center
 
-            rounded-[20px]
+            rounded-[18px]
 
             border
 
@@ -836,8 +488,8 @@ const UploadDropzone = ({
             ? (
               <FileUp
                 className="
-                  h-7
-                  w-7
+                  h-6
+                  w-6
                   text-[#d8b93d]
                 "
               />
@@ -845,17 +497,18 @@ const UploadDropzone = ({
             : (
               <Upload
                 className="
-                  h-6
-                  w-6
+                  h-5
+                  w-5
                   text-[#d6e2dc]
                 "
               />
             )}
         </div>
 
+        {/* TITLE */}
         <h2
           className="
-            text-xl
+            text-lg
             font-bold
 
             tracking-tight
@@ -868,6 +521,7 @@ const UploadDropzone = ({
             : "Upload Files"}
         </h2>
 
+        {/* DESCRIPTION */}
         <p
           className="
             mt-2
@@ -885,51 +539,75 @@ const UploadDropzone = ({
           extend the AI knowledge base.
         </p>
 
-        {/* CATEGORY */}
-        <div className="mt-5 flex w-full justify-center">
-          <CategorySelector />
-        </div>
-
-        <button
-          onClick={() =>
-            inputRef.current.click()
-          }
+        {/* CONTROLS */}
+        <div
           className="
             mt-5
 
             flex
-            h-11
-            items-center
-            justify-center
-
-            rounded-2xl
-
-            border
-            border-[#d8b93d]/20
-
-            bg-[#d8b93d]
-
-            px-6
-
-            text-sm
-            font-semibold
-
-            text-[#111917]
-
-            transition-all
-            duration-300
-
-            hover:bg-[#e6c84c]
+            w-full
+            max-w-[340px]
+            flex-col
+            gap-3
           "
         >
-          Choose Files
-        </button>
+          <UploadCategorySelector
+            categories={
+              categories
+            }
 
+            selectedCategory={
+              selectedCategory
+            }
+
+            setSelectedCategory={
+              setSelectedCategory
+            }
+          />
+
+          <button
+            onClick={() =>
+              inputRef.current.click()
+            }
+            className="
+              flex
+              h-11
+              items-center
+              justify-center
+              gap-2
+
+              rounded-xl
+
+              border
+              border-[#d8b93d]/20
+
+              bg-[#d8b93d]
+
+              px-6
+
+              text-sm
+              font-semibold
+
+              text-[#111917]
+
+              transition-all
+              duration-300
+
+              hover:bg-[#e6c84c]
+            "
+          >
+            <Upload className="h-4 w-4" />
+
+            Choose Files
+          </button>
+        </div>
+
+        {/* FOOTER */}
         <p
           className="
-            mt-3
+            mt-4
 
-            text-xs
+            text-[11px]
 
             tracking-wide
 

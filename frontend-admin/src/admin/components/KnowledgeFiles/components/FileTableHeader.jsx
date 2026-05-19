@@ -1,6 +1,24 @@
 const FileTableHeader =
   () => {
 
+    const headerClass =
+      `
+        border-b
+        border-[#24312b]
+
+        px-5
+        py-3
+
+        text-left
+        text-[10px]
+        font-semibold
+        uppercase
+
+        tracking-[0.14em]
+
+        text-[#70847b]
+      `
+
     return (
       <thead
         className="
@@ -16,106 +34,43 @@ const FileTableHeader =
         <tr>
 
           <th
-            className="
-              border-b
-              border-[#24312b]
-
-              px-6
-              py-4
-
-              text-left
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#70847b]
-            "
+            className={
+              headerClass
+            }
           >
             File
           </th>
 
           <th
-            className="
-              border-b
-              border-[#24312b]
-
-              px-6
-              py-4
-
-              text-left
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#70847b]
-            "
+            className={
+              headerClass
+            }
           >
             Category
           </th>
 
           <th
-            className="
-              border-b
-              border-[#24312b]
-
-              px-6
-              py-4
-
-              text-left
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#70847b]
-            "
+            className={
+              headerClass
+            }
           >
             Chunks
           </th>
 
           <th
-            className="
-              border-b
-              border-[#24312b]
-
-              px-6
-              py-4
-
-              text-left
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#70847b]
-            "
+            className={
+              headerClass
+            }
           >
             Uploaded
           </th>
 
           <th
-            className="
-              border-b
-              border-[#24312b]
-
-              px-6
-              py-4
+            className={`
+              ${headerClass}
 
               text-center
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#70847b]
-            "
+            `}
           >
             Actions
           </th>

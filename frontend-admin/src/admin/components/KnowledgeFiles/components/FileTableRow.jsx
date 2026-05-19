@@ -26,6 +26,15 @@ const FileTableRow = ({
       ).toLocaleString()
     }
 
+  const cellClass =
+    `
+      border-b
+      border-[#202b27]
+
+      px-5
+      py-3.5
+    `
+
   return (
     <tr
       className="
@@ -39,26 +48,22 @@ const FileTableRow = ({
     >
       {/* FILE */}
       <td
-        className="
-          border-b
-          border-[#202b27]
-
-          px-6
-          py-5
-        "
+        className={
+          cellClass
+        }
       >
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
 
           <div
             className="
               flex
-              h-12
-              w-12
+              h-10
+              w-10
               shrink-0
               items-center
               justify-center
 
-              rounded-2xl
+              rounded-xl
 
               border
               border-[#2a3732]
@@ -68,8 +73,8 @@ const FileTableRow = ({
           >
             <FileText
               className="
-                h-5
-                w-5
+                h-4.5
+                w-4.5
 
                 text-[#f5d547]
               "
@@ -82,7 +87,7 @@ const FileTableRow = ({
               className="
                 truncate
 
-                text-sm
+                text-[13px]
                 font-medium
 
                 text-white
@@ -93,9 +98,9 @@ const FileTableRow = ({
 
             <p
               className="
-                mt-1
+                mt-0.5
 
-                text-xs
+                text-[11px]
 
                 text-[#70847b]
               "
@@ -108,13 +113,9 @@ const FileTableRow = ({
 
       {/* CATEGORY */}
       <td
-        className="
-          border-b
-          border-[#202b27]
-
-          px-6
-          py-5
-        "
+        className={
+          cellClass
+        }
       >
         <CategoryBadge
           category={
@@ -125,35 +126,27 @@ const FileTableRow = ({
 
       {/* CHUNKS */}
       <td
-        className="
-          border-b
-          border-[#202b27]
+        className={`
+          ${cellClass}
 
-          px-6
-          py-5
-
-          text-sm
+          text-[13px]
           font-medium
 
           text-white
-        "
+        `}
       >
         {file.chunk_count}
       </td>
 
       {/* DATE */}
       <td
-        className="
-          border-b
-          border-[#202b27]
+        className={`
+          ${cellClass}
 
-          px-6
-          py-5
-
-          text-sm
+          text-[13px]
 
           text-[#8ca097]
-        "
+        `}
       >
         {formatDate(
           file.uploaded_at
@@ -162,13 +155,9 @@ const FileTableRow = ({
 
       {/* ACTIONS */}
       <td
-        className="
-          border-b
-          border-[#202b27]
-
-          px-6
-          py-5
-        "
+        className={
+          cellClass
+        }
       >
         <ActionButtons
           file={file}

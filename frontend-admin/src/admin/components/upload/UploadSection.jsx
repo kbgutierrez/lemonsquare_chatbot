@@ -53,40 +53,38 @@ const UploadSection = () => {
       "
     >
       {/* =====================================
-          DESKTOP HEADER
+          PAGE HEADER
       ===================================== */}
       <div
-        className={`
-          hidden
+        className="
+          mb-4
           shrink-0
 
-          md:block
-
-          ${
-            showTable
-              ? "mb-4"
-              : "mb-6"
-          }
-        `}
+          md:mb-5
+        "
       >
         <div
           className="
             flex
-            items-center
-            justify-between
+            flex-col
+            gap-3
 
-            gap-4
+            lg:flex-row
+            lg:items-center
+            lg:justify-between
           "
         >
           <div>
             <h1
               className="
-                text-3xl
+                text-2xl
                 font-black
 
                 tracking-tight
 
                 text-white
+
+                md:text-3xl
               "
             >
               Upload Knowledge Files
@@ -94,7 +92,7 @@ const UploadSection = () => {
 
             <p
               className="
-                mt-2
+                mt-1
 
                 text-sm
 
@@ -109,6 +107,10 @@ const UploadSection = () => {
           {hasPendingUploads && (
             <div
               className="
+                inline-flex
+                w-fit
+                items-center
+
                 rounded-2xl
 
                 border
@@ -119,8 +121,8 @@ const UploadSection = () => {
                 px-4
                 py-2
 
-                text-sm
-                font-medium
+                text-xs
+                font-semibold
 
                 text-amber-300
               "
@@ -149,7 +151,6 @@ const UploadSection = () => {
         >
           <div
             className="
-              mx-auto
               w-full
               max-w-3xl
             "
@@ -226,12 +227,12 @@ const UploadSection = () => {
               border-t
               border-[#26332d]
 
-              bg-[#0c1311]/95
-
-              backdrop-blur-xl
+              bg-[#0d1412]/95
 
               px-3
               py-3
+
+              backdrop-blur-xl
 
               md:hidden
             "
@@ -239,10 +240,7 @@ const UploadSection = () => {
             <div
               className="
                 mx-auto
-                flex
                 max-w-[700px]
-                flex-col
-                gap-2
               "
             >
               <UploadDropzone
@@ -298,7 +296,7 @@ const UploadSection = () => {
           </div>
 
           {/* =====================================
-              MAIN LAYOUT
+              MAIN CONTENT
           ===================================== */}
           <div
             className="
@@ -317,74 +315,66 @@ const UploadSection = () => {
             <div
               className="
                 hidden
-                w-[360px]
-                shrink-0
+                h-full
 
-                overflow-hidden
-
-                md:block
+                xl:block
+                xl:w-[340px]
+                xl:shrink-0
               "
             >
-              <div
-                className="
-                  h-full
-                  overflow-y-auto
-                "
-              >
-                <UploadDropzone
-                  uploadedFiles={
-                    uploadedFiles
-                  }
+              <UploadDropzone
+                uploadedFiles={
+                  uploadedFiles
+                }
 
-                  inputRef={
-                    inputRef
-                  }
+                inputRef={
+                  inputRef
+                }
 
-                  handleDrop={
-                    handleDrop
-                  }
+                handleDrop={
+                  handleDrop
+                }
 
-                  handleInputChange={
-                    handleInputChange
-                  }
+                handleInputChange={
+                  handleInputChange
+                }
 
-                  clearFiles={
-                    clearFiles
-                  }
+                clearFiles={
+                  clearFiles
+                }
 
-                  confirmUpload={
-                    confirmUpload
-                  }
+                confirmUpload={
+                  confirmUpload
+                }
 
-                  uploading={
-                    uploading
-                  }
+                uploading={
+                  uploading
+                }
 
-                  uploadProgress={
-                    uploadProgress
-                  }
+                uploadProgress={
+                  uploadProgress
+                }
 
-                  hasPendingUploads={
-                    hasPendingUploads
-                  }
+                hasPendingUploads={
+                  hasPendingUploads
+                }
 
-                  categories={
-                    categories
-                  }
+                categories={
+                  categories
+                }
 
-                  selectedCategory={
-                    selectedCategory
-                  }
+                selectedCategory={
+                  selectedCategory
+                }
 
-                  setSelectedCategory={
-                    setSelectedCategory
-                  }
-                />
-              </div>
+                setSelectedCategory={
+                  setSelectedCategory
+                }
+              />
             </div>
 
             {/* =====================================
-                TABLE CONTAINER
+                TABLE AREA
             ===================================== */}
             <div
               className="
@@ -393,155 +383,36 @@ const UploadSection = () => {
 
                 overflow-hidden
 
-                rounded-[28px]
-
-                border
-                border-[#26332d]
-
-                bg-[#101715]
-
-                pb-[180px]
+                pb-[170px]
 
                 md:pb-0
               "
             >
-              <div
-                className="
-                  flex
-                  h-full
-                  flex-col
-                  overflow-hidden
-                "
-              >
-                {/* =====================================
-                    STICKY HEADER
-                ===================================== */}
-                <div
-                  className="
-                    sticky
-                    top-0
-                    z-20
+              <UploadTable
+                uploadedFiles={
+                  uploadedFiles
+                }
 
-                    shrink-0
+                paginatedFiles={
+                  paginatedFiles
+                }
 
-                    border-b
-                    border-[#26332d]
+                currentPage={
+                  currentPage
+                }
 
-                    bg-[#101715]/95
+                totalPages={
+                  totalPages
+                }
 
-                    px-4
-                    py-4
+                removeFile={
+                  removeFile
+                }
 
-                    backdrop-blur-xl
-                  "
-                >
-                  <div
-                    className="
-                      flex
-                      items-center
-                      justify-between
-                    "
-                  >
-                    <div>
-                      <h2
-                        className="
-                          text-lg
-                          font-bold
-                          text-white
-
-                          md:text-xl
-                        "
-                      >
-                        Uploaded Files
-                      </h2>
-
-                      <p
-                        className="
-                          mt-1
-
-                          text-xs
-                          text-[#7f948b]
-
-                          md:text-sm
-                        "
-                      >
-                        {uploadedFiles.length} file(s)
-                        currently queued
-                      </p>
-                    </div>
-
-                    {hasPendingUploads && (
-                      <div
-                        className="
-                          rounded-xl
-
-                          border
-                          border-amber-500/20
-
-                          bg-amber-500/10
-
-                          px-3
-                          py-2
-
-                          text-[11px]
-                          font-semibold
-
-                          text-amber-300
-
-                          md:text-xs
-                        "
-                      >
-                        Pending Uploads
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* =====================================
-                    SCROLLABLE TABLE
-                ===================================== */}
-                <div
-                  className="
-                    flex-1
-                    min-h-0
-
-                    overflow-y-auto
-                    overflow-x-hidden
-
-                    px-2
-                    py-2
-
-                    md:px-4
-                    md:py-4
-                  "
-                >
-                  <UploadTable
-                    uploadedFiles={
-                      uploadedFiles
-                    }
-
-                    paginatedFiles={
-                      paginatedFiles
-                    }
-
-                    currentPage={
-                      currentPage
-                    }
-
-                    totalPages={
-                      totalPages
-                    }
-
-                    removeFile={
-                      removeFile
-                    }
-
-                    setCurrentPage={
-                      setCurrentPage
-                    }
-                  />
-                </div>
-              </div>
+                setCurrentPage={
+                  setCurrentPage
+                }
+              />
             </div>
           </div>
         </>

@@ -61,7 +61,7 @@ const KnowledgeFilesSection =
           min-h-0
           flex-col
 
-          gap-5
+          gap-4
         "
       >
         {/* =====================================
@@ -83,7 +83,7 @@ const KnowledgeFilesSection =
               top-0
               z-10
 
-              w-12
+              w-10
 
               bg-gradient-to-r
               from-[#0f1614]
@@ -102,7 +102,7 @@ const KnowledgeFilesSection =
               top-0
               z-10
 
-              w-12
+              w-10
 
               bg-gradient-to-l
               from-[#0f1614]
@@ -123,7 +123,7 @@ const KnowledgeFilesSection =
               border-b
               border-[#24312b]
 
-              pb-3
+              pb-2
 
               select-none
 
@@ -138,7 +138,7 @@ const KnowledgeFilesSection =
                 items-center
                 gap-2
 
-                pr-8
+                pr-6
               "
             >
               {[
@@ -172,12 +172,12 @@ const KnowledgeFilesSection =
 
                       shrink-0
 
-                      rounded-t-2xl
+                      rounded-t-xl
 
-                      px-5
-                      py-3
+                      px-4
+                      py-2.5
 
-                      text-sm
+                      text-[13px]
                       font-medium
 
                       whitespace-nowrap
@@ -239,14 +239,14 @@ const KnowledgeFilesSection =
 
             overflow-hidden
 
-            rounded-[28px]
+            rounded-[24px]
 
             border
             border-[#26332d]
 
             bg-[#121a18]
 
-            shadow-[0_10px_40px_rgba(0,0,0,0.28)]
+            shadow-[0_8px_32px_rgba(0,0,0,0.24)]
           "
         >
           {/* TOP BAR */}
@@ -258,20 +258,20 @@ const KnowledgeFilesSection =
               items-center
               justify-between
 
-              gap-4
+              gap-3
 
               border-b
               border-[#24312b]
 
-              px-5
-              py-4
+              px-4
+              py-3
             "
           >
             {/* LEFT */}
             <div>
               <h2
                 className="
-                  text-xl
+                  text-lg
                   font-semibold
 
                   tracking-tight
@@ -284,9 +284,9 @@ const KnowledgeFilesSection =
 
               <p
                 className="
-                  mt-1
+                  mt-0.5
 
-                  text-sm
+                  text-xs
 
                   text-[#7f948b]
                 "
@@ -303,21 +303,21 @@ const KnowledgeFilesSection =
             <div
               className="
                 flex
+                h-11
                 w-full
                 items-center
-                gap-3
+                gap-2.5
 
-                rounded-2xl
+                rounded-xl
 
                 border
                 border-[#2d3b35]
 
                 bg-[#18211f]
 
-                px-4
-                py-3
+                px-3.5
 
-                sm:w-[340px]
+                sm:w-[300px]
               "
             >
               <Search

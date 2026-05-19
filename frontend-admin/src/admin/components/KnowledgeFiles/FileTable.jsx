@@ -65,7 +65,7 @@ const FileTable = ({
         <table
           className="
             w-full
-            min-w-[1100px]
+            min-w-[1050px]
 
             border-separate
             border-spacing-0
@@ -102,7 +102,7 @@ const FileTable = ({
 
         {/* EMPTY */}
         {!hasFiles && (
-          <div className="py-20">
+          <div className="py-16">
             <EmptyState
               title="No files found"
               message="
