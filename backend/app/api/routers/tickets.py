@@ -9,7 +9,6 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
 
 from app.api.deps import get_chatbot_db, get_helpdesk_db
@@ -17,22 +16,12 @@ from app.core.config import settings
 from app.core.exceptions import VectorStoreError
 from app.models.chatbot import BlacklistedTicket
 from app.models.helpdesk import TicketEvaluation
-from app.schemas.tickets import TicketDeleteResponse, TicketResponse
 from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service
 from app.services.ingestion_service import DocumentIngestionService
 from app.schemas.tickets import TicketDeleteResponse, TicketResponse, TicketResolveRequest, TicketSyncResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/tickets", tags=["Tickets"])
-
-# Qdrant client for ticket-blacklist operations.
-# This is a lightweight client object (no ML models), so constructing it
-# here as a module-level instance is acceptable.
-_qdrant = QdrantClient(
-    url=settings.QDRANT_URL,
-    api_key=settings.QDRANT_API_KEY,
-    timeout=settings.QDRANT_TIMEOUT,
-)
 
 
 @router.get(
@@ -90,6 +79,7 @@ def get_tickets(
 def delete_ticket_from_ai(
     ticket_number: str,
     db_chatbot: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> TicketDeleteResponse:
     """
     Hard-delete a ticket's vectors from Qdrant and add it to the SQL blacklist.
@@ -99,9 +89,9 @@ def delete_ticket_from_ai(
     """
     logger.info("Blacklisting ticket %s...", ticket_number)
 
-    # 1. Delete from Qdrant.
+    # 1. Delete from Qdrant safely using the injected service client.
     try:
-        _qdrant.delete(
+        ingestion_service.qdrant.delete(
             collection_name=settings.QDRANT_COLLECTION,
             points_selector=qdrant_models.Filter(
                 must=[
@@ -153,9 +143,7 @@ async def sync_resolved_ticket(
     Receives resolved ticket data, cleans it using an LLM, and ingests it into Qdrant.
     Call this API immediately after saving the ticket in the Helpdesk database.
     """
-    # Pass the payload dictionary directly to the ingestion service
     result = await ingestion_service.process_resolved_ticket(payload.model_dump(), db_chatbot)
-    
     return TicketSyncResponse(**result)
 
 @router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
@@ -170,7 +158,6 @@ async def whitelist_ticket(
     and immediately re-ingests it into Qdrant.
     """
     from app.models.chatbot import BlacklistedTicket
-    # Import your SQLAlchemy model that maps to [BigEHelpDeskDev].[dbo].[tbl_ticket_evaluation]
     from app.models.helpdesk import TicketEvaluation 
     
     # 1. Verify and Remove from Blacklist
@@ -198,7 +185,7 @@ async def whitelist_ticket(
         work_done=original_ticket.work_done or "None"
     )
 
-    # 4. Push it back to Qdrant (The AI's Brain)
+    # 4. Push it back to Qdrant
     await ingestion_service.process_resolved_ticket(
         ticket_payload.model_dump(),
         db_chatbot
@@ -208,7 +195,6 @@ async def whitelist_ticket(
         "status": "success", 
         "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI."
     }
-
 
 def run_bulk_ingestion_background():
     """
@@ -232,7 +218,6 @@ async def trigger_bulk_sync(background_tasks: BackgroundTasks):
     Triggers the bulk ingestion script to find and embed any missed Helpdesk tickets.
     Runs asynchronously in the background so the UI doesn't freeze.
     """
-    # Hand the task off to FastAPI's background thread pool
     background_tasks.add_task(run_bulk_ingestion_background)
     
     return {

@@ -1,0 +1,2844 @@
+================================================================================
+TARGETED PROJECT STRUCTURE
+================================================================================
+
+TARGETED FILE TREE
+===================
+└── backend
+    └── app
+        ├── api
+        │   └── routers
+        │       ├── chat.py
+        │       ├── maintenance.py
+        │       └── tickets.py
+        ├── core
+        │   └── database.py
+        ├── main.py
+        ├── models
+        │   └── chatbot.py
+        ├── schemas
+        │   └── documents.py
+        └── services
+            ├── consolidator.py
+            ├── ingestion_service.py
+            ├── orchestrator.py
+            └── settings_service.py
+
+================================================================================
+TARGETED FILE CONTENTS
+================================================================================
+
+================================================================================
+FILE: backend/app/api/routers/chat.py
+================================================================================
+
+"""
+Chat endpoints.
+
+Route handlers here are intentionally thin — they:
+  1. Validate input (Pydantic does this automatically).
+  2. Call the user service to authenticate the token.
+  3. Delegate all business logic to chat_service and the orchestrator.
+  4. Return a typed response.
+
+The original handle_chat was ~150 lines with inline DB operations,
+error handling, and AI calls all tangled together. The handler here
+is ~40 lines of pure orchestration.
+"""
+
+import logging
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_chatbot_db, get_orchestrator
+from app.core.exceptions import AuthenticationError
+from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse
+from app.services import chat_service
+from app.services.orchestrator import SupportOrchestrator
+from app.services.user_service import fetch_user_details
+from app.api.deps import get_chatbot_db, get_orchestrator, get_ingestion_service
+from app.services.ingestion_service import DocumentIngestionService
+from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse, ResolveChatResponse
+from app.schemas.tickets import TicketEscalateRequest, TicketEscalateResponse
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+@router.post("", response_model=ChatResponse)
+async def handle_chat(
+    request: ChatRequest,
+    db: Session = Depends(get_chatbot_db),
+    orchestrator: SupportOrchestrator = Depends(get_orchestrator),
+) -> ChatResponse:
+    """
+    Process a user chat message and return an AI response.
+
+    Flow:
+      1. Authenticate the user token.
+      2. Create or validate the chat session.
+      3. Save the user's message.
+      4. Build chat history string.
+      5. Run the RAG orchestrator.
+      6. Save the AI's response.
+      7. Return structured response.
+    """
+    # 1. Authenticate.
+    try:
+        logger.debug("Authenticating token: %s", request.user_token[:10] + "...")
+        user_data = await fetch_user_details(request.user_token)
+        logger.debug("Auth returned user_data: %s", user_data)
+        user_id = int(user_data.get("id") or 1)
+        user_name = (
+            f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
+        ).strip()
+        logger.info("Auth successful: user_id=%d, user_name=%s", user_id, user_name)
+    except AuthenticationError as exc:
+        logger.error("Authentication failed: %s", exc)
+        raise
+    except Exception as exc:
+        logger.error("Auth service error; rejecting request: %s", exc)
+        raise AuthenticationError("User authentication failed.") from exc
+
+    logger.info("Chat request from user_id=%d | session=%s", user_id, request.session_id)
+
+    # 2. Session management.
+    session_id = chat_service.get_or_create_session(db, request.session_id, user_id)
+
+    # 3. Save user message.
+    chat_service.save_message(db, session_id, "user", request.message)
+
+    # 4. Build history for the AI prompt.
+    history_text = chat_service.get_recent_history_text(db, session_id)
+
+    # 5. AI pipeline.
+    ai_response, ticket_ids = await orchestrator.orchestrate(
+        user_query=request.message,
+        chat_history=history_text,
+        user_name=user_name,
+        db=db,
+    )
+    logger.info("AI response generated for session=%s", session_id)
+
+    # 6. Save AI response.
+    chat_service.save_message(db, session_id, "ai", ai_response)
+
+    return ChatResponse(
+        session_id=session_id,
+        response=ai_response,
+        ticket_ids_used=ticket_ids,
+    )
+
+
+@router.get("/history/{session_id}", response_model=ChatHistoryResponse)
+async def get_chat_history(
+    session_id: str,
+    user_token: str,
+    db: Session = Depends(get_chatbot_db),
+) -> ChatHistoryResponse:
+    """
+    Retrieve the full message history for a session.
+
+    Verifies the requesting user owns the session before returning messages.
+    """
+    user_data = await fetch_user_details(user_token)
+    user_id = user_data.get("id") or 1
+
+    # Raises NotFoundError or AuthorizationError (handled globally).
+    chat_service.get_session_with_auth_check(db, session_id, user_id)
+
+    messages = chat_service.get_all_messages(db, session_id)
+
+    return ChatHistoryResponse(
+        session_id=session_id,
+        messages=[
+            MessageRecord(
+                MessageID=msg.MessageID,
+                SessionID=msg.SessionID,
+                SenderRole=msg.SenderRole,
+                MessageContent=msg.MessageContent,
+                CreatedAt=msg.CreatedAt.isoformat() if msg.CreatedAt else "",
+            )
+            for msg in messages
+        ],
+    )
+
+
+from datetime import datetime
+
+@router.get(
+    "/user-sessions/{requester_id}", 
+    response_model=list[ChatSessionMetaResponse], 
+    summary="Get all chat sessions for a specific user"
+)
+def get_user_chat_sessions(
+    requester_id: str,
+    limit: int = 20,
+    db: Session = Depends(get_chatbot_db)
+):
+    from app.models.chatbot import ChatSession
+    
+    # We can use order_by again because StartTime exists!
+    sessions = (
+        db.query(ChatSession)
+        .filter(ChatSession.RequesterUserID == requester_id)
+        .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
+        .order_by(ChatSession.StartTime.desc())
+        .limit(limit)
+        .all()
+    )
+    
+    result = []
+    for s in sessions:
+        result.append({
+            "session_id": s.SessionID,
+            "status": s.SessionStatus or "Active", # Using your real database column!
+            "created_at": s.StartTime,             # Using your real database column!
+            "message_count": len(s.messages) if s.messages else 0 
+        })
+        
+    return result
+
+@router.get(
+    "/all-sessions", 
+    response_model=list[ChatSessionMetaResponse], 
+    summary="Admin Audit: List all chats"
+)
+def get_all_chat_sessions(
+    limit: int = 50,
+    db: Session = Depends(get_chatbot_db)
+):
+    """Admin-only endpoint to review all employee chats using ONLY available columns."""
+    from app.models.chatbot import ChatSession
+    
+    # Change the basic .all() query to include the filter:
+    sessions = (
+        db.query(ChatSession)
+        .all()
+    )
+    
+    result = []
+    for s in sessions:
+        session_date = None
+        if s.messages:
+            sorted_messages = sorted(s.messages, key=lambda m: m.CreatedAt)
+            session_date = sorted_messages[0].CreatedAt
+            
+        result.append({
+            "session_id": s.SessionID,
+            "user_id": str(s.RequesterUserID), # Convert BigInt to string for safety
+            "status": "Archived",
+            "created_at": session_date,
+            "message_count": len(s.messages) if s.messages else 0 
+        })
+        
+    result.sort(key=lambda x: x["created_at"] if x["created_at"] else datetime.min, reverse=True)
+    return result[:limit]
+
+
+
+@router.post(
+    "/resolve/{session_id}", 
+    response_model=ResolveChatResponse, 
+    summary="Mark chat as resolved and extract KB data"
+)
+async def mark_chat_resolved(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """
+    Frontend triggers this when an employee clicks 'Mark as Resolved'.
+    The AI will extract the problem/solution as strict JSON and add it to its brain.
+    """
+    result = await ingestion_service.process_resolved_chat(session_id, db)
+    return result
+
+
+
+from app.schemas.tickets import TicketDraftResponse, TicketSubmitRequest, TicketEscalateResponse
+
+@router.get("/escalate/draft/{session_id}", response_model=TicketDraftResponse, summary="Draft ticket summary for frontend review")
+async def draft_escalation(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service) # <-- NEW
+):
+    try:
+        # Pass the ingestion_service into the chat service
+        result = await chat_service.draft_ticket_escalation(session_id, db, ingestion_service) 
+        return TicketDraftResponse(**result)
+    except Exception as exc:
+        logger.error(f"Failed to draft ticket: {exc}")
+        return TicketDraftResponse(status="error", summary="", description=str(exc))
+
+@router.post("/escalate/submit", response_model=TicketEscalateResponse, summary="Submit the reviewed ticket to live agents")
+async def submit_escalation(
+    request: TicketSubmitRequest,
+    db: Session = Depends(get_chatbot_db),
+):
+    try:
+        result = await chat_service.submit_ticket_escalation(request.model_dump(), db)
+        return TicketEscalateResponse(**result)
+    except Exception as exc:
+        logger.error(f"Failed to submit ticket: {exc}")
+        return TicketEscalateResponse(status="error", message=str(exc))
+    
+
+@router.delete("/sessions/{session_id}", summary="Archive a chat session")
+def delete_chat_session(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db)
+):
+    """
+    Soft-deletes a chat session so it disappears from user histories and admin views.
+    """
+    chat_service.archive_session(db, session_id)
+    return {"status": "success", "message": f"Session {session_id} archived successfully."}
+
+
+@router.delete("/users/{requester_id}/sessions", summary="Archive all chats for a specific user")
+def clear_all_user_chats(
+    requester_id: int,
+    db: Session = Depends(get_chatbot_db)
+):
+    """
+    Instantly soft-deletes every active chat session belonging to this user.
+    """
+    count = chat_service.archive_all_user_sessions(db, requester_id)
+    
+    if count == 0:
+        return {"status": "skipped", "message": "No active chats to clear."}
+        
+    return {"status": "success", "message": f"Successfully cleared {count} chat sessions."}
+
+
+================================================================================
+FILE: backend/app/api/routers/maintenance.py
+================================================================================
+
+import logging
+from fastapi import APIRouter, Depends, BackgroundTasks
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_chatbot_db, get_ingestion_service
+from app.services.maintenance import LIVE_STATUS
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
+
+@router.post("/consolidate", summary="Clean up Qdrant by merging duplicate tickets")
+async def trigger_knowledge_consolidation(
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service = Depends(get_ingestion_service)
+):
+    """
+    Finds clusters of similar tickets, merges them via LLM into a Master Rule, 
+    and deletes the redundant vectors to optimize the AI's memory.
+    """
+    def run_consolidation():
+        import asyncio
+        from app.services.maintenance import consolidate_similar_tickets
+        asyncio.run(consolidate_similar_tickets(
+            db, 
+            ingestion_service.qdrant, 
+            ingestion_service.embeddings
+        ))
+
+    background_tasks.add_task(run_consolidation)
+    
+    return {
+        "status": "success",
+        "message": "Knowledge consolidation started in the background."
+    }
+
+@router.get("/consolidate/status", summary="Get real-time consolidation progress")
+def get_consolidation_status():
+    """Returns the live, real-time status of the background deduplication job."""
+    return LIVE_STATUS
+
+================================================================================
+FILE: backend/app/api/routers/tickets.py
+================================================================================
+
+"""
+Ticket management endpoints.
+
+Admin operations for viewing and blacklisting IT support tickets.
+Extracted from main.py for proper separation of concerns.
+"""
+
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from sqlalchemy.orm import Session
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
+
+from app.api.deps import get_chatbot_db, get_helpdesk_db
+from app.core.config import settings
+from app.core.exceptions import VectorStoreError
+from app.models.chatbot import BlacklistedTicket
+from app.models.helpdesk import TicketEvaluation
+from app.schemas.tickets import TicketDeleteResponse, TicketResponse
+from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service
+from app.services.ingestion_service import DocumentIngestionService
+from app.schemas.tickets import TicketDeleteResponse, TicketResponse, TicketResolveRequest, TicketSyncResponse
+
+logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/tickets", tags=["Tickets"])
+
+# Qdrant client for ticket-blacklist operations.
+# This is a lightweight client object (no ML models), so constructing it
+# here as a module-level instance is acceptable.
+_qdrant = QdrantClient(
+    url=settings.QDRANT_URL,
+    api_key=settings.QDRANT_API_KEY,
+    timeout=settings.QDRANT_TIMEOUT,
+)
+
+
+@router.get(
+    "",
+    response_model=list[TicketResponse],
+    summary="List resolved tickets",
+)
+def get_tickets(
+    search: str | None = None,
+    skip: int = 0,
+    limit: int = 50,
+    db_helpdesk: Session = Depends(get_helpdesk_db),
+    db_chatbot: Session = Depends(get_chatbot_db),
+) -> list[TicketResponse]:
+    """
+    Return resolved tickets with a flag indicating if each is blacklisted.
+
+    Uses a set for O(1) blacklist lookups instead of a per-ticket query.
+    """
+    blacklisted = {
+        b.TicketNumber
+        for b in db_chatbot.query(BlacklistedTicket.TicketNumber).all()
+    }
+
+    query = db_helpdesk.query(TicketEvaluation).filter(
+        TicketEvaluation.work_done.isnot(None)
+    )
+    if search:
+        query = query.filter(TicketEvaluation.ticket_number.contains(search))
+
+    tickets = (
+        query.order_by(TicketEvaluation.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        TicketResponse(
+            id=t.id,
+            ticket_number=t.ticket_number,
+            issue_reported=t.issue_reported,
+            work_done=t.work_done,
+            is_blacklisted=t.ticket_number in blacklisted,
+        )
+        for t in tickets
+    ]
+
+
+@router.delete(
+    "/{ticket_number}",
+    response_model=TicketDeleteResponse,
+    summary="Remove a ticket from the AI knowledge base",
+)
+def delete_ticket_from_ai(
+    ticket_number: str,
+    db_chatbot: Session = Depends(get_chatbot_db),
+) -> TicketDeleteResponse:
+    """
+    Hard-delete a ticket's vectors from Qdrant and add it to the SQL blacklist.
+
+    Once blacklisted, the ticket will be excluded from future ingest runs
+    and will never re-appear in the knowledge base.
+    """
+    logger.info("Blacklisting ticket %s...", ticket_number)
+
+    # 1. Delete from Qdrant.
+    try:
+        _qdrant.delete(
+            collection_name=settings.QDRANT_COLLECTION,
+            points_selector=qdrant_models.Filter(
+                must=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.ticket_number",
+                        match=qdrant_models.MatchValue(value=ticket_number),
+                    )
+                ]
+            ),
+        )
+        logger.info("Qdrant vectors deleted for ticket %s.", ticket_number)
+    except Exception as exc:
+        raise VectorStoreError(f"Qdrant deletion failed for ticket {ticket_number}: {exc}") from exc
+
+    # 2. Add to SQL blacklist.
+    existing = (
+        db_chatbot.query(BlacklistedTicket)
+        .filter(BlacklistedTicket.TicketNumber == ticket_number)
+        .first()
+    )
+    if not existing:
+        db_chatbot.add(BlacklistedTicket(TicketNumber=ticket_number))
+        try:
+            db_chatbot.commit()
+            logger.info("Ticket %s added to blacklist.", ticket_number)
+        except Exception as exc:
+            db_chatbot.rollback()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to write blacklist entry: {exc}",
+            ) from exc
+
+    return TicketDeleteResponse(
+        status="success",
+        message=f"Ticket {ticket_number} permanently removed from the AI knowledge base.",
+    )
+
+@router.post(
+    "/sync",
+    response_model=TicketSyncResponse,
+    summary="Webhook to sync a resolved ticket to the AI Brain",
+)
+async def sync_resolved_ticket(
+    payload: TicketResolveRequest,
+    db_chatbot: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+) -> TicketSyncResponse:
+    """
+    Receives resolved ticket data, cleans it using an LLM, and ingests it into Qdrant.
+    Call this API immediately after saving the ticket in the Helpdesk database.
+    """
+    # Pass the payload dictionary directly to the ingestion service
+    result = await ingestion_service.process_resolved_ticket(payload.model_dump(), db_chatbot)
+    
+    return TicketSyncResponse(**result)
+
+@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+async def whitelist_ticket(
+    ticket_number: str, 
+    db_chatbot: Session = Depends(get_chatbot_db),
+    db_helpdesk: Session = Depends(get_helpdesk_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+):
+    """
+    Removes a ticket from the blacklist, fetches the original data from the Helpdesk, 
+    and immediately re-ingests it into Qdrant.
+    """
+    from app.models.chatbot import BlacklistedTicket
+    # Import your SQLAlchemy model that maps to [BigEHelpDeskDev].[dbo].[tbl_ticket_evaluation]
+    from app.models.helpdesk import TicketEvaluation 
+    
+    # 1. Verify and Remove from Blacklist
+    blacklisted_entry = db_chatbot.query(BlacklistedTicket).filter(BlacklistedTicket.TicketNumber == ticket_number).first()
+    if not blacklisted_entry:
+        raise HTTPException(status_code=404, detail=f"Ticket {ticket_number} is not currently blacklisted.")
+        
+    db_chatbot.delete(blacklisted_entry)
+    db_chatbot.commit()
+    
+    # 2. Fetch the original ticket data from the Helpdesk Database
+    original_ticket = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.ticket_number == ticket_number).first()
+    if not original_ticket:
+        raise HTTPException(
+            status_code=404, 
+            detail="Ticket removed from blacklist, but the original ticket could not be found in the Helpdesk DB to re-learn."
+        )
+
+    # 3. Format it perfectly for the Ingestion Service
+    ticket_payload = TicketResolveRequest(
+        ticket_number=original_ticket.ticket_number,
+        issue_reported=original_ticket.issue_reported or "None",
+        issue_found=original_ticket.issue_found or "None",
+        issue_cause=original_ticket.issue_cause or "None",
+        work_done=original_ticket.work_done or "None"
+    )
+
+    # 4. Push it back to Qdrant (The AI's Brain)
+    await ingestion_service.process_resolved_ticket(
+        ticket_payload.model_dump(),
+        db_chatbot
+    )
+    
+    return {
+        "status": "success", 
+        "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI."
+    }
+
+
+def run_bulk_ingestion_background():
+    """
+    Wrapper to run the standalone script logic safely in a separate thread.
+    We import inside the function to avoid circular dependencies.
+    """
+    import logging
+    logger = logging.getLogger(__name__)
+    
+    try:
+        from scripts.ingest_tickets import run_ingestion
+        logger.info("Starting background bulk ticket sync...")
+        run_ingestion()
+        logger.info("Background bulk ticket sync completed successfully.")
+    except Exception as e:
+        logger.error(f"Background bulk ingestion failed: {e}", exc_info=True)
+
+@router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")
+async def trigger_bulk_sync(background_tasks: BackgroundTasks):
+    """
+    Triggers the bulk ingestion script to find and embed any missed Helpdesk tickets.
+    Runs asynchronously in the background so the UI doesn't freeze.
+    """
+    # Hand the task off to FastAPI's background thread pool
+    background_tasks.add_task(run_bulk_ingestion_background)
+    
+    return {
+        "status": "success", 
+        "message": "Bulk sync initiated. The AI is currently updating its brain in the background."
+    }
+
+================================================================================
+FILE: backend/app/core/database.py
+================================================================================
+
+"""
+Database engine and session factory configuration.
+
+WHY this file exists separately from models/:
+  Previously, engines, sessions, AND all ORM model classes were all
+  defined in a single core/models.py. That file also imported from
+  user_service.py, creating an upward dependency from the data layer
+  to the service layer.
+
+  Separating database setup here means:
+  - ORM models (models/) have zero knowledge of configuration or services.
+  - Services and routes import from models/ and core/database independently.
+  - Tests can override get_chatbot_db / get_helpdesk_db without touching models.
+"""
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, Session
+
+from app.core.config import settings
+
+
+# ─── Helpdesk Database (Read-Only source of resolved tickets) ─────────────────
+engine_helpdesk = create_engine(
+    settings.HELPDESK_DB_CONN,
+    pool_pre_ping=True,        # Reconnect gracefully after DB restarts
+    pool_recycle=1800,         # Recycle connections every 30 min
+)
+
+SessionHelpdesk = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine_helpdesk,
+)
+
+
+# ─── Chatbot Database (Read/Write for sessions, messages, settings, docs) ─────
+engine_chatbot = create_engine(
+    settings.CHATBOT_DB_CONN,
+    pool_pre_ping=True,
+    pool_recycle=1800,
+)
+
+SessionChatbot = sessionmaker(
+    autocommit=False,
+    autoflush=False,
+    bind=engine_chatbot,
+)
+
+
+def get_chatbot_db() -> Session:
+    """
+    FastAPI dependency that yields a chatbot DB session and ensures
+    it is closed after the request, even if an exception occurs.
+    """
+    db = SessionChatbot()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def get_helpdesk_db() -> Session:
+    """
+    FastAPI dependency that yields a helpdesk DB session (read-only usage).
+    """
+    db = SessionHelpdesk()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+================================================================================
+FILE: backend/app/main.py
+================================================================================
+
+"""
+FastAPI application factory.
+
+This file's ONLY responsibilities:
+  1. Create the FastAPI application.
+  2. Configure middleware.
+  3. Register routers.
+  4. Register exception handlers.
+  5. Run startup / shutdown logic (lifespan).
+
+There is zero business logic here.
+
+Previously, main.py contained 200+ lines including all admin route
+handlers (documents, tickets, settings) and inline ORM queries. That
+violated the Single Responsibility Principle and made the entry point
+the hardest file to navigate in the project.
+"""
+
+import logging
+import sys
+from contextlib import asynccontextmanager
+
+import uvicorn
+from app.api.routers import auth
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from qdrant_client import QdrantClient
+from app.api.routers import analytics  
+
+from app.api.routers import chat, documents, settings, tickets, explorer
+from app.core.config import settings as app_settings
+from app.core.database import SessionChatbot
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import configure_logging
+from app.services.ingestion_service import DocumentIngestionService
+from app.services.orchestrator import SupportOrchestrator
+from app.api.routers import self_knowledge
+from app.api.routers import maintenance, routing
+
+configure_logging()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application startup and shutdown logic.
+
+    On startup:
+      - Verify Qdrant is reachable and the required collection exists.
+      - Load the SupportOrchestrator (downloads ML models if not cached).
+      - Load the DocumentIngestionService (shares the same embedding model).
+
+    Loading ML models in the lifespan:
+      This is intentional. Models are expensive (~1-3 GB, 30-120 seconds to
+      load). By loading them once here and storing them in app.state, every
+      request reuses the same in-memory model rather than reloading per request.
+      The app exits immediately if startup fails, providing a clear error.
+    """
+    logger.info("Starting up — running pre-flight checks...")
+
+    # ── Qdrant health check ───────────────────────────────────────────────
+    try:
+        qdrant_client = QdrantClient(
+            url=app_settings.QDRANT_URL,
+            api_key=app_settings.QDRANT_API_KEY,
+            timeout=app_settings.QDRANT_TIMEOUT,
+        )
+        if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
+            logger.critical(
+                "FATAL: Qdrant collection '%s' does not exist. "
+                "Run scripts/ingest_tickets.py first.",
+                app_settings.QDRANT_COLLECTION,
+            )
+            sys.exit(1)
+        logger.info("Qdrant OK — collection '%s' verified.", app_settings.QDRANT_COLLECTION)
+    except Exception as exc:
+        logger.critical("Qdrant connection failed: %s", exc)
+        sys.exit(1)
+
+    # ── Load ML services (expensive — done once here, not per-request) ────
+    db = SessionChatbot()
+    try:
+        logger.info("Loading AI Orchestrator (embedding + reranker models)...")
+        app.state.orchestrator = SupportOrchestrator(db=db)
+
+        logger.info("Loading Document Ingestion Service (embedding model)...")
+        app.state.ingestion_service = DocumentIngestionService(db=db)
+    except Exception as exc:
+        logger.critical("Failed to initialise AI services: %s", exc, exc_info=True)
+        sys.exit(1)
+    finally:
+        db.close()
+
+    logger.info("Application startup complete.")
+    yield
+
+    # ── Shutdown ──────────────────────────────────────────────────────────
+    logger.info("Application shutting down.")
+
+
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application instance."""
+    app = FastAPI(
+        title="IT Support AI",
+        description="Enterprise IT helpdesk RAG chatbot API.",
+        version="2.0.0",
+        lifespan=lifespan,
+    )
+
+    # ── CORS ──────────────────────────────────────────────────────────────
+    # Origins are configurable via CORS_ORIGINS in .env.
+    # Defaults to localhost only — NOT open to all origins.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=app_settings.CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # ── Exception Handlers ────────────────────────────────────────────────
+    register_exception_handlers(app)
+
+    # ── Routers ───────────────────────────────────────────────────────────
+    PREFIX = "/api"
+    app.include_router(chat.router, prefix=PREFIX)
+    app.include_router(documents.router, prefix=PREFIX)
+    app.include_router(tickets.router, prefix=PREFIX)
+    app.include_router(settings.router, prefix=PREFIX)
+    app.include_router(explorer.router, prefix=PREFIX)
+    app.include_router(self_knowledge.router, prefix="/api")
+    app.include_router(auth.router, prefix=PREFIX)
+    app.include_router(analytics.router, prefix=PREFIX)
+    app.include_router(maintenance.router, prefix=PREFIX)
+    app.include_router(routing.router, prefix=PREFIX) 
+
+    # ── Health Check ──────────────────────────────────────────────────────
+    @app.get("/health", tags=["Health"])
+    def health_check():
+        """Liveness probe endpoint."""
+        return {"status": "ok"}
+
+    return app
+
+
+app = create_app()
+
+if __name__ == "__main__":
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
+
+
+================================================================================
+FILE: backend/app/models/chatbot.py
+================================================================================
+
+"""
+SQLAlchemy ORM models for the Chatbot (read/write) database.
+
+WHY models/ imports nothing from services/:
+  The original models.py imported fetch_user_details from user_service.py.
+  That function was never called inside models.py — the import was
+  accidental pollution. ORM models must be pure data definitions.
+  They have zero business logic and zero knowledge of services.
+"""
+
+import uuid
+from datetime import datetime
+
+from sqlalchemy import (
+    BigInteger,
+    Boolean,
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    Numeric,
+    String,
+    Text,
+)
+from sqlalchemy.orm import declarative_base, relationship
+
+BaseChatbot = declarative_base()
+
+
+class ChatSession(BaseChatbot):
+    """A conversation session between a user and the AI."""
+    __tablename__ = "ChatSession"
+
+    SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    RequesterUserID = Column(BigInteger, nullable=False, default=1)
+    
+    # --- THE NEWLY DISCOVERED COLUMNS ---
+    ChatTitle = Column(String(255))
+    StartTime = Column(DateTime, default=datetime.utcnow)
+    LastActive = Column(DateTime)
+    IsActive = Column(Boolean, default=True)
+    RelatedTicketID = Column(String(50))
+    IssueSummary = Column(Text)
+    ResolutionSummary = Column(Text)
+    SessionStatus = Column(String(50), default="Active")
+
+    messages = relationship(
+        "ChatMessage",
+        back_populates="session",
+        cascade="all, delete-orphan",
+    )
+
+
+class ChatMessage(BaseChatbot):
+    """A single message within a chat session (from user or AI)."""
+
+    __tablename__ = "ChatMessage"
+
+    MessageID = Column(BigInteger, primary_key=True, autoincrement=True)
+    SessionID = Column(
+        String(36),
+        ForeignKey("ChatSession.SessionID", ondelete="CASCADE"),
+        nullable=False,
+    )
+    SenderRole = Column(String(10), nullable=False)  # "user" or "ai"
+    MessageContent = Column(Text, nullable=False)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+
+    session = relationship("ChatSession", back_populates="messages")
+
+
+class AIChatbotSetting(BaseChatbot):
+    """
+    AI configuration row.
+
+    Versioned via IsActive: only one row is active at a time.
+    When settings are updated, the current row is deactivated and a
+    new row is inserted, preserving the full audit history.
+    """
+
+    __tablename__ = "AIChatbot_Settings"
+
+    SettingID = Column(Integer, primary_key=True, autoincrement=True)
+    ActiveModel = Column(String(100), nullable=False)
+    ReformulatorModel = Column(String(100))
+    SystemPrompt = Column(Text, nullable=False)
+    ReformulatorPrompt = Column(Text)
+    Temperature = Column(Numeric(3, 2))
+    ConfidenceThreshold = Column(Numeric(4, 2))
+    EmbeddingModel = Column(String(100))
+    RerankerModel = Column(String(100))
+    TopK_Tickets = Column(Integer)
+    UseReformulator = Column(Boolean, default=True)
+    UseReranker = Column(Boolean, default=True)
+    ChatExtractionPrompt = Column(Text)
+    AllowedCategories = Column(
+        String(500),
+        default=(
+            "Network_Infrastructure,Hardware_Guide,Software_Documentation,"
+            "HR_IT_Policy,Troubleshooting_Manual,General_IT"
+        ),
+    )
+    IsActive = Column(Boolean, default=True)
+    CreatedDate = Column(DateTime, default=datetime.utcnow)
+    UpdatedBy = Column(BigInteger)
+
+
+class UploadedDocument(BaseChatbot):
+    """Metadata record for a PDF document that has been ingested into the vector store."""
+
+    __tablename__ = "tbl_uploaded_documents"
+
+    DocumentID = Column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    FileName = Column(String(255), nullable=False)
+    Category = Column(String(100), nullable=False)
+    ChunkCount = Column(Integer, nullable=False)
+    UploadedAt = Column(DateTime, default=datetime.utcnow)
+    UploadedBy = Column(BigInteger, default=1)
+    IsActive = Column(Boolean, default=True)
+
+
+class BlacklistedTicket(BaseChatbot):
+    """Ticket numbers that have been manually excluded from the AI knowledge base."""
+
+    __tablename__ = "tbl_blacklisted_tickets"
+
+    TicketNumber = Column(String(15), primary_key=True)
+    BlacklistedAt = Column(DateTime, default=datetime.utcnow)
+    BlacklistedBy = Column(BigInteger, default=1)
+
+
+class ManualKnowledgeEntry(BaseChatbot):
+    """Metadata and content record for manually typed knowledge base rules."""
+
+    __tablename__ = "tbl_manual_knowledge"
+
+    EntryID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    Title = Column(String(255), nullable=False)
+    Content = Column(Text, nullable=False)
+    Category = Column(String(100), nullable=False)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    CreatedBy = Column(BigInteger, default=1)
+    IsActive = Column(Boolean, default=True)
+
+
+
+class LearnedChat(BaseChatbot):
+    """Structured knowledge extracted by the AI from resolved chats."""
+
+    __tablename__ = "tbl_learned_chats"
+
+    SessionID = Column(String(36), primary_key=True)
+    IssueReported = Column(Text)
+    IssueFound = Column(Text)
+    RootCause = Column(Text)
+    WorkDone = Column(Text)
+    LearnedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    IsActive = Column(Boolean, default=True)
+
+
+
+class KnowledgeClusterMap(BaseChatbot):
+    """
+    Maps a source record (ticket/manual/chat/pdf) to its canonical Qdrant cluster.
+    This keeps update/delete flows stable even when multiple SQL rows merge into
+    one semantic cluster in Qdrant.
+    """
+
+    __tablename__ = "tbl_knowledge_cluster_map"
+
+    SourceID = Column(String(64), primary_key=True)     # ticket number / entry id / session id / document id
+    SourceType = Column(String(50), nullable=False)     # ticket | manual | chat | pdf
+    ClusterID = Column(String(64), nullable=False, index=True)
+    ClusterKey = Column(String(128), nullable=False, index=True)
+    IsActive = Column(Boolean, default=True)
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+
+class TicketRoutingLog(BaseChatbot):
+    """
+    Telemetry log for the AI Routing Engine.
+    Tracks what the AI predicted, why it predicted it, and if a human had to fix it.
+    """
+    __tablename__ = "tbl_ticket_routing_log"
+
+    LogID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    
+    # The raw input
+    InputSummary = Column(String(500), nullable=False)
+    InputDescription = Column(Text, nullable=False)
+    
+    # The AI's Prediction
+    PredictedDepartment = Column(String(100))
+    PredictedSubcategory = Column(String(100))
+    ConfidenceScore = Column(Numeric(4, 3)) # e.g., 0.985
+    LLMReasoning = Column(Text)             # The explainability payload
+    
+    # The "Continuous Learning" Loop
+    IsHumanOverridden = Column(Boolean, default=False)
+    FinalDepartment = Column(String(100))   # Filled in later if a human corrects it
+    FinalSubcategory = Column(String(100))
+    
+    CreatedAt = Column(DateTime, default=datetime.utcnow)
+
+================================================================================
+FILE: backend/app/schemas/documents.py
+================================================================================
+
+"""Pydantic schemas for document management endpoints."""
+
+from datetime import datetime
+from pydantic import BaseModel
+
+
+class DocumentResponse(BaseModel):
+    document_id: str
+    file_name: str
+    category: str
+    chunk_count: int
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class DocumentUploadResponse(BaseModel):
+    status: str
+    document_id: str
+    category: str
+    chunks_processed: int
+
+
+class DocumentDeleteResponse(BaseModel):
+    status: str
+    document_id: str
+
+
+class DocumentUpdateRequest(BaseModel):
+    file_name: str | None = None
+    category: str | None = None
+
+
+class ManualEntryRequest(BaseModel):
+    title: str
+    content: str
+    category: str | None = None
+
+
+class ManualEntryResponse(BaseModel):
+    entry_id: str
+    title: str
+    content: str
+    category: str
+    created_at: datetime
+    updated_at: datetime
+    is_active: bool = True  # <--- Add " = True" right here
+
+    class Config:
+        from_attributes = True
+
+
+class ManualEntryUpdateRequest(BaseModel):
+    title: str | None = None
+    content: str | None = None
+    category: str | None = None
+
+================================================================================
+FILE: backend/app/services/consolidator.py
+================================================================================
+
+from __future__ import annotations
+
+import hashlib
+import re
+import uuid
+from dataclasses import dataclass
+from typing import Any
+
+from qdrant_client.http.models import PointStruct
+
+
+def _norm(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip().lower()
+    text = re.sub(r"[^\w\s]", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+def _stable_text(value: Any) -> str:
+    if value is None:
+        return "None"
+    text = str(value).strip()
+    return text if text else "None"
+
+
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+@dataclass
+class CanonicalRecord:
+    cluster_key: str
+    point_id: str
+    page_content: str
+    metadata: dict[str, Any]
+
+
+class KnowledgeConsolidator:
+    """
+    Builds canonical knowledge objects before they are embedded into Qdrant.
+
+    Strategy:
+    - Tickets / manual entries / learned chats:
+      deterministic semantic-lite grouping by normalized content hash
+    - PDFs:
+      version by file hash, because docs should generally be replaced, not merged
+    """
+
+    def ticket_cluster_key(self, ticket_number: Any, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any, advanced_work_done: Any) -> str:
+        parts = [
+            _norm(issue_reported),
+            _norm(issue_found),
+            _norm(issue_cause),
+            _norm(work_done),
+            _norm(advanced_work_done),
+        ]
+        raw = " | ".join(parts)
+        return _sha256(raw)
+
+    def manual_cluster_key(self, title: str, content: str, category: str) -> str:
+        raw = f"{_norm(title)} | {_norm(content)} | {_norm(category)}"
+        return _sha256(raw)
+
+    def chat_cluster_key(self, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any) -> str:
+        raw = " | ".join([_norm(issue_reported), _norm(issue_found), _norm(issue_cause), _norm(work_done)])
+        return _sha256(raw)
+
+    def pdf_cluster_key(self, file_name: str, raw_text: str, category: str) -> str:
+        raw = f"{_norm(file_name)} | {_norm(category)} | {_norm(raw_text)}"
+        return _sha256(raw)
+
+    def cluster_id(self, cluster_key: str) -> str:
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"cluster_{cluster_key}"))
+
+    def build_ticket_record(self, *, ticket_number: Any, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any, advanced_work_done: Any) -> CanonicalRecord:
+        cluster_key = self.ticket_cluster_key(ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done)
+        point_id = self.cluster_id(cluster_key)
+
+        page_content = (
+            "CANONICAL HELPDESK ISSUE\n"
+            "========================\n"
+            f"REPRESENTATIVE TICKET NUMBER: {_stable_text(ticket_number)}\n\n"
+            f"ISSUE REPORTED: {_stable_text(issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: {_stable_text(issue_found)}\n"
+            f"ROOT CAUSE: {_stable_text(issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): {_stable_text(work_done)}\n"
+            f"ADVANCED RESOLUTION: {_stable_text(advanced_work_done)}\n"
+        )
+
+        metadata = {
+            "doc_type": "canonical_ticket_cluster",
+            "knowledge_type": "ticket",
+            "cluster_key": cluster_key,
+            "source_id": _stable_text(ticket_number),
+            "source_ids": [_stable_text(ticket_number)],
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+    def build_manual_record(self, *, entry_id: str, title: str, content: str, category: str) -> CanonicalRecord:
+        cluster_key = self.manual_cluster_key(title, content, category)
+        point_id = self.cluster_id(cluster_key)
+
+        page_content = f"TITLE: {title.strip()}\nCONTENT: {content.strip()}"
+        metadata = {
+            "doc_type": "general_text",
+            "knowledge_type": "manual",
+            "cluster_key": cluster_key,
+            "source_id": entry_id,
+            "source_ids": [entry_id],
+            "title": title,
+            "category": category,
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+    def build_chat_record(self, *, session_id: str, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any) -> CanonicalRecord:
+        cluster_key = self.chat_cluster_key(issue_reported, issue_found, issue_cause, work_done)
+        point_id = self.cluster_id(cluster_key)
+
+        page_content = (
+            "ISSUE REPORTED: " + _stable_text(issue_reported) + "\n"
+            "ACTUAL ISSUE FOUND: " + _stable_text(issue_found) + "\n"
+            "ROOT CAUSE: " + _stable_text(issue_cause) + "\n"
+            "RESOLUTION (WORK DONE): " + _stable_text(work_done)
+        )
+        metadata = {
+            "doc_type": "resolved_chat",
+            "knowledge_type": "chat",
+            "cluster_key": cluster_key,
+            "source_id": session_id,
+            "source_ids": [session_id],
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+    def build_pdf_record(self, *, document_id: str, file_name: str, raw_text: str, category: str) -> CanonicalRecord:
+        cluster_key = self.pdf_cluster_key(file_name, raw_text, category)
+        point_id = self.cluster_id(cluster_key)
+
+        # PDF is still chunked later, but the document identity is canonicalized.
+        page_content = raw_text
+        metadata = {
+            "doc_type": "official_document",
+            "knowledge_type": "pdf",
+            "cluster_key": cluster_key,
+            "source_id": document_id,
+            "source_ids": [document_id],
+            "file_name": file_name,
+            "category": category,
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+================================================================================
+FILE: backend/app/services/ingestion_service.py
+================================================================================
+
+"""
+Document ingestion service.
+
+Handles:
+  - PDF parsing and text extraction.
+  - AI-based document categorisation.
+  - Chunk splitting and embedding.
+  - Qdrant vector upsert.
+  - SQL metadata persistence.
+  - Document deletion (Qdrant + SQL).
+  - Canonical knowledge consolidation for manual entries, tickets, and chats.
+
+This version adds a shared consolidation layer so repeated knowledge does not
+explode into many near-identical Qdrant vectors.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import tempfile
+import uuid
+from datetime import datetime
+
+from fastapi import UploadFile
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from pypdf import PdfReader
+from qdrant_client import QdrantClient
+from qdrant_client.http.models import (
+    FieldCondition,
+    Filter,
+    MatchValue,
+    PointStruct,
+)
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.core.exceptions import ValidationError, VectorStoreError
+from app.models.chatbot import (
+    AIChatbotSetting,
+    BlacklistedTicket,
+    KnowledgeClusterMap,
+    LearnedChat,
+    ManualKnowledgeEntry,
+    UploadedDocument,
+)
+from app.services.consolidator import KnowledgeConsolidator
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_CATEGORIES = [
+    "Network_Infrastructure",
+    "Hardware_Guide",
+    "Software_Documentation",
+    "HR_IT_Policy",
+    "Troubleshooting_Manual",
+    "General_IT",
+]
+_PDF_MAGIC = b"%PDF-"
+
+
+class DocumentIngestionService:
+    """
+    Processes knowledge sources into the Qdrant vector store.
+
+    Instantiated once during app lifespan startup. Shared across requests.
+    """
+
+    def __init__(self, db: Session) -> None:
+        logger.info("Initializing DocumentIngestionService...")
+
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+
+        self.embed_model: str = (
+            active_config.EmbeddingModel
+            if active_config and active_config.EmbeddingModel
+            else settings.EMBEDDING_MODEL
+        )
+        self.classifier_model: str = (
+            active_config.ReformulatorModel
+            if active_config and active_config.ReformulatorModel
+            else settings.CLASSIFIER_MODEL
+        )
+
+        raw_categories = active_config.AllowedCategories if active_config else None
+        self.allowed_categories: list[str] = (
+            [c.strip() for c in raw_categories.split(",")]
+            if raw_categories
+            else _DEFAULT_CATEGORIES
+        )
+
+        self.qdrant = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            timeout=settings.QDRANT_TIMEOUT,
+        )
+        self.collection_name = settings.QDRANT_COLLECTION
+        self.embeddings = HuggingFaceEmbeddings(model_name=self.embed_model)
+        self.text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=500,
+            chunk_overlap=50,
+            length_function=len,
+        )
+        self.consolidator = KnowledgeConsolidator()
+
+        logger.info("DocumentIngestionService ready (embed_model=%s).", self.embed_model)
+
+    @staticmethod
+    def _validate_pdf_bytes(data: bytes) -> None:
+        if not data[:5] == _PDF_MAGIC:
+            raise ValidationError(
+                "Uploaded file is not a valid PDF. Only PDF files are supported."
+            )
+
+    def _get_existing_payload(self, point_id: str) -> dict | None:
+        try:
+            records = self.qdrant.retrieve(
+                collection_name=self.collection_name,
+                ids=[point_id],
+                with_payload=True,
+                with_vectors=False,
+            )
+            if records:
+                payload = getattr(records[0], "payload", None)
+                if isinstance(payload, dict):
+                    return payload
+        except Exception as exc:
+            logger.warning("Could not retrieve existing Qdrant point %s: %s", point_id, exc)
+        return None
+
+    @staticmethod
+    def _payload_metadata(payload: dict | None) -> dict:
+        if not isinstance(payload, dict):
+            return {}
+        meta = payload.get("metadata", {})
+        return meta if isinstance(meta, dict) else {}
+
+    def _merge_cluster_payload(
+        self,
+        existing_payload: dict | None,
+        record_page_content: str,
+        record_metadata: dict,
+        source_id: str,
+        source_type: str,
+    ) -> dict:
+        existing_meta = self._payload_metadata(existing_payload)
+
+        source_ids = list(existing_meta.get("source_ids", []) or [])
+        source_already_present = source_id in source_ids
+        if not source_already_present:
+            source_ids.append(source_id)
+
+        source_types = list(existing_meta.get("source_types", []) or [])
+        if source_type not in source_types:
+            source_types.append(source_type)
+
+        existing_frequency = int(existing_meta.get("frequency", 0) or 0)
+        frequency = existing_frequency if source_already_present else existing_frequency + 1
+        if frequency <= 0:
+            frequency = 1
+
+        merged_meta = dict(existing_meta)
+        merged_meta.update(record_metadata)
+        merged_meta["source_id"] = source_id
+        merged_meta["source_ids"] = source_ids
+        merged_meta["source_types"] = source_types
+        merged_meta["frequency"] = frequency
+
+        return {
+            "page_content": record_page_content,
+            "metadata": merged_meta,
+        }
+
+    def _sync_cluster_map(
+        self,
+        db: Session,
+        source_id: str,
+        source_type: str,
+        cluster_id: str,
+        cluster_key: str,
+    ) -> None:
+        mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == source_id)
+            .first()
+        )
+        if mapping:
+            mapping.SourceType = source_type
+            mapping.ClusterID = cluster_id
+            mapping.ClusterKey = cluster_key
+            mapping.IsActive = True
+            mapping.UpdatedAt = datetime.utcnow()
+        else:
+            db.add(
+                KnowledgeClusterMap(
+                    SourceID=source_id,
+                    SourceType=source_type,
+                    ClusterID=cluster_id,
+                    ClusterKey=cluster_key,
+                    IsActive=True,
+                )
+            )
+
+    def _deactivate_source_mapping(self, db: Session, source_id: str) -> str | None:
+        mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == source_id)
+            .first()
+        )
+        if not mapping:
+            return None
+
+        mapping.IsActive = False
+        mapping.UpdatedAt = datetime.utcnow()
+        cluster_id = mapping.ClusterID
+        db.commit()
+        return cluster_id
+
+    def _maybe_delete_orphan_cluster(self, db: Session, cluster_id: str | None) -> None:
+        if not cluster_id:
+            return
+
+        active_count = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.ClusterID == cluster_id)
+            .filter(KnowledgeClusterMap.IsActive == True)
+            .count()
+        )
+        if active_count > 0:
+            return
+
+        try:
+            self.qdrant.delete(
+                collection_name=self.collection_name,
+                points_selector=[cluster_id],
+            )
+        except Exception as exc:
+            logger.warning("Could not delete orphan Qdrant cluster %s: %s", cluster_id, exc)
+
+    async def _upsert_canonical_point_async(
+        self,
+        *,
+        db: Session,
+        source_id: str,
+        source_type: str,
+        cluster_id: str,
+        cluster_key: str,
+        page_content: str,
+        metadata: dict,
+    ) -> None:
+        existing_payload = self._get_existing_payload(cluster_id)
+        payload = self._merge_cluster_payload(
+            existing_payload=existing_payload,
+            record_page_content=page_content,
+            record_metadata=metadata,
+            source_id=source_id,
+            source_type=source_type,
+        )
+
+        vector = await asyncio.to_thread(self.embeddings.embed_query, page_content)
+
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[
+                PointStruct(
+                    id=cluster_id,
+                    vector=vector,
+                    payload=payload,
+                )
+            ],
+        )
+
+        self._sync_cluster_map(db, source_id, source_type, cluster_id, cluster_key)
+        db.commit()
+
+    async def process_pdf_upload(
+        self,
+        file: UploadFile,
+        db: Session,
+        manual_category: str = None,
+    ) -> dict:
+        existing_doc = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.FileName == file.filename)
+            .first()
+        )
+        if existing_doc:
+            raise ValidationError(
+                f"File '{file.filename}' already exists in the database. "
+                f"Document ID: {existing_doc.DocumentID}"
+            )
+
+        raw_bytes = await file.read()
+        self._validate_pdf_bytes(raw_bytes)
+
+        temp_file_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(raw_bytes)
+                temp_file_path = tmp.name
+
+            pdf_reader = PdfReader(temp_file_path)
+            raw_text = ""
+            for page in pdf_reader.pages:
+                text = page.extract_text()
+                if text:
+                    raw_text += text + "\n"
+
+            if not raw_text.strip():
+                raise ValidationError("Could not extract any text from the uploaded PDF.")
+
+            if manual_category and manual_category in self.allowed_categories:
+                ai_category = manual_category
+            else:
+                if manual_category:
+                    logger.warning(
+                        "Admin provided category '%s' but it's not in allowed list: %s",
+                        manual_category,
+                        self.allowed_categories,
+                    )
+                ai_category = await self._classify_document(raw_text)
+
+            cluster_key = self.consolidator.pdf_cluster_key(
+                file_name=file.filename,
+                raw_text=raw_text,
+                category=ai_category,
+            )
+            document_id = self.consolidator.cluster_id(cluster_key)
+
+            chunks = self.text_splitter.split_text(raw_text)
+
+            logger.info("Embedding %d chunks for document %s...", len(chunks), document_id)
+            vectors = await asyncio.to_thread(self.embeddings.embed_documents, chunks)
+
+            points = []
+            for i, chunk in enumerate(chunks):
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{i}"))
+                payload = {
+                    "page_content": chunk,
+                    "metadata": {
+                        "document_id": document_id,
+                        "source": file.filename,
+                        "category": ai_category,
+                        "chunk_index": i,
+                        "doc_type": "official_document",
+                        "knowledge_type": "pdf",
+                        "cluster_key": cluster_key,
+                        "source_id": document_id,
+                        "source_ids": [document_id],
+                        "frequency": 1,
+                    },
+                }
+                points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
+
+            try:
+                self.qdrant.upsert(
+                    collection_name=self.collection_name,
+                    points=points,
+                )
+            except Exception as exc:
+                raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
+
+            db.add(
+                UploadedDocument(
+                    DocumentID=document_id,
+                    FileName=file.filename,
+                    Category=ai_category,
+                    ChunkCount=len(chunks),
+                )
+            )
+            db.commit()
+
+            return {
+                "status": "success",
+                "document_id": document_id,
+                "category": ai_category,
+                "chunks_processed": len(chunks),
+            }
+
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+
+    async def _classify_document(self, text: str) -> str:
+        snippet = text[:3000]
+        try:
+            classify_llm = ChatGroq(
+                model="llama-3.1-8b-instant",
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+
+            prompt = (
+                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {self.allowed_categories}. "
+                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
+            )
+
+            ai_category = (await classify_llm.ainvoke(prompt)).content.strip(' "\'\n')
+            if ai_category not in self.allowed_categories:
+                logger.warning(
+                    "AI hallucinated category '%s'. Defaulting to 'General_IT'.",
+                    ai_category,
+                )
+                return "General_IT"
+            return ai_category
+
+        except Exception as exc:
+            logger.error("Error during AI categorization: %s", exc)
+            return "General_IT"
+
+    async def process_manual_entry(
+        self,
+        title: str,
+        content: str,
+        manual_category: str | None,
+        db: Session,
+    ) -> dict:
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+
+        raw_categories = (
+            active_config.AllowedCategories
+            if active_config and active_config.AllowedCategories
+            else "General_IT"
+        )
+        allowed_categories = [c.strip() for c in raw_categories.split(",")]
+
+        if manual_category:
+            if manual_category not in allowed_categories:
+                raise ValueError(
+                    f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}"
+                )
+            ai_category = manual_category
+        else:
+            classify_llm = ChatGroq(
+                model="llama-3.1-8b-instant",
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+            prompt = (
+                f"You are an IT categorization AI. Read this text: '{title} - {content}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
+                "Reply with ONLY the category name. Do not add punctuation."
+            )
+            ai_category = (await classify_llm.ainvoke(prompt)).content.strip(' "\'\n')
+            if ai_category not in allowed_categories:
+                logger.warning(
+                    "AI hallucinated category '%s'. Overriding to 'General_IT'.",
+                    ai_category,
+                )
+                ai_category = "General_IT"
+
+        document_id = str(uuid.uuid4())
+        record = self.consolidator.build_manual_record(
+            entry_id=document_id,
+            title=title,
+            content=content,
+            category=ai_category,
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=document_id,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        db.add(
+            ManualKnowledgeEntry(
+                EntryID=document_id,
+                Title=title,
+                Content=content,
+                Category=ai_category,
+            )
+        )
+        db.commit()
+
+        return {
+            "status": "success",
+            "entry_id": document_id,
+            "category": ai_category,
+            "message": f"Manual entry added to AI Brain under '{ai_category}'.",
+        }
+
+    async def update_manual_entry(self, entry_id: str, updates: dict, db: Session) -> dict:
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
+        if not entry:
+            raise ValueError("Manual entry not found.")
+
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+        raw_categories = (
+            active_config.AllowedCategories
+            if active_config and active_config.AllowedCategories
+            else "General_IT"
+        )
+        allowed_categories = [c.strip() for c in raw_categories.split(",")]
+
+        if updates.get("title"):
+            entry.Title = updates["title"]
+        if updates.get("content"):
+            entry.Content = updates["content"]
+        if updates.get("category"):
+            new_category = updates["category"]
+            if new_category not in allowed_categories:
+                raise ValueError(
+                    f"Invalid category: '{new_category}'. Must be one of {allowed_categories}"
+                )
+            entry.Category = new_category
+
+        entry.UpdatedAt = datetime.utcnow()
+        db.commit()
+
+        record = self.consolidator.build_manual_record(
+            entry_id=entry.EntryID,
+            title=entry.Title,
+            content=entry.Content,
+            category=entry.Category,
+        )
+
+        old_mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == entry.EntryID)
+            .first()
+        )
+        old_cluster_id = old_mapping.ClusterID if old_mapping else None
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=entry.EntryID,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        if old_cluster_id and old_cluster_id != record.point_id:
+            self._maybe_delete_orphan_cluster(db, old_cluster_id)
+            db.commit()
+
+        return {"status": "success", "message": "Entry updated successfully."}
+
+    async def delete_manual_entry(self, entry_id: str, db: Session) -> dict:
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
+        if entry:
+            entry.IsActive = False
+            db.commit()
+
+        cluster_id = self._deactivate_source_mapping(db, entry_id)
+        self._maybe_delete_orphan_cluster(db, cluster_id)
+        db.commit()
+
+        return {"status": "success", "message": "Manual entry deleted."}
+
+    async def delete_document(self, document_id: str, db: Session) -> dict:
+        doc = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.DocumentID == document_id)
+            .first()
+        )
+        if not doc:
+            raise ValueError("Document not found in database.")
+
+        doc.IsActive = False
+        db.commit()
+
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.document_id",
+                        match=MatchValue(value=document_id),
+                    )
+                ]
+            ),
+        )
+
+        return {
+            "status": "success",
+            "message": f"Document '{doc.FileName}' has been archived and scrubbed from the AI's memory.",
+        }
+
+    async def update_document(self, document_id: str, updates: dict, db: Session) -> dict:
+        document = (
+            db.query(UploadedDocument)
+            .filter(UploadedDocument.DocumentID == document_id)
+            .first()
+        )
+        if not document:
+            raise ValueError(f"Document {document_id} not found in database.")
+
+        payload_updates = {}
+
+        if updates.get("file_name"):
+            document.FileName = updates["file_name"]
+            payload_updates["metadata"] = payload_updates.get("metadata", {})
+            payload_updates["metadata"]["source"] = updates["file_name"]
+
+        if updates.get("category"):
+            new_category = updates["category"]
+            if new_category not in self.allowed_categories:
+                raise ValueError(
+                    f"Invalid category: {new_category}. Must be one of {self.allowed_categories}"
+                )
+
+            document.Category = new_category
+            payload_updates["metadata"] = payload_updates.get("metadata", {})
+            payload_updates["metadata"]["category"] = new_category
+
+        if not payload_updates:
+            return {"status": "skipped", "message": "No valid updates provided."}
+
+        db.commit()
+
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload=payload_updates,
+            points=Filter(
+                must=[
+                    FieldCondition(
+                        key="metadata.document_id",
+                        match=MatchValue(value=document_id),
+                    )
+                ]
+            ),
+        )
+
+        logger.info("Successfully updated metadata for document %s", document_id)
+        return {"status": "success", "message": "Document metadata updated successfully."}
+
+    async def process_resolved_ticket(self, ticket_data: dict, db: Session) -> dict:
+        ticket_number = ticket_data["ticket_number"]
+        logger.info("Processing raw resolved ticket for AI ingestion: %s", ticket_number)
+
+        is_blacklisted = (
+            db.query(BlacklistedTicket)
+            .filter(BlacklistedTicket.TicketNumber == ticket_number)
+            .first()
+        )
+        if is_blacklisted:
+            logger.warning("Ticket %s is blacklisted. Skipping AI ingestion.", ticket_number)
+            return {
+                "status": "skipped",
+                "ticket_number": ticket_number,
+                "message": "Ticket is blacklisted.",
+            }
+
+        record = self.consolidator.build_ticket_record(
+            ticket_number=ticket_number,
+            issue_reported=ticket_data.get("issue_reported"),
+            issue_found=ticket_data.get("issue_found"),
+            issue_cause=ticket_data.get("issue_cause"),
+            work_done=ticket_data.get("work_done"),
+            advanced_work_done=ticket_data.get("advanced_work_done"),
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=str(ticket_number),
+            source_type="ticket",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        return {
+            "status": "success",
+            "ticket_number": ticket_number,
+            "message": "Resolved ticket clustered and added to AI.",
+        }
+
+    async def process_resolved_chat(self, session_id: str, db: Session) -> dict:
+        from app.models.chatbot import ChatMessage
+
+        logger.info("Processing resolved chat session: %s", session_id)
+
+        messages = (
+            db.query(ChatMessage)
+            .filter(ChatMessage.SessionID == session_id)
+            .order_by(ChatMessage.CreatedAt.asc())
+            .all()
+        )
+
+        if len(messages) < 2:
+            return {"status": "skipped", "message": "Chat is too short to summarize."}
+
+        transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
+
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+
+        extraction_model = getattr(active_config, "ReformulatorModel", None)
+        if not extraction_model or extraction_model.strip() == "":
+            extraction_model = "llama-3.1-8b-instant"
+
+        default_prompt = (
+            "You are a strict IT Data Extraction API. Read the chat transcript below and extract the details.\n"
+            "You MUST output EXACTLY a valid JSON object with these four keys: "
+            "'issue_reported', 'issue_found', 'issue_cause', and 'work_done'.\n"
+            "Keep the values concise and professional. Do NOT use first-person.\n"
+            "If no clear resolution was reached, output exactly: {\"error\": \"no resolution\"}\n\n"
+            "Do NOT include markdown formatting (like ```json). Output raw JSON only.\n\n"
+            "Transcript:\n{transcript}\n\n"
+            "JSON Output:"
+        )
+
+        raw_prompt_template = getattr(active_config, "ChatExtractionPrompt", None)
+        if not raw_prompt_template or raw_prompt_template.strip() == "":
+            raw_prompt_template = default_prompt
+
+        if "{transcript}" in raw_prompt_template:
+            prompt = raw_prompt_template.replace("{transcript}", transcript)
+        else:
+            logger.error("Missing {transcript} tag in custom ChatExtractionPrompt. Falling back to default.")
+            prompt = default_prompt.replace("{transcript}", transcript)
+
+        cleaner_llm = ChatGroq(
+            model=extraction_model,
+            temperature=0.0,
+            api_key=settings.GROQ_API_KEY,
+        )
+
+        result = await cleaner_llm.ainvoke(prompt)
+        raw_output = result.content.strip()
+
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+
+        try:
+            extracted_data = json.loads(raw_output)
+        except json.JSONDecodeError:
+            logger.error("Failed to parse LLM JSON: %s", raw_output)
+            return {"status": "error", "message": "AI failed to output valid JSON."}
+
+        if "error" in extracted_data:
+            return {"status": "skipped", "message": "No clear resolution found in transcript."}
+
+        record = self.consolidator.build_chat_record(
+            session_id=session_id,
+            issue_reported=extracted_data.get("issue_reported", "None"),
+            issue_found=extracted_data.get("issue_found", "None"),
+            issue_cause=extracted_data.get("issue_cause", "None"),
+            work_done=extracted_data.get("work_done", "None"),
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        existing_learned = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
+        if not existing_learned:
+            learned_entry = LearnedChat(
+                SessionID=session_id,
+                IssueReported=extracted_data.get("issue_reported", "None"),
+                IssueFound=extracted_data.get("issue_found", "None"),
+                RootCause=extracted_data.get("issue_cause", "None"),
+                WorkDone=extracted_data.get("work_done", "None"),
+            )
+            db.add(learned_entry)
+            db.commit()
+
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "message": "Conversation extracted, clustered, and learned!",
+        }
+
+    async def update_learned_chat(self, session_id: str, updates: dict, db: Session) -> dict:
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
+        if not chat:
+            raise ValueError("Learned chat not found.")
+
+        if updates.get("issue_reported"):
+            chat.IssueReported = updates["issue_reported"]
+        if updates.get("issue_found"):
+            chat.IssueFound = updates["issue_found"]
+        if updates.get("issue_cause"):
+            chat.RootCause = updates["issue_cause"]
+        if updates.get("work_done"):
+            chat.WorkDone = updates["work_done"]
+        chat.UpdatedAt = datetime.utcnow()
+        db.commit()
+
+        record = self.consolidator.build_chat_record(
+            session_id=chat.SessionID,
+            issue_reported=chat.IssueReported,
+            issue_found=chat.IssueFound,
+            issue_cause=chat.RootCause,
+            work_done=chat.WorkDone,
+        )
+
+        old_mapping = (
+            db.query(KnowledgeClusterMap)
+            .filter(KnowledgeClusterMap.SourceID == session_id)
+            .first()
+        )
+        old_cluster_id = old_mapping.ClusterID if old_mapping else None
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        if old_cluster_id and old_cluster_id != record.point_id:
+            self._maybe_delete_orphan_cluster(db, old_cluster_id)
+            db.commit()
+
+        return {"status": "success", "message": "AI knowledge corrected successfully."}
+
+    async def delete_learned_chat(self, session_id: str, db: Session) -> dict:
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
+        if chat:
+            chat.IsActive = False
+            db.commit()
+
+        cluster_id = self._deactivate_source_mapping(db, session_id)
+        self._maybe_delete_orphan_cluster(db, cluster_id)
+        db.commit()
+
+        return {"status": "success", "message": "AI forced to unlearn chat."}
+
+    async def restore_manual_entry(self, entry_id: str, db: Session) -> dict:
+        entry = (
+            db.query(ManualKnowledgeEntry)
+            .filter(ManualKnowledgeEntry.EntryID == entry_id)
+            .first()
+        )
+        if not entry:
+            raise ValueError("Manual entry not found in the database.")
+
+        if entry.IsActive:
+            return {"status": "skipped", "message": "Entry is already active."}
+
+        entry.IsActive = True
+        db.commit()
+
+        record = self.consolidator.build_manual_record(
+            entry_id=entry.EntryID,
+            title=entry.Title,
+            content=entry.Content,
+            category=entry.Category,
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=entry.EntryID,
+            source_type="manual",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        return {"status": "success", "message": "Manual entry successfully restored to the AI Brain."}
+
+    async def restore_learned_chat(self, session_id: str, db: Session) -> dict:
+        chat = (
+            db.query(LearnedChat)
+            .filter(LearnedChat.SessionID == session_id)
+            .first()
+        )
+        if not chat:
+            raise ValueError("Learned chat not found in the database.")
+
+        if chat.IsActive:
+            return {"status": "skipped", "message": "Chat is already active."}
+
+        chat.IsActive = True
+        db.commit()
+
+        record = self.consolidator.build_chat_record(
+            session_id=chat.SessionID,
+            issue_reported=chat.IssueReported,
+            issue_found=chat.IssueFound,
+            issue_cause=chat.RootCause,
+            work_done=chat.WorkDone,
+        )
+
+        await self._upsert_canonical_point_async(
+            db=db,
+            source_id=session_id,
+            source_type="chat",
+            cluster_id=record.point_id,
+            cluster_key=record.cluster_key,
+            page_content=record.page_content,
+            metadata=record.metadata,
+        )
+
+        return {"status": "success", "message": "Learned chat successfully restored to the AI Brain."}
+
+================================================================================
+FILE: backend/app/services/orchestrator.py
+================================================================================
+
+"""
+AI RAG Orchestrator.
+
+Implements the Retrieve-Augment-Generate pipeline:
+  1. Query Reformulation  — LLM rewrites vague queries for better retrieval.
+  2. Federated Vector Search — Separate Qdrant queries for tickets vs documents.
+  3. Cross-Encoder Reranking — Rerank combined results by semantic relevance.
+  4. Slot Allocation — Select top results with a 3-ticket / 2-doc budget.
+  5. Answer Generation — LLM generates a final answer from context.
+
+CRITICAL FIXES vs original:
+  A. No module-level instantiation.
+     The original did `orchestrator = SupportOrchestrator()` at import time,
+     which downloaded two ML models (embeddings + reranker) during import.
+     This object is now created explicitly in the FastAPI lifespan and
+     stored in app.state.
+
+  B. Async correctness.
+     The original `orchestrate()` was a synchronous method that called
+     ChatGroq.invoke() (an HTTP request) inside an async endpoint without
+     await — this blocked the entire event loop. It is now async and uses
+     `ainvoke()` for LLM calls. CPU-bound operations (embedding, reranking)
+     are run via asyncio.to_thread() so they don't block I/O processing.
+
+  C. DB session via parameter, not self-created.
+     The original opened its own SessionLocal() inside __init__. The db
+     session is now passed in from the route via FastAPI DI.
+"""
+
+import asyncio
+import logging
+
+from sqlalchemy.orm import Session
+from langchain_groq import ChatGroq
+from langchain_huggingface import HuggingFaceEmbeddings
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
+from sentence_transformers import CrossEncoder
+
+from app.core.config import settings
+from app.core.exceptions import AIProcessingError
+from app.models.chatbot import AIChatbotSetting
+
+logger = logging.getLogger(__name__)
+
+# Default fallback values used when no active DB config is found.
+_DEFAULT_MAIN_MODEL = "llama-3.3-70b-versatile"
+_DEFAULT_REFORMULATOR_MODEL = "llama-3.1-8b-instant"
+_DEFAULT_REFORMULATOR_PROMPT = (
+    "You are a technical search assistant. Read the chat history and the user's "
+    "latest message. If the latest message is vague, rewrite it into a specific "
+    "IT search query based on the history. Otherwise, return it exactly as written.\n"
+    "DO NOT answer the user. ONLY output the rewritten search string.\n"
+    "History: {chat_history}\n"
+    "Latest Message: {user_query}\n"
+    "Rewritten Search Query:"
+)
+
+
+class SupportOrchestrator:
+    """
+    Manages the full RAG pipeline for IT support queries.
+
+    This object is expensive to create (loads two ML models). It is
+    instantiated once during app startup and reused for every request.
+    """
+
+    def __init__(
+        self,
+        db: Session,
+        embed_model: str | None = None,
+        reranker_model: str | None = None,
+    ) -> None:
+        """
+        Load models and connect to Qdrant.
+
+        Args:
+            db: A short-lived DB session used only during __init__ to read
+                the active AIChatbotSetting. Closed by the caller after init.
+            embed_model: Override embedding model name (optional).
+            reranker_model: Override reranker model name (optional).
+        """
+        logger.info("Initializing AI Orchestrator — loading models...")
+
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+
+        resolved_embed = (
+            embed_model
+            or (active_config.EmbeddingModel if active_config and active_config.EmbeddingModel else None)
+            or settings.EMBEDDING_MODEL
+        )
+        resolved_reranker = (
+            reranker_model
+            or (active_config.RerankerModel if active_config and active_config.RerankerModel else None)
+            or settings.RERANKER_MODEL
+        )
+
+        logger.info("Embedding model  : %s", resolved_embed)
+        logger.info("Reranker model   : %s", resolved_reranker)
+
+        self.qdrant = QdrantClient(
+            url=settings.QDRANT_URL,
+            api_key=settings.QDRANT_API_KEY,
+            timeout=settings.QDRANT_TIMEOUT,
+        )
+        self.collection_name = settings.QDRANT_COLLECTION
+        self.embeddings = HuggingFaceEmbeddings(model_name=resolved_embed)
+        self.reranker = CrossEncoder(resolved_reranker)
+
+        logger.info("AI Orchestrator ready.")
+
+    async def orchestrate(
+        self,
+        user_query: str,
+        chat_history: str,
+        user_name: str,
+        db: Session,
+    ) -> tuple[str, list[int]]:
+        """
+        Run the full RAG pipeline for a user query.
+
+        Args:
+            user_query: The raw message from the user.
+            chat_history: Prior conversation formatted as "role: message" lines.
+            user_name: Display name of the authenticated user (injected into prompt).
+            db: Active DB session for reading current AI settings.
+
+        Returns:
+            A tuple of (ai_response_text, list_of_ticket_ids_used).
+
+        Raises:
+            AIProcessingError: If any stage of the pipeline fails.
+        """
+        try:
+            return await self._run_pipeline(user_query, chat_history, user_name, db)
+        except Exception as exc:
+            logger.error("Orchestrator pipeline failed: %s", exc, exc_info=True)
+            raise AIProcessingError(f"AI pipeline error: {exc}") from exc
+
+    async def debug_orchestrate(
+        self,
+        user_query: str,
+        chat_history: str,
+        user_name: str,
+        db: Session,
+    ) -> dict:
+        """
+        Debug version that returns detailed pipeline information.
+        """
+        # Run the normal pipeline but capture all intermediate data
+        final_answer, ticket_ids = await self.orchestrate(user_query, chat_history, user_name, db)
+        
+        # For debug, we need to re-run the pipeline to capture intermediates
+        # This is a simplified version - in production you'd modify orchestrate to return debug data
+        
+        # Get settings
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+        
+        use_reformulator = bool(
+            active_config.UseReformulator
+            if active_config and active_config.UseReformulator is not None
+            else True
+        )
+        
+        # Reformulate query if enabled
+        search_query = user_query
+        if use_reformulator:
+            reformulator_llm = ChatGroq(
+                model=active_config.ReformulatorModel if active_config and active_config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL,
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+            safe_history = chat_history.strip() or "No previous history. This is the first message."
+            # 1. Get the raw prompt string
+            raw_prompt_template = (
+                active_config.ReformulatorPrompt 
+                if active_config and active_config.ReformulatorPrompt 
+                else _DEFAULT_REFORMULATOR_PROMPT
+            )
+
+            # 2. Safely inject the variables using replace() instead of format()
+            rewrite_prompt = raw_prompt_template.replace(
+                "{chat_history}", safe_history
+            ).replace(
+                "{user_query}", user_query
+            )
+            raw_output = await reformulator_llm.ainvoke(rewrite_prompt)
+            search_query = raw_output.content.strip(' "\'\n')
+        
+        # Vector search
+        query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
+        
+        ticket_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must_not=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+        doc_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+        
+        # Format retrieval results
+        retrieval_results = []
+        for hit in ticket_response.points + doc_response.points:
+            retrieval_results.append({
+                "score": hit.score,
+                "type": hit.payload.get("metadata", {}).get("doc_type", "unknown"),
+                "source": (
+                    hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
+                    if hit.payload.get("metadata", {}).get("doc_type") != "uploaded_manual"
+                    else hit.payload.get("metadata", {}).get("source", "Manual")
+                ),
+                "content": hit.payload.get("page_content", ""),
+            })
+        
+        return {
+            "original_query": user_query,
+            "reformulated_query": search_query,
+            "retrieval_results": retrieval_results,
+            "final_answer": final_answer,
+            "ticket_ids_used": ticket_ids,
+        }
+
+    async def _run_pipeline(
+        self,
+        user_query: str,
+        chat_history: str,
+        user_name: str,
+        db: Session,
+    ) -> tuple[str, list[int]]:
+        # ── 1. Load Dynamic Settings ──────────────────────────────────────
+        active_config = (
+            db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+
+        use_reformulator = bool(
+            active_config.UseReformulator
+            if active_config and active_config.UseReformulator is not None
+            else True
+        )
+        use_reranker = bool(
+            active_config.UseReranker
+            if active_config and active_config.UseReranker is not None
+            else True
+        )
+        main_model = (active_config.ActiveModel if active_config else _DEFAULT_MAIN_MODEL)
+        reformulator_model = (
+            active_config.ReformulatorModel
+            if active_config and active_config.ReformulatorModel
+            else _DEFAULT_REFORMULATOR_MODEL
+        )
+        temperature = float(active_config.Temperature) if active_config else 0.2
+        system_prompt = (
+            active_config.SystemPrompt if active_config else "You are an IT Support Agent."
+        )
+        confidence_threshold = (
+            float(active_config.ConfidenceThreshold)
+            if active_config and active_config.ConfidenceThreshold is not None
+            else -1.0
+        )
+        reformulator_prompt_template = (
+            active_config.ReformulatorPrompt
+            if active_config and active_config.ReformulatorPrompt
+            else _DEFAULT_REFORMULATOR_PROMPT
+        )
+
+        dynamic_llm = ChatGroq(
+            model=main_model,
+            temperature=temperature,
+            api_key=settings.GROQ_API_KEY,
+        )
+
+        # ── 2. Query Reformulation ────────────────────────────────────────
+        search_query = user_query
+        if use_reformulator:
+            reformulator_llm = ChatGroq(
+                model=reformulator_model,
+                temperature=0.0,
+                api_key=settings.GROQ_API_KEY,
+            )
+            safe_history = (
+                chat_history.strip()
+                or "No previous history. This is the first message."
+            )
+            rewrite_prompt = reformulator_prompt_template.replace(
+                "{chat_history}", safe_history
+            ).replace(
+                "{user_query}", user_query
+            )
+            # ainvoke() is async — does NOT block the event loop.
+            raw_output = await reformulator_llm.ainvoke(rewrite_prompt)
+            search_query = raw_output.content.strip(' "\'\n')
+
+        # ── 3. Vector Search (CPU-bound — run in thread) ──────────────────
+        query_vector = await asyncio.to_thread(
+            self.embeddings.embed_query, search_query
+        )
+
+        ticket_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must_not=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+        doc_response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=qdrant_models.Filter(
+                must=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.doc_type",
+                        match=qdrant_models.MatchValue(value="uploaded_manual"),
+                    )
+                ]
+            ),
+            with_payload=True,
+            limit=5,
+        )
+
+        combined_results = ticket_response.points + doc_response.points
+        if not combined_results:
+            return (
+                "I couldn't find any related tickets or documents in the knowledge base.",
+                [],
+            )
+
+        # ── 4. Reranking (CPU-bound — run in thread) ──────────────────────
+        if use_reranker:
+            pairs = [
+                [search_query, hit.payload.get("page_content", "")]
+                for hit in combined_results
+            ]
+            scores = await asyncio.to_thread(self.reranker.predict, pairs)
+            scored_results = sorted(
+                zip(scores, combined_results), key=lambda x: x[0], reverse=True
+            )
+        else:
+            scored_results = sorted(
+                [(hit.score, hit) for hit in combined_results],
+                key=lambda x: x[0],
+                reverse=True,
+            )
+
+        # ── 5. Observability Logging ──────────────────────────────────────
+        logger.debug("Original query : %s", user_query)
+        logger.debug("Search query   : %s", search_query)
+        for score, hit in scored_results:
+            passed = score > confidence_threshold
+            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
+            source = (
+                hit.payload.get("metadata", {}).get("source", "Manual")
+                if doc_type == "uploaded_manual"
+                else hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
+            )
+            logger.debug(
+                "%s | score=%.3f | source=%s",
+                "PASS" if passed else "BLOCKED",
+                score,
+                source,
+            )
+
+        # ── 6. Confidence Filtering & Slot Allocation ─────────────────────
+        valid_hits = [hit for score, hit in scored_results if score > confidence_threshold]
+        if not valid_hits:
+            return (
+                "I'm sorry, that doesn't match any IT issues or solutions in my knowledge base.",
+                [],
+            )
+
+        # Budget: up to 3 tickets + 2 documents = 5 total context items.
+        final_hits: list = []
+        tickets_added = 0
+        docs_added = 0
+        for hit in valid_hits:
+            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
+            if doc_type != "uploaded_manual" and tickets_added < 3:
+                final_hits.append(hit)
+                tickets_added += 1
+            elif doc_type == "uploaded_manual" and docs_added < 2:
+                final_hits.append(hit)
+                docs_added += 1
+            if len(final_hits) == 5:
+                break
+
+        # Fallback: fill any remaining slots with whatever is available.
+        if len(final_hits) < 5:
+            for hit in valid_hits:
+                if hit not in final_hits:
+                    final_hits.append(hit)
+                if len(final_hits) == 5:
+                    break
+
+        ticket_ids = [
+            hit.payload.get("metadata", {}).get("evaluation_id")
+            for hit in final_hits
+            if hit.payload.get("metadata", {}).get("evaluation_id") is not None
+        ]
+
+        # ── 7. Context Formatting & Generation ────────────────────────────
+        formatted_chunks = []
+        for hit in final_hits:
+            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
+            content = hit.payload.get("page_content", "")
+            if doc_type == "uploaded_manual":
+                source_name = hit.payload.get("metadata", {}).get("source", "Manual")
+                cat = hit.payload.get("metadata", {}).get("category", "General")
+                formatted_chunks.append(
+                    f"[SOURCE: OFFICIAL DOCUMENT — {source_name} | CATEGORY: {cat}]\n{content}"
+                )
+            else:
+                t_num = hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
+                formatted_chunks.append(
+                    f"[SOURCE: RESOLVED TICKET — {t_num}]\n{content}"
+                )
+
+        context = "\n\n---\n\n".join(formatted_chunks)
+        final_prompt = (
+            f"{system_prompt}\n"
+            f"The user you are speaking to is named: {user_name}\n\n"
+            f"History: {chat_history}\n\n"
+            f"Retrieved Context:\n{context}\n\n"
+            f"User Query: {user_query}"
+        )
+
+        # ainvoke() — async, does not block the event loop.
+        final_answer_msg = await dynamic_llm.ainvoke(final_prompt)
+        return final_answer_msg.content, ticket_ids
+
+
+================================================================================
+FILE: backend/app/services/settings_service.py
+================================================================================
+
+"""
+AI settings management service.
+
+WHY this service exists:
+  The original main.py had two pairs of duplicate settings endpoints
+  (GET /settings + GET /settings/ai, POST /settings + POST /settings/ai/update)
+  each containing identical raw ORM logic. This service centralises that
+  logic so the router calls one function, not duplicated inline code.
+"""
+
+import logging
+
+from sqlalchemy.orm import Session
+
+from app.core.exceptions import NotFoundError
+from app.models.chatbot import AIChatbotSetting
+from app.schemas.settings import SettingsUpdate
+
+logger = logging.getLogger(__name__)
+
+
+def get_active_settings(db: Session) -> AIChatbotSetting:
+    """
+    Return the currently active AI configuration row.
+
+    Raises:
+        NotFoundError: If no active configuration exists.
+    """
+    config = (
+        db.query(AIChatbotSetting)
+        .filter(AIChatbotSetting.IsActive == True)
+        .order_by(AIChatbotSetting.SettingID.desc())
+        .first()
+    )
+    if not config:
+        raise NotFoundError("No active AI settings configuration found.")
+    return config
+
+
+def update_settings(
+    db: Session,
+    new_settings: SettingsUpdate,
+    updated_by: int,
+) -> AIChatbotSetting:
+    """
+    Archive the current active settings and create a new active row.
+
+    This preserves a full audit trail — old settings rows remain in the
+    database with IsActive=False.
+
+    Args:
+        db: Database session.
+        new_settings: Validated settings payload.
+        updated_by: The user ID performing the update (for audit).
+
+    Returns:
+        The newly created active settings row.
+    """
+    # 1. Deactivate all currently active rows.
+    db.query(AIChatbotSetting).filter(
+        AIChatbotSetting.IsActive == True
+    ).update({"IsActive": False})
+
+    # 2. Insert the new active row.
+    new_config = AIChatbotSetting(
+        ActiveModel=new_settings.ActiveModel,
+        ReformulatorModel=new_settings.ReformulatorModel,
+        SystemPrompt=new_settings.SystemPrompt,
+        ReformulatorPrompt=new_settings.ReformulatorPrompt,
+        Temperature=new_settings.Temperature,
+        ConfidenceThreshold=new_settings.ConfidenceThreshold,
+        EmbeddingModel=new_settings.EmbeddingModel,
+        RerankerModel=new_settings.RerankerModel,
+        TopK_Tickets=new_settings.TopK_Tickets,
+        UseReformulator=new_settings.UseReformulator,
+        UseReranker=new_settings.UseReranker,
+        AllowedCategories=new_settings.AllowedCategories,
+        ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
+        IsActive=True,
+        UpdatedBy=updated_by,
+    )
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    logger.info(
+        "AI settings updated by user %d: model=%s",
+        updated_by,
+        new_settings.ActiveModel,
+    )
+    return new_config
+
+
+def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
+    """
+    Fetches the baseline default configuration (SettingID = 2), 
+    archives the current active settings, and creates a new active row.
+    """
+    # 1. Fetch the baseline default (ID 2)
+    default_config = db.query(AIChatbotSetting).filter(AIChatbotSetting.SettingID == 2).first()
+    
+    if not default_config:
+        raise NotFoundError("System default settings (ID 2) not found in the database.")
+
+    # 2. Deactivate all currently active rows
+    db.query(AIChatbotSetting).filter(
+        AIChatbotSetting.IsActive == True
+    ).update({"IsActive": False})
+
+    # 3. Insert a new active row copying everything from ID 2
+    new_config = AIChatbotSetting(
+        ActiveModel=default_config.ActiveModel,
+        ReformulatorModel=default_config.ReformulatorModel,
+        SystemPrompt=default_config.SystemPrompt,
+        ReformulatorPrompt=default_config.ReformulatorPrompt,
+        Temperature=default_config.Temperature,
+        ConfidenceThreshold=default_config.ConfidenceThreshold,
+        EmbeddingModel=default_config.EmbeddingModel,
+        RerankerModel=default_config.RerankerModel,
+        TopK_Tickets=default_config.TopK_Tickets,
+        UseReformulator=default_config.UseReformulator,
+        UseReranker=default_config.UseReranker,
+        AllowedCategories=default_config.AllowedCategories,
+        ChatExtractionPrompt=default_config.ChatExtractionPrompt,
+        IsActive=True,
+        UpdatedBy=updated_by,
+    )
+    db.add(new_config)
+    db.commit()
+    db.refresh(new_config)
+
+    logger.info("Settings reverted to system defaults (copied from ID 2) by user %d.", updated_by)
+    return new_config
+

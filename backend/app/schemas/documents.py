@@ -41,9 +41,13 @@ class ManualEntryResponse(BaseModel):
     category: str
     created_at: datetime
     updated_at: datetime
+    # We map PascalCase DB fields to snake_case using standard Pydantic logic.
+    is_active: bool | None = None
 
     class Config:
         from_attributes = True
+        populate_by_name = True
+
 
 
 class ManualEntryUpdateRequest(BaseModel):
