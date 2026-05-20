@@ -1,4 +1,9 @@
 import {
+  useState,
+  memo,
+} from "react"
+
+import {
   Ban,
   ChevronDown,
   ChevronUp,
@@ -6,258 +11,94 @@ import {
   MessageSquareText,
 } from "lucide-react"
 
-import {
-  useState,
-} from "react"
+import TicketStatusBadge from "./TicketStatusBadge"
+import EmptyState from "../../../shared/components/EmptyState"
 
-import TicketStatusBadge
-  from "./TicketStatusBadge"
+/* ========================================
+   DETAIL BLOCK
+======================================== */
 
-import EmptyState
-  from "../../../shared/components/EmptyState"
-
-const DetailBlock = ({
-  value,
-}) => {
-
-  if (!value)
-    return null
+const DetailBlock = ({ value }) => {
+  if (!value) return null
 
   return (
-    <div
-      className="
-        rounded-3xl
-
-        border
-        border-[#293731]
-
-        bg-[#141d1a]
-
-        p-5
-      "
-    >
-      <div
-        className="
-          mb-4
-
-          flex
-          items-center
-          gap-3
-        "
-      >
-        <div
-          className="
-            flex
-            h-10
-            w-10
-            items-center
-            justify-center
-
-            rounded-2xl
-
-            bg-[#f5d547]/10
-          "
-        >
-          <MessageSquareText
-            className="
-              h-5
-              w-5
-
-              text-[#f5d547]
-            "
-          />
+    <div className="rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#f5d547]/10">
+          <MessageSquareText className="h-5 w-5 text-[#f5d547]" />
         </div>
 
         <div>
-          <p
-            className="
-              text-[11px]
-              font-semibold
-              uppercase
-
-              tracking-[0.18em]
-
-              text-[#74877f]
-            "
-          >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#74877f]">
             Ticket Details
           </p>
-
-          <p
-            className="
-              mt-1
-
-              text-sm
-              font-medium
-
-              text-white
-            "
-          >
-            Work Done
-          </p>
+          <p className="mt-1 text-sm font-medium text-white">Work Done</p>
         </div>
       </div>
 
-      <p
-        className="
-          whitespace-pre-wrap
-          break-words
-
-          text-sm
-          leading-relaxed
-
-          text-[#d4dfdb]
-        "
-      >
+      <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#d4dfdb]">
         {value}
       </p>
     </div>
   )
 }
 
-const ActionButton = ({
-  children,
-  className,
-  disabled = false,
-  ...props
-}) => (
-  <button
-    disabled={disabled}
-    {...props}
-    className={`
-      flex
-      items-center
-      gap-2
+/* ========================================
+   ACTION BUTTON
+======================================== */
 
-      rounded-2xl
-
-      px-4
-      py-2.5
-
-      text-sm
-      font-medium
-
-      transition-all
-      duration-200
-
-      disabled:cursor-not-allowed
-      disabled:opacity-50
-
-      ${className}
-    `}
-  >
-    {children}
-  </button>
+const ActionButton = memo(
+  ({ children, className = "", ...props }) => (
+    <button
+      {...props}
+      className={`
+        flex items-center gap-2
+        rounded-2xl
+        px-4 py-2.5
+        text-sm font-medium
+        transition-all duration-200
+        disabled:cursor-not-allowed disabled:opacity-50
+        ${className}
+      `}
+    >
+      {children}
+    </button>
+  )
 )
 
-const TicketRow = ({
-  ticket,
-  blockTicket,
-}) => {
+/* ========================================
+   ROW
+======================================== */
 
-  const [expanded, setExpanded] =
-    useState(false)
+const TicketRow = memo(({ ticket, blockTicket }) => {
+  const [expanded, setExpanded] = useState(false)
+
+  const toggle = () => setExpanded((p) => !p)
+
+  const isBlocked = ticket.is_blacklisted
 
   return (
     <>
-      <tr
-        className="
-          group
-
-          border-b
-          border-[#202b27]
-
-          transition-all
-          duration-200
-
-          hover:bg-[#18211f]/70
-        "
-      >
+      <tr className="group border-b border-[#202b27] transition-all duration-200 hover:bg-[#18211f]/70">
         {/* TICKET */}
-        <td
-          className="
-            px-6
-            py-5
-            align-top
-          "
-        >
+        <td className="px-6 py-5 align-top">
           <button
-            onClick={() =>
-              setExpanded(
-                (prev) => !prev
-              )
-            }
-            className="
-              flex
-              items-center
-              gap-3
-
-              transition-all
-              duration-200
-
-              hover:opacity-80
-            "
+            onClick={toggle}
+            className="flex items-center gap-3 transition-all duration-200 hover:opacity-80"
           >
-            <div
-              className="
-                flex
-                h-9
-                w-9
-                items-center
-                justify-center
-
-                rounded-xl
-
-                border
-                border-[#2d3b35]
-
-                bg-[#141d1a]
-              "
-            >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#2d3b35] bg-[#141d1a]">
               {expanded ? (
-                <ChevronUp
-                  className="
-                    h-4
-                    w-4
-
-                    text-[#f5d547]
-                  "
-                />
+                <ChevronUp className="h-4 w-4 text-[#f5d547]" />
               ) : (
-                <ChevronDown
-                  className="
-                    h-4
-                    w-4
-
-                    text-[#74877f]
-                  "
-                />
+                <ChevronDown className="h-4 w-4 text-[#74877f]" />
               )}
             </div>
 
             <div className="text-left">
-              <p
-                className="
-                  text-sm
-                  font-semibold
-
-                  text-white
-                "
-              >
-                {
-                  ticket.ticket_number
-                }
+              <p className="text-sm font-semibold text-white">
+                {ticket.ticket_number}
               </p>
-
-              <p
-                className="
-                  mt-1
-
-                  text-xs
-
-                  text-[#74877f]
-                "
-              >
+              <p className="mt-1 text-xs text-[#74877f]">
                 Support Ticket
               </p>
             </div>
@@ -265,104 +106,37 @@ const TicketRow = ({
         </td>
 
         {/* ISSUE */}
-        <td
-          className="
-            max-w-[560px]
-
-            px-6
-            py-5
-          "
-        >
-          <p
-            className="
-              line-clamp-2
-              break-words
-
-              text-sm
-              leading-relaxed
-
-              text-[#d4dfdb]
-            "
-          >
-            {
-              ticket.issue_reported
-            }
+        <td className="max-w-[560px] px-6 py-5">
+          <p className="line-clamp-2 break-words text-sm leading-relaxed text-[#d4dfdb]">
+            {ticket.issue_reported}
           </p>
         </td>
 
         {/* STATUS */}
-        <td
-          className="
-            px-6
-            py-5
-          "
-        >
-          <TicketStatusBadge
-            blacklisted={
-              ticket.is_blacklisted
-            }
-          />
+        <td className="px-6 py-5">
+          <TicketStatusBadge blacklisted={isBlocked} />
         </td>
 
         {/* ACTIONS */}
-        <td
-          className="
-            px-6
-            py-5
-          "
-        >
-          <div
-            className="
-              flex
-              justify-end
-              gap-3
-            "
-          >
+        <td className="px-6 py-5">
+          <div className="flex justify-end gap-3">
             <ActionButton
-              onClick={() =>
-                blockTicket(
-                  ticket.ticket_number
-                )
-              }
+              onClick={() => blockTicket(ticket.ticket_number)}
               className={
-                ticket.is_blacklisted
-                  ? `
-                    border
-                    border-emerald-500/20
-
-                    bg-emerald-500/10
-
-                    text-emerald-400
-
-                    hover:bg-emerald-500/20
-                  `
-                  : `
-                    border
-                    border-amber-500/20
-
-                    bg-amber-500/10
-
-                    text-amber-300
-
-                    hover:bg-amber-500/20
-                  `
+                isBlocked
+                  ? "border border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                  : "border border-amber-500/20 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20"
               }
             >
-              {ticket.is_blacklisted ? (
+              {isBlocked ? (
                 <>
                   <ShieldCheck className="h-4 w-4" />
-
-                  <span className="hidden xl:inline">
-                    Unblock Ticket
-                  </span>
+                  <span className="hidden xl:inline">Unblock</span>
                 </>
               ) : (
                 <>
                   <Ban className="h-4 w-4" />
-
-                  <span className="hidden xl:inline">
-                    Block Ticket
-                  </span>
+                  <span className="hidden xl:inline">Block</span>
                 </>
               )}
             </ActionButton>
@@ -372,123 +146,42 @@ const TicketRow = ({
 
       {/* EXPANDED */}
       {expanded && (
-        <tr
-          className="
-            border-b
-            border-[#202b27]
-
-            bg-[#141d1a]/70
-          "
-        >
-          <td
-            colSpan={4}
-            className="
-              px-6
-              pb-6
-            "
-          >
-            <DetailBlock
-              value={
-                ticket.work_done ||
-                ticket.advanced_work_done
-              }
-            />
+        <tr className="border-b border-[#202b27] bg-[#141d1a]/70">
+          <td colSpan={4} className="px-6 pb-6">
+            <DetailBlock value={ticket.work_done || ticket.advanced_work_done} />
           </td>
         </tr>
       )}
     </>
   )
-}
+})
 
-const TicketTable = ({
-  tickets,
-  blockTicket,
-}) => {
+/* ========================================
+   TABLE
+======================================== */
 
-  if (tickets.length === 0) {
-
+const TicketTable = ({ tickets, blockTicket }) => {
+  if (!tickets?.length) {
     return (
       <EmptyState
         title="No tickets found"
-        message="
-Support tickets will appear here once users submit requests.
-        "
-        icon={
-          <MessageSquareText
-            className="
-              h-8
-              w-8
-
-              text-[#f5d547]
-            "
-          />
-        }
+        message="Support tickets will appear here once users submit requests."
+        icon={<MessageSquareText className="h-8 w-8 text-[#f5d547]" />}
       />
     )
   }
 
   return (
-    <div
-      className="
-        h-full
-        overflow-auto
-
-        [scrollbar-width:none]
-        [&::-webkit-scrollbar]:hidden
-      "
-    >
-      <table
-        className="
-          min-w-full
-
-          border-separate
-          border-spacing-0
-        "
-      >
-        {/* HEADER */}
-        <thead
-          className="
-            sticky
-            top-0
-            z-10
-
-            bg-[#101715]/95
-
-            backdrop-blur-xl
-          "
-        >
+    <div className="h-full overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <table className="min-w-full border-separate border-spacing-0">
+        <thead className="sticky top-0 z-10 bg-[#101715]/95 backdrop-blur-xl">
           <tr>
-            {[
-              "Ticket",
-              "Issue",
-              "Status",
-              "Actions",
-            ].map((label) => (
-
+            {["Ticket", "Issue", "Status", "Actions"].map((label) => (
               <th
                 key={label}
-                className={`
-                  border-b
-                  border-[#24312b]
-
-                  px-6
-                  py-4
-
-                  text-[11px]
-                  font-semibold
-                  uppercase
-
-                  tracking-[0.18em]
-
-                  text-[#74877f]
-
-                  ${
-                    label ===
-                    "Actions"
-                      ? "text-right"
-                      : "text-left"
-                  }
-                `}
+                className={`border-b border-[#24312b] px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#74877f] ${
+                  label === "Actions" ? "text-right" : "text-left"
+                }`}
               >
                 {label}
               </th>
@@ -496,24 +189,14 @@ Support tickets will appear here once users submit requests.
           </tr>
         </thead>
 
-        {/* BODY */}
         <tbody>
-          {tickets.map(
-            (ticket) => (
-              <TicketRow
-                key={
-                  ticket.id ||
-                  ticket.ticket_number
-                }
-
-                ticket={ticket}
-
-                blockTicket={
-                  blockTicket
-                }
-              />
-            )
-          )}
+          {tickets.map((ticket) => (
+            <TicketRow
+              key={ticket.id || ticket.ticket_number}
+              ticket={ticket}
+              blockTicket={blockTicket}
+            />
+          ))}
         </tbody>
       </table>
     </div>

@@ -6,11 +6,9 @@ import {
 
 import { API_CONFIG } from "../../../../shared/config/sqlVariables"
 
-import useLiveQuery
-  from "../../../../shared/hooks/useLiveQuery"
+import useLiveQuery from "../../../../shared/hooks/useLiveQuery"
 
 import {
-  invalidateCache,
   setCachedData,
 } from "../../../../shared/cache/liveQueryCache"
 
@@ -20,407 +18,208 @@ import {
   updateKnowledgeFile,
 } from "../services/knowledgeFilesService"
 
-import aiSettingsService
-  from "../../../services/aiSettingsService"
+import aiSettingsService from "../../../services/aiSettingsService"
 
-export const useKnowledgeFiles =
-  () => {
+export const useKnowledgeFiles = () => {
 
-    /* ========================================
-       CONSTANTS
-    ======================================== */
+  /* ========================================
+     CONSTANTS
+  ======================================== */
 
-    const CACHE_KEY =
-      "knowledge_files"
+  const CACHE_KEY = "knowledge_files"
+  const POLLING_INTERVAL = API_CONFIG.POLLING_INTERVAL
 
-    const POLLING_INTERVAL =
-      API_CONFIG.POLLING_INTERVAL
+  /* ========================================
+     STATE
+  ======================================== */
 
-    /* ========================================
-       STATE
-    ======================================== */
+  const [selectedCategory, setSelectedCategory] = useState("all")
+  const [search, setSearch] = useState("")
 
-    const [
-      selectedCategory,
-      setSelectedCategory,
-    ] = useState("all")
+  /* ========================================
+     FETCHER
+  ======================================== */
 
-    const [search, setSearch] =
-      useState("")
-
-    /* ========================================
-       FETCHER
-    ======================================== */
-
-    const fetchKnowledgeFiles =
-      useCallback(
-        async () => {
-
-          const [
-            documents,
-            settings,
-          ] = await Promise.all([
-            getKnowledgeFiles(),
-
-            aiSettingsService.getSettings(),
-          ])
-
-          const normalized =
-            Array.isArray(
-              documents
-            )
-              ? documents
-              : []
-
-          const parsedCategories =
-            settings?.AllowedCategories
-              ?.split(",")
-
-              ?.map(
-                (
-                  category
-                ) =>
-                  category.trim()
-              )
-
-              ?.filter(Boolean) || []
-
-          return {
-            files:
-              normalized,
-
-            categories:
-              parsedCategories,
-          }
-        },
-        []
-      )
-
-    /* ========================================
-       LIVE QUERY
-    ======================================== */
-
-    const {
-      data,
-      loading,
-      refreshing,
-      error,
-      refresh,
-    } = useLiveQuery({
-      queryKey:
-        CACHE_KEY,
-
-      queryFn:
-        fetchKnowledgeFiles,
-
-      refetchInterval:
-        POLLING_INTERVAL,
-
-      staleWhileRevalidate:
-        true,
-    })
-
-    const files =
-      data?.files || []
-
-    const allowedCategories =
-      data?.categories || []
-
-    /* ========================================
-       DELETE FILE
-    ======================================== */
-
-    const handleDelete =
-      useCallback(
-        async (
-          documentId
-        ) => {
-
-          const confirmed =
-            window.confirm(
-              "Are you sure you want to permanently delete this document?"
-            )
-
-          if (
-            !confirmed
-          ) {
-            return
-          }
-
-          const previous =
-            data
-
-          try {
-
-            const optimistic =
-              {
-                ...data,
-
-                files:
-                  files.filter(
-                    (file) =>
-                      file.document_id !==
-                      documentId
-                  ),
-              }
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              optimistic
-            )
-
-            await deleteKnowledgeFile(
-              documentId
-            )
-
-            invalidateCache(
-              CACHE_KEY
-            )
-
-            await refresh()
-
-          } catch (error) {
-
-            console.error(
-              "DELETE_DOCUMENT_ERROR",
-              error
-            )
-
-            /* ROLLBACK */
-
-            setCachedData(
-              CACHE_KEY,
-              previous
-            )
-          }
-        },
-        [
-          data,
-          files,
-          refresh,
-        ]
-      )
-
-    /* ========================================
-       UPDATE FILE
-    ======================================== */
-
-    const handleUpdate =
-      useCallback(
-        async (
-          documentId,
-          payload
-        ) => {
-
-          const previous =
-            data
-
-          try {
-
-            const optimistic =
-              {
-                ...data,
-
-                files:
-                  files.map(
-                    (file) => {
-
-                      if (
-                        file.document_id ===
-                        documentId
-                      ) {
-
-                        return {
-                          ...file,
-                          ...payload,
-                        }
-                      }
-
-                      return file
-                    }
-                  ),
-              }
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              optimistic
-            )
-
-            await updateKnowledgeFile(
-              documentId,
-              payload
-            )
-
-            invalidateCache(
-              CACHE_KEY
-            )
-
-            await refresh()
-
-          } catch (error) {
-
-            console.error(
-              "UPDATE_DOCUMENT_ERROR",
-              error
-            )
-
-            /* ROLLBACK */
-
-            setCachedData(
-              CACHE_KEY,
-              previous
-            )
-
-            throw error
-          }
-        },
-        [
-          data,
-          files,
-          refresh,
-        ]
-      )
-
-    /* ========================================
-       FILE CATEGORIES
-    ======================================== */
-
-    const fileCategories =
-      useMemo(
-        () => {
-
-          return [
-            ...new Set(
-              files
-                .map(
-                  (file) =>
-                    file.category
-                )
-                .filter(Boolean)
-            ),
-          ]
-
-        },
-        [files]
-      )
-
-    /* ========================================
-       ALL CATEGORIES
-    ======================================== */
-
-    const allCategories =
-      useMemo(
-        () => {
-
-          return [
-            ...new Set([
-              ...allowedCategories,
-              ...fileCategories,
-            ]),
-          ]
-
-        },
-        [
-          allowedCategories,
-          fileCategories,
-        ]
-      )
-
-    /* ========================================
-       DYNAMIC CATEGORIES
-    ======================================== */
-
-    const dynamicCategories =
-      useMemo(
-        () => {
-
-          return allCategories.map(
-            (category) => ({
-              id: category,
-
-              name:
-                category.replaceAll(
-                  "_",
-                  " "
-                ),
-            })
-          )
-
-        },
-        [allCategories]
-      )
-
-    /* ========================================
-       FILTERED FILES
-    ======================================== */
-
-    const filteredFiles =
-      useMemo(
-        () => {
-
-          const query =
-            search.toLowerCase()
-
-          return files.filter(
-            (file) => {
-
-              const matchesCategory =
-                selectedCategory ===
-                  "all" ||
-                file.category ===
-                  selectedCategory
-
-              const matchesSearch =
-                file.file_name
-                  ?.toLowerCase()
-                  .includes(
-                    query
-                  )
-
-              return (
-                matchesCategory &&
-                matchesSearch
-              )
-            }
-          )
-        },
-
-        [
-          files,
-          selectedCategory,
-          search,
-        ]
-      )
+  const fetchKnowledgeFiles = useCallback(async () => {
+    const [documents, settings] = await Promise.all([
+      getKnowledgeFiles(),
+      aiSettingsService.getSettings(),
+    ])
 
     return {
-      files,
-
-      loading,
-      refreshing,
-
-      error,
-
-      search,
-      setSearch,
-
-      selectedCategory,
-      setSelectedCategory,
-
-      dynamicCategories,
-
-      allCategories,
-
-      filteredFiles,
-
-      loadFiles:
-        refresh,
-
-      handleDelete,
-      handleUpdate,
+      files: Array.isArray(documents) ? documents : [],
+      categories:
+        settings?.AllowedCategories
+          ?.split(",")
+          ?.map((c) => c.trim())
+          ?.filter(Boolean) || [],
     }
+  }, [])
 
+  /* ========================================
+     LIVE QUERY
+  ======================================== */
+
+  const {
+    data,
+    loading,
+    refreshing,
+    error,
+    refresh,
+  } = useLiveQuery({
+    queryKey: CACHE_KEY,
+    queryFn: fetchKnowledgeFiles,
+    refetchInterval: POLLING_INTERVAL,
+    staleWhileRevalidate: true,
+  })
+
+  const files = data?.files || []
+  const allowedCategories = data?.categories || []
+
+  /* ========================================
+     DELETE FILE (OPTIMISTIC SAFE)
+  ======================================== */
+
+  const handleDelete = useCallback(async (documentId) => {
+    const confirmed = window.confirm(
+      "Are you sure you want to permanently delete this document?"
+    )
+
+    if (!confirmed) return
+
+    const previous = structuredClone(data)
+
+    try {
+      const optimistic = {
+        ...data,
+        files: files.filter(
+          (file) => file.document_id !== documentId
+        ),
+      }
+
+      setCachedData(CACHE_KEY, optimistic)
+
+      await deleteKnowledgeFile(documentId)
+
+      await refresh()
+
+    } catch (error) {
+      console.error("DELETE_DOCUMENT_ERROR", error)
+      setCachedData(CACHE_KEY, previous)
+      await refresh()
+    }
+  }, [data, files, refresh])
+
+  /* ========================================
+     UPDATE FILE (OPTIMISTIC SAFE)
+  ======================================== */
+
+  const handleUpdate = useCallback(async (documentId, payload) => {
+    const previous = structuredClone(data)
+
+    try {
+      const optimistic = {
+        ...data,
+        files: files.map((file) =>
+          file.document_id === documentId
+            ? { ...file, ...payload }
+            : file
+        ),
+      }
+
+      setCachedData(CACHE_KEY, optimistic)
+
+      await updateKnowledgeFile(documentId, payload)
+
+      await refresh()
+
+    } catch (error) {
+      console.error("UPDATE_DOCUMENT_ERROR", error)
+      setCachedData(CACHE_KEY, previous)
+      await refresh()
+      throw error
+    }
+  }, [data, files, refresh])
+
+  /* ========================================
+     FILE CATEGORIES
+  ======================================== */
+
+  const fileCategories = useMemo(() => {
+    return [...new Set(
+      files.map((f) => f.category).filter(Boolean)
+    )]
+  }, [files])
+
+  /* ========================================
+     SAFE CATEGORY MERGE (FIXED)
+  ======================================== */
+
+  const allCategories = useMemo(() => {
+    const base = allowedCategories.length
+      ? allowedCategories
+      : fileCategories
+
+    return [...new Set(base)]
+  }, [allowedCategories, fileCategories])
+
+  const dynamicCategories = useMemo(() => {
+    return allCategories.map((category) => ({
+      id: category,
+      name: category.replaceAll("_", " "),
+    }))
+  }, [allCategories])
+
+  /* ========================================
+     FILTERED FILES (SAFER)
+  ======================================== */
+
+  const filteredFiles = useMemo(() => {
+    const query = search.toLowerCase()
+
+    return files.filter((file) => {
+      const name =
+        file.file_name ||
+        file.name ||
+        ""
+
+      const matchesCategory =
+        selectedCategory === "all" ||
+        file.category === selectedCategory
+
+      const matchesSearch =
+        name.toLowerCase().includes(query)
+
+      return matchesCategory && matchesSearch
+    })
+  }, [files, selectedCategory, search])
+
+  /* ========================================
+     RETURN
+  ======================================== */
+
+  return {
+    files,
+    loading,
+    refreshing,
+    error,
+
+    search,
+    setSearch,
+
+    selectedCategory,
+    setSelectedCategory,
+
+    dynamicCategories,
+    allCategories,
+
+    filteredFiles,
+
+    loadFiles: refresh,
+
+    handleDelete,
+    handleUpdate,
   }
+}
+
+export default useKnowledgeFiles

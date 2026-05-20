@@ -1,319 +1,141 @@
 import { API_CONFIG } from "../config/sqlVariables"
 
 /*
-  FINAL ARCHITECTURE RULE:
-  - VITE PROXY handles /api → backend
-  - frontend ONLY sends /api/xxx
-  - NO double prefixing anywhere
+  ARCHITECTURE RULE:
+  - VITE proxy handles /api → backend
+  - frontend ONLY calls /api/*
 */
 
-const REQUEST_TIMEOUT =
-  API_CONFIG.TIMEOUT || 30000
-
-const responseCache =
-  new Map()
-
-const pendingRequests =
-  new Map()
+const REQUEST_TIMEOUT = API_CONFIG.TIMEOUT || 30000
 
 /* ========================================
-   BUILD URL
+   BUILD URL (SAFE)
 ======================================== */
-
-export const buildApiUrl = (
-  endpoint,
-  params = {}
-) => {
-
+export const buildApiUrl = (endpoint, params = {}) => {
   let url = endpoint
 
-  Object.entries(params)
-    .forEach(
-      ([key, value]) => {
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue
 
-        url =
-          url.replace(
-            `:${key}`,
-            encodeURIComponent(value)
-          )
-      }
-    )
+    url = url.replace(`:${key}`, encodeURIComponent(String(value)))
+  }
 
   return url
 }
 
 /* ========================================
+   SAFE JSON PARSE
+======================================== */
+const safeParseJSON = (text) => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+/* ========================================
+   ERROR EXTRACTOR
+======================================== */
+const extractErrorMessage = (data, status) => {
+  const fallback = `Request failed (${status})`
+
+  if (Array.isArray(data?.detail)) {
+    return data.detail
+      .map((item) => item?.msg)
+      .filter(Boolean)
+      .join(", ")
+  }
+
+  if (typeof data?.detail === "string") return data.detail
+  if (typeof data?.error === "string") return data.error
+  if (data?.message) return data.message
+
+  return fallback
+}
+
+/* ========================================
    CORE REQUEST
 ======================================== */
+const request = async ({
+  endpoint,
+  method = "GET",
+  body,
+  headers = {},
+  isFormData = false,
+}) => {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
-const request =
-  async ({
-    endpoint,
-    method = "GET",
-    body,
-    headers = {},
-    isFormData = false,
-  }) => {
+  try {
+    const url = buildApiUrl(endpoint)
 
-    const controller =
-      new AbortController()
-
-    const timeout =
-      setTimeout(
-        () =>
-          controller.abort(),
-        REQUEST_TIMEOUT
-      )
-
-    try {
-
-      console.log(
-        "API_REQUEST:",
-        method,
-        endpoint
-      )
-
-      const url =
-        buildApiUrl(
-          endpoint
-        )
-
-      const finalHeaders =
-        isFormData
-          ? headers
-          : {
-              ...API_CONFIG.HEADERS,
-              ...headers,
-            }
-
-      const response =
-        await fetch(
-          url,
-          {
-            method,
-
-            signal:
-              controller.signal,
-
-            headers:
-              finalHeaders,
-
-            body:
-              body
-                ? isFormData
-                  ? body
-                  : JSON.stringify(
-                      body
-                    )
-                : undefined,
-          }
-        )
-
-      const rawText =
-        await response.text()
-
-      console.log(
-        "API_RESPONSE_STATUS:",
-        response.status
-      )
-
-      console.log(
-        "API_RESPONSE_RAW:",
-        rawText
-      )
-
-      let data = null
-
-      try {
-
-        data =
-          rawText
-            ? JSON.parse(
-                rawText
-              )
-            : null
-
-      } catch {
-
-        data = rawText
-      }
-
-      if (!response.ok) {
-
-        console.error(
-          "API_RESPONSE_ERROR:",
-          data
-        )
-
-        let errorMessage =
-          `Request failed (${response.status})`
-
-        /* ========================================
-           FASTAPI VALIDATION ARRAY
-        ======================================== */
-
-        if (
-          Array.isArray(
-            data?.detail
-          )
-        ) {
-
-          errorMessage =
-            data.detail
-              .map(
-                (
-                  item
-                ) =>
-                  item?.msg
-              )
-              .filter(Boolean)
-              .join(", ")
-
+    /* ========================================
+       HEADER SAFETY LAYER
+    ======================================== */
+    const finalHeaders = isFormData
+      ? headers
+      : {
+          "Content-Type": "application/json",
+          ...API_CONFIG.HEADERS,
+          ...headers,
         }
 
-        /* ========================================
-           FASTAPI STRING DETAIL
-        ======================================== */
+    const response = await fetch(url, {
+      method,
+      signal: controller.signal,
+      headers: finalHeaders,
+      body: body
+        ? isFormData
+          ? body
+          : JSON.stringify(body)
+        : undefined,
+    })
 
-        else if (
-          typeof data?.detail ===
-          "string"
-        ) {
+    const rawText = await response.text()
 
-          errorMessage =
-            data.detail
-        }
+    const data = rawText ? safeParseJSON(rawText) : null
 
-        /* ========================================
-           CUSTOM BACKEND ERROR
-        ======================================== */
-
-        else if (
-          typeof data?.error ===
-          "string"
-        ) {
-
-          errorMessage =
-            data.error
-        }
-
-        /* ========================================
-           GENERIC MESSAGE
-        ======================================== */
-
-        else if (
-          data?.message
-        ) {
-
-          errorMessage =
-            data.message
-        }
-
-        throw new Error(
-          errorMessage
-        )
-      }
-
-      return data
-
-    } catch (err) {
-
-      if (
-        err.name ===
-        "AbortError"
-      ) {
-
-        throw new Error(
-          "Request timeout"
-        )
-      }
-
-      if (
-        err instanceof
-        TypeError
-      ) {
-
-        throw new Error(
-          "Unable to connect to backend server"
-        )
-      }
-
-      throw err
-
-    } finally {
-
-      clearTimeout(
-        timeout
-      )
+    if (!response.ok) {
+      throw new Error(extractErrorMessage(data, response.status))
     }
+
+    return data
+  } catch (err) {
+    if (err.name === "AbortError") {
+      throw new Error("Request timeout")
+    }
+
+    if (err instanceof TypeError) {
+      throw new Error("Unable to connect to backend server")
+    }
+
+    throw err
+  } finally {
+    clearTimeout(timeout)
   }
+}
 
 /* ========================================
    API CLIENT
 ======================================== */
-
 export const apiClient = {
-  get: (
-    endpoint,
-    options
-  ) =>
-    request({
-      endpoint,
-      method: "GET",
-      ...options,
-    }),
+  get: (endpoint, options) =>
+    request({ endpoint, method: "GET", ...options }),
 
-  post: (
-    endpoint,
-    body,
-    options
-  ) =>
-    request({
-      endpoint,
-      method: "POST",
-      body,
-      ...options,
-    }),
+  post: (endpoint, body, options) =>
+    request({ endpoint, method: "POST", body, ...options }),
 
-  put: (
-    endpoint,
-    body,
-    options
-  ) =>
-    request({
-      endpoint,
-      method: "PUT",
-      body,
-      ...options,
-    }),
+  put: (endpoint, body, options) =>
+    request({ endpoint, method: "PUT", body, ...options }),
 
-  patch: (
-    endpoint,
-    body,
-    options
-  ) =>
-    request({
-      endpoint,
-      method: "PATCH",
-      body,
-      ...options,
-    }),
+  patch: (endpoint, body, options) =>
+    request({ endpoint, method: "PATCH", body, ...options }),
 
-  delete: (
-    endpoint,
-    options
-  ) =>
-    request({
-      endpoint,
-      method: "DELETE",
-      ...options,
-    }),
+  delete: (endpoint, options) =>
+    request({ endpoint, method: "DELETE", ...options }),
 
-  upload: (
-    endpoint,
-    formData,
-    options = {}
-  ) =>
+  upload: (endpoint, formData, options = {}) =>
     request({
       endpoint,
       method: "POST",

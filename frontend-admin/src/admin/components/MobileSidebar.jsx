@@ -1,15 +1,6 @@
-import {
-  AnimatePresence,
-  motion,
-} from "framer-motion"
-
-import {
-  Menu,
-  X,
-} from "lucide-react"
-
-import SidebarMenu
-  from "./SidebarMenu.jsx"
+import { AnimatePresence, motion } from "framer-motion"
+import { Menu, X } from "lucide-react"
+import SidebarMenu from "./SidebarMenu.jsx"
 
 const MobileSidebar = ({
   open = false,
@@ -19,32 +10,24 @@ const MobileSidebar = ({
   onLogout,
   adminUser,
 }) => {
-
   /* ========================================
      HANDLE SELECT
   ======================================== */
-
-  const handleSelect =
-    (view) => {
-
-      setActiveView(view)
-
-      setOpen(false)
-    }
+  const handleSelect = (view) => {
+    setActiveView(view)
+    setOpen(false)
+  }
 
   /* ========================================
      RENDER
   ======================================== */
-
   return (
     <>
       {/* MOBILE TOGGLE BUTTON */}
       <button
         type="button"
         aria-label="Open Navigation"
-        onClick={() =>
-          setOpen(true)
-        }
+        onClick={() => setOpen(true)}
         className="
           fixed
           left-4
@@ -90,21 +73,11 @@ const MobileSidebar = ({
           <>
             {/* BACKDROP */}
             <motion.div
-              initial={{
-                opacity: 0,
-              }}
-              animate={{
-                opacity: 1,
-              }}
-              exit={{
-                opacity: 0,
-              }}
-              transition={{
-                duration: 0.2,
-              }}
-              onClick={() =>
-                setOpen(false)
-              }
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              onClick={() => setOpen(false)}
               className="
                 fixed
                 inset-0
@@ -119,18 +92,9 @@ const MobileSidebar = ({
 
             {/* SIDEBAR PANEL */}
             <motion.div
-              initial={{
-                x: -320,
-                opacity: 0,
-              }}
-              animate={{
-                x: 0,
-                opacity: 1,
-              }}
-              exit={{
-                x: -320,
-                opacity: 0,
-              }}
+              initial={{ x: -320, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: -320, opacity: 0 }}
               transition={{
                 type: "spring",
                 damping: 24,
@@ -156,9 +120,7 @@ const MobileSidebar = ({
                 <button
                   type="button"
                   aria-label="Close Navigation"
-                  onClick={() =>
-                    setOpen(false)
-                  }
+                  onClick={() => setOpen(false)}
                   className="
                     absolute
                     right-4
@@ -189,22 +151,10 @@ const MobileSidebar = ({
 
                 {/* SIDEBAR */}
                 <SidebarMenu
-                  activeView={
-                    activeView
-                  }
-
-                  setActiveView={
-                    handleSelect
-                  }
-
-                  onLogout={
-                    onLogout
-                  }
-
-                  adminUser={
-                    adminUser
-                  }
-
+                  activeView={activeView}
+                  setActiveView={handleSelect}
+                  onLogout={onLogout}
+                  adminUser={adminUser}
                   isMobile
                 />
               </div>
