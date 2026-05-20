@@ -50,6 +50,10 @@ from app.models.chatbot import (
     ChatSession,
 )
 from app.services.consolidator import KnowledgeConsolidator
+from app.core.metadata_contract import (
+    build_pdf_metadata,
+    build_qdrant_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -345,21 +349,16 @@ class DocumentIngestionService:
             points = []
             for i, chunk in enumerate(chunks):
                 chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{i}"))
-                payload = {
-                    "page_content": chunk,
-                    "metadata": {
-                        "document_id": document_id,
-                        "source": file.filename,
-                        "category": ai_category,
-                        "chunk_index": i,
-                        "doc_type": "official_document",
-                        "knowledge_type": "pdf",
-                        "cluster_key": cluster_key,
-                        "source_id": document_id,
-                        "source_ids": [document_id],
-                        "frequency": 1,
-                    },
-                }
+                payload = build_qdrant_payload(
+                    page_content=chunk,
+                    metadata=build_pdf_metadata(
+                        cluster_key=cluster_key,
+                        document_id=document_id,
+                        file_name=file.filename,
+                        category=ai_category,
+                        chunk_index=i,
+                    ),
+                )
                 points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
 
             try:
@@ -677,7 +676,7 @@ class DocumentIngestionService:
                 "message": "Ticket is blacklisted.",
             }
 
-        record = self.consolidator.build_ticket_record(
+        canonical_record = self.consolidator.build_ticket_record(
             ticket_number=ticket_number,
             issue_reported=ticket_data.get("issue_reported"),
             issue_found=ticket_data.get("issue_found"),
@@ -686,14 +685,41 @@ class DocumentIngestionService:
             advanced_work_done=ticket_data.get("advanced_work_done"),
         )
 
+        raw_record = self.consolidator.build_raw_ticket_record(
+            ticket_number=ticket_number,
+            issue_reported=ticket_data.get("issue_reported"),
+            issue_found=ticket_data.get("issue_found"),
+            issue_cause=ticket_data.get("issue_cause"),
+            work_done=ticket_data.get("work_done"),
+            advanced_work_done=ticket_data.get("advanced_work_done"),
+        )
+
+        # Upsert raw ticket vector first for exact ticket lookups.
+        raw_vector = await asyncio.to_thread(self.embeddings.embed_query, raw_record.page_content)
+        raw_payload = build_qdrant_payload(
+            page_content=raw_record.page_content,
+            metadata=raw_record.metadata,
+        )
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[
+                PointStruct(
+                    id=raw_record.point_id,
+                    vector=raw_vector,
+                    payload=raw_payload,
+                )
+            ],
+        )
+
+        # Upsert the canonical cluster vector for semantic retrieval.
         await self._upsert_canonical_point_async(
             db=db,
             source_id=str(ticket_number),
             source_type="ticket",
-            cluster_id=record.point_id,
-            cluster_key=record.cluster_key,
-            page_content=record.page_content,
-            metadata=record.metadata,
+            cluster_id=canonical_record.point_id,
+            cluster_key=canonical_record.cluster_key,
+            page_content=canonical_record.page_content,
+            metadata=canonical_record.metadata,
         )
 
         return {

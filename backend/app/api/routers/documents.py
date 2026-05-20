@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
+from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
     DocumentDeleteResponse,
     DocumentResponse,
@@ -96,12 +97,12 @@ async def debug_full_rag_pipeline(
         "reformulated_query": debug_result["reformulated_query"],
         "retrieval_results": {
             "tickets": [
-                r for r in debug_result["retrieval_results"] 
-                if r["type"] != "uploaded_manual"
+                r for r in debug_result["retrieval_results"]
+                if r.get("type") in TICKET_LIKE_DOC_TYPES
             ],
             "documents": [
-                r for r in debug_result["retrieval_results"] 
-                if r["type"] == "uploaded_manual"
+                r for r in debug_result["retrieval_results"]
+                if r.get("type") in DOCUMENT_DOC_TYPES
             ]
         },
         "final_answer": debug_result["final_answer"],

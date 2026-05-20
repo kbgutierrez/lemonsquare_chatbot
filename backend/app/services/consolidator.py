@@ -8,6 +8,18 @@ from typing import Any
 
 from qdrant_client.http.models import PointStruct
 
+from app.core.metadata_contract import (
+    DOC_TYPE_RAW_TICKET,
+    DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_GENERAL_TEXT,
+    DOC_TYPE_OFFICIAL_DOCUMENT,
+    DOC_TYPE_RESOLVED_CHAT,
+    KNOWLEDGE_TYPE_TICKET,
+    KNOWLEDGE_TYPE_CHAT,
+    KNOWLEDGE_TYPE_MANUAL,
+    KNOWLEDGE_TYPE_PDF,
+)
+
 
 def _norm(value: Any) -> str:
     if value is None:
@@ -90,8 +102,36 @@ class KnowledgeConsolidator:
         )
 
         metadata = {
-            "doc_type": "canonical_ticket_cluster",
-            "knowledge_type": "ticket",
+            "doc_type": DOC_TYPE_CANONICAL_TICKET,
+            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
+            "cluster_key": cluster_key,
+            "source_id": _stable_text(ticket_number),
+            "source_ids": [_stable_text(ticket_number)],
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+    def build_raw_ticket_record(self, *, ticket_number: Any, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any, advanced_work_done: Any) -> CanonicalRecord:
+        """Build a raw (non-consolidated) ticket record for exact lookup and full recall."""
+        # Use ticket number as the unique identifier for this raw vector
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket_number}"))
+        
+        # Also compute cluster key for semantic grouping metadata
+        cluster_key = self.ticket_cluster_key(ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done)
+
+        page_content = (
+            f"TICKET NUMBER: {_stable_text(ticket_number)}\n"
+            f"ISSUE REPORTED: {_stable_text(issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: {_stable_text(issue_found)}\n"
+            f"ROOT CAUSE: {_stable_text(issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): {_stable_text(work_done)}\n"
+            f"ADVANCED RESOLUTION: {_stable_text(advanced_work_done)}\n"
+        )
+
+        metadata = {
+            "doc_type": DOC_TYPE_RAW_TICKET,
+            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
+            "ticket_number": _stable_text(ticket_number),
             "cluster_key": cluster_key,
             "source_id": _stable_text(ticket_number),
             "source_ids": [_stable_text(ticket_number)],
@@ -105,8 +145,8 @@ class KnowledgeConsolidator:
 
         page_content = f"TITLE: {title.strip()}\nCONTENT: {content.strip()}"
         metadata = {
-            "doc_type": "general_text",
-            "knowledge_type": "manual",
+            "doc_type": DOC_TYPE_GENERAL_TEXT,
+            "knowledge_type": KNOWLEDGE_TYPE_MANUAL,
             "cluster_key": cluster_key,
             "source_id": entry_id,
             "source_ids": [entry_id],
@@ -127,8 +167,8 @@ class KnowledgeConsolidator:
             "RESOLUTION (WORK DONE): " + _stable_text(work_done)
         )
         metadata = {
-            "doc_type": "resolved_chat",
-            "knowledge_type": "chat",
+            "doc_type": DOC_TYPE_RESOLVED_CHAT,
+            "knowledge_type": KNOWLEDGE_TYPE_CHAT,
             "cluster_key": cluster_key,
             "source_id": session_id,
             "source_ids": [session_id],
@@ -143,8 +183,8 @@ class KnowledgeConsolidator:
         # PDF is still chunked later, but the document identity is canonicalized.
         page_content = raw_text
         metadata = {
-            "doc_type": "official_document",
-            "knowledge_type": "pdf",
+            "doc_type": DOC_TYPE_OFFICIAL_DOCUMENT,
+            "knowledge_type": KNOWLEDGE_TYPE_PDF,
             "cluster_key": cluster_key,
             "source_id": document_id,
             "source_ids": [document_id],
@@ -153,3 +193,4 @@ class KnowledgeConsolidator:
             "frequency": 1,
         }
         return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+    

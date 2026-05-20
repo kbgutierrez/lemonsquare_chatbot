@@ -69,7 +69,7 @@ def run_routing_ingestion() -> None:
         logger.info("Loading embedding model...")
         embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-        collection_name = getattr(settings, "QDRANT_COLLECTION", "LemonSquareQdrant")
+        collection_name = getattr(settings, "QDRANT_ROUTING_COLLECTION", "LemonSquareRouting")
         
         BATCH_SIZE = 128
         total_docs = len(docs)

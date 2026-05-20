@@ -30,6 +30,14 @@ from sentence_transformers import CrossEncoder
 from app.core.config import settings
 from app.core.exceptions import AIProcessingError
 from app.models.chatbot import AIChatbotSetting
+from app.core.metadata_contract import (
+    DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_GENERAL_TEXT,
+    DOC_TYPE_OFFICIAL_DOCUMENT,
+    DOC_TYPE_RESOLVED_CHAT,
+)
+
+from app.core.retrieval_models import RetrievalDocument
 
 logger = logging.getLogger(__name__)
 
@@ -205,7 +213,7 @@ class SupportOrchestrator:
             self.embeddings.embed_query, search_query
         )
 
-        # Ticket Bucket: canonical clusters & resolved chats
+        # Ticket Bucket: raw tickets (exact lookup) + canonical clusters (semantic) & resolved chats
         ticket_response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -213,7 +221,13 @@ class SupportOrchestrator:
                 must=[
                     qdrant_models.FieldCondition(
                         key="metadata.doc_type",
-                        match=qdrant_models.MatchAny(any=["canonical_ticket_cluster", "resolved_chat"]),
+                        match=qdrant_models.MatchAny(
+                            any=[
+                                "raw_ticket",
+                                DOC_TYPE_CANONICAL_TICKET,
+                                DOC_TYPE_RESOLVED_CHAT,
+                            ]
+                        ),
                     )
                 ]
             ),
@@ -229,7 +243,12 @@ class SupportOrchestrator:
                 must=[
                     qdrant_models.FieldCondition(
                         key="metadata.doc_type",
-                        match=qdrant_models.MatchAny(any=["official_document", "general_text"]),
+                        match=qdrant_models.MatchAny(
+                            any=[
+                                DOC_TYPE_OFFICIAL_DOCUMENT,
+                                DOC_TYPE_GENERAL_TEXT,
+                            ]
+                        ),
                     )
                 ]
             ),
@@ -238,6 +257,10 @@ class SupportOrchestrator:
         )
 
         combined_results = ticket_response.points + doc_response.points
+        retrieval_docs = [
+            RetrievalDocument.from_qdrant(hit)
+            for hit in combined_results
+        ]
         
         if not combined_results:
             fallback_msg = "I couldn't find any related tickets or documents in the knowledge base."
@@ -254,16 +277,18 @@ class SupportOrchestrator:
         # ── 4. Reranking (CPU-bound — run in thread) ──────────────────────
         if use_reranker:
             pairs = [
-                [search_query, hit.payload.get("page_content", "")]
-                for hit in combined_results
+                [search_query, doc.page_content]
+                for doc in retrieval_docs
             ]
             scores = await asyncio.to_thread(self.reranker.predict, pairs)
             scored_results = sorted(
-                zip(scores, combined_results), key=lambda x: x[0], reverse=True
+                zip(scores, retrieval_docs),
+                key=lambda x: x[0],
+                reverse=True,
             )
         else:
             scored_results = sorted(
-                [(hit.score, hit) for hit in combined_results],
+                [(doc.score, doc) for doc in retrieval_docs],
                 key=lambda x: x[0],
                 reverse=True,
             )
@@ -271,23 +296,23 @@ class SupportOrchestrator:
         # ── 5. Observability Logging ──────────────────────────────────────
         logger.debug("Original query : %s", user_query)
         logger.debug("Search query   : %s", search_query)
-        for score, hit in scored_results:
+        for score, doc in scored_results:
             passed = score > confidence_threshold
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            source = (
-                hit.payload.get("metadata", {}).get("source", "Manual")
-                if doc_type in ["official_document", "general_text"]
-                else hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
-            )
+
             logger.debug(
-                "%s | score=%.3f | source=%s",
+                "%s | score=%.3f | source=%s | type=%s",
                 "PASS" if passed else "BLOCKED",
                 score,
-                source,
+                doc.source_name,
+                doc.doc_type,
             )
 
         # ── 6. Confidence Filtering & Slot Allocation ─────────────────────
-        valid_hits = [hit for score, hit in scored_results if score > confidence_threshold]
+        valid_hits = [
+            doc
+            for score, doc in scored_results
+            if score > confidence_threshold
+        ]
         if not valid_hits:
             fallback_msg = "I'm sorry, that doesn't match any IT issues or solutions in my knowledge base."
             if debug:
@@ -309,16 +334,15 @@ class SupportOrchestrator:
         docs_added = 0
         
         for hit in valid_hits:
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            is_doc = doc_type in ["official_document", "general_text"]
-            
+            is_doc = hit.is_document
+
             if not is_doc and tickets_added < ticket_budget:
                 final_hits.append(hit)
                 tickets_added += 1
             elif is_doc and docs_added < doc_budget:
                 final_hits.append(hit)
                 docs_added += 1
-                
+
             if len(final_hits) == top_k:
                 break
 
@@ -330,28 +354,13 @@ class SupportOrchestrator:
                 if len(final_hits) == top_k:
                     break
 
-        ticket_ids = [
-            hit.payload.get("metadata", {}).get("evaluation_id")
-            for hit in final_hits
-            if hit.payload.get("metadata", {}).get("evaluation_id") is not None
-        ]
+        ticket_ids = []
 
         # ── 7. Context Formatting & Generation ────────────────────────────
-        formatted_chunks = []
-        for hit in final_hits:
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            content = hit.payload.get("page_content", "")
-            if doc_type in ["official_document", "general_text"]:
-                source_name = hit.payload.get("metadata", {}).get("source", "Manual")
-                cat = hit.payload.get("metadata", {}).get("category", "General")
-                formatted_chunks.append(
-                    f"[SOURCE: OFFICIAL DOCUMENT — {source_name} | CATEGORY: {cat}]\n{content}"
-                )
-            else:
-                t_num = hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
-                formatted_chunks.append(
-                    f"[SOURCE: RESOLVED TICKET — {t_num}]\n{content}"
-                )
+        formatted_chunks = [
+            hit.format_for_prompt()
+            for hit in final_hits
+        ]
 
         context = "\n\n---\n\n".join(formatted_chunks)
         final_prompt = (
@@ -367,14 +376,14 @@ class SupportOrchestrator:
         if debug:
             debug_retrieval = []
             for hit in final_hits:
-                meta = hit.payload.get("metadata", {})
-                d_type = meta.get("doc_type", "unknown")
-                debug_retrieval.append({
-                    "score": getattr(hit, "score", 0.0), 
-                    "type": d_type,
-                    "source": meta.get("source", "Manual") if d_type in ["official_document", "general_text"] else meta.get("ticket_number", "UNKNOWN"),
-                    "content": hit.payload.get("page_content", ""),
-                })
+                debug_retrieval.append(
+                    {
+                        "score": hit.score,
+                        "type": hit.doc_type,
+                        "source": hit.source_name,
+                        "content": hit.page_content,
+                    }
+                )
             
             return {
                 "original_query": user_query,
