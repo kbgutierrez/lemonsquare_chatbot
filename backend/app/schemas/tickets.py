@@ -1,6 +1,8 @@
 """Pydantic schemas for ticket management endpoints."""
 
-from pydantic import BaseModel
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class TicketResponse(BaseModel):
@@ -15,12 +17,14 @@ class TicketDeleteResponse(BaseModel):
     status: str
     message: str
 
+
 class TicketResolveRequest(BaseModel):
     ticket_number: str
-    issue_reported: str  
+    issue_reported: str
     issue_found: str
     issue_cause: str
     work_done: str
+
 
 class TicketSyncResponse(BaseModel):
     status: str
@@ -29,14 +33,16 @@ class TicketSyncResponse(BaseModel):
 
 
 class TicketEscalateRequest(BaseModel):
-    session_id: str
+    session_id: UUID
     requester_id: int
     company_id: int
+
 
 class TicketEscalateResponse(BaseModel):
     status: str
     message: str
     bizportal_response: dict | str | None = None
+
 
 class TicketDraftResponse(BaseModel):
     status: str
@@ -47,12 +53,17 @@ class TicketDraftResponse(BaseModel):
     department_name: str | None = None
     subcategory_name: str | None = None
     routing_reasoning: str | None = None
+    routing_confidence: float | None = None
+    routing_source: str | None = None
+
 
 class TicketSubmitRequest(BaseModel):
-    session_id: str
+    session_id: UUID
     requester_id: int
     company_id: int
-    summary: str
-    description: str
+
+    summary: str = Field(..., min_length=3, max_length=255)
+    description: str = Field(..., min_length=3)
+
     department_id: int
     subcategory_id: int
