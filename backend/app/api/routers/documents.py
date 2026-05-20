@@ -167,7 +167,12 @@ async def delete_document(
     Remove a document's vectors from Qdrant and its metadata from SQL.
     """
     result = await ingestion_service.delete_document(document_id, db)
-    return DocumentDeleteResponse(**result)
+    
+    # ── FIX: Manually inject the document_id to satisfy the Pydantic schema ──
+    return DocumentDeleteResponse(
+        status=result.get("status", "success"),
+        document_id=document_id
+    )
 
 
 @router.post("/manual", summary="Add manual text to KB")
@@ -296,6 +301,3 @@ async def restore_manual_knowledge(
         return result
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-
-
-
