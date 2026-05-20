@@ -7,10 +7,16 @@ const TicketField = ({
   disabled = false,
   max,
 }) => {
+
+  const hasLimit =
+    Boolean(max)
+
   return (
-    <div className="min-w-0 max-w-full">
+    <div className="min-w-0">
+
       {/* HEADER */}
       <div className="mb-2 flex items-center justify-between gap-3">
+
         <label
           className="
             flex
@@ -23,6 +29,7 @@ const TicketField = ({
             text-slate-700
           "
         >
+
           {Icon && (
             <Icon
               className="
@@ -37,13 +44,13 @@ const TicketField = ({
           <span className="truncate">
             {label}
           </span>
+
         </label>
 
-        {max && (
+        {hasLimit && (
           <span
             className="
               shrink-0
-
               text-xs
               text-slate-400
             "
@@ -51,6 +58,7 @@ const TicketField = ({
             {value.length}/{max}
           </span>
         )}
+
       </div>
 
       {/* INPUT */}
@@ -58,23 +66,20 @@ const TicketField = ({
         type="text"
         value={value}
         disabled={disabled}
-        onChange={(e) =>
-          onChange?.(e.target.value)
-        }
         placeholder={placeholder}
+        onChange={event =>
+          onChange?.(
+            event.target.value
+          )
+        }
         className="
           block
-
           w-full
-          min-w-0
-          max-w-full
 
           overflow-hidden
-
           truncate
 
           rounded-2xl
-
           border
           border-violet-200
 
@@ -95,6 +100,7 @@ const TicketField = ({
           focus:bg-white
         "
       />
+
     </div>
   )
 }

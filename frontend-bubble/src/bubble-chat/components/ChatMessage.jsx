@@ -1,22 +1,116 @@
 import {
+  memo,
+  useMemo,
+  useState,
+} from "react"
+
+import {
   Bot,
   User,
 } from "lucide-react"
 
-import {
-  useState,
-} from "react"
-
-const TypingDots = () => {
-
-  return (
+const TypingDots = memo(
+  () => (
     <div className="flex items-center gap-1 py-0.5">
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce" />
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.15s]" />
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.3s]" />
+      {[0, 0.15, 0.3].map(delay => (
+        <span
+          key={delay}
+          className={`
+            h-1.5
+            w-1.5
+            rounded-full
+
+            bg-emerald-400
+
+            animate-bounce
+
+            [animation-delay:${delay}s]
+          `}
+        />
+      ))}
     </div>
   )
+)
+
+const MESSAGE_CONFIG = {
+  agent: {
+    wrapper:
+      "justify-start",
+
+    bubble: `
+      border
+      border-emerald-100/60
+
+      bg-white/85
+
+      text-slate-800
+
+      shadow-[0_3px_10px_rgba(16,185,129,0.06)]
+    `,
+
+    avatar: `
+      bg-emerald-100
+      text-emerald-700
+      ring-2
+      ring-emerald-50
+    `,
+
+    time:
+      "text-slate-400",
+
+    Icon: Bot,
+  },
+
+  user: {
+    wrapper:
+      "justify-end",
+
+    bubble: `
+      border
+      border-emerald-200/50
+
+      bg-white/70
+
+      text-slate-800
+
+      shadow-[0_3px_10px_rgba(16,185,129,0.08)]
+    `,
+
+    avatar: `
+      bg-emerald-500
+      text-white
+      ring-2
+      ring-emerald-100
+    `,
+
+    time:
+      "text-slate-400",
+
+    Icon: User,
+  },
 }
+
+const Avatar = ({
+  avatar,
+  Icon,
+}) => (
+  <div
+    className={`
+      flex
+      h-7
+      w-7
+      shrink-0
+      items-center
+      justify-center
+
+      rounded-full
+
+      ${avatar}
+    `}
+  >
+    <Icon className="h-3.5 w-3.5" />
+  </div>
+)
 
 const ChatMessage = ({
   message = {},
@@ -26,125 +120,71 @@ const ChatMessage = ({
     useState(false)
 
   const sender =
-    message?.sender || "agent"
+    message?.sender ===
+    "user"
+      ? "user"
+      : "agent"
 
-  const text =
-    typeof message?.text === "string"
-      ? message.text
-      : ""
+  const isTyping =
+    Boolean(
+      message?.isTyping
+    )
 
   const timestamp =
     message?.time || ""
 
+  const text =
+    typeof message?.text ===
+    "string"
+      ? message.text
+      : ""
+
   const isAgent =
     sender === "agent"
-
-  const isTyping =
-    Boolean(message?.isTyping)
-
-  const config = isAgent
-    ? {
-        wrapper: "justify-start",
-
-        bubble: `
-          rounded-xl
-
-          border
-          border-emerald-100/60
-
-          bg-white/85
-
-          text-slate-800
-
-          shadow-[0_3px_10px_rgba(16,185,129,0.06)]
-        `,
-
-        time: "text-slate-400",
-
-        avatar: `
-          bg-emerald-100
-          text-emerald-700
-          ring-2
-          ring-emerald-50
-        `,
-
-        Icon: Bot,
-      }
-    : {
-        wrapper: "justify-end",
-
-        bubble: `
-          rounded-xl
-
-          bg-white/70
-
-          border
-          border-emerald-200/50
-
-          text-slate-800
-
-          shadow-[0_3px_10px_rgba(16,185,129,0.08)]
-        `,
-
-        time: "text-slate-400",
-
-        avatar: `
-          bg-emerald-500
-          text-white
-          ring-2
-          ring-emerald-100
-        `,
-
-        Icon: User,
-      }
 
   const {
     wrapper,
     bubble,
-    time,
     avatar,
+    time,
     Icon,
-  } = config
+  } = useMemo(
+    () =>
+      MESSAGE_CONFIG[
+        sender
+      ],
+
+    [sender]
+  )
 
   return (
     <div
       onClick={() =>
-        setShowTime(prev => !prev)
+        setShowTime(
+          prev => !prev
+        )
       }
       className={`
         group
 
         flex
         items-end
-
         gap-2
 
-        animate-[fadeIn_.15s_ease-out]
-
         cursor-pointer
+
+        animate-[fadeIn_.15s_ease-out]
 
         ${wrapper}
       `}
     >
 
-      {/* AVATAR */}
+      {/* LEFT AVATAR */}
       {isAgent && (
-        <div
-          className={`
-            flex
-            h-7
-            w-7
-            shrink-0
-            items-center
-            justify-center
-
-            rounded-full
-
-            ${avatar}
-          `}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </div>
+        <Avatar
+          avatar={avatar}
+          Icon={Icon}
+        />
       )}
 
       {/* BUBBLE */}
@@ -166,7 +206,7 @@ const ChatMessage = ({
         `}
       >
 
-        {/* TEXT */}
+        {/* CONTENT */}
         {isTyping ? (
           <TypingDots />
         ) : (
@@ -183,7 +223,7 @@ const ChatMessage = ({
           </p>
         )}
 
-        {/* TIME (TOGGLE) */}
+        {/* TIME */}
         {!!timestamp && !isTyping && (
           <div
             className={`
@@ -200,7 +240,7 @@ const ChatMessage = ({
               ${
                 showTime
                   ? "opacity-100"
-                  : "opacity-0 h-0"
+                  : "h-0 opacity-0"
               }
             `}
           >
@@ -210,28 +250,16 @@ const ChatMessage = ({
 
       </div>
 
-      {/* USER AVATAR */}
+      {/* RIGHT AVATAR */}
       {!isAgent && (
-        <div
-          className={`
-            flex
-            h-7
-            w-7
-            shrink-0
-            items-center
-            justify-center
-
-            rounded-full
-
-            ${avatar}
-          `}
-        >
-          <Icon className="h-3.5 w-3.5" />
-        </div>
+        <Avatar
+          avatar={avatar}
+          Icon={Icon}
+        />
       )}
 
     </div>
   )
 }
 
-export default ChatMessage
+export default memo(ChatMessage)

@@ -7,249 +7,524 @@ import {
 
 import chatbotService from "../services/chatbotService"
 
-export const useChatMessages = () => {
+/* ========================================
+   HELPERS
+======================================== */
 
-  const [messages, setMessages] = useState([])
-  const [isSendingMessage, setIsSendingMessage] = useState(false)
-  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
-  const [isResolvingConversation, setIsResolvingConversation] = useState(false)
+const createMessage = ({
+  sender,
+  text = "",
+  isTyping = false,
+}) => ({
+  id: crypto.randomUUID(),
+  sender,
+  text,
+  time: isTyping
+    ? ""
+    : new Date().toLocaleTimeString(
+        [],
+        {
+          hour: "2-digit",
+          minute: "2-digit",
+        }
+      ),
+  isTyping,
+})
 
-  const [sessionId, setSessionId] = useState(null)
-  const [resolved, setResolved] = useState(false)
+/* ========================================
+   HOOK
+======================================== */
 
-  /* ========================================
-     🔥 NEW FIX: HARD RESET LOCK
-  ======================================== */
-  const clearedRef = useRef(false)
+export const useChatMessages =
+  () => {
 
-  const mountedRef = useRef(true)
-  const requestLockRef = useRef(false)
-  const sessionIdRef = useRef(null)
-  const activeLoadIdRef = useRef(null)
-  const messagesRef = useRef([])
+    const [messages, setMessages] =
+      useState([])
 
-  useEffect(() => {
-    messagesRef.current = messages
-  }, [messages])
+    const [
+      isSendingMessage,
+      setIsSendingMessage,
+    ] = useState(false)
 
-  const getTime = (date = new Date()) =>
-    new Date(date).toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
+    const [
+      isLoadingConversation,
+      setIsLoadingConversation,
+    ] = useState(false)
+
+    const [
+      isResolvingConversation,
+      setIsResolvingConversation,
+    ] = useState(false)
+
+    const [sessionId, setSessionId] =
+      useState(null)
+
+    const [resolved, setResolved] =
+      useState(false)
+
+    /* ========================================
+       REFS
+    ======================================== */
+
+    const refs = useRef({
+      mounted: true,
+      cleared: false,
+      requestLocked: false,
+      sessionId: null,
+      activeLoadId: null,
+      messages: [],
     })
 
-  useEffect(() => {
-    mountedRef.current = true
-    return () => {
-      mountedRef.current = false
-    }
-  }, [])
+    const state =
+      refs.current
 
-  const syncResolvedStatus = useCallback(async (targetSessionId) => {
+    /* ========================================
+       SYNC MESSAGE REF
+    ======================================== */
 
-    if (!targetSessionId) {
-      setResolved(false)
-      return
-    }
+    useEffect(() => {
 
-    try {
-      const sessions = await chatbotService.loadUserSessions()
+      state.messages = messages
 
-      const matched = sessions.find(
-        (s) => s.id === targetSessionId
+    }, [messages, state])
+
+    /* ========================================
+       MOUNT LIFECYCLE
+    ======================================== */
+
+    useEffect(() => {
+
+      state.mounted = true
+
+      return () => {
+        state.mounted = false
+      }
+
+    }, [state])
+
+    /* ========================================
+       RESOLVED STATUS
+    ======================================== */
+
+    const syncResolvedStatus =
+      useCallback(
+        async (
+          targetSessionId
+        ) => {
+
+          if (
+            !targetSessionId
+          ) {
+
+            setResolved(false)
+
+            return
+          }
+
+          try {
+
+            const sessions =
+              await chatbotService.loadUserSessions()
+
+            const matched =
+              sessions.find(
+                session =>
+                  session.id ===
+                  targetSessionId
+              )
+
+            if (
+              !state.mounted
+            ) {
+              return
+            }
+
+            setResolved(
+              Boolean(
+                matched?.resolved
+              )
+            )
+
+          } catch (error) {
+
+            console.error(
+              "SYNC_RESOLVED_STATUS_ERROR",
+              error
+            )
+          }
+        },
+        [state]
       )
 
-      if (!mountedRef.current) return
+    /* ========================================
+       LOAD CONVERSATION
+    ======================================== */
 
-      setResolved(Boolean(matched?.resolved))
+    const loadConversation =
+      useCallback(
+        async (
+          targetSessionId
+        ) => {
 
-    } catch (error) {
-      console.error("SYNC_RESOLVED_STATUS_ERROR", error)
-    }
-  }, [])
+          if (
+            !targetSessionId
+          ) {
+            return
+          }
 
-  const loadConversation = useCallback(async (targetSessionId) => {
+          /*
+            BLOCK AUTO-RESTORE
+          */
 
-    if (!targetSessionId) return
+          if (
+            state.cleared
+          ) {
 
-    /* 🔥 BLOCK AUTO-RESTORE AFTER CLEAR */
-    if (clearedRef.current) {
-      console.log("BLOCKED_AUTO_RESTORE_AFTER_CLEAR")
-      return
-    }
+            console.log(
+              "BLOCKED_AUTO_RESTORE_AFTER_CLEAR"
+            )
 
-    const loadId = crypto.randomUUID()
-    activeLoadIdRef.current = loadId
+            return
+          }
 
-    setIsLoadingConversation(true)
+          const loadId =
+            crypto.randomUUID()
 
-    try {
+          state.activeLoadId =
+            loadId
 
-      const data = await chatbotService.loadSession(targetSessionId)
+          setIsLoadingConversation(
+            true
+          )
 
-      if (activeLoadIdRef.current !== loadId) return
-      if (!mountedRef.current) return
+          try {
 
-      const normalized = Array.isArray(data?.messages)
-        ? data.messages
-        : []
+            const data =
+              await chatbotService.loadSession(
+                targetSessionId
+              )
 
-      setMessages(normalized)
+            const staleRequest =
+              state.activeLoadId !==
+              loadId
 
-      await syncResolvedStatus(targetSessionId)
+            if (
+              staleRequest ||
+              !state.mounted
+            ) {
 
-    } catch (error) {
+              return
+            }
 
-      console.error("LOAD_HISTORY_ERROR", error)
+            setMessages(
+              Array.isArray(
+                data?.messages
+              )
+                ? data.messages
+                : []
+            )
 
-      if (mountedRef.current) {
-        setMessages([])
-        setSessionId(null)
-        setResolved(false)
-        sessionIdRef.current = null
+            await syncResolvedStatus(
+              targetSessionId
+            )
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_HISTORY_ERROR",
+              error
+            )
+
+            if (
+              !state.mounted
+            ) {
+              return
+            }
+
+            setMessages([])
+            setSessionId(null)
+            setResolved(false)
+
+            state.sessionId =
+              null
+
+          } finally {
+
+            if (
+              state.mounted
+            ) {
+
+              setIsLoadingConversation(
+                false
+              )
+            }
+          }
+        },
+        [
+          state,
+          syncResolvedStatus,
+        ]
+      )
+
+    /* ========================================
+       AUTO LOAD
+    ======================================== */
+
+    useEffect(() => {
+
+      if (!sessionId) {
+        return
       }
 
-    } finally {
-      if (mountedRef.current) {
-        setIsLoadingConversation(false)
-      }
+      loadConversation(
+        sessionId
+      )
+
+    }, [
+      sessionId,
+      loadConversation,
+    ])
+
+    /* ========================================
+       SEND MESSAGE
+    ======================================== */
+
+    const sendMessage =
+      useCallback(
+        async text => {
+
+          if (
+            resolved
+          ) {
+            return
+          }
+
+          const trimmed =
+            text?.trim()
+
+          if (
+            !trimmed ||
+            state.requestLocked
+          ) {
+
+            return
+          }
+
+          state.requestLocked =
+            true
+
+          const current =
+            state.messages
+
+          const userMessage =
+            createMessage({
+              sender: "user",
+              text: trimmed,
+            })
+
+          const typingMessage =
+            createMessage({
+              sender: "agent",
+              isTyping: true,
+            })
+
+          setMessages([
+            ...current,
+            userMessage,
+            typingMessage,
+          ])
+
+          setIsSendingMessage(
+            true
+          )
+
+          try {
+
+            const response =
+              await chatbotService.sendMessage(
+                {
+                  SessionID:
+                    state.sessionId,
+
+                  MessageContent:
+                    trimmed,
+                }
+              )
+
+            if (
+              response?.sessionId
+            ) {
+
+              state.sessionId =
+                response.sessionId
+
+              setSessionId(
+                response.sessionId
+              )
+            }
+
+            const aiMessage =
+              createMessage({
+                sender: "agent",
+
+                text:
+                  response?.message?.trim() ||
+                  "Empty response",
+              })
+
+            setMessages([
+              ...current,
+              userMessage,
+              aiMessage,
+            ])
+
+          } catch (error) {
+
+            console.error(
+              "SEND_MESSAGE_ERROR",
+              error
+            )
+
+          } finally {
+
+            setIsSendingMessage(
+              false
+            )
+
+            state.requestLocked =
+              false
+          }
+        },
+        [resolved, state]
+      )
+
+    /* ========================================
+       RESOLVE CONVERSATION
+    ======================================== */
+
+    const resolveConversation =
+      useCallback(
+        async () => {
+
+          if (
+            !state.sessionId ||
+            resolved
+          ) {
+
+            return
+          }
+
+          try {
+
+            setIsResolvingConversation(
+              true
+            )
+
+            await chatbotService.resolveConversation(
+              state.sessionId
+            )
+
+            setResolved(true)
+
+          } catch (error) {
+
+            console.error(
+              error
+            )
+
+            throw error
+
+          } finally {
+
+            setIsResolvingConversation(
+              false
+            )
+          }
+        },
+        [resolved, state]
+      )
+
+    /* ========================================
+       RESTORE
+    ======================================== */
+
+    const restoreConversation =
+      useCallback(
+        ({
+          sessionId,
+        }) => {
+
+          if (
+            !sessionId
+          ) {
+            return
+          }
+
+          state.cleared =
+            false
+
+          setMessages([])
+
+          state.sessionId =
+            sessionId
+
+          setSessionId(
+            sessionId
+          )
+        },
+        [state]
+      )
+
+    /* ========================================
+       CLEAR
+    ======================================== */
+
+    const clearConversation =
+      useCallback(
+        () => {
+
+          state.activeLoadId =
+            null
+
+          state.sessionId =
+            null
+
+          state.cleared =
+            true
+
+          setMessages([])
+          setSessionId(null)
+          setResolved(false)
+
+          console.log(
+            "CONVERSATION_CLEARED"
+          )
+        },
+        [state]
+      )
+
+    return {
+      messages,
+
+      loading:
+        isSendingMessage,
+
+      isSendingMessage,
+
+      isLoadingConversation,
+
+      isResolvingConversation,
+
+      sessionId,
+
+      resolved,
+
+      sendMessage,
+
+      resolveConversation,
+
+      clearConversation,
+
+      restoreConversation,
     }
-
-  }, [syncResolvedStatus])
-
-  useEffect(() => {
-
-    if (!sessionId) return
-
-    loadConversation(sessionId)
-
-  }, [sessionId, loadConversation])
-
-  const sendMessage = useCallback(async (text) => {
-
-    if (resolved) return
-
-    const trimmed = text?.trim()
-    if (!trimmed) return
-
-    if (requestLockRef.current) return
-    requestLockRef.current = true
-
-    const current = messagesRef.current
-
-    const userMessage = {
-      id: crypto.randomUUID(),
-      sender: "user",
-      text: trimmed,
-      time: getTime(),
-    }
-
-    const typingMessage = {
-      id: crypto.randomUUID(),
-      sender: "agent",
-      text: "",
-      time: "",
-      isTyping: true,
-    }
-
-    setMessages([...current, userMessage, typingMessage])
-
-    setIsSendingMessage(true)
-
-    try {
-
-      const response = await chatbotService.sendMessage({
-        SessionID: sessionIdRef.current,
-        MessageContent: trimmed,
-      })
-
-      if (response?.sessionId) {
-        sessionIdRef.current = response.sessionId
-        setSessionId(response.sessionId)
-      }
-
-      const aiMessage = {
-        id: crypto.randomUUID(),
-        sender: "agent",
-        text: response?.message?.trim() || "Empty response",
-        time: getTime(),
-      }
-
-      setMessages([...current, userMessage, aiMessage])
-
-    } catch (error) {
-
-      console.error("SEND_MESSAGE_ERROR", error)
-
-    } finally {
-      setIsSendingMessage(false)
-      requestLockRef.current = false
-    }
-
-  }, [resolved])
-
-  const resolveConversation = useCallback(async () => {
-
-    if (!sessionIdRef.current) return
-
-    if (resolved) return
-
-    try {
-
-      setIsResolvingConversation(true)
-
-      await chatbotService.resolveConversation(sessionIdRef.current)
-
-      setResolved(true)
-
-    } catch (error) {
-      console.error(error)
-      throw error
-    } finally {
-      setIsResolvingConversation(false)
-    }
-
-  }, [resolved])
-
-  const restoreConversation = useCallback(({ sessionId }) => {
-
-    if (!sessionId) return
-
-    clearedRef.current = false  // 🔥 allow restore again
-
-    setMessages([])
-    sessionIdRef.current = sessionId
-    setSessionId(sessionId)
-
-  }, [])
-
-  const clearConversation = useCallback(() => {
-
-    activeLoadIdRef.current = null
-    sessionIdRef.current = null
-
-    setMessages([])
-    setSessionId(null)
-    setResolved(false)
-
-    /* 🔥 CRITICAL FIX */
-    clearedRef.current = true
-
-    console.log("CONVERSATION_CLEARED")
-
-  }, [])
-
-  return {
-    messages,
-    loading: isSendingMessage,
-    isSendingMessage,
-    isLoadingConversation,
-    isResolvingConversation,
-    sessionId,
-    resolved,
-    sendMessage,
-    resolveConversation,
-    clearConversation,
-    restoreConversation,
   }
-}

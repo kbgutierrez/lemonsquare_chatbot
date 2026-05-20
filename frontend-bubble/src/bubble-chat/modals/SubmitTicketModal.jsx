@@ -12,6 +12,85 @@ import ModalShell from "../components/ModalShell.jsx"
 
 import { useTicketForm } from "../hooks/useTicketForm"
 
+import { cn } from "../utils/cn"
+
+/* ========================================
+   REUSABLE UI
+======================================== */
+
+const LoadingLines = () => (
+  <div className="mt-4 space-y-3">
+    {[
+      "w-full",
+      "w-11/12",
+      "w-4/5",
+    ].map(width => (
+      <div
+        key={width}
+        className={cn(
+          "h-3",
+          width,
+          "animate-pulse",
+          "rounded-full",
+          "bg-violet-100"
+        )}
+      />
+    ))}
+  </div>
+)
+
+const ActionButton = ({
+  children,
+  disabled,
+  onClick,
+  variant = "primary",
+}) => {
+
+  const isPrimary =
+    variant === "primary"
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        "rounded-2xl",
+        "text-sm font-medium",
+        "transition-all duration-200",
+        "disabled:cursor-not-allowed",
+        "disabled:opacity-50",
+
+        isPrimary
+          ? [
+              "flex w-full items-center justify-center gap-2",
+              "bg-gradient-to-r from-violet-600 to-purple-500",
+              "px-6 py-3",
+              "text-white",
+              "shadow-lg",
+              "hover:scale-[1.02]",
+              "sm:w-auto",
+            ]
+          : [
+              "w-full",
+              "border border-slate-200",
+              "bg-white",
+              "px-5 py-3",
+              "text-slate-700",
+              "hover:bg-slate-50",
+              "sm:w-auto",
+            ]
+      )}
+    >
+      {children}
+    </button>
+  )
+}
+
+/* ========================================
+   COMPONENT
+======================================== */
+
 const SubmitTicketModal = ({
   onClose,
   sessionId,
@@ -22,11 +101,8 @@ const SubmitTicketModal = ({
   const {
     loading,
     success,
-
     submit,
-
     aiSummary,
-
     summaryLoading,
   } = useTicketForm({
     sessionId,
@@ -36,12 +112,49 @@ const SubmitTicketModal = ({
     onSuccess: () => {
 
       setTimeout(() => {
-
         onClose?.()
-
       }, 1200)
     },
   })
+
+  const buttonContent =
+    loading ? (
+      <>
+        <div
+          className="
+            h-4 w-4
+            animate-spin
+            rounded-full
+            border-2
+            border-white/40
+            border-t-white
+          "
+        />
+
+        Escalating...
+      </>
+    ) : summaryLoading ? (
+      <>
+        <LoaderCircle
+          className="
+            h-4 w-4
+            animate-spin
+          "
+        />
+
+        Preparing Summary...
+      </>
+    ) : (
+      <>
+        <SendHorizonal
+          className="
+            h-4 w-4
+          "
+        />
+
+        Confirm Submit
+      </>
+    )
 
   return (
     <ModalShell
@@ -52,47 +165,34 @@ const SubmitTicketModal = ({
       icon={
         <MessageSquareWarning
           className="
-            h-5
-            w-5
+            h-5 w-5
           "
         />
       }
     >
       <div
         className="
-          px-4
-          py-4
-
-          sm:px-6
-          sm:py-5
+          px-4 py-4
+          sm:px-6 sm:py-5
         "
       >
+
         {/* SUCCESS */}
         {success && (
           <div
             className="
               mb-5
-
-              flex
-              items-start
-              gap-3
-
+              flex items-start gap-3
               rounded-2xl
-
-              border
-              border-emerald-100
-
+              border border-emerald-100
               bg-emerald-50
-
               p-4
             "
           >
             <CheckCircle2
               className="
                 mt-0.5
-                h-5
-                w-5
-
+                h-5 w-5
                 text-emerald-600
               "
             />
@@ -100,9 +200,7 @@ const SubmitTicketModal = ({
             <div>
               <p
                 className="
-                  text-sm
-                  font-semibold
-
+                  text-sm font-semibold
                   text-emerald-700
                 "
               >
@@ -112,9 +210,7 @@ const SubmitTicketModal = ({
               <p
                 className="
                   mt-1
-
                   text-xs
-
                   text-emerald-600
                 "
               >
@@ -128,12 +224,8 @@ const SubmitTicketModal = ({
         <div
           className="
             overflow-hidden
-
             rounded-3xl
-
-            border
-            border-violet-100
-
+            border border-violet-100
             bg-gradient-to-br
             from-violet-50
             to-indigo-50
@@ -141,46 +233,32 @@ const SubmitTicketModal = ({
         >
           <div
             className="
-              flex
-              items-start
-              gap-4
-
+              flex items-start gap-4
               p-5
             "
           >
+
             <div
               className="
-                flex
-                h-12
-                w-12
-                shrink-0
-                items-center
-                justify-center
-
+                flex h-12 w-12 shrink-0
+                items-center justify-center
                 rounded-2xl
-
                 bg-white
-
                 shadow-sm
               "
             >
               {summaryLoading ? (
                 <LoaderCircle
                   className="
-                    h-6
-                    w-6
-
+                    h-6 w-6
                     animate-spin
-
                     text-violet-600
                   "
                 />
               ) : (
                 <BrainCircuit
                   className="
-                    h-6
-                    w-6
-
+                    h-6 w-6
                     text-violet-600
                   "
                 />
@@ -188,18 +266,15 @@ const SubmitTicketModal = ({
             </div>
 
             <div className="min-w-0 flex-1">
+
               <div
                 className="
-                  flex
-                  items-center
-                  gap-2
+                  flex items-center gap-2
                 "
               >
                 <Sparkles
                   className="
-                    h-4
-                    w-4
-
+                    h-4 w-4
                     text-violet-500
                   "
                 />
@@ -210,7 +285,6 @@ const SubmitTicketModal = ({
                     font-semibold
                     uppercase
                     tracking-[0.18em]
-
                     text-violet-600
                   "
                 >
@@ -220,93 +294,42 @@ const SubmitTicketModal = ({
 
               {summaryLoading ? (
                 <div className="mt-4">
+
                   <div
                     className="
-                      h-4
-                      w-2/3
-
+                      h-4 w-2/3
                       animate-pulse
-
                       rounded-full
-
                       bg-violet-200
                     "
                   />
 
-                  <div className="mt-4 space-y-3">
-                    <div
-                      className="
-                        h-3
-                        w-full
-
-                        animate-pulse
-
-                        rounded-full
-
-                        bg-violet-100
-                      "
-                    />
-
-                    <div
-                      className="
-                        h-3
-                        w-11/12
-
-                        animate-pulse
-
-                        rounded-full
-
-                        bg-violet-100
-                      "
-                    />
-
-                    <div
-                      className="
-                        h-3
-                        w-4/5
-
-                        animate-pulse
-
-                        rounded-full
-
-                        bg-violet-100
-                      "
-                    />
-                  </div>
+                  <LoadingLines />
 
                   <div
                     className="
                       mt-5
-
-                      flex
-                      items-center
-                      gap-2
-
-                      text-xs
-                      text-violet-600
+                      flex items-center gap-2
+                      text-xs text-violet-600
                     "
                   >
                     <LoaderCircle
                       className="
-                        h-3.5
-                        w-3.5
-
+                        h-3.5 w-3.5
                         animate-spin
                       "
                     />
 
                     Generating escalation summary...
                   </div>
+
                 </div>
               ) : (
                 <>
                   <h3
                     className="
                       mt-3
-
-                      text-sm
-                      font-semibold
-
+                      text-sm font-semibold
                       text-slate-900
                     "
                   >
@@ -316,12 +339,8 @@ const SubmitTicketModal = ({
                   <p
                     className="
                       mt-3
-
                       whitespace-pre-wrap
-
-                      text-sm
-                      leading-relaxed
-
+                      text-sm leading-relaxed
                       text-slate-700
                     "
                   >
@@ -337,31 +356,21 @@ const SubmitTicketModal = ({
         <div
           className="
             mt-5
-
             rounded-3xl
-
-            border
-            border-amber-100
-
+            border border-amber-100
             bg-amber-50/70
-
             p-4
           "
         >
           <div
             className="
-              flex
-              items-start
-              gap-3
+              flex items-start gap-3
             "
           >
             <ShieldAlert
               className="
                 mt-0.5
-                h-5
-                w-5
-                shrink-0
-
+                h-5 w-5 shrink-0
                 text-amber-600
               "
             />
@@ -369,9 +378,7 @@ const SubmitTicketModal = ({
             <div>
               <p
                 className="
-                  text-sm
-                  font-semibold
-
+                  text-sm font-semibold
                   text-amber-800
                 "
               >
@@ -381,10 +388,7 @@ const SubmitTicketModal = ({
               <p
                 className="
                   mt-1
-
-                  text-xs
-                  leading-relaxed
-
+                  text-xs leading-relaxed
                   text-amber-700
                 "
               >
@@ -399,135 +403,29 @@ const SubmitTicketModal = ({
         <div
           className="
             mt-6
-
-            flex
-            flex-col-reverse
-            gap-3
-
-            sm:flex-row
-            sm:justify-end
+            flex flex-col-reverse gap-3
+            sm:flex-row sm:justify-end
           "
         >
-          <button
-            type="button"
+
+          <ActionButton
+            variant="secondary"
             onClick={onClose}
             disabled={loading}
-            className="
-              w-full
-
-              rounded-2xl
-
-              border
-              border-slate-200
-
-              bg-white
-
-              px-5
-              py-3
-
-              text-sm
-              font-medium
-              text-slate-700
-
-              transition-colors
-              duration-200
-
-              hover:bg-slate-50
-
-              disabled:cursor-not-allowed
-              disabled:opacity-50
-
-              sm:w-auto
-            "
           >
             Cancel
-          </button>
+          </ActionButton>
 
-          <button
-            type="button"
+          <ActionButton
             onClick={submit}
             disabled={
               loading ||
               summaryLoading
             }
-            className="
-              flex
-              w-full
-              items-center
-              justify-center
-              gap-2
-
-              rounded-2xl
-
-              bg-gradient-to-r
-              from-violet-600
-              to-purple-500
-
-              px-6
-              py-3
-
-              text-sm
-              font-medium
-              text-white
-
-              shadow-lg
-
-              transition-all
-              duration-200
-
-              hover:scale-[1.02]
-
-              disabled:cursor-not-allowed
-              disabled:opacity-50
-
-              sm:w-auto
-            "
           >
-            {loading ? (
-              <>
-                <div
-                  className="
-                    h-4
-                    w-4
+            {buttonContent}
+          </ActionButton>
 
-                    animate-spin
-
-                    rounded-full
-
-                    border-2
-                    border-white/40
-                    border-t-white
-                  "
-                />
-
-                Escalating...
-              </>
-            ) : summaryLoading ? (
-              <>
-                <LoaderCircle
-                  className="
-                    h-4
-                    w-4
-
-                    animate-spin
-                  "
-                />
-
-                Preparing Summary...
-              </>
-            ) : (
-              <>
-                <SendHorizonal
-                  className="
-                    h-4
-                    w-4
-                  "
-                />
-
-                Confirm Submit
-              </>
-            )}
-          </button>
         </div>
       </div>
     </ModalShell>

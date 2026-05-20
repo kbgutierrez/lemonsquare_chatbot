@@ -21,21 +21,310 @@ import {
   useConversationHistory,
 } from "../hooks/useConversationHistory"
 
+import { cn } from "../utils/cn"
+
 const PAGE_SIZE = 3
 
-const formatDate = (dateString) => {
+/* ========================================
+   HELPERS
+======================================== */
 
-  if (!dateString) return "Unknown"
+const formatDate = (
+  dateString
+) => {
 
-  const date = new Date(dateString)
+  if (!dateString) {
+    return "Unknown"
+  }
 
-  return date.toLocaleString([], {
+  return new Date(
+    dateString
+  ).toLocaleString([], {
     month: "short",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
   })
 }
+
+/* ========================================
+   REUSABLE UI
+======================================== */
+
+const PaginationButton = ({
+  children,
+  disabled,
+  onClick,
+}) => (
+  <button
+    type="button"
+    disabled={disabled}
+    onClick={onClick}
+    className={cn(
+      "flex items-center gap-2",
+      "rounded-xl",
+      "border border-emerald-100",
+      "px-3 py-2",
+      "text-sm",
+      "disabled:opacity-40"
+    )}
+  >
+    {children}
+  </button>
+)
+
+const EmptyState = () => (
+  <div
+    className="
+      flex flex-col
+      items-center justify-center
+      py-20
+      text-center
+    "
+  >
+    <div
+      className="
+        flex h-14 w-14
+        items-center justify-center
+        rounded-2xl
+        bg-emerald-50
+      "
+    >
+      <History
+        className="
+          h-7 w-7
+          text-emerald-500
+        "
+      />
+    </div>
+
+    <p
+      className="
+        mt-4
+        text-sm font-medium
+        text-slate-700
+      "
+    >
+      No conversation history yet.
+    </p>
+  </div>
+)
+
+const LoadingState = () => (
+  <div
+    className="
+      flex flex-col
+      items-center justify-center
+      py-20
+    "
+  >
+    <div
+      className="
+        h-9 w-9
+        animate-spin
+        rounded-full
+        border-4
+        border-emerald-100
+        border-t-emerald-500
+      "
+    />
+
+    <p
+      className="
+        mt-4
+        text-sm text-slate-500
+      "
+    >
+      Loading conversations...
+    </p>
+  </div>
+)
+
+const ConversationCard = ({
+  conversation,
+  onSelect,
+  onDelete,
+}) => {
+
+  const isResolved =
+    Boolean(
+      conversation.resolved
+    )
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onSelect}
+      className={cn(
+        "group relative",
+        "w-full cursor-pointer",
+        "overflow-hidden",
+        "rounded-2xl",
+        "border border-emerald-100/60",
+        "bg-white/70",
+        "p-4",
+        "text-left",
+        "backdrop-blur-md",
+        "transition-all duration-200",
+        "hover:-translate-y-0.5",
+        "hover:bg-emerald-50/60",
+        "active:scale-[0.99]"
+      )}
+    >
+
+      {/* DELETE */}
+      <button
+        type="button"
+        onClick={onDelete}
+        className={cn(
+          "absolute right-3 top-3",
+          "flex h-7 w-7",
+          "items-center justify-center",
+          "rounded-lg",
+          "text-slate-400",
+          "transition-all",
+          "hover:bg-red-50",
+          "hover:text-red-500"
+        )}
+      >
+        <Trash2
+          className="
+            h-4 w-4
+          "
+        />
+      </button>
+
+      <div
+        className="
+          flex items-start
+          justify-between gap-3
+        "
+      >
+
+        <div
+          className="
+            min-w-0 flex-1
+          "
+        >
+
+          <div
+            className="
+              flex items-center gap-2
+            "
+          >
+
+            {isResolved ? (
+              <Lock
+                className="
+                  h-4 w-4
+                  text-emerald-600
+                "
+              />
+            ) : (
+              <MessageSquare
+                className="
+                  h-4 w-4
+                  text-emerald-500
+                "
+              />
+            )}
+
+            <p
+              className="
+                truncate
+                text-sm font-semibold
+                text-slate-900
+              "
+            >
+              {conversation.title}
+            </p>
+
+          </div>
+
+          <p
+            className="
+              mt-2
+              line-clamp-2
+              text-xs text-slate-500
+            "
+          >
+            {conversation.preview}
+          </p>
+
+        </div>
+
+        <ChevronRight
+          className="
+            h-5 w-5
+            text-slate-400
+          "
+        />
+
+      </div>
+
+      <div
+        className="
+          mt-4
+          flex items-center
+          justify-between
+        "
+      >
+
+        <p
+          className="
+            text-[10px]
+            text-slate-400
+          "
+        >
+          {formatDate(
+            conversation.updatedAt
+          )}
+        </p>
+
+        <div
+          className="
+            flex gap-2
+          "
+        >
+
+          {isResolved && (
+            <span
+              className="
+                rounded-full
+                bg-emerald-100
+                px-2 py-1
+                text-[10px]
+                font-medium
+                text-emerald-700
+              "
+            >
+              Resolved
+            </span>
+          )}
+
+          <span
+            className="
+              rounded-full
+              bg-emerald-50
+              px-2 py-1
+              text-[10px]
+              font-medium
+              text-emerald-700
+            "
+          >
+            {conversation.messageCount || 0} msgs
+          </span>
+
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================
+   COMPONENT
+======================================== */
 
 const ChatHistoryModal = ({
   onClose,
@@ -50,65 +339,126 @@ const ChatHistoryModal = ({
     clearAllHistory,
   } = useConversationHistory()
 
-  const [page, setPage] = useState(1)
-  const [showClearConfirm, setShowClearConfirm] = useState(false)
-  const [clearingAll, setClearingAll] = useState(false)
+  const [page, setPage] =
+    useState(1)
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(conversations.length / PAGE_SIZE)
-  )
+  const [
+    showClearConfirm,
+    setShowClearConfirm,
+  ] = useState(false)
 
-  const paginatedConversations = useMemo(() => {
+  const [
+    clearingAll,
+    setClearingAll,
+  ] = useState(false)
 
-    const start = (page - 1) * PAGE_SIZE
-    const end = start + PAGE_SIZE
+  const totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        conversations.length /
+          PAGE_SIZE
+      )
+    )
 
-    return conversations.slice(start, end)
+  const paginatedConversations =
+    useMemo(() => {
 
-  }, [conversations, page])
+      const start =
+        (page - 1) *
+        PAGE_SIZE
 
-  const handleConversationClick = async (conversation) => {
+      return conversations.slice(
+        start,
+        start + PAGE_SIZE
+      )
 
-    try {
+    }, [
+      conversations,
+      page,
+    ])
 
-      const result = selectConversation(conversation.id)
+  /* ========================================
+     ACTIONS
+  ======================================== */
 
-      onLoadConversation?.(result)
-      onClose?.()
+  const handleConversationClick =
+    async (
+      conversation
+    ) => {
 
-    } catch (error) {
-      console.error("CONVERSATION_SELECT_ERROR", error)
+      try {
+
+        const result =
+          selectConversation(
+            conversation.id
+          )
+
+        onLoadConversation?.(
+          result
+        )
+
+        onClose?.()
+
+      } catch (error) {
+
+        console.error(
+          "CONVERSATION_SELECT_ERROR",
+          error
+        )
+      }
     }
-  }
 
-  const handleDeleteConversation = async (event, sessionId) => {
+  const handleDeleteConversation =
+    async (
+      event,
+      sessionId
+    ) => {
 
-    event.stopPropagation()
+      event.stopPropagation()
 
-    try {
-      await deleteConversation(sessionId)
-    } catch (error) {
-      console.error("DELETE_CONVERSATION_ERROR", error)
+      try {
+
+        await deleteConversation(
+          sessionId
+        )
+
+      } catch (error) {
+
+        console.error(
+          "DELETE_CONVERSATION_ERROR",
+          error
+        )
+      }
     }
-  }
 
-  const handleClearAll = async () => {
+  const handleClearAll =
+    async () => {
 
-    try {
+      try {
 
-      setClearingAll(true)
-      await clearAllHistory()
+        setClearingAll(true)
 
-      setShowClearConfirm(false)
-      setPage(1)
+        await clearAllHistory()
 
-    } catch (error) {
-      console.error("CLEAR_ALL_HISTORY_ERROR", error)
-    } finally {
-      setClearingAll(false)
+        setShowClearConfirm(
+          false
+        )
+
+        setPage(1)
+
+      } catch (error) {
+
+        console.error(
+          "CLEAR_ALL_HISTORY_ERROR",
+          error
+        )
+
+      } finally {
+
+        setClearingAll(false)
+      }
     }
-  }
 
   return (
     <>
@@ -118,34 +468,34 @@ const ChatHistoryModal = ({
         subtitle="Conversation History"
         size="lg"
         icon={
-          <History className="h-5 w-5 text-emerald-600" />
+          <History
+            className="
+              h-5 w-5
+              text-emerald-600
+            "
+          />
         }
+
         headerActions={
-          conversations.length > 0 && (
+          conversations.length >
+            0 && (
             <button
               type="button"
-              onClick={() => setShowClearConfirm(true)}
-              className="
-                rounded-xl
-
-                border
-                border-red-100
-
-                bg-red-50
-
-                px-3
-                py-2
-
-                text-xs
-                font-semibold
-
-                text-red-600
-
-                transition-all
-                duration-200
-
-                hover:bg-red-100
-              "
+              onClick={() =>
+                setShowClearConfirm(
+                  true
+                )
+              }
+              className={cn(
+                "rounded-xl",
+                "border border-red-100",
+                "bg-red-50",
+                "px-3 py-2",
+                "text-xs font-semibold",
+                "text-red-600",
+                "transition-all duration-200",
+                "hover:bg-red-100"
+              )}
             >
               Clear All
             </button>
@@ -153,342 +503,291 @@ const ChatHistoryModal = ({
         }
       >
 
-        <div className="p-4 sm:p-5">
+        <div
+          className="
+            p-4
+            sm:p-5
+          "
+        >
 
-          {/* LOADING */}
           {loading && (
-            <div className="flex flex-col items-center justify-center py-20">
-
-              <div className="
-                h-9
-                w-9
-                animate-spin
-                rounded-full
-                border-4
-                border-emerald-100
-                border-t-emerald-500
-              " />
-
-              <p className="mt-4 text-sm text-slate-500">
-                Loading conversations...
-              </p>
-
-            </div>
+            <LoadingState />
           )}
 
-          {/* EMPTY */}
-          {!loading && conversations.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
+          {!loading &&
+            conversations.length ===
+              0 && (
+              <EmptyState />
+            )}
 
-              <div className="
-                flex
-                h-14
-                w-14
-                items-center
-                justify-center
+          {!loading &&
+            conversations.length >
+              0 && (
+              <>
 
-                rounded-2xl
+                {/* LIST */}
+                <div
+                  className="
+                    space-y-3
+                  "
+                >
 
-                bg-emerald-50
-              ">
-                <History className="h-7 w-7 text-emerald-500" />
-              </div>
-
-              <p className="mt-4 text-sm font-medium text-slate-700">
-                No conversation history yet.
-              </p>
-
-            </div>
-          )}
-
-          {/* LIST */}
-          {!loading && conversations.length > 0 && (
-            <>
-
-              <div className="space-y-3">
-
-                {paginatedConversations.map((conversation) => {
-
-                  const isResolved = Boolean(conversation.resolved)
-
-                  return (
-                    <div
-                      key={conversation.id}
-                      role="button"
-                      tabIndex={0}
-                      onClick={() => handleConversationClick(conversation)}
-                      className="
-                        group
-
-                        relative
-
-                        w-full
-                        cursor-pointer
-
-                        overflow-hidden
-
-                        rounded-2xl
-
-                        border
-                        border-emerald-100/60
-
-                        bg-white/70
-
-                        p-4
-
-                        text-left
-
-                        backdrop-blur-md
-
-                        transition-all
-                        duration-200
-
-                        hover:-translate-y-0.5
-                        hover:bg-emerald-50/60
-
-                        active:scale-[0.99]
-                      "
-                    >
-
-                      {/* DELETE */}
-                      <button
-                        type="button"
-                        onClick={(e) =>
-                          handleDeleteConversation(e, conversation.id)
+                  {paginatedConversations.map(
+                    (
+                      conversation
+                    ) => (
+                      <ConversationCard
+                        key={
+                          conversation.id
                         }
-                        className="
-                          absolute
-                          right-3
-                          top-3
 
-                          flex
-                          h-7
-                          w-7
-                          items-center
-                          justify-center
+                        conversation={
+                          conversation
+                        }
 
-                          rounded-lg
+                        onSelect={() =>
+                          handleConversationClick(
+                            conversation
+                          )
+                        }
 
-                          text-slate-400
+                        onDelete={(
+                          event
+                        ) =>
+                          handleDeleteConversation(
+                            event,
+                            conversation.id
+                          )
+                        }
+                      />
+                    )
+                  )}
 
-                          transition-all
+                </div>
 
-                          hover:bg-red-50
-                          hover:text-red-500
-                        "
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-
-                      <div className="flex items-start justify-between gap-3">
-
-                        <div className="min-w-0 flex-1">
-
-                          <div className="flex items-center gap-2">
-
-                            {isResolved ? (
-                              <Lock className="h-4 w-4 text-emerald-600" />
-                            ) : (
-                              <MessageSquare className="h-4 w-4 text-emerald-500" />
-                            )}
-
-                            <p className="truncate text-sm font-semibold text-slate-900">
-                              {conversation.title}
-                            </p>
-
-                          </div>
-
-                          <p className="mt-2 line-clamp-2 text-xs text-slate-500">
-                            {conversation.preview}
-                          </p>
-
-                        </div>
-
-                        <ChevronRight className="h-5 w-5 text-slate-400" />
-
-                      </div>
-
-                      <div className="mt-4 flex items-center justify-between">
-
-                        <p className="text-[10px] text-slate-400">
-                          {formatDate(conversation.updatedAt)}
-                        </p>
-
-                        <div className="flex gap-2">
-
-                          {isResolved && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-medium text-emerald-700">
-                              Resolved
-                            </span>
-                          )}
-
-                          <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-medium text-emerald-700">
-                            {conversation.messageCount || 0} msgs
-                          </span>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-                  )
-
-                })}
-
-              </div>
-
-              {/* PAGINATION */}
-              <div className="mt-5 flex items-center justify-between">
-
-                <button
-                  type="button"
-                  disabled={page === 1}
-                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                {/* PAGINATION */}
+                <div
                   className="
-                    flex
-                    items-center
-                    gap-2
-
-                    rounded-xl
-
-                    border
-                    border-emerald-100
-
-                    px-3
-                    py-2
-
-                    text-sm
-
-                    disabled:opacity-40
+                    mt-5
+                    flex items-center
+                    justify-between
                   "
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                  Prev
-                </button>
 
-                <p className="text-xs text-slate-500">
-                  {page} / {totalPages}
-                </p>
+                  <PaginationButton
+                    disabled={
+                      page === 1
+                    }
 
-                <button
-                  type="button"
-                  disabled={page === totalPages}
-                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                  className="
-                    flex
-                    items-center
-                    gap-2
+                    onClick={() =>
+                      setPage(
+                        p =>
+                          Math.max(
+                            1,
+                            p - 1
+                          )
+                      )
+                    }
+                  >
+                    <ChevronLeft
+                      className="
+                        h-4 w-4
+                      "
+                    />
 
-                    rounded-xl
+                    Prev
+                  </PaginationButton>
 
-                    border
-                    border-emerald-100
+                  <p
+                    className="
+                      text-xs
+                      text-slate-500
+                    "
+                  >
+                    {page} /{" "}
+                    {totalPages}
+                  </p>
 
-                    px-3
-                    py-2
+                  <PaginationButton
+                    disabled={
+                      page ===
+                      totalPages
+                    }
 
-                    text-sm
+                    onClick={() =>
+                      setPage(
+                        p =>
+                          Math.min(
+                            totalPages,
+                            p + 1
+                          )
+                      )
+                    }
+                  >
+                    Next
 
-                    disabled:opacity-40
-                  "
-                >
-                  Next
-                  <ChevronRight className="h-4 w-4" />
-                </button>
+                    <ChevronRight
+                      className="
+                        h-4 w-4
+                      "
+                    />
+                  </PaginationButton>
 
-              </div>
-
-            </>
-          )}
+                </div>
+              </>
+            )}
 
         </div>
-
       </ModalShell>
 
       {/* CONFIRM MODAL */}
       {showClearConfirm && (
-        <div className="
-          fixed
-          inset-0
-          z-[999]
+        <div
+          className={cn(
+            "fixed inset-0 z-[999]",
+            "flex items-center justify-center",
+            "bg-black/40",
+            "backdrop-blur-sm",
+            "px-4"
+          )}
+        >
 
-          flex
-          items-center
-          justify-center
-
-          bg-black/40
-
-          backdrop-blur-sm
-          px-4
-        ">
-
-          <div className="
-            relative
-            w-full
-            max-w-md
-
-            rounded-2xl
-
-            bg-white
-
-            p-6
-
-            shadow-2xl
-          ">
+          <div
+            className={cn(
+              "relative w-full max-w-md",
+              "rounded-2xl",
+              "bg-white",
+              "p-6",
+              "shadow-2xl"
+            )}
+          >
 
             <button
-              onClick={() => setShowClearConfirm(false)}
-              className="absolute right-3 top-3 text-slate-400"
+              onClick={() =>
+                setShowClearConfirm(
+                  false
+                )
+              }
+              className="
+                absolute
+                right-3 top-3
+                text-slate-400
+              "
             >
-              <X className="h-4 w-4" />
+              <X
+                className="
+                  h-4 w-4
+                "
+              />
             </button>
 
-            <div className="text-center">
+            <div
+              className="
+                text-center
+              "
+            >
 
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50">
-                <AlertTriangle className="h-7 w-7 text-red-500" />
+              <div
+                className="
+                  mx-auto
+                  flex h-14 w-14
+                  items-center justify-center
+                  rounded-2xl
+                  bg-red-50
+                "
+              >
+                <AlertTriangle
+                  className="
+                    h-7 w-7
+                    text-red-500
+                  "
+                />
               </div>
 
-              <h3 className="mt-4 text-lg font-semibold">
+              <h3
+                className="
+                  mt-4
+                  text-lg font-semibold
+                "
+              >
                 Clear all chats?
               </h3>
 
-              <p className="mt-2 text-sm text-slate-500">
-                This action cannot be undone.
+              <p
+                className="
+                  mt-2
+                  text-sm text-slate-500
+                "
+              >
+                This action cannot be
+                undone.
               </p>
 
-              <div className="mt-6 flex gap-3">
+              <div
+                className="
+                  mt-6
+                  flex gap-3
+                "
+              >
 
                 <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="flex-1 rounded-xl border border-slate-200 py-2 text-sm"
+                  onClick={() =>
+                    setShowClearConfirm(
+                      false
+                    )
+                  }
+                  className="
+                    flex-1
+                    rounded-xl
+                    border border-slate-200
+                    py-2
+                    text-sm
+                  "
                 >
                   Cancel
                 </button>
 
                 <button
-                  onClick={handleClearAll}
-                  className="flex-1 rounded-xl bg-red-600 py-2 text-sm text-white"
+                  onClick={
+                    handleClearAll
+                  }
+                  className="
+                    flex-1
+                    rounded-xl
+                    bg-red-600
+                    py-2
+                    text-sm
+                    text-white
+                  "
                 >
+
                   {clearingAll ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                    <span
+                      className="
+                        flex items-center
+                        justify-center gap-2
+                      "
+                    >
+                      <Loader2
+                        className="
+                          h-4 w-4
+                          animate-spin
+                        "
+                      />
+
                       Clearing
                     </span>
                   ) : (
                     "Clear"
                   )}
+
                 </button>
 
               </div>
-
             </div>
-
           </div>
-
         </div>
       )}
-
     </>
   )
 }

@@ -22,15 +22,6 @@ import {
 const REQUEST_TIMEOUT =
   API_CONFIG.TIMEOUT
 
-/*
-  SDK-SAFE DEVELOPMENT MODE
-
-  IMPORTANT:
-  - Controlled by Vite env
-  - NOT hardcoded
-  - Safe for production builds
-*/
-
 const DEV_MODE =
   import.meta.env.DEV
 
@@ -40,131 +31,157 @@ const DEV_USER_TOKEN =
   "11318"
 
 /* ========================================
-   API REQUEST
+   HELPERS
 ======================================== */
 
-const apiRequest =
-  async ({
-    endpoint,
-    method = "GET",
-    body,
-    headers = {},
-  }) => {
-
-    const controller =
-      new AbortController()
-
-    const timeoutId =
-      setTimeout(
-        () =>
-          controller.abort(),
-        REQUEST_TIMEOUT
-      )
+const parseJsonSafely =
+  async (response) => {
 
     try {
-
-      const response =
-        await fetch(
-          endpoint,
-          {
-            method,
-
-            headers: {
-              ...API_CONFIG.HEADERS,
-              ...headers,
-            },
-
-            body:
-              body
-                ? JSON.stringify(
-                    body
-                  )
-                : undefined,
-
-            signal:
-              controller.signal,
-          }
-        )
-
-      const data =
-        await response.json()
-
-      if (
-        !response.ok
-      ) {
-
-        throw new Error(
-          data?.detail ||
-          data?.message ||
-          "API request failed."
-        )
-      }
-
-      return data
-
-    } catch (error) {
-
-      if (
-        error.name ===
-        "AbortError"
-      ) {
-
-        throw new Error(
-          "Request timeout exceeded."
-        )
-      }
-
-      throw error
-
-    } finally {
-
-      clearTimeout(
-        timeoutId
-      )
+      return await response.json()
+    } catch {
+      return null
     }
   }
 
+const formatTime = (date) =>
+  date.toLocaleTimeString(
+    [],
+    {
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  )
+
+const normalizeDate = (
+  value
+) =>
+  value
+    ? new Date(value)
+    : new Date()
+
+const isValidToken = (
+  token
+) =>
+  token &&
+  token !== "null" &&
+  token !== "undefined"
+
 /* ========================================
-   GET USER TOKEN
+   API REQUEST
+======================================== */
+
+const apiRequest = async ({
+  endpoint,
+  method = "GET",
+  body,
+  headers = {},
+}) => {
+
+  const controller =
+    new AbortController()
+
+  const timeoutId =
+    setTimeout(
+      () =>
+        controller.abort(),
+      REQUEST_TIMEOUT
+    )
+
+  try {
+
+    const response =
+      await fetch(
+        endpoint,
+        {
+          method,
+
+          headers: {
+            ...API_CONFIG.HEADERS,
+            ...headers,
+          },
+
+          body:
+            body
+              ? JSON.stringify(
+                  body
+                )
+              : undefined,
+
+          signal:
+            controller.signal,
+        }
+      )
+
+    const data =
+      await parseJsonSafely(
+        response
+      )
+
+    if (!response.ok) {
+
+      throw new Error(
+        data?.detail ||
+        data?.message ||
+        "API request failed."
+      )
+    }
+
+    return data
+
+  } catch (error) {
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
+      throw new Error(
+        "Request timeout exceeded."
+      )
+    }
+
+    throw error
+
+  } finally {
+
+    clearTimeout(
+      timeoutId
+    )
+  }
+}
+
+/* ========================================
+   USER TOKEN
 ======================================== */
 
 const getUserToken =
   () => {
 
-    /*
-      1. RUNTIME CONFIG
-    */
-
-    const runtimeConfig =
+    const runtimeToken =
       getRuntimeConfig()
+        ?.userToken
 
     if (
-      runtimeConfig?.userToken
+      isValidToken(
+        runtimeToken
+      )
     ) {
-
-      return runtimeConfig.userToken
+      return runtimeToken
     }
 
-    /*
-      2. GLOBAL WINDOW CONFIG
-    */
-
-    if (
-      typeof window !==
-        "undefined" &&
+    const globalToken =
       window
         ?.LemonSquareChatConfig
         ?.userToken
+
+    if (
+      isValidToken(
+        globalToken
+      )
     ) {
-
-      return window
-        .LemonSquareChatConfig
-        .userToken
+      return globalToken
     }
-
-    /*
-      3. LOCAL STORAGE
-    */
 
     const localToken =
       localStorage.getItem(
@@ -172,23 +189,17 @@ const getUserToken =
       )
 
     if (
-      localToken &&
-      localToken !== "null" &&
-      localToken !== "undefined"
+      isValidToken(
+        localToken
+      )
     ) {
-
       return localToken
     }
-
-    /*
-      4. DEV FALLBACK
-    */
 
     if (
       DEV_MODE &&
       DEV_USER_TOKEN
     ) {
-
       return DEV_USER_TOKEN
     }
 
@@ -198,60 +209,18 @@ const getUserToken =
   }
 
 /* ========================================
-   VERIFY USER TOKEN
-======================================== */
-
-const verifyUserToken =
-  async () => {
-
-    const userToken =
-      getUserToken()
-
-    const endpoint =
-      buildApiUrl(
-        API_ENDPOINTS.AUTH_VERIFY
-      )
-
-    const finalUrl =
-      `${endpoint}?user_token=${encodeURIComponent(
-        userToken
-      )}`
-
-    console.log(
-      "VERIFY_USER_TOKEN",
-      {
-        endpoint:
-          finalUrl,
-      }
-    )
-
-    return await apiRequest({
-      endpoint:
-        finalUrl,
-    })
-  }
-
-/* ========================================
-   RESOLVE REQUESTER ID
+   REQUESTER ID
 ======================================== */
 
 const resolveRequesterId =
-  (
-    authToken
-  ) => {
+  (authToken) => {
 
     if (
       typeof authToken !==
       "string"
     ) {
-
       return authToken
     }
-
-    /*
-      DEV TOKEN:
-      TEST_USER_1
-    */
 
     if (
       DEV_MODE &&
@@ -260,15 +229,10 @@ const resolveRequesterId =
       )
     ) {
 
-      const parts =
-        authToken.split(
-          "_"
-        )
-
       const maybeId =
-        parts[
-          parts.length - 1
-        ]
+        authToken
+          .split("_")
+          .at(-1)
 
       if (
         /^\d+$/.test(
@@ -282,36 +246,19 @@ const resolveRequesterId =
       }
     }
 
-    /*
-      PURE NUMERIC TOKEN
-    */
-
-    if (
-      /^\d+$/.test(
-        authToken
-      )
-    ) {
-
-      return Number(
-        authToken
-      )
-    }
-
-    /*
-      JWT / HASH / OTHER TOKEN
-    */
-
-    return authToken
+    return /^\d+$/.test(
+      authToken
+    )
+      ? Number(authToken)
+      : authToken
   }
 
 /* ========================================
-   RESPONSE VALIDATION
+   VALIDATION
 ======================================== */
 
 const validateChatResponse =
-  (
-    response
-  ) => {
+  (response) => {
 
     if (
       !response ||
@@ -361,7 +308,7 @@ const validateChatResponse =
   }
 
 /* ========================================
-   NORMALIZE HISTORY MESSAGE
+   NORMALIZERS
 ======================================== */
 
 const normalizeHistoryMessage =
@@ -371,11 +318,9 @@ const normalizeHistoryMessage =
   ) => {
 
     const createdAt =
-      message?.CreatedAt
-        ? new Date(
-            message.CreatedAt
-          )
-        : new Date()
+      normalizeDate(
+        message?.CreatedAt
+      )
 
     return {
       id:
@@ -393,25 +338,12 @@ const normalizeHistoryMessage =
         "",
 
       time:
-        createdAt.toLocaleTimeString(
-          [],
-          {
-            hour:
-              "2-digit",
-
-            minute:
-              "2-digit",
-          }
-        ),
+        formatTime(createdAt),
 
       createdAt:
         createdAt.toISOString(),
     }
   }
-
-/* ========================================
-   NORMALIZE SESSION
-======================================== */
 
 const normalizeSession =
   (
@@ -420,11 +352,15 @@ const normalizeSession =
   ) => {
 
     const createdAt =
-      session?.created_at
-        ? new Date(
-            session.created_at
-          )
-        : new Date()
+      normalizeDate(
+        session?.created_at
+      )
+
+    const resolved =
+      String(
+        session?.status || ""
+      ).toLowerCase() ===
+      "resolved"
 
     return {
       id:
@@ -432,7 +368,6 @@ const normalizeSession =
         `session-${index}`,
 
       title: null,
-
       preview: null,
 
       createdAt:
@@ -447,26 +382,17 @@ const normalizeSession =
           0
         ),
 
-      resolved:
-        String(
-          session?.status ||
-          ""
-        ).toLowerCase() ===
-        "resolved",
+      resolved,
 
       resolvedAt:
-        String(
-          session?.status ||
-          ""
-        ).toLowerCase() ===
-        "resolved"
+        resolved
           ? createdAt.toISOString()
           : null,
     }
   }
 
 /* ========================================
-   SEND MESSAGE
+   API METHODS
 ======================================== */
 
 const sendMessage =
@@ -475,30 +401,25 @@ const sendMessage =
     MessageContent,
   }) => {
 
-    const userToken =
-      getUserToken()
-
-    const payload = {
-      session_id:
-        SessionID || null,
-
-      message:
-        MessageContent,
-
-      user_token:
-        userToken,
-    }
-
-    const endpoint =
-      buildApiUrl(
-        API_ENDPOINTS.CHAT_SEND
-      )
-
     const response =
       await apiRequest({
-        endpoint,
+        endpoint:
+          buildApiUrl(
+            API_ENDPOINTS.CHAT_SEND
+          ),
+
         method: "POST",
-        body: payload,
+
+        body: {
+          session_id:
+            SessionID || null,
+
+          message:
+            MessageContent,
+
+          user_token:
+            getUserToken(),
+        },
       })
 
     return validateChatResponse(
@@ -506,17 +427,10 @@ const sendMessage =
     )
   }
 
-/* ========================================
-   LOAD SESSION
-======================================== */
-
 const loadSession =
   async (
     SessionID
   ) => {
-
-    const userToken =
-      getUserToken()
 
     const endpoint =
       buildApiUrl(
@@ -527,15 +441,12 @@ const loadSession =
         }
       )
 
-    const finalUrl =
-      `${endpoint}?user_token=${encodeURIComponent(
-        userToken
-      )}`
-
     const response =
       await apiRequest({
         endpoint:
-          finalUrl,
+          `${endpoint}?user_token=${encodeURIComponent(
+            getUserToken()
+          )}`,
       })
 
     return {
@@ -554,19 +465,12 @@ const loadSession =
     }
   }
 
-/* ========================================
-   LOAD USER SESSIONS
-======================================== */
-
 const loadUserSessions =
   async () => {
 
-    const userToken =
-      getUserToken()
-
     const requesterId =
       resolveRequesterId(
-        userToken
+        getUserToken()
       )
 
     const endpoint =
@@ -583,109 +487,98 @@ const loadUserSessions =
       })
 
     const sessions =
-      Array.isArray(
-        response
-      )
+      Array.isArray(response)
         ? response
         : response?.sessions ||
-        []
+          []
 
     return sessions.map(
       normalizeSession
     )
   }
 
-/* ========================================
-   DELETE SESSION
-======================================== */
-
 const deleteConversation =
   async (
     SessionID
-  ) => {
+  ) =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.CHAT_DELETE_SESSION,
+          {
+            sessionId:
+              SessionID,
+          }
+        ),
 
-    const endpoint =
-      buildApiUrl(
-        API_ENDPOINTS.CHAT_DELETE_SESSION,
-        {
-          sessionId:
-            SessionID,
-        }
-      )
-
-    return await apiRequest({
-      endpoint,
       method: "DELETE",
     })
-  }
-
-/* ========================================
-   CLEAR ALL SESSIONS
-======================================== */
 
 const clearAllSessions =
   async () => {
 
-    const userToken =
-      getUserToken()
-
     const requesterId =
       resolveRequesterId(
-        userToken
+        getUserToken()
       )
 
-    const endpoint =
-      buildApiUrl(
-        API_ENDPOINTS.CHAT_CLEAR_ALL,
-        {
-          requesterId,
-        }
-      )
+    return apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.CHAT_CLEAR_ALL,
+          {
+            requesterId,
+          }
+        ),
 
-    return await apiRequest({
-      endpoint,
       method: "DELETE",
     })
   }
 
-/* ========================================
-   LOAD AI SETTINGS
-======================================== */
-
-const loadAISettings =
-  async () => {
-
-    return {
-      success: true,
-
-      message:
-        "AI settings endpoint not yet connected.",
-    }
-  }
-
-/* ========================================
-   RESOLVE CONVERSATION
-======================================== */
-
 const resolveConversation =
   async (
     SessionID
-  ) => {
+  ) =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.CHAT_RESOLVE,
+          {
+            sessionId:
+              SessionID,
+          }
+        ),
+
+      method: "POST",
+    })
+
+const verifyUserToken =
+  async () => {
 
     const endpoint =
       buildApiUrl(
-        API_ENDPOINTS.CHAT_RESOLVE,
-        {
-          sessionId:
-            SessionID,
-        }
+        API_ENDPOINTS.AUTH_VERIFY
       )
 
-    return await apiRequest({
-      endpoint,
-      method: "POST",
+    return apiRequest({
+      endpoint:
+        `${endpoint}?user_token=${encodeURIComponent(
+          getUserToken()
+        )}`,
     })
   }
+
+/* ========================================
+   PLACEHOLDER
+======================================== */
+
+const loadAISettings =
+  async () => ({
+    success: true,
+
+    message:
+      "AI settings endpoint not yet connected.",
+  })
 
 /* ========================================
    EXPORT
@@ -693,23 +586,14 @@ const resolveConversation =
 
 const chatbotService = {
   sendMessage,
-
   loadSession,
-
   loadUserSessions,
-
   deleteConversation,
-
   clearAllSessions,
-
   resolveConversation,
-
   loadAISettings,
-
   verifyUserToken,
-
   getUserToken,
-
   resolveRequesterId,
 }
 

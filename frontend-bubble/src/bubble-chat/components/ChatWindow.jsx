@@ -6,6 +6,18 @@ import ChatFooter from "./ChatFooter/ChatFooter.jsx"
 import chatWindowBackground
   from "../../assets/Chatwindow-background.png"
 
+const overlayClass = `
+  pointer-events-none
+  absolute
+  inset-0
+`
+
+const glowClass = `
+  pointer-events-none
+  absolute
+  z-0
+`
+
 const ChatWindow = ({
   messages = [],
   loading = false,
@@ -13,11 +25,6 @@ const ChatWindow = ({
   onSendMessage,
   onClose,
   onOpenModal,
-
-  /*
-    NEW: optional session reset key
-    (safe addition, backward compatible)
-  */
   sessionKey,
 }) => {
 
@@ -33,6 +40,8 @@ const ChatWindow = ({
         min-h-0
         flex-col
 
+        overflow-hidden
+
         rounded-[28px]
 
         bg-[#f6fff7]
@@ -44,38 +53,29 @@ const ChatWindow = ({
       {/* BACKGROUND IMAGE */}
       <img
         src={chatWindowBackground}
-        alt="Chat Background"
+        alt=""
         draggable={false}
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
+        className={`
+          ${overlayClass}
 
           h-full
           w-full
 
-          object-cover
-
           select-none
-
-          opacity-100
-        "
+          object-cover
+        `}
       />
 
       {/* OVERLAY */}
       <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
+        className={`
+          ${overlayClass}
 
           bg-gradient-to-b
           from-[#f3fff4]/90
           via-[#f7fff8]/88
           to-white/96
-        "
+        `}
       />
 
       {/* INNER */}
@@ -88,8 +88,6 @@ const ChatWindow = ({
           h-full
           min-h-0
           flex-col
-
-          rounded-[28px]
         "
       >
 
@@ -106,67 +104,67 @@ const ChatWindow = ({
         <main className="relative flex-1 min-h-0 overflow-hidden">
 
           {/* TOP GLOW */}
-          <div className="
-            pointer-events-none
+          <div
+            className={`
+              ${glowClass}
 
-            absolute
-            inset-x-0
-            top-0
+              inset-x-0
+              top-0
 
-            h-40
+              h-40
 
-            bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_72%)]
-
-            z-0
-          " />
+              bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_72%)]
+            `}
+          />
 
           {/* BOTTOM GLOW */}
-          <div className="
-            pointer-events-none
+          <div
+            className={`
+              ${glowClass}
 
-            absolute
-            bottom-0
-            right-0
+              bottom-0
+              right-0
 
-            h-52
-            w-52
-
-            rounded-full
-
-            bg-emerald-200/20
-
-            blur-3xl
-
-            z-0
-          " />
-
-          {/* RESOLVED BANNER */}
-          {resolved && (
-            <div className="
-              absolute
-              left-1/2
-              top-3
-              z-20
-
-              -translate-x-1/2
+              h-52
+              w-52
 
               rounded-full
 
-              border
-              border-emerald-200
+              bg-emerald-200/20
 
-              bg-emerald-50
+              blur-3xl
+            `}
+          />
 
-              px-4
-              py-2
+          {/* RESOLVED */}
+          {resolved && (
+            <div
+              className="
+                absolute
+                left-1/2
+                top-3
+                z-20
 
-              text-xs
-              font-medium
+                -translate-x-1/2
 
-              text-emerald-700
+                rounded-full
 
-              shadow-sm
-            ">
+                border
+                border-emerald-200
+
+                bg-emerald-50
+
+                px-4
+                py-2
+
+                text-xs
+                font-medium
+
+                text-emerald-700
+
+                shadow-sm
+              "
+            >
               This conversation has been resolved.
             </div>
           )}

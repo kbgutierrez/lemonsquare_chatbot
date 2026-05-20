@@ -4,8 +4,8 @@ import {
 } from "lucide-react"
 
 import {
-  motion,
   AnimatePresence,
+  motion,
 } from "framer-motion"
 
 import useHorizontalDragScroll
@@ -24,7 +24,21 @@ const quickQuestions = [
   "Account locked",
 ]
 
-const chip = `
+const animation = {
+  initial: {
+    opacity: 0,
+  },
+
+  animate: {
+    opacity: 1,
+  },
+
+  exit: {
+    opacity: 0,
+  },
+}
+
+const chipClass = `
   shrink-0
 
   rounded-full
@@ -46,6 +60,68 @@ const chip = `
   hover:scale-[1.02]
 `
 
+const faqButtonClass = `
+  group
+
+  flex
+  items-center
+  gap-1
+
+  rounded-full
+
+  border
+  border-white/60
+
+  bg-white/75
+
+  px-2.5
+  py-[4px]
+
+  text-[9px]
+  font-bold
+
+  uppercase
+  tracking-[0.12em]
+
+  text-[#1f5c2e]
+
+  shadow-[0_3px_10px_rgba(34,197,94,0.10)]
+
+  backdrop-blur-md
+
+  transition-all
+  duration-200
+
+  hover:bg-white
+  hover:scale-[1.04]
+`
+
+const collapseButtonClass = `
+  flex
+  h-5.5
+  w-5.5
+  items-center
+  justify-center
+
+  rounded-full
+
+  border
+  border-white/60
+
+  bg-white/70
+
+  text-[#256537]
+
+  backdrop-blur-md
+
+  transition-all
+  duration-200
+
+  hover:bg-white
+  hover:rotate-180
+  hover:scale-[1.05]
+`
+
 const ChatFooterFAQ = ({
   loading,
   showQuestions,
@@ -61,28 +137,25 @@ const ChatFooterFAQ = ({
 
       <AnimatePresence mode="wait">
 
-        {/* ====================================
-            COLLAPSED BUTTON
-        ==================================== */}
-
+        {/* COLLAPSED */}
         {!showQuestions && (
           <motion.div
             key="faq-collapsed"
 
             initial={{
-              opacity: 0,
+              ...animation.initial,
               x: 6,
               scale: 0.95,
             }}
 
             animate={{
-              opacity: 1,
+              ...animation.animate,
               x: 0,
               scale: 1,
             }}
 
             exit={{
-              opacity: 0,
+              ...animation.exit,
               x: 6,
               scale: 0.95,
             }}
@@ -100,47 +173,14 @@ const ChatFooterFAQ = ({
 
             <button
               type="button"
+
               aria-label="Open FAQ"
 
               onClick={() =>
                 setShowQuestions(true)
               }
 
-              className="
-                group
-
-                flex
-                items-center
-                gap-1
-
-                rounded-full
-
-                border
-                border-white/60
-
-                bg-white/75
-
-                px-2.5
-                py-[4px]
-
-                text-[9px]
-                font-bold
-
-                uppercase
-                tracking-[0.12em]
-
-                text-[#1f5c2e]
-
-                shadow-[0_3px_10px_rgba(34,197,94,0.10)]
-
-                backdrop-blur-md
-
-                transition-all
-                duration-200
-
-                hover:bg-white
-                hover:scale-[1.04]
-              "
+              className={faqButtonClass}
             >
 
               <Sparkles
@@ -182,28 +222,25 @@ const ChatFooterFAQ = ({
           </motion.div>
         )}
 
-        {/* ====================================
-            EXPANDED FAQ
-        ==================================== */}
-
+        {/* EXPANDED */}
         {showQuestions && (
           <motion.div
             key="faq-expanded"
 
             initial={{
-              opacity: 0,
+              ...animation.initial,
               y: -6,
               scale: 0.97,
             }}
 
             animate={{
-              opacity: 1,
+              ...animation.animate,
               y: 0,
               scale: 1,
             }}
 
             exit={{
-              opacity: 0,
+              ...animation.exit,
               y: -6,
               scale: 0.97,
             }}
@@ -214,10 +251,7 @@ const ChatFooterFAQ = ({
             }}
           >
 
-            {/* ====================================
-                TOP BAR
-            ==================================== */}
-
+            {/* TOP */}
             <motion.div
               initial={{
                 opacity: 0,
@@ -243,41 +277,16 @@ const ChatFooterFAQ = ({
               "
             >
 
-              {/* CLOSE ONLY (no label anymore) */}
-
               <button
                 type="button"
+
                 aria-label="Hide FAQ"
 
                 onClick={() =>
                   setShowQuestions(false)
                 }
 
-                className="
-                  flex
-                  h-5.5
-                  w-5.5
-                  items-center
-                  justify-center
-
-                  rounded-full
-
-                  border
-                  border-white/60
-
-                  bg-white/70
-
-                  text-[#256537]
-
-                  backdrop-blur-md
-
-                  transition-all
-                  duration-200
-
-                  hover:bg-white
-                  hover:rotate-180
-                  hover:scale-[1.05]
-                "
+                className={collapseButtonClass}
               >
 
                 <ChevronDown
@@ -291,12 +300,10 @@ const ChatFooterFAQ = ({
 
             </motion.div>
 
-            {/* ====================================
-                QUESTIONS
-            ==================================== */}
-
+            {/* QUESTIONS */}
             <div
               ref={faqScrollRef}
+
               className="
                 flex
                 gap-1.5
@@ -322,9 +329,22 @@ const ChatFooterFAQ = ({
             >
 
               {quickQuestions.map(
-                (question, index) => (
+                (
+                  question,
+                  index
+                ) => (
                   <motion.button
                     key={question}
+
+                    type="button"
+
+                    draggable={false}
+
+                    disabled={loading}
+
+                    onClick={() =>
+                      onQuestionClick(question)
+                    }
 
                     initial={{
                       opacity: 0,
@@ -349,18 +369,8 @@ const ChatFooterFAQ = ({
                       duration: 0.18,
                     }}
 
-                    type="button"
-
-                    draggable={false}
-
-                    disabled={loading}
-
-                    onClick={() =>
-                      onQuestionClick(question)
-                    }
-
                     className={`
-                      ${chip}
+                      ${chipClass}
 
                       px-2.5
                       py-1

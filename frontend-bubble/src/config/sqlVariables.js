@@ -1,22 +1,3 @@
-/*
-  CENTRALIZED APP CONFIG
-
-  SDK-SAFE CONFIGURATION LAYER
-
-  Future-safe for:
-  - SQL Server
-  - REST API
-  - WebSockets
-  - RAG
-  - AI Models
-  - Admin Dashboard
-  - SDK Embedding
-*/
-
-/* ========================================
-   ENVIRONMENT
-======================================== */
-
 const ENV = {
   API_BASE_URL:
     import.meta.env.VITE_API_BASE_URL ||
@@ -32,26 +13,23 @@ const ENV = {
 }
 
 /* ========================================
-   SDK GLOBAL CONFIG
+   HELPERS
 ======================================== */
 
-const resolveSdkGlobalConfig =
-  () => {
+const cleanUrl = (
+  url,
+  fallback
+) =>
+  (url || fallback).replace(
+    /\/$/,
+    ""
+  )
 
-    if (
-      typeof window ===
-        "undefined"
-    ) {
-
-      return {}
-    }
-
-    return (
-      window
-        .LemonSquareChatConfig ||
+const getGlobalConfig = () =>
+  typeof window === "undefined"
+    ? {}
+    : window.LemonSquareChatConfig ||
       {}
-    )
-  }
 
 /* ========================================
    SDK RUNTIME CONFIG
@@ -64,45 +42,28 @@ const SDK_RUNTIME_CONFIG = {
   wsBaseUrl:
     ENV.WS_BASE_URL,
 
-  userToken:
-    null,
+  userToken: null,
 
   environment:
     ENV.APP_ENV,
 }
 
-/* ========================================
-   APPLY SDK CONFIG
-======================================== */
-
-const sdkGlobalConfig =
-  resolveSdkGlobalConfig()
-
 Object.assign(
   SDK_RUNTIME_CONFIG,
-  sdkGlobalConfig
+  getGlobalConfig()
 )
 
 /* ========================================
-   GET RUNTIME CONFIG
+   RUNTIME CONFIG
 ======================================== */
 
 export const getRuntimeConfig =
-  () => {
-
-    return {
-      ...SDK_RUNTIME_CONFIG,
-    }
-  }
-
-/* ========================================
-   UPDATE RUNTIME CONFIG
-======================================== */
+  () => ({
+    ...SDK_RUNTIME_CONFIG,
+  })
 
 export const updateRuntimeConfig =
-  (
-    nextConfig = {}
-  ) => {
+  (nextConfig = {}) => {
 
     Object.assign(
       SDK_RUNTIME_CONFIG,
@@ -116,19 +77,14 @@ export const updateRuntimeConfig =
   }
 
 /* ========================================
-   API CONFIG
+   API / WS CONFIG
 ======================================== */
 
 export const API_CONFIG = {
   get BASE_URL() {
-
-    return (
-      SDK_RUNTIME_CONFIG
-        .apiBaseUrl ||
+    return cleanUrl(
+      SDK_RUNTIME_CONFIG.apiBaseUrl,
       "/api"
-    ).replace(
-      /\/$/,
-      ""
     )
   },
 
@@ -140,20 +96,11 @@ export const API_CONFIG = {
   },
 }
 
-/* ========================================
-   WEBSOCKET CONFIG
-======================================== */
-
 export const WS_CONFIG = {
   get BASE_URL() {
-
-    return (
-      SDK_RUNTIME_CONFIG
-        .wsBaseUrl ||
+    return cleanUrl(
+      SDK_RUNTIME_CONFIG.wsBaseUrl,
       "/ws"
-    ).replace(
-      /\/$/,
-      ""
     )
   },
 }
@@ -163,11 +110,7 @@ export const WS_CONFIG = {
 ======================================== */
 
 export const API_ENDPOINTS = {
-
-  /* ====================================
-     DOCUMENTS
-  ==================================== */
-
+  /* DOCUMENTS */
   DOCUMENTS:
     "/documents",
 
@@ -189,17 +132,11 @@ export const API_ENDPOINTS = {
   DOCUMENT_MANUAL_ENTRY_DELETE:
     "/documents/manual/:entryId",
 
-  /* ====================================
-     KNOWLEDGE EXPLORER
-  ==================================== */
-
+  /* KNOWLEDGE */
   KNOWLEDGE_EXPLORE:
     "/knowledge/explore",
 
-  /* ====================================
-     CHAT
-  ==================================== */
-
+  /* CHAT */
   CHAT_SEND:
     "/chat",
 
@@ -218,27 +155,18 @@ export const API_ENDPOINTS = {
   CHAT_CLEAR_ALL:
     "/chat/users/:requesterId/sessions",
 
-  /* ====================================
-     AUTH
-  ==================================== */
-
+  /* AUTH */
   AUTH_VERIFY:
     "/auth/verify",
 
-  /* ====================================
-     SELF KNOWLEDGE
-  ==================================== */
-
+  /* SELF KNOWLEDGE */
   SELF_KNOWLEDGE_UPDATE:
     "/self_knowledge/chats/:sessionId",
 
   SELF_KNOWLEDGE_DELETE:
     "/self_knowledge/chats/:sessionId",
 
-  /* ====================================
-     TICKETS
-  ==================================== */
-
+  /* TICKETS */
   TICKETS:
     "/tickets",
 
@@ -251,10 +179,7 @@ export const API_ENDPOINTS = {
   TICKET_WHITELIST:
     "/tickets/:ticketNumber/whitelist",
 
-  /* ====================================
-     AI SETTINGS
-  ==================================== */
-
+  /* SETTINGS */
   AI_SETTINGS:
     "/settings",
 }
@@ -320,31 +245,22 @@ export const SESSION_DEFAULTS = {
 }
 
 /* ========================================
-   BUILD API URL
+   URL BUILDER
 ======================================== */
 
 export const buildApiUrl = (
   endpoint,
   params = {}
-) => {
-
-  let url =
-    `${API_CONFIG.BASE_URL}${endpoint}`
-
-  Object.entries(params).forEach(
-    ([key, value]) => {
-
-      url = url.replace(
+) =>
+  Object.entries(params).reduce(
+    (url, [key, value]) =>
+      url.replace(
         `:${key}`,
-        encodeURIComponent(
-          value
-        )
-      )
-    }
-  )
+        encodeURIComponent(value)
+      ),
 
-  return url
-}
+    `${API_CONFIG.BASE_URL}${endpoint}`
+  )
 
 /* ========================================
    CHAT WIDGET CONFIG

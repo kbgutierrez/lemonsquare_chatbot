@@ -9,33 +9,39 @@ import chatWindowBackground
 
 const MAX_MESSAGE_LENGTH = 4000
 
+const iconClass =
+  "relative z-10 h-4 w-4 text-white"
+
+const backgroundImageClass = `
+  absolute inset-0
+  h-full w-full
+  object-cover
+`
+
 const ChatFooterInput = ({
   textareaRef,
   message,
   setMessage,
-
-  /*
-    IMPORTANT:
-    loading should ONLY
-    represent AI replying.
-  */
   loading,
-
   resolved,
-
   onKeyDown,
   onSend,
 }) => {
 
-  const isDisabled =
-    resolved
-
   const canSend =
     !loading &&
     !resolved &&
-    Boolean(
-      message?.trim()
-    )
+    !!message?.trim()
+
+  const placeholder =
+    resolved
+      ? "Resolved conversations are read-only."
+      : loading
+        ? "AI is replying..."
+        : "Ask LemonSquare AI..."
+
+  const handleSend =
+    () => canSend && onSend?.()
 
   return (
     <div
@@ -70,10 +76,7 @@ const ChatFooterInput = ({
       "
     >
 
-      {/* ====================================
-          BACKGROUND IMAGE LAYER
-      ==================================== */}
-
+      {/* BACKGROUND */}
       <div
         className="
           pointer-events-none
@@ -85,30 +88,20 @@ const ChatFooterInput = ({
         "
       >
 
-        {/* IMAGE */}
-
         <img
           src={chatWindowBackground}
           alt=""
           draggable={false}
-          className="
-            absolute
-            inset-0
-
-            h-full
-            w-full
+          className={`
+            ${backgroundImageClass}
 
             scale-[1.7]
-
-            object-cover
 
             opacity-[0.18]
 
             blur-lg
-          "
+          `}
         />
-
-        {/* SOFT OVERLAY */}
 
         <div
           className="
@@ -121,39 +114,32 @@ const ChatFooterInput = ({
 
       </div>
 
-      {/* ====================================
-          TEXTAREA
-      ==================================== */}
-
+      {/* INPUT */}
       <textarea
         ref={textareaRef}
+
         rows={1}
+
         value={message}
-        disabled={
-          isDisabled
-        }
-        maxLength={
-          MAX_MESSAGE_LENGTH
-        }
+
+        disabled={resolved}
+
+        maxLength={MAX_MESSAGE_LENGTH}
+
         enterKeyHint="send"
+
         aria-label="Chat input"
-        onChange={(
-          event
-        ) =>
+
+        placeholder={placeholder}
+
+        onKeyDown={onKeyDown}
+
+        onChange={(event) =>
           setMessage(
             event.target.value
           )
         }
-        onKeyDown={
-          onKeyDown
-        }
-        placeholder={
-          resolved
-            ? "Resolved conversations are read-only."
-            : loading
-              ? "AI is replying..."
-              : "Ask LemonSquare AI..."
-        }
+
         className="
           relative
           z-10
@@ -188,26 +174,16 @@ const ChatFooterInput = ({
         "
       />
 
-      {/* ====================================
-          SEND BUTTON
-      ==================================== */}
-
+      {/* SEND BUTTON */}
       <button
         type="button"
+
         aria-label="Send message"
-        disabled={
-          !canSend
-        }
-        onClick={() => {
 
-          if (
-            !canSend
-          ) {
-            return
-          }
+        disabled={!canSend}
 
-          onSend()
-        }}
+        onClick={handleSend}
+
         className="
           group
           relative
@@ -241,10 +217,7 @@ const ChatFooterInput = ({
         "
       >
 
-        {/* ====================================
-            BUTTON BACKGROUND IMAGE
-        ==================================== */}
-
+        {/* BUTTON BG */}
         <div
           className="
             absolute
@@ -254,30 +227,20 @@ const ChatFooterInput = ({
           "
         >
 
-          {/* IMAGE */}
-
           <img
             src={chatWindowBackground}
             alt=""
             draggable={false}
-            className="
-              absolute
-              inset-0
-
-              h-full
-              w-full
+            className={`
+              ${backgroundImageClass}
 
               scale-[2.1]
-
-              object-cover
 
               opacity-95
 
               blur-[2px]
-            "
+            `}
           />
-
-          {/* COLOR OVERLAY */}
 
           <div
             className="
@@ -287,8 +250,6 @@ const ChatFooterInput = ({
               bg-[#8ee89a]/42
             "
           />
-
-          {/* HOVER GLOSS */}
 
           <div
             className="
@@ -308,48 +269,15 @@ const ChatFooterInput = ({
 
         </div>
 
-        {/* ====================================
-            ICON
-        ==================================== */}
-
+        {/* ICON */}
         {loading ? (
           <LoaderCircle
-            className="
-              relative
-              z-10
-
-              h-4
-              w-4
-
-              animate-spin
-
-              text-white
-            "
+            className={`${iconClass} animate-spin`}
           />
         ) : resolved ? (
-          <Lock
-            className="
-              relative
-              z-10
-
-              h-4
-              w-4
-
-              text-white
-            "
-          />
+          <Lock className={iconClass} />
         ) : (
-          <SendHorizonal
-            className="
-              relative
-              z-10
-
-              h-4
-              w-4
-
-              text-white
-            "
-          />
+          <SendHorizonal className={iconClass} />
         )}
 
       </button>
@@ -358,5 +286,4 @@ const ChatFooterInput = ({
   )
 }
 
-export default
-ChatFooterInput
+export default ChatFooterInput
