@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """
 Chat endpoints.
 
@@ -27,17 +28,57 @@ from app.api.deps import get_chatbot_db, get_orchestrator, get_ingestion_service
 from app.services.ingestion_service import DocumentIngestionService
 from app.schemas.chat import ChatHistoryResponse, ChatRequest, ChatResponse, MessageRecord, ChatSessionMetaResponse, ResolveChatResponse
 from app.schemas.tickets import TicketEscalateRequest, TicketEscalateResponse
+=======
+import logging
+from datetime import datetime
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from app.api.deps import (
+    get_chatbot_db,
+    get_ingestion_service,
+    get_orchestrator,
+)
+from app.core.exceptions import AuthenticationError
+from app.schemas.chat import (
+    ChatHistoryResponse,
+    ChatRequest,
+    ChatResponse,
+    ChatSessionMetaResponse,
+    MessageRecord,
+    ResolveChatResponse,
+)
+from app.schemas.tickets import (
+    TicketDraftResponse,
+    TicketEscalateResponse,
+    TicketSubmitRequest,
+)
+from app.services import chat_service
+from app.services.ingestion_service import DocumentIngestionService
+from app.services.orchestrator import SupportOrchestrator
+from app.services.user_service import fetch_user_details
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/chat", tags=["Chat"])
+
+router = APIRouter(
+    prefix="/chat",
+    tags=["Chat"],
+)
 
 
-@router.post("", response_model=ChatResponse)
+@router.post(
+    "",
+    response_model=ChatResponse,
+)
 async def handle_chat(
     request: ChatRequest,
     db: Session = Depends(get_chatbot_db),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
 ) -> ChatResponse:
+<<<<<<< HEAD
     """
     Process a user chat message and return an AI response.
 
@@ -51,24 +92,36 @@ async def handle_chat(
       7. Return structured response.
     """
     # 1. Authenticate.
+=======
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     try:
-        logger.debug("Authenticating token: %s", request.user_token[:10] + "...")
-        user_data = await fetch_user_details(request.user_token)
-        logger.debug("Auth returned user_data: %s", user_data)
-        user_id = int(user_data.get("id") or 1)
+        user_data = await fetch_user_details(
+            request.user_token
+        )
+
+        user_id = int(
+            user_data.get("id") or 1
+        )
+
         user_name = (
-            f"{user_data.get('firstname', 'Guest')} {user_data.get('lastname', 'User')}"
+            f"{user_data.get('firstname', 'Guest')} "
+            f"{user_data.get('lastname', 'User')}"
         ).strip()
-        logger.info("Auth successful: user_id=%d, user_name=%s", user_id, user_name)
-    except AuthenticationError as exc:
-        logger.error("Authentication failed: %s", exc)
+
+    except AuthenticationError:
         raise
+
     except Exception as exc:
-        logger.error("Auth service error; rejecting request: %s", exc)
-        raise AuthenticationError("User authentication failed.") from exc
+        logger.error(
+            "Authentication failure: %s",
+            exc,
+        )
 
-    logger.info("Chat request from user_id=%d | session=%s", user_id, request.session_id)
+        raise AuthenticationError(
+            "User authentication failed."
+        ) from exc
 
+<<<<<<< HEAD
     # 2. Session management.
     session_id = chat_service.get_or_create_session(db, request.session_id, user_id)
 
@@ -84,11 +137,48 @@ async def handle_chat(
         chat_history=history_text,
         user_name=user_name,
         db=db,
+=======
+    session_id = chat_service.get_or_create_session(
+        db,
+        request.session_id,
+        user_id,
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     )
-    logger.info("AI response generated for session=%s", session_id)
 
+<<<<<<< HEAD
     # 6. Save AI response.
     chat_service.save_message(db, session_id, "ai", ai_response)
+=======
+    chat_service.save_message(
+        db,
+        session_id,
+        "user",
+        request.message,
+    )
+
+    history_text = (
+        chat_service.get_recent_history_text(
+            db,
+            session_id,
+        )
+    )
+
+    ai_response, ticket_ids = (
+        await orchestrator.orchestrate(
+            user_query=request.message,
+            chat_history=history_text,
+            user_name=user_name,
+            db=db,
+        )
+    )
+
+    chat_service.save_message(
+        db,
+        session_id,
+        "ai",
+        ai_response,
+    )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
     return ChatResponse(
         session_id=session_id,
@@ -97,12 +187,16 @@ async def handle_chat(
     )
 
 
-@router.get("/history/{session_id}", response_model=ChatHistoryResponse)
+@router.get(
+    "/history/{session_id}",
+    response_model=ChatHistoryResponse,
+)
 async def get_chat_history(
     session_id: str,
     user_token: str,
     db: Session = Depends(get_chatbot_db),
 ) -> ChatHistoryResponse:
+<<<<<<< HEAD
     """
     Retrieve the full message history for a session.
 
@@ -113,8 +207,24 @@ async def get_chat_history(
 
     # Raises NotFoundError or AuthorizationError (handled globally).
     chat_service.get_session_with_auth_check(db, session_id, user_id)
+=======
+    user_data = await fetch_user_details(
+        user_token
+    )
 
-    messages = chat_service.get_all_messages(db, session_id)
+    user_id = user_data.get("id") or 1
+
+    chat_service.get_session_with_auth_check(
+        db,
+        session_id,
+        user_id,
+    )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
+
+    messages = chat_service.get_all_messages(
+        db,
+        session_id,
+    )
 
     return ChatHistoryResponse(
         session_id=session_id,
@@ -124,7 +234,11 @@ async def get_chat_history(
                 SessionID=msg.SessionID,
                 SenderRole=msg.SenderRole,
                 MessageContent=msg.MessageContent,
-                CreatedAt=msg.CreatedAt.isoformat() if msg.CreatedAt else "",
+                CreatedAt=(
+                    msg.CreatedAt.isoformat()
+                    if msg.CreatedAt
+                    else ""
+                ),
             )
             for msg in messages
         ],
@@ -134,15 +248,15 @@ async def get_chat_history(
 from datetime import datetime
 
 @router.get(
-    "/user-sessions/{requester_id}", 
-    response_model=list[ChatSessionMetaResponse], 
-    summary="Get all chat sessions for a specific user"
+    "/user-sessions/{requester_id}",
+    response_model=list[ChatSessionMetaResponse],
 )
 def get_user_chat_sessions(
     requester_id: str,
     limit: int = 20,
-    db: Session = Depends(get_chatbot_db)
+    db: Session = Depends(get_chatbot_db),
 ):
+<<<<<<< HEAD
     from app.models.chatbot import ChatSession
     
     # We can use order_by again because StartTime exists!
@@ -150,10 +264,44 @@ def get_user_chat_sessions(
         db.query(ChatSession)
         .filter(ChatSession.RequesterUserID == requester_id)
         .filter(ChatSession.IsActive == True) # <-- ADD THIS LINE
+=======
+    from app.models.chatbot import (
+        ChatMessage,
+        ChatSession,
+    )
+
+    sessions = (
+        db.query(
+            ChatSession.SessionID,
+            ChatSession.SessionStatus,
+            ChatSession.StartTime,
+            ChatSession.RequesterUserID,
+            func.count(ChatMessage.MessageID).label(
+                "message_count"
+            ),
+        )
+        .outerjoin(
+            ChatMessage,
+            ChatSession.SessionID
+            == ChatMessage.SessionID,
+        )
+        .filter(
+            ChatSession.RequesterUserID
+            == requester_id
+        )
+        .filter(ChatSession.IsActive == True)
+        .group_by(
+            ChatSession.SessionID,
+            ChatSession.SessionStatus,
+            ChatSession.StartTime,
+            ChatSession.RequesterUserID,
+        )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
         .order_by(ChatSession.StartTime.desc())
         .limit(limit)
         .all()
     )
+<<<<<<< HEAD
     
     result = []
     for s in sessions:
@@ -165,16 +313,30 @@ def get_user_chat_sessions(
         })
         
     return result
+=======
+
+    return [
+        {
+            "session_id": sid,
+            "status": status or "Active",
+            "created_at": start_time,
+            "message_count": msg_count,
+            "user_id": str(req_id),
+        }
+        for sid, status, start_time, req_id, msg_count in sessions
+    ]
+
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
 @router.get(
-    "/all-sessions", 
-    response_model=list[ChatSessionMetaResponse], 
-    summary="Admin Audit: List all chats"
+    "/all-sessions",
+    response_model=list[ChatSessionMetaResponse],
 )
 def get_all_chat_sessions(
     limit: int = 50,
-    db: Session = Depends(get_chatbot_db)
+    db: Session = Depends(get_chatbot_db),
 ):
+<<<<<<< HEAD
     """Admin-only endpoint to review all employee chats using ONLY available columns."""
     from app.models.chatbot import ChatSession
     
@@ -202,18 +364,63 @@ def get_all_chat_sessions(
     result.sort(key=lambda x: x["created_at"] if x["created_at"] else datetime.min, reverse=True)
     return result[:limit]
 
+=======
+    from app.models.chatbot import (
+        ChatMessage,
+        ChatSession,
+    )
+
+    sessions = (
+        db.query(
+            ChatSession.SessionID,
+            ChatSession.SessionStatus,
+            ChatSession.StartTime,
+            ChatSession.RequesterUserID,
+            func.count(ChatMessage.MessageID).label(
+                "message_count"
+            ),
+        )
+        .outerjoin(
+            ChatMessage,
+            ChatSession.SessionID
+            == ChatMessage.SessionID,
+        )
+        .group_by(
+            ChatSession.SessionID,
+            ChatSession.SessionStatus,
+            ChatSession.StartTime,
+            ChatSession.RequesterUserID,
+        )
+        .order_by(ChatSession.StartTime.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "session_id": sid,
+            "status": status or "Active",
+            "created_at": start_time,
+            "message_count": msg_count,
+            "user_id": str(req_id),
+        }
+        for sid, status, start_time, req_id, msg_count in sessions
+    ]
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
 
 @router.post(
-    "/resolve/{session_id}", 
-    response_model=ResolveChatResponse, 
-    summary="Mark chat as resolved and extract KB data"
+    "/resolve/{session_id}",
+    response_model=ResolveChatResponse,
 )
 async def mark_chat_resolved(
     session_id: str,
     db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+    ingestion_service: DocumentIngestionService = Depends(
+        get_ingestion_service
+    ),
 ):
+<<<<<<< HEAD
     """
     Frontend triggers this when an employee clicks 'Mark as Resolved'.
     The AI will extract the problem/solution as strict JSON and add it to its brain.
@@ -238,12 +445,43 @@ async def draft_escalation(
     except Exception as exc:
         logger.error(f"Failed to draft ticket: {exc}")
         return TicketDraftResponse(status="error", summary="", description=str(exc))
+=======
+    return await ingestion_service.process_resolved_chat(
+        session_id,
+        db,
+    )
 
-@router.post("/escalate/submit", response_model=TicketEscalateResponse, summary="Submit the reviewed ticket to live agents")
+
+@router.get(
+    "/escalate/draft/{session_id}",
+    response_model=TicketDraftResponse,
+)
+async def draft_escalation(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(
+        get_ingestion_service
+    ),
+):
+    result = await chat_service.draft_ticket_escalation(
+        session_id,
+        db,
+        ingestion_service,
+    )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
+
+    return TicketDraftResponse(**result)
+
+
+@router.post(
+    "/escalate/submit",
+    response_model=TicketEscalateResponse,
+)
 async def submit_escalation(
     request: TicketSubmitRequest,
     db: Session = Depends(get_chatbot_db),
 ):
+<<<<<<< HEAD
     try:
         result = await chat_service.submit_ticket_escalation(request.model_dump(), db)
         return TicketEscalateResponse(**result)
@@ -251,24 +489,53 @@ async def submit_escalation(
         logger.error(f"Failed to submit ticket: {exc}")
         return TicketEscalateResponse(status="error", message=str(exc))
     
+=======
+    result = await chat_service.submit_ticket_escalation(
+        request.model_dump(),
+        db,
+    )
 
-@router.delete("/sessions/{session_id}", summary="Archive a chat session")
+    return TicketEscalateResponse(**result)
+
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
+
+@router.delete(
+    "/sessions/{session_id}",
+)
 def delete_chat_session(
     session_id: str,
-    db: Session = Depends(get_chatbot_db)
+    db: Session = Depends(get_chatbot_db),
 ):
+<<<<<<< HEAD
     """
     Soft-deletes a chat session so it disappears from user histories and admin views.
     """
     chat_service.archive_session(db, session_id)
     return {"status": "success", "message": f"Session {session_id} archived successfully."}
+=======
+    chat_service.archive_session(
+        db,
+        session_id,
+    )
+
+    return {
+        "status": "success",
+        "message": (
+            f"Session {session_id} "
+            f"archived successfully."
+        ),
+    }
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
 
-@router.delete("/users/{requester_id}/sessions", summary="Archive all chats for a specific user")
+@router.delete(
+    "/users/{requester_id}/sessions",
+)
 def clear_all_user_chats(
     requester_id: int,
-    db: Session = Depends(get_chatbot_db)
+    db: Session = Depends(get_chatbot_db),
 ):
+<<<<<<< HEAD
     """
     Instantly soft-deletes every active chat session belonging to this user.
     """
@@ -278,3 +545,23 @@ def clear_all_user_chats(
         return {"status": "skipped", "message": "No active chats to clear."}
         
     return {"status": "success", "message": f"Successfully cleared {count} chat sessions."}
+=======
+    count = chat_service.archive_all_user_sessions(
+        db,
+        requester_id,
+    )
+
+    if count == 0:
+        return {
+            "status": "skipped",
+            "message": "No active chats to clear.",
+        }
+
+    return {
+        "status": "success",
+        "message": (
+            f"Successfully cleared "
+            f"{count} chat sessions."
+        ),
+    }
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1

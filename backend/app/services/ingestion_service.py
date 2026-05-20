@@ -47,6 +47,7 @@ from app.models.chatbot import (
     LearnedChat,
     ManualKnowledgeEntry,
     UploadedDocument,
+    ChatSession,
 )
 from app.services.consolidator import KnowledgeConsolidator
 
@@ -805,6 +806,17 @@ class DocumentIngestionService:
                 WorkDone=extracted_data.get("work_done", "None"),
             )
             db.add(learned_entry)
+            db.commit()
+
+
+        session = (
+            db.query(ChatSession)
+            .filter(ChatSession.SessionID == session_id)
+            .first()
+)
+
+        if session:
+            session.SessionStatus = "Resolved"
             db.commit()
 
         return {
