@@ -237,17 +237,19 @@ def build_cluster_documents(
     tickets: list[TicketEvaluation],
     blacklisted_nums: set[Any],
     previous_state: dict[str, str],
-) -> tuple[list[ClusterDocument], dict[str, str], int, int]:
+) -> tuple[list[ClusterDocument], list[ClusterDocument], dict[str, str], int, int]:
     """
-    Group tickets into canonical clusters and build one document per cluster.
+    Build BOTH raw ticket documents AND canonical cluster documents.
 
     Returns:
-      - cluster docs to upload
+      - raw_ticket_docs (one per ticket for exact lookup)
+      - canonical_cluster_docs (consolidated for semantic memory)
       - updated state map
       - skipped blacklisted count
       - skipped unchanged cluster count
     """
     grouped: dict[str, list[TicketEvaluation]] = defaultdict(list)
+    raw_docs: list[ClusterDocument] = []
     skipped_blacklisted = 0
 
     for ticket in tickets:
@@ -255,9 +257,38 @@ def build_cluster_documents(
             skipped_blacklisted += 1
             continue
 
+        # Build raw ticket document (one per ticket)
+        raw_vector_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket.ticket_number}"))
+        raw_content = (
+            f"TICKET NUMBER: {stable_text(ticket.ticket_number)}\n"
+            f"ISSUE REPORTED: {stable_text(ticket.issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: {stable_text(ticket.issue_found)}\n"
+            f"ROOT CAUSE: {stable_text(ticket.issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): {stable_text(ticket.work_done)}\n"
+            f"ADVANCED RESOLUTION: {stable_text(ticket.advanced_work_done)}\n"
+        )
+        raw_metadata = {
+            "doc_type": "raw_ticket",
+            "category": "Database Helpdesk Sync",
+            "ticket_number": stable_text(ticket.ticket_number),
+            "frequency": 1,
+        }
+        raw_doc = Document(page_content=raw_content, metadata=raw_metadata)
+        raw_docs.append(
+            ClusterDocument(
+                cluster_key=f"raw_{ticket.ticket_number}",
+                document=raw_doc,
+                vector_id=raw_vector_id,
+                content_hash=build_content_hash(raw_content),
+                ticket_count=1,
+            )
+        )
+
+        # Group for canonical clustering
         group_key = build_grouping_signature(ticket)
         grouped[group_key].append(ticket)
 
+    # Build canonical clusters
     cluster_docs: list[ClusterDocument] = []
     updated_state = dict(previous_state)
     skipped_unchanged = 0
@@ -306,10 +337,11 @@ def build_cluster_documents(
         updated_state[cluster_key] = content_hash
 
     logger.info("Skipped %d blacklisted tickets.", skipped_blacklisted)
+    logger.info("Built %d raw ticket documents.", len(raw_docs))
     logger.info("Built %d canonical clusters.", len(cluster_docs))
     logger.info("Skipped %d unchanged clusters.", skipped_unchanged)
 
-    return cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged
+    return raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged
 
 
 def upload_batches(
@@ -375,26 +407,37 @@ def run_ingestion(batch_size: int = 20) -> None:
         logger.info("Fetched %d resolved tickets.", len(resolved_tickets))
 
         logger.info("Grouping tickets into canonical clusters...")
-        cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged = build_cluster_documents(
+        raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged = build_cluster_documents(
             tickets=resolved_tickets,
             blacklisted_nums=blacklisted_nums,
             previous_state=previous_state,
         )
 
         logger.info(
-            "Ready to upload %d canonical documents (%d unchanged clusters skipped).",
+            "Ready to upload %d raw tickets + %d canonical clusters (%d unchanged clusters skipped).",
+            len(raw_docs),
             len(cluster_docs),
             skipped_unchanged,
         )
 
-        if not cluster_docs:
+        if not raw_docs and not cluster_docs:
             logger.info("Nothing new to ingest. Sync complete.")
             return
 
         logger.info("Loading embedding model: %s", settings.EMBEDDING_MODEL)
         embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-        uploaded = upload_batches(
+        # Upload raw tickets first for exact lookup coverage
+        logger.info("Uploading %d raw ticket vectors...", len(raw_docs))
+        uploaded_raw = upload_batches(
+            cluster_docs=raw_docs,
+            embeddings=embeddings,
+            batch_size=batch_size,
+        )
+
+        # Then upload canonical clusters for semantic memory
+        logger.info("Uploading %d canonical cluster vectors...", len(cluster_docs))
+        uploaded_canonical = upload_batches(
             cluster_docs=cluster_docs,
             embeddings=embeddings,
             batch_size=batch_size,
@@ -403,8 +446,9 @@ def run_ingestion(batch_size: int = 20) -> None:
         save_state(STATE_PATH, updated_state)
 
         logger.info(
-            "Qdrant sync complete. Uploaded %d canonical documents into '%s'.",
-            uploaded,
+            "Qdrant sync complete. Uploaded %d raw tickets + %d canonical clusters into '%s'.",
+            uploaded_raw,
+            uploaded_canonical,
             settings.QDRANT_COLLECTION,
         )
 
