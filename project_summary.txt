@@ -4,8 +4,6 @@ PROJECT DIRECTORY TREE
 Earl/
 ├── .env.example
 ├── .gitignore
-├── Results.csv
-├── SUBCATEGORY.sql
 ├── backend
 │   ├── .ticket_cluster_state.json
 │   ├── app
@@ -15,6 +13,7 @@ Earl/
 │   │   │   ├── deps.py
 │   │   │   └── routers
 │   │   │       ├── __init__.py
+│   │   │       ├── admin_auth.py
 │   │   │       ├── analytics.py
 │   │   │       ├── auth.py
 │   │   │       ├── chat.py
@@ -47,315 +46,43 @@ Earl/
 │   │   │   ├── self_knowledge.py
 │   │   │   ├── settings.py
 │   │   │   └── tickets.py
-│   │   ├── services
-│   │   │   ├── __init__.py
-│   │   │   ├── chat_service.py
-│   │   │   ├── consolidator.py
-│   │   │   ├── ingestion_service.py
-│   │   │   ├── maintenance.py
-│   │   │   ├── orchestrator.py
-│   │   │   ├── routing_service.py
-│   │   │   ├── settings_service.py
-│   │   │   ├── taxonomy_service.py
-│   │   │   └── user_service.py
-│   │   └── {api
+│   │   └── services
+│   │       ├── __init__.py
+│   │       ├── chat_service.py
+│   │       ├── consolidator.py
+│   │       ├── ingestion_service.py
+│   │       ├── maintenance.py
+│   │       ├── orchestrator.py
+│   │       ├── routing_service.py
+│   │       ├── settings_service.py
+│   │       ├── taxonomy_service.py
+│   │       └── user_service.py
 │   ├── data
 │   │   └── routing
 │   │       ├── routing_dataset.csv
 │   │       ├── routing_dataset.jsonl
 │   │       └── routing_dataset_stats.json
 │   ├── package-lock.json
-│   ├── project_summary.txt
 │   ├── requirements.txt
 │   ├── scripts
+│   │   ├── README.md
 │   │   ├── __init__.py
 │   │   ├── build_routing_dataset.py
 │   │   ├── ingest_routing.py
 │   │   ├── ingest_tickets.py
-│   │   └── sync_routing_data.py
+│   │   ├── rebuild_canonical_vectors.py
+│   │   ├── reingest_all.py
+│   │   ├── sync_routing_data.py
+│   │   └── wipe_recreate_qdrant.py
 │   └── wipe_qdrant.py
-├── ch.py
 ├── erd.png
-├── frontend-admin
-│   ├── .gitignore
-│   ├── README.md
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── src
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── admin
-│   │   │   ├── components
-│   │   │   │   ├── KnowledgeFiles
-│   │   │   │   │   ├── FileTable.jsx
-│   │   │   │   │   ├── KnowledgeFilesSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ActionButtons.jsx
-│   │   │   │   │   │   ├── CategoryBadge.jsx
-│   │   │   │   │   │   ├── FileTableEmpty.jsx
-│   │   │   │   │   │   ├── FileTableHeader.jsx
-│   │   │   │   │   │   └── FileTableRow.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useKnowledgeFiles.js
-│   │   │   │   │   ├── index.js
-│   │   │   │   │   ├── modals
-│   │   │   │   │   │   └── EditFileModal.jsx
-│   │   │   │   │   └── services
-│   │   │   │   │       └── knowledgeFilesService.js
-│   │   │   │   ├── MobileSidebar.jsx
-│   │   │   │   ├── SidebarMenu.jsx
-│   │   │   │   ├── manual-entries
-│   │   │   │   │   ├── ManualEntriesSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ManualEntriesHeader.jsx
-│   │   │   │   │   │   ├── ManualEntriesPagination.jsx
-│   │   │   │   │   │   ├── ManualEntryCard.jsx
-│   │   │   │   │   │   ├── ManualEntryModal.jsx
-│   │   │   │   │   │   └── ManualEntryTabs.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useManualEntries.js
-│   │   │   │   │   ├── services
-│   │   │   │   │   │   └── manualEntriesService.js
-│   │   │   │   │   └── utils
-│   │   │   │   │       └── normalizeManualEntry.js
-│   │   │   │   ├── pipeline-debug
-│   │   │   │   │   ├── PipelineDebugSection.jsx
-│   │   │   │   │   └── components
-│   │   │   │   │       ├── ContextItem.jsx
-│   │   │   │   │       ├── DebugCard.jsx
-│   │   │   │   │       ├── DropdownCard.jsx
-│   │   │   │   │       ├── PipelineControls.jsx
-│   │   │   │   │       ├── PipelinePromptBox.jsx
-│   │   │   │   │       └── PipelineResults.jsx
-│   │   │   │   ├── resolved-chats
-│   │   │   │   │   ├── ResolvedChatsSection.jsx
-│   │   │   │   │   ├── components
-│   │   │   │   │   │   ├── ResolvedChatCard.jsx
-│   │   │   │   │   │   ├── ResolvedChatEditModal.jsx
-│   │   │   │   │   │   ├── ResolvedChatsEmpty.jsx
-│   │   │   │   │   │   ├── ResolvedChatsHeader.jsx
-│   │   │   │   │   │   └── ResolvedChatsPagination.jsx
-│   │   │   │   │   ├── hooks
-│   │   │   │   │   │   └── useResolvedChats.js
-│   │   │   │   │   └── utils
-│   │   │   │   │       └── parseResolvedChat.js
-│   │   │   │   ├── settings
-│   │   │   │   │   ├── AISettingsPanel.jsx
-│   │   │   │   │   ├── SettingsActions.jsx
-│   │   │   │   │   ├── SettingsHeader.jsx
-│   │   │   │   │   ├── SettingsInput.jsx
-│   │   │   │   │   ├── SettingsSelect.jsx
-│   │   │   │   │   ├── SettingsTextarea.jsx
-│   │   │   │   │   └── SettingsToggle.jsx
-│   │   │   │   ├── tickets
-│   │   │   │   │   ├── TicketPagination.jsx
-│   │   │   │   │   ├── TicketSearch.jsx
-│   │   │   │   │   ├── TicketStatusBadge.jsx
-│   │   │   │   │   ├── TicketTable.jsx
-│   │   │   │   │   └── TicketsSection.jsx
-│   │   │   │   └── upload
-│   │   │   │       ├── UploadDropzone.jsx
-│   │   │   │       ├── UploadMobileCard.jsx
-│   │   │   │       ├── UploadPagination.jsx
-│   │   │   │       ├── UploadSection.jsx
-│   │   │   │       ├── UploadStatusBadge.jsx
-│   │   │   │       ├── UploadTable.jsx
-│   │   │   │       └── UploadTableRow.jsx
-│   │   │   ├── constants
-│   │   │   │   ├── adminSections.js
-│   │   │   │   └── navigation.js
-│   │   │   ├── data
-│   │   │   │   └── aiModels.js
-│   │   │   ├── hooks
-│   │   │   │   ├── useAISettings.js
-│   │   │   │   ├── useFileUpload.js
-│   │   │   │   └── useTickets.js
-│   │   │   ├── layouts
-│   │   │   │   └── AdminLayout.jsx
-│   │   │   ├── pages
-│   │   │   │   ├── AdminDashboard.jsx
-│   │   │   │   └── LoginPage.jsx
-│   │   │   └── services
-│   │   │       ├── aiSettingsService.js
-│   │   │       ├── pipelineDebugService.js
-│   │   │       ├── ticketAdminService.js
-│   │   │       └── uploadService.js
-│   │   ├── assets
-│   │   │   ├── hero.png
-│   │   │   ├── react.svg
-│   │   │   └── vite.svg
-│   │   ├── index.css
-│   │   ├── main.jsx
-│   │   └── shared
-│   │       ├── api
-│   │       │   ├── client.js
-│   │       │   └── endpoints.js
-│   │       ├── components
-│   │       │   ├── EmptyState.jsx
-│   │       │   ├── ErrorState.jsx
-│   │       │   └── LoadingSpinner.jsx
-│   │       ├── config
-│   │       │   └── sqlVariables.js
-│   │       └── hooks
-│   │           └── useHorizontalDragScroll.js
-│   ├── tailwind.config.js
-│   └── vite.config.js
-├── frontend-bubble
-│   ├── .gitignore
-│   ├── README.md
-│   ├── eslint.config.js
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── postcss.config.js
-│   ├── src
-│   │   ├── App.css
-│   │   ├── App.jsx
-│   │   ├── assets
-│   │   │   ├── hero.png
-│   │   │   ├── react.svg
-│   │   │   └── vite.svg
-│   │   ├── bubble-chat
-│   │   │   ├── BubbleChat.jsx
-│   │   │   ├── components
-│   │   │   │   ├── ChatBubble.jsx
-│   │   │   │   ├── ChatFooter
-│   │   │   │   │   ├── ChatFooter.jsx
-│   │   │   │   │   ├── ChatFooterFAQ.jsx
-│   │   │   │   │   ├── ChatFooterInput.jsx
-│   │   │   │   │   └── ChatFooterResolved.jsx
-│   │   │   │   ├── ChatHeader.jsx
-│   │   │   │   ├── ChatMenu.jsx
-│   │   │   │   ├── ChatMessage.jsx
-│   │   │   │   ├── ChatMessages.jsx
-│   │   │   │   ├── ChatWindow.jsx
-│   │   │   │   ├── ModalShell.jsx
-│   │   │   │   ├── TicketDropdown.jsx
-│   │   │   │   ├── TicketField.jsx
-│   │   │   │   └── TicketTextarea.jsx
-│   │   │   ├── constants
-│   │   │   │   └── chatConfig.js
-│   │   │   ├── hooks
-│   │   │   │   ├── useBubbleDrag.js
-│   │   │   │   ├── useChatMessages.js
-│   │   │   │   ├── useConversationHistory.js
-│   │   │   │   ├── useHorizontalDragScroll.js
-│   │   │   │   └── useTicketForm.js
-│   │   │   ├── modals
-│   │   │   │   ├── AboutHelpDeskModal.jsx
-│   │   │   │   ├── CallAgentModal.jsx
-│   │   │   │   ├── ChatHistoryModal.jsx
-│   │   │   │   ├── ClearConversationModal.jsx
-│   │   │   │   ├── ResolveConversationModal.jsx
-│   │   │   │   └── SubmitTicketModal.jsx
-│   │   │   ├── services
-│   │   │   │   ├── chatbotService.js
-│   │   │   │   └── ticketService.js
-│   │   │   └── utils
-│   │   │       └── snapPosition.js
-│   │   ├── config
-│   │   │   └── sqlVariables.js
-│   │   ├── index.css
-│   │   └── main.jsx
-│   ├── tailwind.config.js
-│   └── vite.config.js
 ├── project_summary.txt
 ├── requirements.txt
-├── sample.py
-├── sql
-│   ├── chatbot.sql
-│   ├── chatbot_gantt_chart.xlsx
-│   ├── chatbotmessage.sql
-│   ├── chatbotsession.sql
-│   ├── chatbotsettings.sql
-│   ├── createtablecbot.sql
-│   ├── helpdeskdev.sql
-│   └── helpdeskdevaluation.sql
-├── src
-│   └── admin
-│       └── components
-│           ├── manual-entries
-│           │   └── ManualEntriesSection.jsx
-│           └── resolved-chats
-│               └── ResolvedChatsSection.jsx
-├── streamlit_app.py
-├── streamlit_chat_history.py
-├── subcat.csv
-└── webhook.txt
+└── sample.py
 
 ================================================
 FILE CONTENTS
 ================================================
-
---- FILE: ch.py ---
-import os
-from pathlib import Path
-
-# --- Configuration ---
-OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode'}
-EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
-
-def generate_tree(root_dir, prefix=""):
-    """Recursively generates a visual directory tree."""
-    tree = []
-    items = sorted([item for item in os.listdir(root_dir) if item not in EXCLUDE_DIRS])
-    
-    for i, item in enumerate(items):
-        path = os.path.join(root_dir, item)
-        is_last = (i == len(items) - 1)
-        connector = "└── " if is_last else "├── "
-        
-        tree.append(f"{prefix}{connector}{item}")
-        
-        if os.path.isdir(path):
-            extension = "    " if is_last else "│   "
-            tree.extend(generate_tree(path, prefix + extension))
-    return tree
-
-def pack_project():
-    root_path = Path.cwd()
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as f:
-        # 1. Write the Directory Tree
-        f.write("================================================\n")
-        f.write(f"PROJECT DIRECTORY TREE\n")
-        f.write("================================================\n")
-        tree_lines = generate_tree(root_path)
-        f.write(f"{root_path.name}/\n" + "\n".join(tree_lines) + "\n\n")
-
-        # 2. Write File Contents
-        f.write("================================================\n")
-        f.write("FILE CONTENTS\n")
-        f.write("================================================\n\n")
-        
-        for root, dirs, files in os.walk(root_path):
-            # Prune excluded directories in-place
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
-            
-            for file in files:
-                if file in EXCLUDE_FILES:
-                    continue
-                
-                file_path = Path(root) / file
-                relative_path = file_path.relative_to(root_path)
-                
-                f.write(f"--- FILE: {relative_path} ---\n")
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as code_file:
-                        f.write(code_file.read())
-                except Exception as e:
-                    f.write(f"[Error reading file: {e}]")
-                
-                f.write("\n\n")
-
-    print(f"Successfully packed project into {OUTPUT_FILE}")
-
-if __name__ == "__main__":
-    pack_project()
 
 --- FILE: sample.py ---
 import os
@@ -363,7 +90,7 @@ from pathlib import Path
 
 # --- Configuration ---
 OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend'}
+EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend', 'frontend-bubble','frontend-admin', 'sql'}
 EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
 
 # Add a set of allowed extensions for text/code files
@@ -434,502 +161,6 @@ def pack_project():
 
 if __name__ == "__main__":
     pack_project()
-
---- FILE: streamlit_app.py ---
-import streamlit as st
-import requests
-import pandas as pd
-import json
-import time
-
-# --- CONFIGURATION ---
-st.set_page_config(page_title="Lemon Square IT AI", page_icon="🍋", layout="wide")
-API_BASE = "http://localhost:8000/api"
-
-# --- API HELPER FUNCTIONS ---
-def api_request(method, endpoint, params=None, json_data=None, files=None, data=None):
-    url = f"{API_BASE}{endpoint}"
-
-    try:
-        if method == "GET":
-            res = requests.get(url, params=params)
-
-        elif method == "POST":
-            res = requests.post(
-                url,
-                params=params,
-                json=json_data,
-                files=files,
-                data=data
-            )
-
-        elif method == "PUT":
-            res = requests.put(url, params=params, json=json_data)
-
-        elif method == "DELETE":
-            res = requests.delete(url, params=params)
-
-        res.raise_for_status()
-        return res.json()
-
-    except requests.exceptions.HTTPError as e:
-        err_msg = (
-            e.response.json().get('error', str(e))
-            if e.response else str(e)
-        )
-
-        st.error(f"API Error: {err_msg}")
-        return None
-
-    except Exception as e:
-        st.error(f"Connection Error: {e}")
-        return None
-
-
-# --- SESSION STATE INITIALIZATION ---
-if "user" not in st.session_state:
-    st.session_state.user = None
-
-# BACKEND OWNS SESSION CREATION
-if "session_id" not in st.session_state:
-    st.session_state.session_id = None
-
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-
-if "ticket_draft" not in st.session_state:
-    st.session_state.ticket_draft = None
-
-if "system_categories" not in st.session_state:
-    st.session_state.system_categories = ["General_IT"]
-
-
-# ==========================================
-# 🔐 AUTHENTICATION
-# ==========================================
-if not st.session_state.user:
-
-    st.title("🍋 Lemon Square IT Helpdesk")
-
-    st.markdown(
-        "Please log in using your Employee ID "
-        "(Try `TEST_USER_1` for local dev)."
-    )
-
-    with st.form("login_form"):
-
-        user_id = st.text_input("User Token")
-
-        if st.form_submit_button("Login"):
-
-            with st.spinner("Authenticating..."):
-
-                auth_data = api_request(
-                    "GET",
-                    "/auth/verify",
-                    params={"user_token": user_id}
-                )
-
-                if auth_data and auth_data.get("is_valid"):
-
-                    st.session_state.user = auth_data
-
-                    st.success(
-                        f"Welcome, {auth_data['name']}!"
-                    )
-
-                    # Fetch active categories on login
-                    settings = api_request("GET", "/settings")
-
-                    if settings:
-                        st.session_state.system_categories = [
-                            c.strip()
-                            for c in settings.get(
-                                "AllowedCategories",
-                                "General_IT"
-                            ).split(",")
-                        ]
-
-                    st.rerun()
-
-                else:
-                    st.error(
-                        auth_data.get(
-                            "error",
-                            "Authentication failed."
-                        )
-                    )
-
-    st.stop()
-
-
-# ==========================================
-# 🧭 SIDEBAR NAVIGATION
-# ==========================================
-with st.sidebar:
-
-    st.subheader(
-        f"👤 {st.session_state.user['name']}"
-    )
-
-    st.caption(
-        f"{st.session_state.user.get('department', 'Unknown Dept')} "
-        f"| ID: {st.session_state.user.get('user_id')}"
-    )
-
-    st.markdown("---")
-
-    view = st.radio(
-        "Navigation",
-        [
-            "💬 IT Support Chat",
-            "📊 Admin: Dashboard",
-            "📚 Admin: Knowledge Explorer",
-            "📄 Admin: Documents & Rules",
-            "🧠 Admin: Self-Knowledge & Tickets",
-            "⚙️ Admin: System Settings",
-            "🧪 Admin: Pipeline Debugger"
-        ]
-    )
-
-    st.markdown("---")
-
-    if st.button("🚪 Logout", use_container_width=True):
-        st.session_state.clear()
-        st.rerun()
-
-
-# ==========================================
-# VIEW 1: IT SUPPORT CHAT
-# ==========================================
-if view == "💬 IT Support Chat":
-
-    st.title("IT Support Assistant")
-
-    # Header actions
-    col1, col2, col3, col4 = st.columns([4, 2, 2, 2])
-
-    with col2:
-
-        if st.button("✨ New Chat"):
-
-            # CLEAR SESSION
-            # BACKEND WILL GENERATE NEW ID
-            st.session_state.session_id = None
-
-            st.session_state.chat_history = []
-            st.session_state.ticket_draft = None
-
-            st.rerun()
-
-    with col3:
-
-        if st.button(
-            "✅ Mark Resolved",
-            type="secondary",
-            use_container_width=True
-        ):
-
-            if not st.session_state.session_id:
-                st.warning("No active chat session yet.")
-
-            else:
-                with st.spinner(
-                    "Extracting resolution to AI Brain..."
-                ):
-
-                    res = api_request(
-                        "POST",
-                        f"/chat/resolve/{st.session_state.session_id}"
-                    )
-
-                    if res:
-                        st.success(
-                            "Chat learned successfully!"
-                        )
-
-    with col4:
-
-        if st.button(
-            "🚨 Escalate to Agent",
-            type="primary",
-            use_container_width=True
-        ):
-
-            if not st.session_state.session_id:
-                st.warning("No active chat session yet.")
-
-            else:
-                with st.spinner(
-                    "Drafting ticket & routing..."
-                ):
-
-                    res = api_request(
-                        "GET",
-                        f"/chat/escalate/draft/{st.session_state.session_id}"
-                    )
-
-                    if (
-                        res and
-                        res.get("status") == "success"
-                    ):
-                        st.session_state.ticket_draft = res
-                        st.rerun()
-
-    # Escalation Draft UI
-    if st.session_state.ticket_draft:
-
-        st.warning("### 📝 Review Ticket Draft")
-
-        draft = st.session_state.ticket_draft
-
-        if draft.get("routing_reasoning"):
-            st.info(
-                f"🧠 **AI Routing Reasoning:** "
-                f"{draft['routing_reasoning']}"
-            )
-
-        with st.form("escalate_form"):
-
-            summary = st.text_input(
-                "Summary",
-                value=draft.get("summary", "")
-            )
-
-            desc = st.text_area(
-                "Description",
-                value=draft.get("description", ""),
-                height=150
-            )
-
-            c1, c2 = st.columns(2)
-
-            c1.text_input(
-                "Predicted Dept",
-                value=draft.get(
-                    "department_name",
-                    "Unknown"
-                ),
-                disabled=True
-            )
-
-            c2.text_input(
-                "Predicted Subcategory",
-                value=draft.get(
-                    "subcategory_name",
-                    "Unknown"
-                ),
-                disabled=True
-            )
-
-            if st.form_submit_button(
-                "Submit Ticket to Helpdesk",
-                type="primary"
-            ):
-
-                payload = {
-                    "session_id": st.session_state.session_id,
-                    "requester_id": int(
-                        st.session_state.user.get(
-                            "user_id",
-                            1
-                        )
-                    ),
-                    "company_id": int(
-                        st.session_state.user.get(
-                            "company_id",
-                            1
-                        )
-                    ),
-                    "summary": summary,
-                    "description": desc,
-                    "department_id": draft.get(
-                        "department_id",
-                        29
-                    ),
-                    "subcategory_id": draft.get(
-                        "subcategory_id",
-                        11200
-                    )
-                }
-
-                with st.spinner("Submitting..."):
-
-                    submit_res = api_request(
-                        "POST",
-                        "/chat/escalate/submit",
-                        json_data=payload
-                    )
-
-                    if submit_res:
-                        st.success(
-                            "Ticket escalated successfully!"
-                        )
-
-                        st.session_state.ticket_draft = None
-                        st.rerun()
-
-    st.markdown("---")
-
-    # Chat History Display
-    for msg in st.session_state.chat_history:
-
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-    # ==========================================
-    # CHAT INPUT
-    # ==========================================
-    if prompt := st.chat_input(
-        "Describe your IT issue here..."
-    ):
-
-        st.session_state.chat_history.append({
-            "role": "user",
-            "content": prompt
-        })
-
-        with st.chat_message("user"):
-            st.markdown(prompt)
-
-        with st.chat_message("assistant"):
-
-            with st.spinner("AI is thinking..."):
-
-                # BUILD PAYLOAD
-                payload = {
-                    "message": prompt,
-                    "user_token": str(
-                        st.session_state.user.get(
-                            "user_id",
-                            "TEST_USER_1"
-                        )
-                    )
-                }
-
-                # ONLY SEND SESSION ID
-                # IF BACKEND ALREADY CREATED ONE
-                if st.session_state.session_id:
-                    payload["session_id"] = (
-                        st.session_state.session_id
-                    )
-
-                # SEND REQUEST
-                res = api_request(
-                    "POST",
-                    "/chat",
-                    json_data=payload
-                )
-
-                if res and "response" in res:
-
-                    # CAPTURE BACKEND SESSION ID
-                    if (
-                        not st.session_state.session_id and
-                        "session_id" in res
-                    ):
-                        st.session_state.session_id = (
-                            res["session_id"]
-                        )
-
-                    ai_reply = res["response"]
-
-                    st.markdown(ai_reply)
-
-                    if res.get("ticket_ids_used"):
-
-                        st.caption(
-                            f"Context used: "
-                            f"Tickets {res['ticket_ids_used']}"
-                        )
-
-                    st.session_state.chat_history.append({
-                        "role": "assistant",
-                        "content": ai_reply
-                    })
-
---- FILE: streamlit_chat_history.py ---
-import streamlit as st
-import requests
-from typing import Dict, Any, List
-
-API_BASE_URL = "http://localhost:8000/api"
-
-st.set_page_config(page_title="Chat History Viewer", layout="wide")
-st.title("Chat History Viewer")
-st.markdown("Enter a user ID to load that user's chat sessions and inspect session history.")
-
-
-def make_request(method: str, endpoint: str, params: Dict[str, Any] = None) -> Any:
-    url = f"{API_BASE_URL}{endpoint}"
-    try:
-        if method == "GET":
-            response = requests.get(url, params=params)
-        else:
-            raise ValueError("Unsupported method")
-
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as exc:
-        st.error(f"Request error: {exc}")
-        return None
-
-
-with st.form(key="chat_history_form"):
-    st.subheader("Load chat history for a user")
-    user_id = st.text_input("User ID", help="Enter the numeric or string user identifier.")
-    user_token = st.text_input(
-        "User Token",
-        value="TEST_USER_1",
-        help="Provide a valid auth token for the history endpoint. Use TEST_USER_1 if your backend allows it.",
-    )
-    session_limit = st.number_input("Max sessions to fetch", min_value=1, max_value=100, value=20, step=1)
-    fetch = st.form_submit_button("Load Chat Sessions")
-
-if fetch:
-    if not user_id:
-        st.error("Please enter a User ID.")
-    elif not user_token:
-        st.error("Please enter a User Token.")
-    else:
-        sessions = make_request("GET", f"/chat/user-sessions/{user_id}", {"limit": session_limit})
-        if sessions is None:
-            st.error("Unable to fetch sessions.")
-        elif len(sessions) == 0:
-            st.info("No chat sessions found for that user.")
-        else:
-            st.success(f"Found {len(sessions)} sessions for user {user_id}.")
-
-            session_options = [f"{item['session_id']} ({item['message_count']} msgs)" for item in sessions]
-            selected = st.selectbox("Select session to inspect", session_options)
-            selected_index = session_options.index(selected)
-            selected_session = sessions[selected_index]["session_id"]
-
-            st.markdown(f"### Session details for `{selected_session}`")
-            st.write(sessions[selected_index])
-
-            history = make_request(
-                "GET",
-                f"/chat/history/{selected_session}",
-                {"user_token": user_token},
-            )
-            if history is None:
-                st.error("Unable to fetch chat history for the selected session.")
-            else:
-                st.markdown("#### Messages")
-                messages = history.get("messages", [])
-                if not messages:
-                    st.info("This session has no messages.")
-                else:
-                    for msg in messages:
-                        align = "left" if msg["SenderRole"] == "user" else "right"
-                        with st.container():
-                            st.markdown(
-                                f"**{msg['SenderRole'].title()}** — {msg['CreatedAt']}"
-                            )
-                            st.write(msg["MessageContent"])
-                            st.markdown("---")
-
 
 --- FILE: backend\wipe_qdrant.py ---
 """
@@ -1028,43 +259,44 @@ if __name__ == "__main__":
 
 --- FILE: backend\app\main.py ---
 """
-FastAPI application factory.
+FastAPI application factory (PRODUCTION SAFE VERSION)
 
-This file's ONLY responsibilities:
-  1. Create the FastAPI application.
-  2. Configure middleware.
-  3. Register routers.
-  4. Register exception handlers.
-  5. Run startup / shutdown logic (lifespan).
-
-There is zero business logic here.
-
-Previously, main.py contained 200+ lines including all admin route
-handlers (documents, tickets, settings) and inline ORM queries. That
-violated the Single Responsibility Principle and made the entry point
-the hardest file to navigate in the project.
+Fixes:
+- consistent routing
+- removes double-prefix confusion
+- cleaner API structure
+- prevents full backend shutdown on AI/Qdrant failure
+- keeps auth + health routes alive during partial failures
 """
 
 import logging
-import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
-from app.api.routers import auth
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
-from app.api.routers import analytics  
 
-from app.api.routers import chat, documents, settings, tickets, explorer
+from app.api.routers import (
+    auth,
+    analytics,
+    chat,
+    documents,
+    settings,
+    tickets,
+    explorer,
+    self_knowledge,
+    maintenance,
+    routing,
+    admin_auth,
+)
+
 from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
-from app.api.routers import self_knowledge
-from app.api.routers import maintenance, routing
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -1072,74 +304,97 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """
-    Application startup and shutdown logic.
-
-    On startup:
-      - Verify Qdrant is reachable and the required collection exists.
-      - Load the SupportOrchestrator (downloads ML models if not cached).
-      - Load the DocumentIngestionService (shares the same embedding model).
-
-    Loading ML models in the lifespan:
-      This is intentional. Models are expensive (~1-3 GB, 30-120 seconds to
-      load). By loading them once here and storing them in app.state, every
-      request reuses the same in-memory model rather than reloading per request.
-      The app exits immediately if startup fails, providing a clear error.
-    """
     logger.info("Starting up — running pre-flight checks...")
 
-    # ── Qdrant health check ───────────────────────────────────────────────
+    # ========================================
+    # DEFAULT SAFE APP STATE
+    # ========================================
+
+    app.state.ai_available = False
+    app.state.orchestrator = None
+    app.state.ingestion_service = None
+
+    # ========================================
+    # QDRANT CHECK
+    # ========================================
+
     try:
         qdrant_client = QdrantClient(
             url=app_settings.QDRANT_URL,
             api_key=app_settings.QDRANT_API_KEY,
             timeout=app_settings.QDRANT_TIMEOUT,
         )
-        if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
-            logger.critical(
-                "FATAL: Qdrant collection '%s' does not exist. "
-                "Run scripts/ingest_tickets.py first.",
+
+        if not qdrant_client.collection_exists(
+            app_settings.QDRANT_COLLECTION
+        ):
+            logger.error(
+                "Qdrant collection missing: %s",
                 app_settings.QDRANT_COLLECTION,
             )
-            sys.exit(1)
-        logger.info("Qdrant OK — collection '%s' verified.", app_settings.QDRANT_COLLECTION)
-    except Exception as exc:
-        logger.critical("Qdrant connection failed: %s", exc)
-        sys.exit(1)
+        else:
+            logger.info("Qdrant OK")
 
-    # ── Load ML services (expensive — done once here, not per-request) ────
+    except Exception as exc:
+        logger.error(
+            "Qdrant connection failed: %s",
+            exc,
+            exc_info=True,
+        )
+
+    # ========================================
+    # AI SERVICE INITIALIZATION
+    # ========================================
+
     db = SessionChatbot()
+
     try:
-        logger.info("Loading AI Orchestrator (embedding + reranker models)...")
+        logger.info("Loading AI services...")
+
         app.state.orchestrator = SupportOrchestrator(db=db)
 
-        logger.info("Loading Document Ingestion Service (embedding model)...")
-        app.state.ingestion_service = DocumentIngestionService(db=db)
+        app.state.ingestion_service = (
+            DocumentIngestionService(db=db)
+        )
+
+        app.state.ai_available = True
+
+        logger.info("AI services loaded successfully")
+
     except Exception as exc:
-        logger.critical("Failed to initialise AI services: %s", exc, exc_info=True)
-        sys.exit(1)
+        logger.error(
+            "AI initialization failed: %s",
+            exc,
+            exc_info=True,
+        )
+
+        # IMPORTANT:
+        # Do NOT kill the backend.
+        # Auth + health endpoints should still function.
+
+        app.state.ai_available = False
+
     finally:
         db.close()
 
-    logger.info("Application startup complete.")
+    logger.info("Startup complete")
+
     yield
 
-    # ── Shutdown ──────────────────────────────────────────────────────────
-    logger.info("Application shutting down.")
+    logger.info("Shutdown")
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application instance."""
     app = FastAPI(
         title="IT Support AI",
-        description="Enterprise IT helpdesk RAG chatbot API.",
         version="2.0.0",
         lifespan=lifespan,
     )
 
-    # ── CORS ──────────────────────────────────────────────────────────────
-    # Origins are configurable via CORS_ORIGINS in .env.
-    # Defaults to localhost only — NOT open to all origins.
+    # ========================================
+    # CORS
+    # ========================================
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.CORS_ORIGINS,
@@ -1148,27 +403,38 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
-    # ── Exception Handlers ────────────────────────────────────────────────
     register_exception_handlers(app)
 
-    # ── Routers ───────────────────────────────────────────────────────────
-    PREFIX = "/api"
-    app.include_router(chat.router, prefix=PREFIX)
-    app.include_router(documents.router, prefix=PREFIX)
-    app.include_router(tickets.router, prefix=PREFIX)
-    app.include_router(settings.router, prefix=PREFIX)
-    app.include_router(explorer.router, prefix=PREFIX)
-    app.include_router(self_knowledge.router, prefix="/api")
-    app.include_router(auth.router, prefix=PREFIX)
-    app.include_router(analytics.router, prefix=PREFIX)
-    app.include_router(maintenance.router, prefix=PREFIX)
-    app.include_router(routing.router, prefix=PREFIX) 
+    # ========================================
+    # ROUTES
+    # ========================================
 
-    # ── Health Check ──────────────────────────────────────────────────────
-    @app.get("/health", tags=["Health"])
-    def health_check():
-        """Liveness probe endpoint."""
-        return {"status": "ok"}
+    app.include_router(chat.router, prefix="/api")
+    app.include_router(documents.router, prefix="/api")
+    app.include_router(tickets.router, prefix="/api")
+    app.include_router(settings.router, prefix="/api")
+    app.include_router(explorer.router, prefix="/api")
+    app.include_router(analytics.router, prefix="/api")
+    app.include_router(maintenance.router, prefix="/api")
+    app.include_router(routing.router, prefix="/api")
+
+    # AUTH
+    app.include_router(auth.router, prefix="/api")
+    app.include_router(admin_auth.router, prefix="/api")
+
+    # self knowledge already contains internal prefix
+    app.include_router(self_knowledge.router)
+
+    # ========================================
+    # HEALTH
+    # ========================================
+
+    @app.get("/health")
+    def health():
+        return {
+            "status": "ok",
+            "ai_available": app.state.ai_available,
+        }
 
     return app
 
@@ -1176,8 +442,12 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
-
+    uvicorn.run(
+        "app.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=False,
+    )
 
 --- FILE: backend\app\__init__.py ---
 # app/__init__.py
@@ -1236,6 +506,258 @@ __all__ = [
 
 --- FILE: backend\app\api\__init__.py ---
 
+
+--- FILE: backend\app\api\routers\admin_auth.py ---
+import logging
+import httpx
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["Admin Auth"]
+)
+
+# ========================================
+# REQUEST MODEL
+# ========================================
+
+class AdminLoginRequest(BaseModel):
+    username: str
+    password: str
+
+
+# ========================================
+# EXTERNAL API
+# ========================================
+
+BIZPORTAL_LOGIN_URL = (
+    "https://lsbizportal.lemonsquare.com.ph/"
+    "testportal/api/chatbot/admin/login"
+)
+
+
+# ========================================
+# SAFE JSON PARSER
+# ========================================
+
+def safe_json(response: httpx.Response):
+    try:
+        if not response.text:
+            return {}
+
+        return response.json()
+
+    except Exception:
+        logger.error(
+            "BizPortal returned non-JSON response"
+        )
+
+        logger.error(
+            "RAW RESPONSE: %s",
+            response.text,
+        )
+
+        return {
+            "status": "error",
+            "message": "Invalid JSON response",
+            "raw_response": response.text,
+        }
+
+
+# ========================================
+# LOGIN ROUTE
+# ========================================
+
+@router.post(
+    "/login",
+    summary="Admin login via BizPortal"
+)
+async def admin_login(
+    payload: AdminLoginRequest
+):
+
+    # ========================================
+    # VALIDATION
+    # ========================================
+
+    username = payload.username.strip()
+    password = payload.password.strip()
+
+    if not username or not password:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Username and password required"
+            ),
+        )
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=30
+        ) as client:
+
+            response = await client.post(
+                BIZPORTAL_LOGIN_URL,
+                json={
+                    "username": username,
+                    "password": password,
+                },
+                headers={
+                    "Content-Type":
+                    "application/json"
+                },
+            )
+
+        logger.info(
+            "BizPortal login status: %s",
+            response.status_code,
+        )
+
+        data = safe_json(response)
+
+        logger.info(
+            "BizPortal login response: %s",
+            data,
+        )
+
+        # ========================================
+        # HTTP FAILURE
+        # ========================================
+
+        if response.status_code != 200:
+
+            error_message = (
+                data.get("message")
+                or data.get("error")
+                or data.get("detail")
+                or "Login failed"
+            )
+
+            logger.warning(
+                "BizPortal HTTP auth failure: %s",
+                error_message,
+            )
+
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=error_message,
+            )
+
+        # ========================================
+        # LOGICAL AUTH FAILURE
+        # ========================================
+
+        # IMPORTANT:
+        # BizPortal may still return 200
+        # even when credentials are invalid.
+        #
+        # We MUST validate response content.
+
+        if isinstance(data, dict):
+
+            status = str(
+                data.get("status", "")
+            ).lower()
+
+            success = data.get("success")
+
+            message = str(
+                data.get("message", "")
+            ).lower()
+
+            # Common failure patterns
+            auth_failed = any([
+                status == "error",
+                success is False,
+                "invalid" in message,
+                "incorrect" in message,
+                "unauthorized" in message,
+                "failed" in message,
+            ])
+
+            if auth_failed:
+
+                logger.warning(
+                    "BizPortal rejected credentials."
+                )
+
+                raise HTTPException(
+                    status_code=401,
+                    detail=(
+                        data.get("message")
+                        or data.get("error")
+                        or "Invalid credentials"
+                    ),
+                )
+
+        # ========================================
+        # RESPONSE STRUCTURE VALIDATION
+        # ========================================
+
+        # IMPORTANT:
+        # Ensure actual authenticated user exists
+
+        possible_user = (
+            data.get("data")
+            or data.get("response")
+            or data
+        )
+
+        if not isinstance(possible_user, dict):
+
+            logger.warning(
+                "No valid user object returned."
+            )
+
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication failed",
+            )
+
+        # ========================================
+        # SUCCESS
+        # ========================================
+
+        return {
+            "success": True,
+            "message": "Login successful",
+            "data": possible_user,
+        }
+
+    except httpx.RequestError as exc:
+
+        logger.error(
+            "Connection error: %s",
+            exc,
+            exc_info=True,
+        )
+
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Unable to connect to BizPortal"
+            ),
+        )
+
+    except HTTPException:
+        raise
+
+    except Exception as exc:
+
+        logger.error(
+            "Unexpected login error: %s",
+            exc,
+            exc_info=True,
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error",
+        )
 
 --- FILE: backend\app\api\routers\analytics.py ---
 import logging
@@ -1728,6 +1250,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
+from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
     DocumentDeleteResponse,
     DocumentResponse,
@@ -1804,12 +1327,12 @@ async def debug_full_rag_pipeline(
         "reformulated_query": debug_result["reformulated_query"],
         "retrieval_results": {
             "tickets": [
-                r for r in debug_result["retrieval_results"] 
-                if r["type"] != "uploaded_manual"
+                r for r in debug_result["retrieval_results"]
+                if r.get("type") in TICKET_LIKE_DOC_TYPES
             ],
             "documents": [
-                r for r in debug_result["retrieval_results"] 
-                if r["type"] == "uploaded_manual"
+                r for r in debug_result["retrieval_results"]
+                if r.get("type") in DOCUMENT_DOC_TYPES
             ]
         },
         "final_answer": debug_result["final_answer"],
@@ -2540,16 +2063,11 @@ async def whitelist_ticket(
         work_done=original_ticket.work_done or "None"
     )
 
-<<<<<<< HEAD
-    # 4. Push it back to Qdrant (The AI's Brain)
-    await ingestion_service.process_resolved_ticket(ticket_payload)
-=======
     # 4. Push it back to Qdrant
     await ingestion_service.process_resolved_ticket(
         ticket_payload.model_dump(),
         db_chatbot
     )
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     
     return {
         "status": "success", 
@@ -2900,10 +2418,267 @@ def configure_logging(level: str = "INFO") -> None:
 
 
 --- FILE: backend\app\core\metadata_contract.py ---
+"""
+Canonical metadata and payload contracts.
 
+This module is the SINGLE source of truth for:
+- Qdrant payload schemas
+- metadata normalization
+- doc type constants
+- knowledge type constants
+- payload builders
+
+All ingestion pipelines should construct payloads through this module.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+
+# =========================================================
+# DOC TYPES
+# =========================================================
+
+DOC_TYPE_RAW_TICKET = "raw_ticket"
+DOC_TYPE_CANONICAL_TICKET = "canonical_ticket_cluster"
+DOC_TYPE_RESOLVED_CHAT = "resolved_chat"
+DOC_TYPE_OFFICIAL_DOCUMENT = "official_document"
+DOC_TYPE_GENERAL_TEXT = "general_text"
+
+
+DOCUMENT_DOC_TYPES = {
+    DOC_TYPE_OFFICIAL_DOCUMENT,
+    DOC_TYPE_GENERAL_TEXT,
+}
+
+TICKET_LIKE_DOC_TYPES = {
+    DOC_TYPE_RAW_TICKET,
+    DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_RESOLVED_CHAT,
+}
+
+
+# =========================================================
+# KNOWLEDGE TYPES
+# =========================================================
+
+KNOWLEDGE_TYPE_TICKET = "ticket"
+KNOWLEDGE_TYPE_CHAT = "chat"
+KNOWLEDGE_TYPE_MANUAL = "manual"
+KNOWLEDGE_TYPE_PDF = "pdf"
+
+
+# =========================================================
+# HELPERS
+# =========================================================
+
+def normalize_metadata(metadata: dict | None) -> dict:
+    if not isinstance(metadata, dict):
+        return {}
+
+    normalized = dict(metadata)
+
+    normalized.setdefault("doc_type", "unknown")
+    normalized.setdefault("knowledge_type", "unknown")
+    normalized.setdefault("cluster_key", "")
+    normalized.setdefault("source_id", "")
+    normalized.setdefault("source_ids", [])
+    normalized.setdefault("source_types", [])
+    normalized.setdefault("frequency", 1)
+
+    return normalized
+
+
+def build_qdrant_payload(
+    *,
+    page_content: str,
+    metadata: dict,
+) -> dict:
+    return {
+        "page_content": page_content,
+        "metadata": normalize_metadata(metadata),
+    }
+
+
+# =========================================================
+# METADATA BUILDERS
+# =========================================================
+
+def build_ticket_metadata(
+    *,
+    cluster_key: str,
+    ticket_number: str,
+) -> dict:
+    return normalize_metadata(
+        {
+            "doc_type": DOC_TYPE_CANONICAL_TICKET,
+            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
+            "cluster_key": cluster_key,
+            "source_id": ticket_number,
+            "source_ids": [ticket_number],
+            "ticket_number": ticket_number,
+            "frequency": 1,
+        }
+    )
+
+
+def build_chat_metadata(
+    *,
+    cluster_key: str,
+    session_id: str,
+) -> dict:
+    return normalize_metadata(
+        {
+            "doc_type": DOC_TYPE_RESOLVED_CHAT,
+            "knowledge_type": KNOWLEDGE_TYPE_CHAT,
+            "cluster_key": cluster_key,
+            "source_id": session_id,
+            "source_ids": [session_id],
+            "session_id": session_id,
+            "frequency": 1,
+        }
+    )
+
+
+def build_manual_metadata(
+    *,
+    cluster_key: str,
+    entry_id: str,
+    title: str,
+    category: str,
+) -> dict:
+    return normalize_metadata(
+        {
+            "doc_type": DOC_TYPE_GENERAL_TEXT,
+            "knowledge_type": KNOWLEDGE_TYPE_MANUAL,
+            "cluster_key": cluster_key,
+            "source_id": entry_id,
+            "source_ids": [entry_id],
+            "title": title,
+            "category": category,
+            "source": title,
+            "frequency": 1,
+        }
+    )
+
+
+def build_pdf_metadata(
+    *,
+    cluster_key: str,
+    document_id: str,
+    file_name: str,
+    category: str,
+    chunk_index: int,
+) -> dict:
+    return normalize_metadata(
+        {
+            "doc_type": DOC_TYPE_OFFICIAL_DOCUMENT,
+            "knowledge_type": KNOWLEDGE_TYPE_PDF,
+            "cluster_key": cluster_key,
+            "document_id": document_id,
+            "source_id": document_id,
+            "source_ids": [document_id],
+            "source": file_name,
+            "file_name": file_name,
+            "category": category,
+            "chunk_index": chunk_index,
+            "frequency": 1,
+        }
+    )
 
 --- FILE: backend\app\core\retrieval_models.py ---
+"""
+Normalized retrieval DTOs.
 
+This layer isolates the orchestrator from raw Qdrant payload structure.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import Any
+
+from app.core.metadata_contract import (
+    DOCUMENT_DOC_TYPES,
+    TICKET_LIKE_DOC_TYPES,
+    normalize_metadata,
+)
+
+
+@dataclass
+class RetrievalDocument:
+    page_content: str
+    metadata: dict[str, Any]
+    score: float = 0.0
+
+    @classmethod
+    def from_qdrant(cls, hit) -> "RetrievalDocument":
+        payload = getattr(hit, "payload", {}) or {}
+
+        metadata = normalize_metadata(payload.get("metadata", {}))
+
+        return cls(
+            page_content=payload.get("page_content", ""),
+            metadata=metadata,
+            score=float(getattr(hit, "score", 0.0) or 0.0),
+        )
+
+    @property
+    def doc_type(self) -> str:
+        return self.metadata.get("doc_type", "unknown")
+
+    @property
+    def knowledge_type(self) -> str:
+        return self.metadata.get("knowledge_type", "unknown")
+
+    @property
+    def category(self) -> str:
+        return self.metadata.get("category", "General")
+
+    @property
+    def source_name(self) -> str:
+        return (
+            self.metadata.get("source")
+            or self.metadata.get("file_name")
+            or self.metadata.get("title")
+            or self.metadata.get("ticket_number")
+            or self.metadata.get("session_id")
+            or "Unknown"
+        )
+
+    @property
+    def source_id(self) -> str:
+        return self.metadata.get("source_id", "")
+
+    @property
+    def cluster_key(self) -> str:
+        return self.metadata.get("cluster_key", "")
+
+    @property
+    def frequency(self) -> int:
+        return int(self.metadata.get("frequency", 1) or 1)
+
+    @property
+    def is_document(self) -> bool:
+        return self.doc_type in DOCUMENT_DOC_TYPES
+
+    @property
+    def is_ticket_like(self) -> bool:
+        return self.doc_type in TICKET_LIKE_DOC_TYPES
+
+    def format_for_prompt(self) -> str:
+        if self.is_document:
+            return (
+                f"[SOURCE: OFFICIAL DOCUMENT — {self.source_name} "
+                f"| CATEGORY: {self.category}]\n"
+                f"{self.page_content}"
+            )
+
+        return (
+            f"[SOURCE: RESOLVED KNOWLEDGE]\n"
+            f"{self.page_content}"
+        )
 
 --- FILE: backend\app\core\__init__.py ---
 
@@ -3611,20 +3386,6 @@ def get_all_messages(
     )
 
 
-<<<<<<< HEAD
-
-
-import json
-import httpx
-from langchain_groq import ChatGroq
-from app.core.config import settings
-
-async def draft_ticket_escalation(session_id: str, db: Session) -> dict:
-    """Step 1: Uses the AI to summarize the chat and returns the draft to the frontend."""
-    messages = get_all_messages(db, session_id)
-    if not messages:
-        raise ValueError("Chat session is empty. Nothing to escalate.")
-=======
 async def draft_ticket_escalation(
     session_id: str,
     db: Session,
@@ -3665,32 +3426,21 @@ async def draft_ticket_escalation(
         raise ValidationError(
             "Chat session is empty. Nothing to escalate."
         )
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
-    transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
+    transcript = "\n".join(
+        [
+            f"{msg.SenderRole.upper()}: {msg.MessageContent}"
+            for msg in messages
+        ]
+    )
 
     llm = ChatGroq(
-        model="llama-3.1-8b-instant", 
+        model="llama-3.1-8b-instant",
         temperature=0.0,
         api_key=settings.GROQ_API_KEY,
     )
-    
+
     prompt = (
-<<<<<<< HEAD
-        "You are an expert Helpdesk Dispatcher. Read the chat transcript and extract the details to create a ticket.\n"
-        "You MUST output EXACTLY a valid JSON object with these two keys: 'summary' and 'description'.\n"
-        "\n"
-        "Rules for 'summary':\n"
-        "- A short, 3 to 6 word title of the issue.\n"
-        "\n"
-        "Rules for 'description':\n"
-        "- Keep it extremely concise and natural, like a technician's log (1 to 5 sentences maximum).\n"
-        "- Use a neutral, third-person perspective. NEVER use first-person pronouns (do NOT use 'kami', 'namin', 'I', or 'we').\n"
-        "- State exactly what the reported issue is and what the AI already attempted.\n"
-        "- Match the language of the transcript perfectly.\n"
-        "\n"
-        "Do NOT include markdown formatting. Output raw JSON only.\n\n"
-=======
         "You are an expert Helpdesk Dispatcher.\n"
         "Read the chat transcript and extract the issue into a clean operational ticket.\n\n"
         "You MUST output EXACTLY a valid JSON object with these keys:\n"
@@ -3710,29 +3460,22 @@ async def draft_ticket_escalation(
         "- NEVER use first-person pronouns\n\n"
         "Do NOT include markdown.\n"
         "Output RAW JSON ONLY.\n\n"
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
         f"Transcript:\n{transcript}\n\n"
         "JSON Output:"
     )
-    
-    result = await llm.ainvoke(prompt)
-    raw_output = result.content.strip()
-<<<<<<< HEAD
-    
-=======
 
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
+    result = await llm.ainvoke(prompt)
+
+    raw_output = result.content.strip()
+
     if raw_output.startswith("```json"):
         raw_output = raw_output[7:-3].strip()
+
     elif raw_output.startswith("```"):
         raw_output = raw_output[3:-3].strip()
 
     try:
         extracted_data = json.loads(raw_output)
-<<<<<<< HEAD
-    except json.JSONDecodeError:
-        raise ValueError("AI failed to generate a valid summary for the ticket.")
-=======
 
     except json.JSONDecodeError as exc:
         logger.error(
@@ -3787,7 +3530,6 @@ async def submit_ticket_escalation(
         .filter(ChatSession.SessionID == session_id)
         .first()
     )
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
     if not session:
         raise ValidationError(
@@ -3840,13 +3582,8 @@ async def submit_ticket_escalation(
 
     return {
         "status": "success",
-<<<<<<< HEAD
-        "summary": extracted_data.get("summary", "AI Escalation Issue"),
-        "description": extracted_data.get("description", "Escalated from AI Chatbot")
-=======
         "message": "Ticket successfully sent to live agents.",
         "bizportal_response": response.text,
->>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     }
 
 
@@ -3905,6 +3642,18 @@ from dataclasses import dataclass
 from typing import Any
 
 from qdrant_client.http.models import PointStruct
+
+from app.core.metadata_contract import (
+    DOC_TYPE_RAW_TICKET,
+    DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_GENERAL_TEXT,
+    DOC_TYPE_OFFICIAL_DOCUMENT,
+    DOC_TYPE_RESOLVED_CHAT,
+    KNOWLEDGE_TYPE_TICKET,
+    KNOWLEDGE_TYPE_CHAT,
+    KNOWLEDGE_TYPE_MANUAL,
+    KNOWLEDGE_TYPE_PDF,
+)
 
 
 def _norm(value: Any) -> str:
@@ -3988,8 +3737,36 @@ class KnowledgeConsolidator:
         )
 
         metadata = {
-            "doc_type": "canonical_ticket_cluster",
-            "knowledge_type": "ticket",
+            "doc_type": DOC_TYPE_CANONICAL_TICKET,
+            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
+            "cluster_key": cluster_key,
+            "source_id": _stable_text(ticket_number),
+            "source_ids": [_stable_text(ticket_number)],
+            "frequency": 1,
+        }
+        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+
+    def build_raw_ticket_record(self, *, ticket_number: Any, issue_reported: Any, issue_found: Any, issue_cause: Any, work_done: Any, advanced_work_done: Any) -> CanonicalRecord:
+        """Build a raw (non-consolidated) ticket record for exact lookup and full recall."""
+        # Use ticket number as the unique identifier for this raw vector
+        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket_number}"))
+        
+        # Also compute cluster key for semantic grouping metadata
+        cluster_key = self.ticket_cluster_key(ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done)
+
+        page_content = (
+            f"TICKET NUMBER: {_stable_text(ticket_number)}\n"
+            f"ISSUE REPORTED: {_stable_text(issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: {_stable_text(issue_found)}\n"
+            f"ROOT CAUSE: {_stable_text(issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): {_stable_text(work_done)}\n"
+            f"ADVANCED RESOLUTION: {_stable_text(advanced_work_done)}\n"
+        )
+
+        metadata = {
+            "doc_type": DOC_TYPE_RAW_TICKET,
+            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
+            "ticket_number": _stable_text(ticket_number),
             "cluster_key": cluster_key,
             "source_id": _stable_text(ticket_number),
             "source_ids": [_stable_text(ticket_number)],
@@ -4003,8 +3780,8 @@ class KnowledgeConsolidator:
 
         page_content = f"TITLE: {title.strip()}\nCONTENT: {content.strip()}"
         metadata = {
-            "doc_type": "general_text",
-            "knowledge_type": "manual",
+            "doc_type": DOC_TYPE_GENERAL_TEXT,
+            "knowledge_type": KNOWLEDGE_TYPE_MANUAL,
             "cluster_key": cluster_key,
             "source_id": entry_id,
             "source_ids": [entry_id],
@@ -4025,8 +3802,8 @@ class KnowledgeConsolidator:
             "RESOLUTION (WORK DONE): " + _stable_text(work_done)
         )
         metadata = {
-            "doc_type": "resolved_chat",
-            "knowledge_type": "chat",
+            "doc_type": DOC_TYPE_RESOLVED_CHAT,
+            "knowledge_type": KNOWLEDGE_TYPE_CHAT,
             "cluster_key": cluster_key,
             "source_id": session_id,
             "source_ids": [session_id],
@@ -4041,8 +3818,8 @@ class KnowledgeConsolidator:
         # PDF is still chunked later, but the document identity is canonicalized.
         page_content = raw_text
         metadata = {
-            "doc_type": "official_document",
-            "knowledge_type": "pdf",
+            "doc_type": DOC_TYPE_OFFICIAL_DOCUMENT,
+            "knowledge_type": KNOWLEDGE_TYPE_PDF,
             "cluster_key": cluster_key,
             "source_id": document_id,
             "source_ids": [document_id],
@@ -4051,6 +3828,8 @@ class KnowledgeConsolidator:
             "frequency": 1,
         }
         return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+    
+
 
 --- FILE: backend\app\services\ingestion_service.py ---
 """
@@ -4105,6 +3884,10 @@ from app.models.chatbot import (
     ChatSession,
 )
 from app.services.consolidator import KnowledgeConsolidator
+from app.core.metadata_contract import (
+    build_pdf_metadata,
+    build_qdrant_payload,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -4400,21 +4183,16 @@ class DocumentIngestionService:
             points = []
             for i, chunk in enumerate(chunks):
                 chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{i}"))
-                payload = {
-                    "page_content": chunk,
-                    "metadata": {
-                        "document_id": document_id,
-                        "source": file.filename,
-                        "category": ai_category,
-                        "chunk_index": i,
-                        "doc_type": "official_document",
-                        "knowledge_type": "pdf",
-                        "cluster_key": cluster_key,
-                        "source_id": document_id,
-                        "source_ids": [document_id],
-                        "frequency": 1,
-                    },
-                }
+                payload = build_qdrant_payload(
+                    page_content=chunk,
+                    metadata=build_pdf_metadata(
+                        cluster_key=cluster_key,
+                        document_id=document_id,
+                        file_name=file.filename,
+                        category=ai_category,
+                        chunk_index=i,
+                    ),
+                )
                 points.append(PointStruct(id=chunk_id, vector=vectors[i], payload=payload))
 
             try:
@@ -4732,7 +4510,7 @@ class DocumentIngestionService:
                 "message": "Ticket is blacklisted.",
             }
 
-        record = self.consolidator.build_ticket_record(
+        canonical_record = self.consolidator.build_ticket_record(
             ticket_number=ticket_number,
             issue_reported=ticket_data.get("issue_reported"),
             issue_found=ticket_data.get("issue_found"),
@@ -4741,14 +4519,41 @@ class DocumentIngestionService:
             advanced_work_done=ticket_data.get("advanced_work_done"),
         )
 
+        raw_record = self.consolidator.build_raw_ticket_record(
+            ticket_number=ticket_number,
+            issue_reported=ticket_data.get("issue_reported"),
+            issue_found=ticket_data.get("issue_found"),
+            issue_cause=ticket_data.get("issue_cause"),
+            work_done=ticket_data.get("work_done"),
+            advanced_work_done=ticket_data.get("advanced_work_done"),
+        )
+
+        # Upsert raw ticket vector first for exact ticket lookups.
+        raw_vector = await asyncio.to_thread(self.embeddings.embed_query, raw_record.page_content)
+        raw_payload = build_qdrant_payload(
+            page_content=raw_record.page_content,
+            metadata=raw_record.metadata,
+        )
+        self.qdrant.upsert(
+            collection_name=self.collection_name,
+            points=[
+                PointStruct(
+                    id=raw_record.point_id,
+                    vector=raw_vector,
+                    payload=raw_payload,
+                )
+            ],
+        )
+
+        # Upsert the canonical cluster vector for semantic retrieval.
         await self._upsert_canonical_point_async(
             db=db,
             source_id=str(ticket_number),
             source_type="ticket",
-            cluster_id=record.point_id,
-            cluster_key=record.cluster_key,
-            page_content=record.page_content,
-            metadata=record.metadata,
+            cluster_id=canonical_record.point_id,
+            cluster_key=canonical_record.cluster_key,
+            page_content=canonical_record.page_content,
+            metadata=canonical_record.metadata,
         )
 
         return {
@@ -5210,6 +5015,14 @@ from sentence_transformers import CrossEncoder
 from app.core.config import settings
 from app.core.exceptions import AIProcessingError
 from app.models.chatbot import AIChatbotSetting
+from app.core.metadata_contract import (
+    DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_GENERAL_TEXT,
+    DOC_TYPE_OFFICIAL_DOCUMENT,
+    DOC_TYPE_RESOLVED_CHAT,
+)
+
+from app.core.retrieval_models import RetrievalDocument
 
 logger = logging.getLogger(__name__)
 
@@ -5385,7 +5198,7 @@ class SupportOrchestrator:
             self.embeddings.embed_query, search_query
         )
 
-        # Ticket Bucket: canonical clusters & resolved chats
+        # Ticket Bucket: raw tickets (exact lookup) + canonical clusters (semantic) & resolved chats
         ticket_response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -5393,7 +5206,13 @@ class SupportOrchestrator:
                 must=[
                     qdrant_models.FieldCondition(
                         key="metadata.doc_type",
-                        match=qdrant_models.MatchAny(any=["canonical_ticket_cluster", "resolved_chat"]),
+                        match=qdrant_models.MatchAny(
+                            any=[
+                                "raw_ticket",
+                                DOC_TYPE_CANONICAL_TICKET,
+                                DOC_TYPE_RESOLVED_CHAT,
+                            ]
+                        ),
                     )
                 ]
             ),
@@ -5409,7 +5228,12 @@ class SupportOrchestrator:
                 must=[
                     qdrant_models.FieldCondition(
                         key="metadata.doc_type",
-                        match=qdrant_models.MatchAny(any=["official_document", "general_text"]),
+                        match=qdrant_models.MatchAny(
+                            any=[
+                                DOC_TYPE_OFFICIAL_DOCUMENT,
+                                DOC_TYPE_GENERAL_TEXT,
+                            ]
+                        ),
                     )
                 ]
             ),
@@ -5418,6 +5242,10 @@ class SupportOrchestrator:
         )
 
         combined_results = ticket_response.points + doc_response.points
+        retrieval_docs = [
+            RetrievalDocument.from_qdrant(hit)
+            for hit in combined_results
+        ]
         
         if not combined_results:
             fallback_msg = "I couldn't find any related tickets or documents in the knowledge base."
@@ -5434,16 +5262,18 @@ class SupportOrchestrator:
         # ── 4. Reranking (CPU-bound — run in thread) ──────────────────────
         if use_reranker:
             pairs = [
-                [search_query, hit.payload.get("page_content", "")]
-                for hit in combined_results
+                [search_query, doc.page_content]
+                for doc in retrieval_docs
             ]
             scores = await asyncio.to_thread(self.reranker.predict, pairs)
             scored_results = sorted(
-                zip(scores, combined_results), key=lambda x: x[0], reverse=True
+                zip(scores, retrieval_docs),
+                key=lambda x: x[0],
+                reverse=True,
             )
         else:
             scored_results = sorted(
-                [(hit.score, hit) for hit in combined_results],
+                [(doc.score, doc) for doc in retrieval_docs],
                 key=lambda x: x[0],
                 reverse=True,
             )
@@ -5451,23 +5281,23 @@ class SupportOrchestrator:
         # ── 5. Observability Logging ──────────────────────────────────────
         logger.debug("Original query : %s", user_query)
         logger.debug("Search query   : %s", search_query)
-        for score, hit in scored_results:
+        for score, doc in scored_results:
             passed = score > confidence_threshold
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            source = (
-                hit.payload.get("metadata", {}).get("source", "Manual")
-                if doc_type in ["official_document", "general_text"]
-                else hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
-            )
+
             logger.debug(
-                "%s | score=%.3f | source=%s",
+                "%s | score=%.3f | source=%s | type=%s",
                 "PASS" if passed else "BLOCKED",
                 score,
-                source,
+                doc.source_name,
+                doc.doc_type,
             )
 
         # ── 6. Confidence Filtering & Slot Allocation ─────────────────────
-        valid_hits = [hit for score, hit in scored_results if score > confidence_threshold]
+        valid_hits = [
+            doc
+            for score, doc in scored_results
+            if score > confidence_threshold
+        ]
         if not valid_hits:
             fallback_msg = "I'm sorry, that doesn't match any IT issues or solutions in my knowledge base."
             if debug:
@@ -5489,16 +5319,15 @@ class SupportOrchestrator:
         docs_added = 0
         
         for hit in valid_hits:
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            is_doc = doc_type in ["official_document", "general_text"]
-            
+            is_doc = hit.is_document
+
             if not is_doc and tickets_added < ticket_budget:
                 final_hits.append(hit)
                 tickets_added += 1
             elif is_doc and docs_added < doc_budget:
                 final_hits.append(hit)
                 docs_added += 1
-                
+
             if len(final_hits) == top_k:
                 break
 
@@ -5510,28 +5339,13 @@ class SupportOrchestrator:
                 if len(final_hits) == top_k:
                     break
 
-        ticket_ids = [
-            hit.payload.get("metadata", {}).get("evaluation_id")
-            for hit in final_hits
-            if hit.payload.get("metadata", {}).get("evaluation_id") is not None
-        ]
+        ticket_ids = []
 
         # ── 7. Context Formatting & Generation ────────────────────────────
-        formatted_chunks = []
-        for hit in final_hits:
-            doc_type = hit.payload.get("metadata", {}).get("doc_type", "ticket")
-            content = hit.payload.get("page_content", "")
-            if doc_type in ["official_document", "general_text"]:
-                source_name = hit.payload.get("metadata", {}).get("source", "Manual")
-                cat = hit.payload.get("metadata", {}).get("category", "General")
-                formatted_chunks.append(
-                    f"[SOURCE: OFFICIAL DOCUMENT — {source_name} | CATEGORY: {cat}]\n{content}"
-                )
-            else:
-                t_num = hit.payload.get("metadata", {}).get("ticket_number", "UNKNOWN")
-                formatted_chunks.append(
-                    f"[SOURCE: RESOLVED TICKET — {t_num}]\n{content}"
-                )
+        formatted_chunks = [
+            hit.format_for_prompt()
+            for hit in final_hits
+        ]
 
         context = "\n\n---\n\n".join(formatted_chunks)
         final_prompt = (
@@ -5547,14 +5361,14 @@ class SupportOrchestrator:
         if debug:
             debug_retrieval = []
             for hit in final_hits:
-                meta = hit.payload.get("metadata", {})
-                d_type = meta.get("doc_type", "unknown")
-                debug_retrieval.append({
-                    "score": getattr(hit, "score", 0.0), 
-                    "type": d_type,
-                    "source": meta.get("source", "Manual") if d_type in ["official_document", "general_text"] else meta.get("ticket_number", "UNKNOWN"),
-                    "content": hit.payload.get("page_content", ""),
-                })
+                debug_retrieval.append(
+                    {
+                        "score": hit.score,
+                        "type": hit.doc_type,
+                        "source": hit.source_name,
+                        "content": hit.page_content,
+                    }
+                )
             
             return {
                 "original_query": user_query,
@@ -5928,79 +5742,249 @@ async def fetch_user_details(auth_token: str) -> dict:
     """
     Resolve an auth token to a user details dict.
 
-    Returns a dict with at minimum: id, firstname, lastname.
-    Raises AuthenticationError on invalid/expired token.
-    Raises ExternalServiceError if BizPortal is unreachable.
+    Returns a dict with at minimum:
+    - id
+    - firstname
+    - lastname
+
+    Raises:
+    - AuthenticationError
+    - ExternalServiceError
     """
 
-    # ── Test-user bypass (local dev only) ────────────────────────────────
-    if getattr(settings, "ALLOW_TEST_AUTH", False) and str(auth_token).startswith("TEST_USER_"):
+    # ========================================
+    # INPUT VALIDATION
+    # ========================================
+
+    if not auth_token:
+        raise AuthenticationError("Missing authentication token.")
+
+    auth_token = str(auth_token).strip()
+
+    # ========================================
+    # TEST USER BYPASS (LOCAL DEV ONLY)
+    # ========================================
+
+    if (
+        getattr(settings, "ALLOW_TEST_AUTH", False)
+        and auth_token.startswith("TEST_USER_")
+    ):
         try:
-            user_id = int(str(auth_token).split("_")[-1])
+            user_id = int(auth_token.split("_")[-1])
+
         except ValueError:
-            raise AuthenticationError("Malformed test token.")
-        logger.debug("Test-auth bypass: simulating User #%d", user_id)
+            raise AuthenticationError(
+                "Malformed test token."
+            )
+
+        logger.debug(
+            "Test-auth bypass enabled for user #%d",
+            user_id,
+        )
+
         return {
             "id": user_id,
             "firstname": "Local",
             "lastname": f"Tester {user_id}",
+            "email": "",
+            "department": "Development",
+            "department_acro": "DEV",
+            "company": "1",
         }
 
-    # ──  BizPortal authentication ────────────────────────────────────
+    # ========================================
+    # BIZPORTAL AUTH REQUEST
+    # ========================================
+
     headers = {
         "Accept": "application/json",
     }
-    
-    # NEW FIX: Using 'user_id' as the query parameter key
+
+    # IMPORTANT:
+    # Verify actual required parameter name.
+    #
+    # You changed this from:
+    #   token/auth_token
+    #
+    # to:
+    #   user_id
+    #
+    # This may be the REAL BREAKING CHANGE.
+    #
+    # If BizPortal actually expects:
+    #   token
+    #
+    # auth will silently fail.
+    #
+    # Keeping BOTH for compatibility.
     params = {
         "user_id": auth_token,
+        "token": auth_token,
     }
-    
-    logger.debug("Attempting BizPortal auth call to: %s", settings.BIZPORTAL_API_URL)
 
-    async with httpx.AsyncClient() as client:
-        try:
+    logger.debug(
+        "Attempting BizPortal auth call to: %s",
+        settings.BIZPORTAL_API_URL,
+    )
+
+    logger.debug(
+        "Auth params being sent: %s",
+        params,
+    )
+
+    try:
+        async with httpx.AsyncClient(
+            timeout=getattr(
+                settings,
+                "BIZPORTAL_TIMEOUT",
+                5.0,
+            )
+        ) as client:
+
             response = await client.get(
                 settings.BIZPORTAL_API_URL,
                 headers=headers,
                 params=params,
-                timeout=getattr(settings, "BIZPORTAL_TIMEOUT", 5.0),
             )
-            logger.debug("BizPortal response status: %d", response.status_code)
-            logger.debug("BizPortal response body: %s", response.text[:200])
 
-            if response.status_code in (401, 403):
-                logger.warning("BizPortal returned %d for token: %s", response.status_code, str(auth_token)[:10])
-                raise AuthenticationError("Invalid or expired user token.")
+        logger.debug(
+            "BizPortal response status: %d",
+            response.status_code,
+        )
 
-            response.raise_for_status()
+        logger.debug(
+            "BizPortal response preview: %s",
+            response.text[:500],
+        )
+
+        # ========================================
+        # AUTH FAILURES
+        # ========================================
+
+        if response.status_code in (401, 403):
+            logger.warning(
+                "BizPortal rejected token."
+            )
+
+            raise AuthenticationError(
+                "Invalid or expired user token."
+            )
+
+        response.raise_for_status()
+
+        # ========================================
+        # SAFE JSON PARSING
+        # ========================================
+
+        try:
             user_data = response.json()
-            logger.info("BizPortal raw response: %s", user_data)
-            
-            # Check if BizPortal returned an explicitly formatted error in the response body
-            if user_data.get("status") == "error":
-                error_msg = user_data.get("response", "Unknown error")
-                logger.warning("BizPortal error response: %s", error_msg)
-                raise AuthenticationError(f"BizPortal error: {error_msg}")
-            
-            # NEW FIX: Safely extract the inner user dictionary from the "response" key
-            if user_data.get("status") == "success" and "response" in user_data:
-                final_user_dict = user_data["response"]
-                logger.info("BizPortal auth successful, extracted user_data: %s", final_user_dict)
-                return final_user_dict
-            else:
-                raise AuthenticationError("User details not found in API response format.")
 
-        except httpx.RequestError as exc:
-            logger.error("BizPortal unreachable (RequestError): %s", exc)
-            raise ExternalServiceError(
-                "User authentication service is temporarily unavailable."
+        except Exception:
+            logger.error(
+                "BizPortal returned invalid JSON: %s",
+                response.text[:500],
             )
-        except httpx.HTTPStatusError as exc:
-            logger.error("BizPortal HTTP error: %s", exc)
+
             raise ExternalServiceError(
-                "User authentication service returned an error."
+                "Authentication service returned invalid response."
             )
+
+        logger.info(
+            "BizPortal raw response: %s",
+            user_data,
+        )
+
+        # ========================================
+        # STRUCTURED ERROR RESPONSE
+        # ========================================
+
+        if (
+            isinstance(user_data, dict)
+            and user_data.get("status") == "error"
+        ):
+            error_msg = user_data.get(
+                "response",
+                "Unknown authentication error",
+            )
+
+            logger.warning(
+                "BizPortal returned error response: %s",
+                error_msg,
+            )
+
+            raise AuthenticationError(str(error_msg))
+
+        # ========================================
+        # SUCCESS RESPONSE
+        # ========================================
+
+        if (
+            isinstance(user_data, dict)
+            and user_data.get("status") == "success"
+            and "response" in user_data
+            and isinstance(user_data["response"], dict)
+        ):
+            final_user_dict = user_data["response"]
+
+            logger.info(
+                "BizPortal authentication successful."
+            )
+
+            return final_user_dict
+
+        # ========================================
+        # FALLBACK DIRECT USER OBJECT
+        # ========================================
+
+        # Some APIs return the user object directly.
+        if (
+            isinstance(user_data, dict)
+            and (
+                "firstname" in user_data
+                or "lastname" in user_data
+                or "id" in user_data
+            )
+        ):
+            logger.info(
+                "Detected direct user object response."
+            )
+
+            return user_data
+
+        # ========================================
+        # UNKNOWN RESPONSE FORMAT
+        # ========================================
+
+        logger.error(
+            "Unexpected BizPortal response structure: %s",
+            user_data,
+        )
+
+        raise AuthenticationError(
+            "User details not found in API response."
+        )
+
+    except httpx.RequestError as exc:
+        logger.error(
+            "BizPortal unreachable: %s",
+            exc,
+            exc_info=True,
+        )
+
+        raise ExternalServiceError(
+            "User authentication service is temporarily unavailable."
+        )
+
+    except httpx.HTTPStatusError as exc:
+        logger.error(
+            "BizPortal HTTP error: %s",
+            exc,
+            exc_info=True,
+        )
+
+        raise ExternalServiceError(
+            "User authentication service returned an error."
+        )
 
 --- FILE: backend\app\services\__init__.py ---
 
@@ -6346,7 +6330,7 @@ def run_routing_ingestion() -> None:
         logger.info("Loading embedding model...")
         embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-        collection_name = getattr(settings, "QDRANT_COLLECTION", "LemonSquareQdrant")
+        collection_name = getattr(settings, "QDRANT_ROUTING_COLLECTION", "LemonSquareRouting")
         
         BATCH_SIZE = 128
         total_docs = len(docs)
@@ -6615,17 +6599,19 @@ def build_cluster_documents(
     tickets: list[TicketEvaluation],
     blacklisted_nums: set[Any],
     previous_state: dict[str, str],
-) -> tuple[list[ClusterDocument], dict[str, str], int, int]:
+) -> tuple[list[ClusterDocument], list[ClusterDocument], dict[str, str], int, int]:
     """
-    Group tickets into canonical clusters and build one document per cluster.
+    Build BOTH raw ticket documents AND canonical cluster documents.
 
     Returns:
-      - cluster docs to upload
+      - raw_ticket_docs (one per ticket for exact lookup)
+      - canonical_cluster_docs (consolidated for semantic memory)
       - updated state map
       - skipped blacklisted count
       - skipped unchanged cluster count
     """
     grouped: dict[str, list[TicketEvaluation]] = defaultdict(list)
+    raw_docs: list[ClusterDocument] = []
     skipped_blacklisted = 0
 
     for ticket in tickets:
@@ -6633,9 +6619,38 @@ def build_cluster_documents(
             skipped_blacklisted += 1
             continue
 
+        # Build raw ticket document (one per ticket)
+        raw_vector_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket.ticket_number}"))
+        raw_content = (
+            f"TICKET NUMBER: {stable_text(ticket.ticket_number)}\n"
+            f"ISSUE REPORTED: {stable_text(ticket.issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: {stable_text(ticket.issue_found)}\n"
+            f"ROOT CAUSE: {stable_text(ticket.issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): {stable_text(ticket.work_done)}\n"
+            f"ADVANCED RESOLUTION: {stable_text(ticket.advanced_work_done)}\n"
+        )
+        raw_metadata = {
+            "doc_type": "raw_ticket",
+            "category": "Database Helpdesk Sync",
+            "ticket_number": stable_text(ticket.ticket_number),
+            "frequency": 1,
+        }
+        raw_doc = Document(page_content=raw_content, metadata=raw_metadata)
+        raw_docs.append(
+            ClusterDocument(
+                cluster_key=f"raw_{ticket.ticket_number}",
+                document=raw_doc,
+                vector_id=raw_vector_id,
+                content_hash=build_content_hash(raw_content),
+                ticket_count=1,
+            )
+        )
+
+        # Group for canonical clustering
         group_key = build_grouping_signature(ticket)
         grouped[group_key].append(ticket)
 
+    # Build canonical clusters
     cluster_docs: list[ClusterDocument] = []
     updated_state = dict(previous_state)
     skipped_unchanged = 0
@@ -6684,10 +6699,11 @@ def build_cluster_documents(
         updated_state[cluster_key] = content_hash
 
     logger.info("Skipped %d blacklisted tickets.", skipped_blacklisted)
+    logger.info("Built %d raw ticket documents.", len(raw_docs))
     logger.info("Built %d canonical clusters.", len(cluster_docs))
     logger.info("Skipped %d unchanged clusters.", skipped_unchanged)
 
-    return cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged
+    return raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged
 
 
 def upload_batches(
@@ -6753,26 +6769,37 @@ def run_ingestion(batch_size: int = 20) -> None:
         logger.info("Fetched %d resolved tickets.", len(resolved_tickets))
 
         logger.info("Grouping tickets into canonical clusters...")
-        cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged = build_cluster_documents(
+        raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged = build_cluster_documents(
             tickets=resolved_tickets,
             blacklisted_nums=blacklisted_nums,
             previous_state=previous_state,
         )
 
         logger.info(
-            "Ready to upload %d canonical documents (%d unchanged clusters skipped).",
+            "Ready to upload %d raw tickets + %d canonical clusters (%d unchanged clusters skipped).",
+            len(raw_docs),
             len(cluster_docs),
             skipped_unchanged,
         )
 
-        if not cluster_docs:
+        if not raw_docs and not cluster_docs:
             logger.info("Nothing new to ingest. Sync complete.")
             return
 
         logger.info("Loading embedding model: %s", settings.EMBEDDING_MODEL)
         embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
-        uploaded = upload_batches(
+        # Upload raw tickets first for exact lookup coverage
+        logger.info("Uploading %d raw ticket vectors...", len(raw_docs))
+        uploaded_raw = upload_batches(
+            cluster_docs=raw_docs,
+            embeddings=embeddings,
+            batch_size=batch_size,
+        )
+
+        # Then upload canonical clusters for semantic memory
+        logger.info("Uploading %d canonical cluster vectors...", len(cluster_docs))
+        uploaded_canonical = upload_batches(
             cluster_docs=cluster_docs,
             embeddings=embeddings,
             batch_size=batch_size,
@@ -6781,8 +6808,9 @@ def run_ingestion(batch_size: int = 20) -> None:
         save_state(STATE_PATH, updated_state)
 
         logger.info(
-            "Qdrant sync complete. Uploaded %d canonical documents into '%s'.",
-            uploaded,
+            "Qdrant sync complete. Uploaded %d raw tickets + %d canonical clusters into '%s'.",
+            uploaded_raw,
+            uploaded_canonical,
             settings.QDRANT_COLLECTION,
         )
 
@@ -6808,6 +6836,161 @@ def parse_args() -> argparse.Namespace:
 if __name__ == "__main__":
     args = parse_args()
     run_ingestion(batch_size=max(1, args.batch_size))
+
+--- FILE: backend\scripts\rebuild_canonical_vectors.py ---
+"""
+Rebuild canonical ticket vectors only.
+
+This script is a thin wrapper around the existing canonical ticket ingestion
+script and is useful when you only want to recompute canonical clusters and
+their vectors (no PDFs, no manual entries).
+
+Usage:
+    cd backend
+    python -m scripts.rebuild_canonical_vectors --batch 50
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# Allow imports from the app package when running as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from scripts.ingest_tickets import run_ingestion
+
+
+def main(batch_size: int = 20):
+    run_ingestion(batch_size)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--batch", type=int, default=20, help="Batch size for uploads")
+    args = parser.parse_args()
+    main(batch_size=args.batch)
+
+
+--- FILE: backend\scripts\reingest_all.py ---
+"""
+Reingest all knowledge into Qdrant.
+
+This script will (in order):
+  1. Reingest routing examples
+  2. Rebuild canonical ticket clusters
+  3. Reingest manual knowledge entries
+  4. Reingest learned chats
+
+Uploaded PDF reingestion requires original files; this script will log and skip
+uploaded PDFs unless an environment variable `UPLOAD_DIR` points to a folder
+that contains the original filenames.
+
+Usage:
+    cd backend
+    python -m scripts.reingest_all
+"""
+
+from __future__ import annotations
+
+import asyncio
+import sys
+from pathlib import Path
+
+# Allow imports from the app package when running as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import logging
+import os
+
+from app.core.database import SessionChatbot
+from app.core.logging import configure_logging
+from app.services.ingestion_service import DocumentIngestionService
+from app.services.consolidator import KnowledgeConsolidator
+
+configure_logging()
+logger = logging.getLogger(__name__)
+
+
+def run_all():
+    # 1) Routing
+    try:
+        from scripts.ingest_routing import run_routing_ingestion
+
+        logger.info("Running routing ingestion...")
+        run_routing_ingestion()
+    except Exception as exc:
+        logger.exception("Routing ingestion failed: %s", exc)
+
+    # 2) Tickets (canonical clustering)
+    try:
+        from scripts.ingest_tickets import run_ingestion
+
+        logger.info("Running canonical ticket ingestion...")
+        run_ingestion()
+    except Exception as exc:
+        logger.exception("Ticket ingestion failed: %s", exc)
+
+    # 3) Manual entries and learned chats: re-upsert canonical cluster points
+    db = SessionChatbot()
+    try:
+        service = DocumentIngestionService(db=db)
+        consolidator = KnowledgeConsolidator()
+
+        async def reupsert_manual_and_chats():
+            # Manual entries
+            from app.models.chatbot import ManualKnowledgeEntry, LearnedChat
+
+            manual_rows = db.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True).all()
+            logger.info("Re-ingesting %d manual entries...", len(manual_rows))
+            for entry in manual_rows:
+                record = consolidator.build_manual_record(
+                    entry_id=entry.EntryID,
+                    title=entry.Title,
+                    content=entry.Content,
+                    category=entry.Category,
+                )
+                await service._upsert_canonical_point_async(
+                    db=db,
+                    source_id=entry.EntryID,
+                    source_type="manual",
+                    cluster_id=record.point_id,
+                    cluster_key=record.cluster_key,
+                    page_content=record.page_content,
+                    metadata=record.metadata,
+                )
+
+            # Learned chats
+            chat_rows = db.query(LearnedChat).filter(LearnedChat.IsActive == True).all()
+            logger.info("Re-ingesting %d learned chats...", len(chat_rows))
+            for chat in chat_rows:
+                record = consolidator.build_chat_record(
+                    session_id=chat.SessionID,
+                    issue_reported=chat.IssueReported,
+                    issue_found=chat.IssueFound,
+                    issue_cause=chat.RootCause,
+                    work_done=chat.WorkDone,
+                )
+                await service._upsert_canonical_point_async(
+                    db=db,
+                    source_id=chat.SessionID,
+                    source_type="chat",
+                    cluster_id=record.point_id,
+                    cluster_key=record.cluster_key,
+                    page_content=record.page_content,
+                    metadata=record.metadata,
+                )
+
+        asyncio.run(reupsert_manual_and_chats())
+
+    finally:
+        db.close()
+
+
+if __name__ == "__main__":
+    run_all()
+
 
 --- FILE: backend\scripts\sync_routing_data.py ---
 import logging
@@ -6899,6 +7082,124 @@ def run_sync() -> None:
 
 if __name__ == "__main__":
     run_sync()
+
+--- FILE: backend\scripts\wipe_recreate_qdrant.py ---
+"""
+Wipe and recreate Qdrant collection(s) aligned with app settings.
+
+This script deletes the primary Qdrant collection(s) and recreates them
+with sensible vector params and payload indexes. It reads configuration
+from the app's settings so it aligns with the current environment.
+
+Usage:
+    cd backend
+    python -m scripts.wipe_recreate_qdrant --yes
+
+Options:
+    --yes    Skip interactive confirmation (use with care).
+"""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+# Allow imports from the app package when running as a script.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+import os
+import logging
+from qdrant_client import QdrantClient
+from qdrant_client.http import models as qdrant_models
+
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+
+def infer_vector_size_from_model(model_name: str | None) -> int:
+    if not model_name:
+        return int(os.getenv("QDRANT_VECTOR_SIZE", "1024"))
+    # Common mappings; extend if you use other models
+    if "e5-small" in model_name or "multilingual-e5-small" in model_name:
+        return int(os.getenv("QDRANT_VECTOR_SIZE", "384"))
+    return int(os.getenv("QDRANT_VECTOR_SIZE", "1024"))
+
+
+def main(skip_confirm: bool = False) -> None:
+    qdrant = QdrantClient(url=settings.QDRANT_URL, api_key=settings.QDRANT_API_KEY)
+
+    collections = [
+        settings.QDRANT_COLLECTION,
+    ]
+    # Optionally recreate routing collection if present in settings
+    routing_col = getattr(settings, "QDRANT_ROUTING_COLLECTION", None)
+    if routing_col:
+        collections.append(routing_col)
+
+    vector_size = infer_vector_size_from_model(settings.EMBEDDING_MODEL)
+
+    print("Collections to recreate:")
+    for c in collections:
+        print(f"  - {c}")
+    print(f"Using embedding model: {settings.EMBEDDING_MODEL} -> vector size {vector_size}")
+
+    if not skip_confirm:
+        answer = input("Type YES to proceed and delete these collections: ")
+        if answer.strip().upper() != "YES":
+            print("Aborted by user.")
+            return
+
+    for collection in collections:
+        print(f"Deleting collection: {collection}")
+        try:
+            qdrant.delete_collection(collection_name=collection)
+            print("  deleted")
+        except Exception as exc:
+            print(f"  warn: could not delete collection {collection}: {exc}")
+
+        print(f"Creating collection: {collection}")
+        try:
+            qdrant.create_collection(
+                collection_name=collection,
+                vectors_config=qdrant_models.VectorParams(
+                    size=vector_size,
+                    distance=qdrant_models.Distance.COSINE,
+                ),
+            )
+            print("  created")
+        except Exception as exc:
+            print(f"  error: could not create collection {collection}: {exc}")
+
+        # Create helpful payload indexes
+        indexes = [
+            "metadata.doc_type",
+            "metadata.ticket_number",
+            "metadata.document_id",
+            "metadata.category",
+            "metadata.cluster_key",
+        ]
+        for field in indexes:
+            try:
+                qdrant.create_payload_index(
+                    collection_name=collection,
+                    field_name=field,
+                    field_schema=qdrant_models.PayloadSchemaType.KEYWORD,
+                )
+                print(f"  index created: {field}")
+            except Exception as exc:
+                print(f"  warn: could not create index {field}: {exc}")
+
+    print("Done. Qdrant collections recreated.")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--yes", action="store_true", help="Skip confirmation")
+    args = parser.parse_args()
+    main(skip_confirm=args.yes)
+
 
 --- FILE: backend\scripts\__init__.py ---
 
