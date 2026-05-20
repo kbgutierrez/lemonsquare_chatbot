@@ -6,12 +6,8 @@ import {
   useState,
 } from "react"
 
-import {
-  uploadDocument,
-} from "../services/uploadService"
-
-import aiSettingsService
-  from "../services/aiSettingsService"
+import { uploadDocument } from "../services/uploadService"
+import aiSettingsService from "../services/aiSettingsService"
 
 import {
   getCachedData,
@@ -20,634 +16,307 @@ import {
 } from "../../shared/cache/liveQueryCache"
 
 const ITEMS_PER_PAGE = 5
+const UPLOAD_CACHE_KEY = "global_upload_queue"
 
-const UPLOAD_CACHE_KEY =
-  "global_upload_queue"
+/* ========================================
+   SAFE UUID (FALLBACK READY)
+======================================== */
+const safeUUID = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID()
+  }
+  return `id_${Date.now()}_${Math.random()}`
+}
 
-export const useFileUpload =
-  () => {
+/* ========================================
+   HOOK
+======================================== */
+export const useFileUpload = () => {
+  const inputRef = useRef(null)
+  const uploadLockRef = useRef(false)
+  const mountedRef = useRef(true)
+  const rawFilesRef = useRef(new Map())
 
-    /* =========================================
-       REFS
-    ========================================= */
+  /* ========================================
+     CACHE INIT
+  ======================================== */
+  const initialUploads = getCachedData(UPLOAD_CACHE_KEY) || []
 
-    const inputRef =
-      useRef(null)
+  const [uploadedFiles, setUploadedFiles] = useState(initialUploads)
+  const [currentPage, setCurrentPage] = useState(1)
 
-    const uploadLockRef =
-      useRef(false)
+  const [hasPendingUploads, setHasPendingUploads] = useState(() =>
+    initialUploads.some((f) => f.statusType === "pending")
+  )
 
-    const mountedRef =
-      useRef(true)
+  const [selectedCategory, setSelectedCategory] = useState("")
+  const [categories, setCategories] = useState([])
 
-    /* =========================================
-       INITIAL CACHE HYDRATION
-    ========================================= */
+  /* ========================================
+     SAFE PENDING STATE
+  ======================================== */
+  const computePending = useCallback((files) => {
+    return files.some((f) => f.statusType === "pending")
+  }, [])
 
-    const initialUploads =
-      getCachedData(
-        UPLOAD_CACHE_KEY
-      ) || []
+  const syncCache = useCallback((files) => {
+    const safe = files.map(({ raw, ...rest }) => rest)
+    setCachedData(UPLOAD_CACHE_KEY, safe)
+  }, [])
 
-    /* =========================================
-       STATE
-    ========================================= */
+  /* ========================================
+     SUBSCRIPTION
+  ======================================== */
+  useEffect(() => {
+    mountedRef.current = true
 
-    const [uploadedFiles, setUploadedFiles] =
-      useState(
-        initialUploads
-      )
+    const unsubscribe = subscribeCache(
+      UPLOAD_CACHE_KEY,
+      (updatedFiles) => {
+        if (!mountedRef.current) return
 
-    const [currentPage, setCurrentPage] =
-      useState(1)
+        const safe = Array.isArray(updatedFiles) ? updatedFiles : []
 
-    const [hasPendingUploads, setHasPendingUploads] =
-      useState(() =>
-        initialUploads.some(
-          (file) =>
-            file.statusType ===
-            "pending"
-        )
-      )
+        const hydrated = safe.map((file) => ({
+          ...file,
+          raw: rawFilesRef.current.get(file.id) || null,
+        }))
 
-    const [
-      selectedCategory,
-      setSelectedCategory,
-    ] = useState("")
-
-    const [categories, setCategories] =
-      useState([])
-
-    /* =========================================
-       CACHE SYNC
-    ========================================= */
-
-    const syncCache =
-      useCallback(
-        (files) => {
-
-          setCachedData(
-            UPLOAD_CACHE_KEY,
-            files
-          )
-        },
-        []
-      )
-
-    /* =========================================
-       CACHE SUBSCRIPTION
-    ========================================= */
-
-    useEffect(() => {
-
-      mountedRef.current =
-        true
-
-      const unsubscribe =
-        subscribeCache(
-          UPLOAD_CACHE_KEY,
-          (updatedFiles) => {
-
-            if (
-              !mountedRef.current
-            ) {
-              return
-            }
-
-            const safe =
-              Array.isArray(
-                updatedFiles
-              )
-                ? updatedFiles
-                : []
-
-            setUploadedFiles(
-              safe
-            )
-
-            setHasPendingUploads(
-              safe.some(
-                (file) =>
-                  file.statusType ===
-                  "pending"
-              )
-            )
-          }
-        )
-
-      return () => {
-
-        mountedRef.current =
-          false
-
-        unsubscribe?.()
+        setUploadedFiles(hydrated)
+        setHasPendingUploads(computePending(hydrated))
       }
-
-    }, [])
-
-    /* =========================================
-       LOAD CATEGORIES
-    ========================================= */
-
-    useEffect(() => {
-
-      const loadCategories =
-        async () => {
-
-          try {
-
-            const settings =
-              await aiSettingsService.getSettings()
-
-            const parsed =
-              settings?.AllowedCategories
-                ?.split(",")
-
-                ?.map((item) =>
-                  item.trim()
-                )
-
-                ?.filter(Boolean) || []
-
-            setCategories(parsed)
-
-          } catch (error) {
-
-            console.error(
-              "LOAD_CATEGORIES_ERROR",
-              error
-            )
-          }
-        }
-
-      loadCategories()
-
-    }, [])
-
-    /* =========================================
-       FORMAT SIZE
-    ========================================= */
-
-    const formatSize =
-      useCallback(
-        (size) =>
-          `${(
-            size /
-            1024 /
-            1024
-          ).toFixed(2)} MB`,
-        []
-      )
-
-    /* =========================================
-       UPDATE FILE
-    ========================================= */
-
-    const updateFile =
-      useCallback(
-        (
-          id,
-          updates
-        ) => {
-
-          setUploadedFiles(
-            (prev) => {
-
-              const updated =
-                prev.map(
-                  (file) =>
-                    file.id === id
-                      ? {
-                          ...file,
-                          ...updates,
-                        }
-                      : file
-                )
-
-              syncCache(
-                updated
-              )
-
-              return updated
-            }
-          )
-        },
-        [syncCache]
-      )
-
-    /* =========================================
-       CHECK PENDING
-    ========================================= */
-
-    const refreshPendingState =
-      useCallback(
-        (files) => {
-
-          const hasPending =
-            files.some(
-              (file) =>
-                file.statusType ===
-                "pending"
-            )
-
-          setHasPendingUploads(
-            hasPending
-          )
-        },
-        []
-      )
-
-    /* =========================================
-       CLEAR FILES
-    ========================================= */
-
-    const clearFiles =
-      useCallback(
-        () => {
-
-          setUploadedFiles([])
-
-          syncCache([])
-
-          setHasPendingUploads(
-            false
-          )
-
-          setCurrentPage(1)
-        },
-        [syncCache]
-      )
-
-    /* =========================================
-       UPLOAD SINGLE
-    ========================================= */
-
-    const uploadFile =
-      useCallback(
-        async (
-          localId,
-          file,
-          category
-        ) => {
-
-          try {
-
-            const data =
-              await uploadDocument(
-                file,
-                category
-              )
-
-            updateFile(
-              localId,
-              {
-                status:
-                  "Uploaded",
-
-                statusType:
-                  "success",
-
-                response:
-                  data,
-              }
-            )
-
-          } catch (error) {
-
-            console.error(
-              "UPLOAD_ERROR",
-              error
-            )
-
-            updateFile(
-              localId,
-              {
-                status:
-                  error.message ||
-                  "Upload Failed",
-
-                statusType:
-                  "error",
-              }
-            )
-          }
-        },
-        [updateFile]
-      )
-
-    /* =========================================
-       CONFIRM UPLOAD
-    ========================================= */
-
-    const confirmUpload =
-      useCallback(
-        async () => {
-
-          if (
-            uploadLockRef.current
-          ) {
-            return
-          }
-
-          uploadLockRef.current =
-            true
-
-          try {
-
-            const pending =
-              uploadedFiles.filter(
-                (file) =>
-                  file.statusType ===
-                  "pending"
-              )
-
-            if (
-              pending.length === 0
-            ) {
-              return
-            }
-
-            setHasPendingUploads(
-              false
-            )
-
-            await Promise.all(
-              pending.map(
-                async (file) => {
-
-                  updateFile(
-                    file.id,
-                    {
-                      status:
-                        "Uploading...",
-
-                      statusType:
-                        "loading",
-                    }
-                  )
-
-                  await uploadFile(
-                    file.id,
-                    file.raw,
-                    file.category
-                  )
-                }
-              )
-            )
-
-          } finally {
-
-            uploadLockRef.current =
-              false
-
-            setUploadedFiles(
-              (prev) => {
-
-                refreshPendingState(prev)
-
-                syncCache(prev)
-
-                return prev
-              }
-            )
-          }
-        },
-        [
-          uploadedFiles,
-          uploadFile,
-          updateFile,
-          refreshPendingState,
-          syncCache,
-        ]
-      )
-
-    /* =========================================
-       HANDLE FILES
-    ========================================= */
-
-    const handleFiles =
-      useCallback(
-        (files) => {
-
-          const validFiles =
-            Array.from(
-              files
-            ).filter(
-              (file) =>
-                file.name
-                  .toLowerCase()
-                  .endsWith(
-                    ".pdf"
-                  )
-            )
-
-          if (
-            validFiles.length === 0
-          ) {
-            return
-          }
-
-          const mapped =
-            validFiles.map(
-              (
-                file
-              ) => ({
-                id:
-                  crypto.randomUUID(),
-
-                raw:
-                  file,
-
-                name:
-                  file.name,
-
-                size:
-                  formatSize(
-                    file.size
-                  ),
-
-                type:
-                  file.name
-                    .split(".")
-                    .pop()
-                    ?.toUpperCase(),
-
-                category:
-                  selectedCategory,
-
-                status:
-                  "Pending",
-
-                statusType:
-                  "pending",
-
-                uploadedAt:
-                  new Date()
-                    .toLocaleString(),
-              })
-            )
-
-          setUploadedFiles(
-            (prev) => {
-
-              const existingNames =
-                new Set(
-                  prev.map(
-                    (file) =>
-                      file.name
-                  )
-                )
-
-              const deduplicated =
-                mapped.filter(
-                  (file) =>
-                    !existingNames.has(
-                      file.name
-                    )
-                )
-
-              const updated =
-                [
-                  ...deduplicated,
-                  ...prev,
-                ]
-
-              refreshPendingState(
-                updated
-              )
-
-              syncCache(
-                updated
-              )
-
-              return updated
-            }
-          )
-        },
-        [
-          formatSize,
-          refreshPendingState,
-          selectedCategory,
-          syncCache,
-        ]
-      )
-
-    const handleInputChange =
-      useCallback(
-        (event) => {
-
-          handleFiles(
-            event.target.files
-          )
-
-          event.target.value =
-            ""
-        },
-        [handleFiles]
-      )
-
-    const handleDrop =
-      useCallback(
-        (event) => {
-
-          event.preventDefault()
-
-          handleFiles(
-            event.dataTransfer
-              .files
-          )
-        },
-        [handleFiles]
-      )
-
-    const removeFile =
-      useCallback(
-        (id) => {
-
-          setUploadedFiles(
-            (prev) => {
-
-              const updated =
-                prev.filter(
-                  (file) =>
-                    file.id !== id
-                )
-
-              refreshPendingState(
-                updated
-              )
-
-              syncCache(
-                updated
-              )
-
-              return updated
-            }
-          )
-        },
-        [
-          refreshPendingState,
-          syncCache,
-        ]
-      )
-
-    const showTable =
-      uploadedFiles.length > 0
-
-    const totalPages =
-      Math.max(
-        1,
-        Math.ceil(
-          uploadedFiles.length /
-          ITEMS_PER_PAGE
-        )
-      )
-
-    const paginatedFiles =
-      useMemo(
-        () =>
-          uploadedFiles.slice(
-            (
-              currentPage -
-              1
-            ) *
-              ITEMS_PER_PAGE,
-
-            currentPage *
-              ITEMS_PER_PAGE
-          ),
-
-        [
-          uploadedFiles,
-          currentPage,
-        ]
-      )
-
-    return {
-      inputRef,
-
-      uploadedFiles,
-
-      currentPage,
-      totalPages,
-      paginatedFiles,
-
-      hasPendingUploads,
-      showTable,
-
-      categories,
-      selectedCategory,
-      setSelectedCategory,
-
-      handleInputChange,
-      handleDrop,
-
-      removeFile,
-      clearFiles,
-
-      confirmUpload,
-
-      setCurrentPage,
+    )
+
+    return () => {
+      mountedRef.current = false
+      unsubscribe?.()
+    }
+  }, [computePending])
+
+  /* ========================================
+     LOAD CATEGORIES
+  ======================================== */
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const settings = await aiSettingsService.getSettings()
+
+        const parsed =
+          settings?.AllowedCategories?.split(",")
+            ?.map((x) => x.trim())
+            ?.filter(Boolean) || []
+
+        setCategories(parsed)
+      } catch (error) {
+        console.error("LOAD_CATEGORIES_ERROR", error)
+      }
     }
 
+    loadCategories()
+  }, [])
+
+  /* ========================================
+     FORMAT
+  ======================================== */
+  const formatSize = useCallback((size) => {
+    return `${(size / 1024 / 1024).toFixed(2)} MB`
+  }, [])
+
+  /* ========================================
+     UPDATE FILE
+  ======================================== */
+  const updateFile = useCallback((id, updates) => {
+    setUploadedFiles((prev) => {
+      const updated = prev.map((f) =>
+        f.id === id ? { ...f, ...updates } : f
+      )
+
+      setHasPendingUploads(computePending(updated))
+      syncCache(updated)
+
+      return updated
+    })
+  }, [syncCache, computePending])
+
+  /* ========================================
+     CLEAR
+  ======================================== */
+  const clearFiles = useCallback(() => {
+    rawFilesRef.current.clear()
+    setUploadedFiles([])
+    setHasPendingUploads(false)
+    setCurrentPage(1)
+    syncCache([])
+  }, [syncCache])
+
+  /* ========================================
+     UPLOAD SINGLE FILE
+  ======================================== */
+  const uploadFile = useCallback(async (localId, file, category) => {
+    try {
+      if (!file) throw new Error("Missing file reference")
+
+      const data = await uploadDocument(file, category)
+
+      updateFile(localId, {
+        status: "Uploaded",
+        statusType: "success",
+        response: data,
+      })
+    } catch (error) {
+      const msg = String(error?.message || "").toLowerCase()
+
+      const duplicate =
+        msg.includes("already") ||
+        msg.includes("exists") ||
+        msg.includes("duplicate")
+
+      updateFile(localId, {
+        status: duplicate ? "Already Exists" : error.message || "Upload Failed",
+        statusType: duplicate ? "warning" : "error",
+      })
+    }
+  }, [updateFile])
+
+  /* ========================================
+     CONFIRM UPLOAD
+  ======================================== */
+  const confirmUpload = useCallback(async () => {
+    if (uploadLockRef.current) return
+    uploadLockRef.current = true
+
+    try {
+      const pending = uploadedFiles.filter((f) => f.statusType === "pending")
+      if (!pending.length) return
+
+      setHasPendingUploads(false)
+
+      await Promise.all(
+        pending.map(async (file) => {
+          updateFile(file.id, {
+            status: "Uploading...",
+            statusType: "loading",
+          })
+
+          await uploadFile(
+            file.id,
+            rawFilesRef.current.get(file.id),
+            file.category
+          )
+        })
+      )
+    } finally {
+      uploadLockRef.current = false
+
+      setUploadedFiles((prev) => {
+        setHasPendingUploads(computePending(prev))
+        syncCache(prev)
+        return prev
+      })
+    }
+  }, [uploadedFiles, uploadFile, updateFile, computePending, syncCache])
+
+  /* ========================================
+     FILE HANDLING
+  ======================================== */
+  const handleFiles = useCallback((files) => {
+    const valid = Array.from(files).filter((f) =>
+      f.name.toLowerCase().endsWith(".pdf")
+    )
+
+    if (!valid.length) return
+
+    const mapped = valid.map((file) => {
+      const id = safeUUID()
+
+      rawFilesRef.current.set(id, file)
+
+      return {
+        id,
+        raw: file,
+        name: file.name,
+        size: formatSize(file.size),
+        type: file.name.split(".").pop()?.toUpperCase(),
+        category: selectedCategory,
+        status: "Pending",
+        statusType: "pending",
+        uploadedAt: new Date().toLocaleString(),
+      }
+    })
+
+    setUploadedFiles((prev) => {
+      const existing = new Set(prev.map((f) => f.name))
+      const filtered = mapped.filter((f) => !existing.has(f.name))
+
+      const updated = [...filtered, ...prev]
+
+      setHasPendingUploads(computePending(updated))
+      syncCache(updated)
+
+      return updated
+    })
+  }, [formatSize, selectedCategory, computePending, syncCache])
+
+  const handleInputChange = useCallback((e) => {
+    handleFiles(e.target.files)
+    e.target.value = ""
+  }, [handleFiles])
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault()
+    handleFiles(e.dataTransfer.files)
+  }, [handleFiles])
+
+  const removeFile = useCallback((id) => {
+    rawFilesRef.current.delete(id)
+
+    setUploadedFiles((prev) => {
+      const updated = prev.filter((f) => f.id !== id)
+
+      setHasPendingUploads(computePending(updated))
+      syncCache(updated)
+
+      return updated
+    })
+  }, [computePending, syncCache])
+
+  /* ========================================
+     DERIVED
+  ======================================== */
+  const showTable = uploadedFiles.length > 0
+
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(uploadedFiles.length / ITEMS_PER_PAGE))
+  }, [uploadedFiles])
+
+  const paginatedFiles = useMemo(() => {
+    return uploadedFiles.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    )
+  }, [uploadedFiles, currentPage])
+
+  /* ========================================
+     RETURN
+  ======================================== */
+  return {
+    inputRef,
+    uploadedFiles,
+    currentPage,
+    totalPages,
+    paginatedFiles,
+    hasPendingUploads,
+    showTable,
+    categories,
+    selectedCategory,
+    setSelectedCategory,
+    handleInputChange,
+    handleDrop,
+    removeFile,
+    clearFiles,
+    confirmUpload,
+    setCurrentPage,
   }
+}
+
+export default useFileUpload

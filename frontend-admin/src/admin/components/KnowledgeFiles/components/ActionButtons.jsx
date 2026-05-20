@@ -3,6 +3,26 @@ import {
   Trash2,
 } from "lucide-react"
 
+const buttonBaseClass =
+  `
+    flex
+    items-center
+    gap-1.5
+
+    rounded-lg
+
+    border
+
+    px-3
+    py-2
+
+    text-[12px]
+    font-medium
+
+    transition-all
+    duration-200
+  `
+
 const ActionButtons = ({
   file,
   deleting,
@@ -16,7 +36,7 @@ const ActionButtons = ({
         flex
         items-center
         justify-center
-        gap-3
+        gap-2
       "
     >
       {/* EDIT */}
@@ -24,33 +44,19 @@ const ActionButtons = ({
         onClick={() =>
           onEdit?.(file)
         }
-        className="
-          flex
-          items-center
-          gap-2
+        className={`
+          ${buttonBaseClass}
 
-          rounded-xl
-
-          border
           border-[#2d3b35]
 
           bg-[#18211f]
 
-          px-4
-          py-2.5
-
-          text-sm
-          font-medium
-
           text-white
 
-          transition-all
-          duration-200
-
           hover:bg-[#202b27]
-        "
+        `}
       >
-        <Pencil className="h-4 w-4" />
+        <Pencil className="h-3.5 w-3.5" />
 
         Edit
       </button>
@@ -58,41 +64,29 @@ const ActionButtons = ({
       {/* DELETE */}
       <button
         disabled={deleting}
+
         onClick={() =>
           onDelete?.(
             file.document_id
           )
         }
-        className="
-          flex
-          items-center
-          gap-2
 
-          rounded-xl
+        className={`
+          ${buttonBaseClass}
 
-          border
           border-red-500/20
 
           bg-red-500/10
 
-          px-4
-          py-2.5
-
-          text-sm
-          font-medium
-
           text-red-400
-
-          transition-all
-          duration-200
 
           hover:bg-red-500/20
 
           disabled:cursor-not-allowed
           disabled:opacity-60
-        "
+        `}
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-3.5 w-3.5" />
 
         Delete
       </button>

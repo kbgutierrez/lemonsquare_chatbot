@@ -1,35 +1,62 @@
 import { API_CONFIG } from "../config/sqlVariables"
 
 /*
-  FINAL ARCHITECTURE RULE:
-  - VITE PROXY handles /api → backend
-  - frontend ONLY sends /api/xxx
-  - NO double prefixing anywhere
+  ARCHITECTURE RULE:
+  - VITE proxy handles /api → backend
+  - frontend ONLY calls /api/*
 */
 
 const REQUEST_TIMEOUT = API_CONFIG.TIMEOUT || 30000
 
-const responseCache = new Map()
-const pendingRequests = new Map()
-
 /* ========================================
-   BUILD URL (FIXED — NO DOUBLE /api)
+   BUILD URL (SAFE)
 ======================================== */
-
 export const buildApiUrl = (endpoint, params = {}) => {
-  let url = endpoint // ✅ IMPORTANT: DO NOT prepend /api again
+  let url = endpoint
 
-  Object.entries(params).forEach(([key, value]) => {
-    url = url.replace(`:${key}`, encodeURIComponent(value))
-  })
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null) continue
+
+    url = url.replace(`:${key}`, encodeURIComponent(String(value)))
+  }
 
   return url
 }
 
 /* ========================================
+   SAFE JSON PARSE
+======================================== */
+const safeParseJSON = (text) => {
+  try {
+    return JSON.parse(text)
+  } catch {
+    return text
+  }
+}
+
+/* ========================================
+   ERROR EXTRACTOR
+======================================== */
+const extractErrorMessage = (data, status) => {
+  const fallback = `Request failed (${status})`
+
+  if (Array.isArray(data?.detail)) {
+    return data.detail
+      .map((item) => item?.msg)
+      .filter(Boolean)
+      .join(", ")
+  }
+
+  if (typeof data?.detail === "string") return data.detail
+  if (typeof data?.error === "string") return data.error
+  if (data?.message) return data.message
+
+  return fallback
+}
+
+/* ========================================
    CORE REQUEST
 ======================================== */
-
 const request = async ({
   endpoint,
   method = "GET",
@@ -38,29 +65,26 @@ const request = async ({
   isFormData = false,
 }) => {
   const controller = new AbortController()
-
-  const timeout = setTimeout(
-    () => controller.abort(),
-    REQUEST_TIMEOUT
-  )
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
   try {
-    console.log("API_REQUEST:", method, endpoint)
-
-    // ✅ FINAL FIX: use endpoint directly (VITE handles /api)
     const url = buildApiUrl(endpoint)
+
+    /* ========================================
+       HEADER SAFETY LAYER
+    ======================================== */
+    const finalHeaders = isFormData
+      ? headers
+      : {
+          "Content-Type": "application/json",
+          ...API_CONFIG.HEADERS,
+          ...headers,
+        }
 
     const response = await fetch(url, {
       method,
       signal: controller.signal,
-
-      headers: isFormData
-        ? headers
-        : {
-            ...API_CONFIG.HEADERS,
-            ...headers,
-          },
-
+      headers: finalHeaders,
       body: body
         ? isFormData
           ? body
@@ -68,25 +92,15 @@ const request = async ({
         : undefined,
     })
 
-    const text = await response.text()
+    const rawText = await response.text()
 
-    let data = null
-    try {
-      data = text ? JSON.parse(text) : null
-    } catch {
-      data = text
-    }
+    const data = rawText ? safeParseJSON(rawText) : null
 
     if (!response.ok) {
-      throw new Error(
-        data?.detail ||
-        data?.message ||
-        `Request failed (${response.status})`
-      )
+      throw new Error(extractErrorMessage(data, response.status))
     }
 
     return data
-
   } catch (err) {
     if (err.name === "AbortError") {
       throw new Error("Request timeout")
@@ -97,7 +111,6 @@ const request = async ({
     }
 
     throw err
-
   } finally {
     clearTimeout(timeout)
   }
@@ -106,22 +119,30 @@ const request = async ({
 /* ========================================
    API CLIENT
 ======================================== */
-
 export const apiClient = {
-  get: (e, o) =>
-    request({ endpoint: e, method: "GET", ...o }),
+  get: (endpoint, options) =>
+    request({ endpoint, method: "GET", ...options }),
 
-  post: (e, b, o) =>
-    request({ endpoint: e, method: "POST", body: b, ...o }),
+  post: (endpoint, body, options) =>
+    request({ endpoint, method: "POST", body, ...options }),
 
-  put: (e, b, o) =>
-    request({ endpoint: e, method: "PUT", body: b, ...o }),
+  put: (endpoint, body, options) =>
+    request({ endpoint, method: "PUT", body, ...options }),
 
-  patch: (e, b, o) =>
-    request({ endpoint: e, method: "PATCH", body: b, ...o }),
+  patch: (endpoint, body, options) =>
+    request({ endpoint, method: "PATCH", body, ...options }),
 
-  delete: (e, o) =>
-    request({ endpoint: e, method: "DELETE", ...o }),
+  delete: (endpoint, options) =>
+    request({ endpoint, method: "DELETE", ...options }),
+
+  upload: (endpoint, formData, options = {}) =>
+    request({
+      endpoint,
+      method: "POST",
+      body: formData,
+      isFormData: true,
+      ...options,
+    }),
 }
 
 export default apiClient

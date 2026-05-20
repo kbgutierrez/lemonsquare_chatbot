@@ -26,686 +26,337 @@ import {
 } from "../services/manualEntriesService"
 
 const ITEMS_PER_PAGE = 6
-
 const SUCCESS_TIMEOUT = 3500
+const CACHE_KEY = "manual_entries"
 
-const useManualEntries =
-  () => {
+const useManualEntries = () => {
+  /* ========================================
+     REFS
+  ======================================== */
 
-    /* ========================================
-       CONSTANTS
-    ======================================== */
+  const mountedRef = useRef(true)
+  const successTimeoutRef = useRef(null)
 
-    const CACHE_KEY =
-      "manual_entries"
+  /* ========================================
+     UI STATE
+  ======================================== */
 
-    const POLLING_INTERVAL =
-      API_CONFIG.POLLING_INTERVAL
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState("")
+  const [successMessage, setSuccessMessage] = useState("")
+  const [search, setSearch] = useState("")
+  const [page, setPage] = useState(1)
+  const [activeCategory, setActiveCategory] = useState("All")
 
-    /* ========================================
-       REFS
-    ======================================== */
+  /* ========================================
+     CLEANUP
+  ======================================== */
 
-    const mountedRef =
-      useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
 
-    const successTimeoutRef =
-      useRef(null)
+    return () => {
+      mountedRef.current = false
 
-    /* ========================================
-       STATE
-    ======================================== */
-
-    const [submitting, setSubmitting] =
-      useState(false)
-
-    const [error, setError] =
-      useState("")
-
-    const [
-      successMessage,
-      setSuccessMessage,
-    ] = useState("")
-
-    const [search, setSearch] =
-      useState("")
-
-    const [page, setPage] =
-      useState(1)
-
-    const [
-      activeCategory,
-      setActiveCategory,
-    ] = useState("All")
-
-    /* ========================================
-       CLEANUP
-    ======================================== */
-
-    useEffect(() => {
-
-      mountedRef.current =
-        true
-
-      return () => {
-
-        mountedRef.current =
-          false
-
-        if (
-          successTimeoutRef.current
-        ) {
-
-          clearTimeout(
-            successTimeoutRef.current
-          )
-        }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
       }
+    }
+  }, [])
 
-    }, [])
+  /* ========================================
+     FETCHER
+  ======================================== */
 
-    /* ========================================
-       FETCHER
-    ======================================== */
+  const safeFetchManualEntries = useCallback(async () => {
+    const response = await fetchManualEntries()
 
-    const safeFetchManualEntries =
-      useCallback(
-        async () => {
+    if (Array.isArray(response)) return response
+    if (Array.isArray(response?.data)) return response.data
 
-          const response =
-            await fetchManualEntries()
+    console.warn("INVALID_MANUAL_ENTRIES_RESPONSE", response)
+    return []
+  }, [])
 
-          if (
-            Array.isArray(
-              response
-            )
-          ) {
+  /* ========================================
+     LIVE QUERY
+  ======================================== */
 
-            return response
-          }
+  const {
+    data: items,
+    loading,
+    refreshing,
+    refresh,
+  } = useLiveQuery({
+    queryKey: CACHE_KEY,
+    queryFn: safeFetchManualEntries,
+    initialData: [],
+    refetchInterval: API_CONFIG.POLLING_INTERVAL,
+    staleWhileRevalidate: true,
+  })
 
-          /* SAFE OBJECT FALLBACK */
+  const safeItems = useMemo(
+    () => (Array.isArray(items) ? items : []),
+    [items]
+  )
 
-          if (
-            Array.isArray(
-              response?.data
-            )
-          ) {
+  /* ========================================
+     SUCCESS AUTO CLEAR
+  ======================================== */
 
-            return response.data
-          }
+  useEffect(() => {
+    if (!successMessage) return
 
-          console.warn(
-            "INVALID_MANUAL_ENTRIES_RESPONSE",
-            response
-          )
+    successTimeoutRef.current = setTimeout(() => {
+      if (mountedRef.current) {
+        setSuccessMessage("")
+      }
+    }, SUCCESS_TIMEOUT)
 
-          return []
-        },
-        []
-      )
+    return () => {
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current)
+      }
+    }
+  }, [successMessage])
 
-    /* ========================================
-       LIVE QUERY
-    ======================================== */
+  /* ========================================
+     RESET PAGE ON FILTER
+  ======================================== */
 
-    const {
-      data: items,
+  useEffect(() => {
+    setPage(1)
+  }, [search, activeCategory])
 
-      loading,
-      refreshing,
+  /* ========================================
+     CATEGORIES (DERIVED)
+  ======================================== */
 
-      refresh,
-    } = useLiveQuery({
-      queryKey:
-        CACHE_KEY,
+  const categories = useMemo(() => {
+    const unique = [
+      ...new Set(
+        safeItems
+          .map((i) => i.category)
+          .filter(Boolean)
+      ),
+    ]
 
-      queryFn:
-        safeFetchManualEntries,
+    return ["All", ...unique]
+  }, [safeItems])
 
-      initialData: [],
+  /* ========================================
+     FILTER
+  ======================================== */
 
-      refetchInterval:
-        POLLING_INTERVAL,
+  const filtered = useMemo(() => {
+    const query = search.toLowerCase()
 
-      staleWhileRevalidate:
-        true,
+    return safeItems.filter((item) => {
+      const text = [
+        item.title,
+        item.content,
+        item.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+
+      const matchesSearch = text.includes(query)
+      const matchesCategory =
+        activeCategory === "All" ||
+        item.category === activeCategory
+
+      return matchesSearch && matchesCategory
     })
+  }, [safeItems, search, activeCategory])
 
-    /* ========================================
-       SAFE ARRAY
-    ======================================== */
+  /* ========================================
+     PAGINATION
+  ======================================== */
 
-    const safeItems =
-      useMemo(
-        () => {
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)),
+    [filtered]
+  )
 
-          return Array.isArray(
-            items
-          )
-            ? items
-            : []
-        },
-        [items]
-      )
+  const paginatedItems = useMemo(
+    () =>
+      filtered.slice(
+        (page - 1) * ITEMS_PER_PAGE,
+        page * ITEMS_PER_PAGE
+      ),
+    [filtered, page]
+  )
 
-    /* ========================================
-       AUTO HIDE SUCCESS
-    ======================================== */
+  /* ========================================
+     CREATE (OPTIMISTIC)
+  ======================================== */
 
-    useEffect(() => {
+  const handleCreateEntry = useCallback(
+    async (form, resetForm, closeModal) => {
+      setError("")
 
-      if (
-        !successMessage
-      ) {
+      if (!form.title?.trim() || !form.content?.trim()) {
+        setError("Title and content are required.")
         return
       }
 
-      successTimeoutRef.current =
-        setTimeout(() => {
+      try {
+        setSubmitting(true)
 
-          if (
-            mountedRef.current
-          ) {
-
-            setSuccessMessage("")
-          }
-
-        }, SUCCESS_TIMEOUT)
-
-      return () => {
-
-        if (
-          successTimeoutRef.current
-        ) {
-
-          clearTimeout(
-            successTimeoutRef.current
-          )
+        const optimistic = {
+          id: `temp-${Date.now()}`,
+          title: form.title,
+          content: form.content,
+          category: form.category || "General",
         }
+
+        setCachedData(CACHE_KEY, [optimistic, ...safeItems])
+
+        const response = await createManualEntry(form)
+
+        invalidateCache(CACHE_KEY)
+        await refresh()
+
+        if (mountedRef.current) {
+          setSuccessMessage(
+            `✨ AI categorized entry as ${
+              response?.category || form?.category || "General"
+            }`
+          )
+
+          resetForm?.()
+          closeModal?.()
+        }
+      } catch (error) {
+        invalidateCache(CACHE_KEY)
+        await refresh()
+
+        if (mountedRef.current) {
+          setError(error.message || "Failed to create entry.")
+        }
+      } finally {
+        if (mountedRef.current) setSubmitting(false)
       }
+    },
+    [safeItems, refresh]
+  )
 
-    }, [successMessage])
+  /* ========================================
+     UPDATE (OPTIMISTIC + ROLLBACK CLEAN)
+  ======================================== */
 
-    /* ========================================
-       RESET PAGE ON FILTER
-    ======================================== */
+  const handleUpdateEntry = useCallback(
+    async (entryId, form, onFinish) => {
+      setError("")
 
-    useEffect(() => {
+      const previous = safeItems
 
-      setPage(1)
+      try {
+        setSubmitting(true)
 
-    }, [
-      search,
-      activeCategory,
-    ])
-
-    /* ========================================
-       CATEGORY TABS
-    ======================================== */
-
-    const categories =
-      useMemo(() => {
-
-        const unique =
-          [
-            ...new Set(
-              safeItems
-                .map(
-                  (item) =>
-                    item.category
-                )
-                .filter(Boolean)
-            ),
-          ]
-
-        return [
-          "All",
-          ...unique,
-        ]
-
-      }, [safeItems])
-
-    /* ========================================
-       FILTERED ITEMS
-    ======================================== */
-
-    const filtered =
-      useMemo(() => {
-
-        const query =
-          search.toLowerCase()
-
-        return safeItems.filter(
-          (item) => {
-
-            const searchable =
-              [
-                item.title,
-                item.content,
-                item.category,
-              ]
-                .filter(Boolean)
-                .join(" ")
-                .toLowerCase()
-
-            const matchesSearch =
-              searchable.includes(
-                query
-              )
-
-            const matchesCategory =
-              activeCategory ===
-                "All" ||
-              item.category ===
-                activeCategory
-
-            return (
-              matchesSearch &&
-              matchesCategory
-            )
-          }
+        const optimistic = safeItems.map((item) =>
+          item.id === entryId ? { ...item, ...form } : item
         )
 
-      }, [
-        safeItems,
-        search,
-        activeCategory,
-      ])
-
-    /* ========================================
-       PAGINATION
-    ======================================== */
-
-    const totalPages =
-      useMemo(
-        () =>
-          Math.max(
-            1,
-            Math.ceil(
-              filtered.length /
-              ITEMS_PER_PAGE
-            )
-          ),
-        [filtered]
-      )
-
-    const paginatedItems =
-      useMemo(
-        () =>
-          filtered.slice(
-            (page - 1) *
-              ITEMS_PER_PAGE,
-
-            page *
-              ITEMS_PER_PAGE
-          ),
-        [
-          filtered,
-          page,
-        ]
-      )
-
-    /* ========================================
-       CREATE ENTRY
-    ======================================== */
-
-    const handleCreateEntry =
-      useCallback(
-        async (
-          form,
-          resetForm,
-          closeModal
-        ) => {
-
-          setError("")
-
-          if (
-            !form.title?.trim() ||
-            !form.content?.trim()
-          ) {
-
-            setError(
-              "Title and content are required."
-            )
-
-            return
-          }
-
-          try {
-
-            setSubmitting(true)
-
-            const optimistic =
-              {
-                id:
-                  `temp-${Date.now()}`,
-
-                title:
-                  form.title,
-
-                content:
-                  form.content,
-
-                category:
-                  form.category ||
-                  "General",
-              }
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              [
-                optimistic,
-                ...safeItems,
-              ]
-            )
-
-            const response =
-              await createManualEntry(
-                form
-              )
-
-            invalidateCache(
-              CACHE_KEY
-            )
-
-            await refresh()
-
-            if (
-              mountedRef.current
-            ) {
-
-              setSuccessMessage(
-                `✨ AI categorized entry as ${
-                  response?.category ||
-                  form?.category ||
-                  "General"
-                }`
-              )
-
-              resetForm?.()
-
-              closeModal?.()
-            }
-
-          } catch (error) {
+        setCachedData(CACHE_KEY, optimistic)
 
-            console.error(
-              "CREATE_ENTRY_ERROR",
-              error
-            )
-
-            invalidateCache(
-              CACHE_KEY
-            )
+        await updateManualEntry(entryId, form)
 
-            await refresh()
+        invalidateCache(CACHE_KEY)
+        await refresh()
 
-            if (
-              mountedRef.current
-            ) {
+        if (mountedRef.current) {
+          setSuccessMessage("Entry updated successfully")
+          onFinish?.()
+        }
+      } catch (error) {
+        setCachedData(CACHE_KEY, previous)
 
-              setError(
-                error.message ||
-                "Failed to create entry."
-              )
-            }
+        if (mountedRef.current) {
+          setError(error.message || "Failed to update entry.")
+        }
+      } finally {
+        if (mountedRef.current) setSubmitting(false)
+      }
+    },
+    [safeItems, refresh]
+  )
 
-          } finally {
+  /* ========================================
+     DELETE (OPTIMISTIC)
+  ======================================== */
 
-            if (
-              mountedRef.current
-            ) {
+  const handleDeleteEntry = useCallback(
+    async (entryId) => {
+      setError("")
 
-              setSubmitting(false)
-            }
-          }
-        },
-        [
-          safeItems,
-          refresh,
-        ]
-      )
+      const previous = safeItems
 
-    /* ========================================
-       UPDATE ENTRY
-    ======================================== */
-
-    const handleUpdateEntry =
-      useCallback(
-        async (
-          entryId,
-          form,
-          onFinish
-        ) => {
-
-          setError("")
-
-          const previous =
-            [...safeItems]
-
-          try {
-
-            setSubmitting(true)
-
-            const optimistic =
-              safeItems.map(
-                (item) => {
-
-                  if (
-                    item.id ===
-                    entryId
-                  ) {
+      try {
+        setSubmitting(true)
 
-                    return {
-                      ...item,
-                      ...form,
-                    }
-                  }
-
-                  return item
-                }
-              )
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              optimistic
-            )
+        const optimistic = safeItems.filter((i) => i.id !== entryId)
 
-            await updateManualEntry(
-              entryId,
-              form
-            )
-
-            invalidateCache(
-              CACHE_KEY
-            )
-
-            await refresh()
+        setCachedData(CACHE_KEY, optimistic)
 
-            if (
-              mountedRef.current
-            ) {
+        await deleteManualEntry(entryId)
 
-              setSuccessMessage(
-                "Entry updated successfully"
-              )
+        invalidateCache(CACHE_KEY)
+        await refresh()
 
-              onFinish?.()
-            }
+        if (mountedRef.current) {
+          setSuccessMessage("🗑️ Entry deleted successfully")
+        }
+      } catch (error) {
+        setCachedData(CACHE_KEY, previous)
 
-          } catch (error) {
+        if (mountedRef.current) {
+          setError(error.message || "Failed to delete entry.")
+        }
+      } finally {
+        if (mountedRef.current) setSubmitting(false)
+      }
+    },
+    [safeItems, refresh]
+  )
 
-            console.error(
-              "UPDATE_ENTRY_ERROR",
-              error
-            )
+  /* ========================================
+     EXPORT
+  ======================================== */
 
-            /* ROLLBACK */
+  return {
+    items: safeItems,
 
-            setCachedData(
-              CACHE_KEY,
-              previous
-            )
+    loading,
+    refreshing,
 
-            if (
-              mountedRef.current
-            ) {
+    submitting,
 
-              setError(
-                error.message ||
-                "Failed to update entry."
-              )
-            }
+    error,
+    successMessage,
 
-          } finally {
+    search,
+    setSearch,
 
-            if (
-              mountedRef.current
-            ) {
-
-              setSubmitting(false)
-            }
-          }
-        },
-        [
-          safeItems,
-          refresh,
-        ]
-      )
-
-    /* ========================================
-       DELETE ENTRY
-    ======================================== */
-
-    const handleDeleteEntry =
-      useCallback(
-        async (
-          entryId
-        ) => {
+    page,
+    setPage,
 
-          setError("")
+    categories,
 
-          const previous =
-            [...safeItems]
+    activeCategory,
+    setActiveCategory,
 
-          try {
+    paginatedItems,
+    totalPages,
 
-            setSubmitting(true)
+    handleCreateEntry,
+    handleUpdateEntry,
+    handleDeleteEntry,
 
-            const optimistic =
-              safeItems.filter(
-                (item) =>
-                  item.id !==
-                  entryId
-              )
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              optimistic
-            )
-
-            await deleteManualEntry(
-              entryId
-            )
-
-            invalidateCache(
-              CACHE_KEY
-            )
-
-            await refresh()
-
-            if (
-              mountedRef.current
-            ) {
-
-              setSuccessMessage(
-                "🗑️ Entry deleted successfully"
-              )
-            }
-
-          } catch (error) {
-
-            console.error(
-              "DELETE_ENTRY_ERROR",
-              error
-            )
-
-            /* ROLLBACK */
-
-            setCachedData(
-              CACHE_KEY,
-              previous
-            )
-
-            if (
-              mountedRef.current
-            ) {
-
-              setError(
-                error.message ||
-                "Failed to delete entry."
-              )
-            }
-
-          } finally {
-
-            if (
-              mountedRef.current
-            ) {
-
-              setSubmitting(false)
-            }
-          }
-        },
-        [
-          safeItems,
-          refresh,
-        ]
-      )
-
-    return {
-      items:
-        safeItems,
-
-      loading,
-      refreshing,
-
-      submitting,
-
-      error,
-      successMessage,
-
-      search,
-      setSearch,
-
-      page,
-      setPage,
-
-      categories,
-
-      activeCategory,
-      setActiveCategory,
-
-      paginatedItems,
-      totalPages,
-
-      handleCreateEntry,
-      handleUpdateEntry,
-      handleDeleteEntry,
-
-      setError,
-
-      reloadEntries:
-        refresh,
-    }
-
+    setError,
+    reloadEntries: refresh,
   }
+}
 
 export default useManualEntries

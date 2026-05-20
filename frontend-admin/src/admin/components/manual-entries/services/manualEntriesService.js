@@ -19,29 +19,88 @@ const API_URL =
   )
 
 /* ========================================
+   SAFE ARRAY EXTRACTION
+======================================== */
+
+const extractEntriesArray =
+  (payload) => {
+
+    if (
+      Array.isArray(
+        payload
+      )
+    ) {
+
+      return payload
+    }
+
+    const possibleArrays = [
+      payload?.data,
+      payload?.items,
+      payload?.entries,
+      payload?.results,
+      payload?.manual_entries,
+      payload?.manualEntries,
+    ]
+
+    for (const value of possibleArrays) {
+
+      if (
+        Array.isArray(
+          value
+        )
+      ) {
+
+        return value
+      }
+    }
+
+    return []
+  }
+
+/* ========================================
    FETCH ENTRIES
 ======================================== */
 
 export const fetchManualEntries =
   async () => {
 
-    const data =
-      await apiClient.get(
-        API_URL
+    try {
+
+      const response =
+        await apiClient.get(
+          API_URL
+        )
+
+      console.log(
+        "FETCH_MANUAL_ENTRIES_RESPONSE",
+        response
       )
 
-    console.log(
-      "FETCH_MANUAL_ENTRIES_RESPONSE",
-      data
-    )
-
-    return Array.isArray(
-      data
-    )
-      ? data.map(
-          normalizeManualEntry
+      const entries =
+        extractEntriesArray(
+          response
         )
-      : []
+
+      return entries.map(
+        normalizeManualEntry
+      )
+
+    } catch (error) {
+
+      console.error(
+        "FETCH_MANUAL_ENTRIES_FAILED",
+        error
+      )
+
+      /*
+        FRONTEND FALLBACK:
+        Prevent page crash when backend
+        returns 500.
+      */
+
+      return []
+    }
   }
 
 /* ========================================

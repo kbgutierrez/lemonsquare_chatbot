@@ -6,11 +6,6 @@ export const API_ENDPOINTS = {
   AUTH_VERIFY:
     "/api/auth/verify",
 
-  // ✅ FIXED
-  // Backend route:
-  // app.include_router(admin_auth.router, prefix="/api")
-  // router.prefix("/admin")
-  // final => /api/admin/login
   LSBIZPORTAL_LOGIN:
     "/api/admin/login",
 

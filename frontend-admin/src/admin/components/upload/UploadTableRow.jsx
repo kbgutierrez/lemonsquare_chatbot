@@ -1,18 +1,8 @@
-import {
-  FileText,
-  X,
-} from "lucide-react"
-
+import { FileText, X } from "lucide-react"
 import UploadStatusBadge from "./UploadStatusBadge"
 
-const UploadTableRow = ({
-  file,
-  removeFile,
-}) => {
-
-  const isUploading =
-    file.statusType ===
-    "loading"
+const UploadTableRow = ({ file, removeFile }) => {
+  const isUploading = file.statusType === "loading"
 
   return (
     <tr
@@ -29,7 +19,6 @@ const UploadTableRow = ({
       {/* FILE */}
       <td className="px-5 py-4">
         <div className="flex items-center gap-3">
-          {/* FILE ICON */}
           <div
             className="
               flex
@@ -47,17 +36,9 @@ const UploadTableRow = ({
               bg-[#1b2422]
             "
           >
-            <FileText
-              className="
-                h-4.5
-                w-4.5
-
-                text-[#f5d547]
-              "
-            />
+            <FileText className="h-4.5 w-4.5 text-[#f5d547]" />
           </div>
 
-          {/* FILE INFO */}
           <div className="min-w-0">
             <p
               className="
@@ -73,15 +54,7 @@ const UploadTableRow = ({
               {file.name}
             </p>
 
-            <p
-              className="
-                mt-1
-
-                text-xs
-
-                text-[#7f948b]
-              "
-            >
+            <p className="mt-1 text-xs text-[#7f948b]">
               {file.type}
             </p>
           </div>
@@ -89,19 +62,7 @@ const UploadTableRow = ({
       </td>
 
       {/* SIZE */}
-      <td
-        className="
-          whitespace-nowrap
-
-          px-5
-          py-4
-
-          text-sm
-          font-medium
-
-          text-[#c4d1cb]
-        "
-      >
+      <td className="px-5 py-4 text-sm font-medium text-[#c4d1cb]">
         {file.size}
       </td>
 
@@ -130,8 +91,7 @@ const UploadTableRow = ({
             text-[#d7e2dd]
           "
         >
-          {file.category ||
-            "General"}
+          {file.category || "General"}
         </div>
       </td>
 
@@ -144,19 +104,7 @@ const UploadTableRow = ({
       </td>
 
       {/* UPLOADED */}
-      <td
-        className="
-          whitespace-nowrap
-
-          px-5
-          py-4
-
-          text-xs
-          font-medium
-
-          text-[#81958c]
-        "
-      >
+      <td className="px-5 py-4 text-xs font-medium text-[#81958c]">
         {file.uploadedAt}
       </td>
 
@@ -164,9 +112,7 @@ const UploadTableRow = ({
       <td className="px-5 py-4">
         <button
           disabled={isUploading}
-          onClick={() =>
-            removeFile(file.id)
-          }
+          onClick={() => removeFile(file.id)}
           className="
             flex
             h-10

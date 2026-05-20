@@ -1,244 +1,106 @@
-import {
-  useEffect,
-  useState,
-} from "react"
+import { useEffect, useState } from "react"
 
-import pipelineDebugService
-  from "../../services/pipelineDebugService"
+import pipelineDebugService from "../../services/pipelineDebugService"
 
-import PipelineControls
-  from "./components/PipelineControls"
+import PipelineControls from "./components/PipelineControls"
+import PipelinePromptBox from "./components/PipelinePromptBox"
+import PipelineResults from "./components/PipelineResults"
 
-import PipelinePromptBox
-  from "./components/PipelinePromptBox"
-
-import PipelineResults
-  from "./components/PipelineResults"
-
-import ErrorState
-  from "../../../shared/components/ErrorState"
-
-import LoadingSpinner
-  from "../../../shared/components/LoadingSpinner"
+import ErrorState from "../../../shared/components/ErrorState"
+import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 
 import {
   getCachedData,
   setCachedData,
 } from "../../../shared/cache/liveQueryCache"
 
-const CACHE_KEY =
-  "pipeline_debug_state"
+const CACHE_KEY = "pipeline_debug_state"
 
 const PipelineDebugSection = () => {
-
   /* ========================================
-     CACHE HYDRATION
+     CACHE HYDRATION (SAFE)
   ======================================== */
-
-  const cached =
-    getCachedData(
-      CACHE_KEY
-    ) || {}
+  const cached = getCachedData(CACHE_KEY) ?? {}
 
   /* ========================================
      STATE
   ======================================== */
-
-  const [prompt, setPrompt] =
-    useState(
-      cached.prompt || ""
-    )
-
-  const [userToken, setUserToken] =
-    useState(
-      cached.userToken || ""
-    )
-
-  const [sessionId, setSessionId] =
-    useState(
-      cached.sessionId || ""
-    )
-
-  const [loading, setLoading] =
-    useState(false)
-
-  const [result, setResult] =
-    useState(
-      cached.result || null
-    )
-
-  const [error, setError] =
-    useState("")
-
-  const [showConfig, setShowConfig] =
-    useState(
-      cached.showConfig ??
-      true
-    )
+  const [prompt, setPrompt] = useState(cached.prompt || "")
+  const [userToken, setUserToken] = useState(cached.userToken || "")
+  const [sessionId, setSessionId] = useState(cached.sessionId || "")
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState(cached.result || null)
+  const [error, setError] = useState("")
+  const [showConfig, setShowConfig] = useState(cached.showConfig ?? true)
 
   /* ========================================
      PERSIST STATE
   ======================================== */
-
   useEffect(() => {
-
-    setCachedData(
-      CACHE_KEY,
-      {
-        prompt,
-        userToken,
-        sessionId,
-        result,
-        showConfig,
-      }
-    )
-
-  }, [
-    prompt,
-    userToken,
-    sessionId,
-    result,
-    showConfig,
-  ])
+    setCachedData(CACHE_KEY, {
+      prompt,
+      userToken,
+      sessionId,
+      result,
+      showConfig,
+    })
+  }, [prompt, userToken, sessionId, result, showConfig])
 
   /* ========================================
-     LOAD ADMIN TOKEN
+     LOAD TOKEN (FIXED: RUN ONLY ON MOUNT)
   ======================================== */
-
   useEffect(() => {
+    const storedToken = localStorage.getItem("admin_user_token")
 
-    const storedToken =
-      localStorage.getItem(
-        "admin_user_token"
-      )
+    if (!storedToken) return
+    if (userToken) return
 
-    if (
-      storedToken &&
-      !userToken
-    ) {
-
-      setUserToken(
-        storedToken
-      )
-    }
-
-  }, [userToken])
+    setUserToken(storedToken)
+  }, []) // FIXED: run once only
 
   /* ========================================
      RUN PIPELINE
   ======================================== */
+  const handleRun = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      setResult(null)
 
-  const handleRun =
-    async () => {
-
-      try {
-
-        setLoading(true)
-
-        setError("")
-
-        setResult(null)
-
-        if (!prompt.trim()) {
-
-          throw new Error(
-            "Prompt is required."
-          )
-        }
-
-        if (!userToken.trim()) {
-
-          throw new Error(
-            "User token is missing."
-          )
-        }
-
-        const response =
-          await pipelineDebugService
-            .debugPipeline({
-              message:
-                prompt,
-
-              user_token:
-                userToken,
-
-              session_id:
-                sessionId ||
-                null,
-            })
-
-        console.log(
-          "PIPELINE_DEBUG_RESULT",
-          response
-        )
-
-        setResult(response)
-
-        setShowConfig(false)
-
-      } catch (err) {
-
-        console.error(
-          "PIPELINE_DEBUG_ERROR",
-          err
-        )
-
-        setError(
-          err.message ||
-          "Pipeline debug failed."
-        )
-
-      } finally {
-
-        setLoading(false)
+      if (!prompt.trim()) {
+        throw new Error("Prompt is required.")
       }
+
+      if (!userToken.trim()) {
+        throw new Error("User token is missing.")
+      }
+
+      const response = await pipelineDebugService.debugPipeline({
+        message: prompt,
+        user_token: userToken,
+        session_id: sessionId || null,
+      })
+
+      console.log("PIPELINE_DEBUG_RESULT", response)
+
+      setResult(response)
+      setShowConfig(false)
+    } catch (err) {
+      console.error("PIPELINE_DEBUG_ERROR", err)
+
+      setError(err.message || "Pipeline debug failed.")
+    } finally {
+      setLoading(false)
     }
+  }
 
   return (
-    <section
-      className="
-        flex
-        h-full
-        flex-col
-
-        overflow-hidden
-      "
-    >
+    <section className="flex h-full flex-col overflow-hidden">
       {/* HEADER */}
-      <div
-        className="
-          mb-4
+      <div className="mb-4 rounded-3xl border border-[#25332d] bg-[#151d1b] p-5">
+        <h1 className="text-2xl font-bold text-white">Pipeline Debug</h1>
 
-          rounded-3xl
-
-          border
-          border-[#25332d]
-
-          bg-[#151d1b]
-
-          p-5
-        "
-      >
-        <h1
-          className="
-            text-2xl
-            font-bold
-
-            text-white
-          "
-        >
-          Pipeline Debug
-        </h1>
-
-        <p
-          className="
-            mt-2
-
-            text-sm
-
-            text-[#8ea59b]
-          "
-        >
+        <p className="mt-2 text-sm text-[#8ea59b]">
           Full RAG orchestration inspector.
         </p>
       </div>
@@ -246,20 +108,14 @@ const PipelineDebugSection = () => {
       {/* CONTROLS */}
       <PipelineControls
         userToken={userToken}
-        setUserToken={
-          setUserToken
-        }
+        setUserToken={setUserToken}
         sessionId={sessionId}
-        setSessionId={
-          setSessionId
-        }
+        setSessionId={setSessionId}
         loading={loading}
         prompt={prompt}
         handleRun={handleRun}
         showConfig={showConfig}
-        setShowConfig={
-          setShowConfig
-        }
+        setShowConfig={setShowConfig}
       />
 
       {/* PROMPT */}
@@ -279,18 +135,11 @@ const PipelineDebugSection = () => {
 
       {/* ERROR */}
       {error && !loading && (
-        <ErrorState
-          title="Pipeline Debug Error"
-          message={error}
-        />
+        <ErrorState title="Pipeline Debug Error" message={error} />
       )}
 
       {/* RESULTS */}
-      {!loading && !error && (
-        <PipelineResults
-          result={result}
-        />
-      )}
+      {!loading && !error && <PipelineResults result={result} />}
     </section>
   )
 }

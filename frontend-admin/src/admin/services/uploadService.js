@@ -89,9 +89,12 @@ export const uploadDocument =
       endpoint
     )
 
-    return apiClient.upload(
+    return apiClient.post(
       endpoint,
-      formData
+      formData,
+      {
+        isFormData: true,
+      }
     )
   }
 

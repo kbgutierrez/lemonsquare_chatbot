@@ -8,18 +8,20 @@ const CategoryBadge = ({
         inline-flex
         items-center
 
-        rounded-2xl
+        rounded-xl
 
         border
         border-[#2d3b35]
 
         bg-[#18211f]
 
-        px-3
-        py-1.5
+        px-2.5
+        py-1
 
-        text-xs
+        text-[11px]
         font-medium
+
+        leading-none
 
         text-[#d4dfdb]
       "

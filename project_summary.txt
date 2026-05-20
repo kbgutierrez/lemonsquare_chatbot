@@ -6,9 +6,6 @@ Earl/
 ├── .gitignore
 ├── Results.csv
 ├── SUBCATEGORY.sql
-├── ai_context.txt
-├── apply_changes.py
-├── apply_json.py
 ├── backend
 │   ├── .ticket_cluster_state.json
 │   ├── app
@@ -18,7 +15,6 @@ Earl/
 │   │   │   ├── deps.py
 │   │   │   └── routers
 │   │   │       ├── __init__.py
-│   │   │       ├── admin_auth.py
 │   │   │       ├── analytics.py
 │   │   │       ├── auth.py
 │   │   │       ├── chat.py
@@ -80,7 +76,192 @@ Earl/
 │   └── wipe_qdrant.py
 ├── ch.py
 ├── erd.png
-├── fetch_files.py
+├── frontend-admin
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── admin
+│   │   │   ├── components
+│   │   │   │   ├── KnowledgeFiles
+│   │   │   │   │   ├── FileTable.jsx
+│   │   │   │   │   ├── KnowledgeFilesSection.jsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ActionButtons.jsx
+│   │   │   │   │   │   ├── CategoryBadge.jsx
+│   │   │   │   │   │   ├── FileTableEmpty.jsx
+│   │   │   │   │   │   ├── FileTableHeader.jsx
+│   │   │   │   │   │   └── FileTableRow.jsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useKnowledgeFiles.js
+│   │   │   │   │   ├── index.js
+│   │   │   │   │   ├── modals
+│   │   │   │   │   │   └── EditFileModal.jsx
+│   │   │   │   │   └── services
+│   │   │   │   │       └── knowledgeFilesService.js
+│   │   │   │   ├── MobileSidebar.jsx
+│   │   │   │   ├── SidebarMenu.jsx
+│   │   │   │   ├── manual-entries
+│   │   │   │   │   ├── ManualEntriesSection.jsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ManualEntriesHeader.jsx
+│   │   │   │   │   │   ├── ManualEntriesPagination.jsx
+│   │   │   │   │   │   ├── ManualEntryCard.jsx
+│   │   │   │   │   │   ├── ManualEntryModal.jsx
+│   │   │   │   │   │   └── ManualEntryTabs.jsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useManualEntries.js
+│   │   │   │   │   ├── services
+│   │   │   │   │   │   └── manualEntriesService.js
+│   │   │   │   │   └── utils
+│   │   │   │   │       └── normalizeManualEntry.js
+│   │   │   │   ├── pipeline-debug
+│   │   │   │   │   ├── PipelineDebugSection.jsx
+│   │   │   │   │   └── components
+│   │   │   │   │       ├── ContextItem.jsx
+│   │   │   │   │       ├── DebugCard.jsx
+│   │   │   │   │       ├── DropdownCard.jsx
+│   │   │   │   │       ├── PipelineControls.jsx
+│   │   │   │   │       ├── PipelinePromptBox.jsx
+│   │   │   │   │       └── PipelineResults.jsx
+│   │   │   │   ├── resolved-chats
+│   │   │   │   │   ├── ResolvedChatsSection.jsx
+│   │   │   │   │   ├── components
+│   │   │   │   │   │   ├── ResolvedChatCard.jsx
+│   │   │   │   │   │   ├── ResolvedChatEditModal.jsx
+│   │   │   │   │   │   ├── ResolvedChatsEmpty.jsx
+│   │   │   │   │   │   ├── ResolvedChatsHeader.jsx
+│   │   │   │   │   │   └── ResolvedChatsPagination.jsx
+│   │   │   │   │   ├── hooks
+│   │   │   │   │   │   └── useResolvedChats.js
+│   │   │   │   │   └── utils
+│   │   │   │   │       └── parseResolvedChat.js
+│   │   │   │   ├── settings
+│   │   │   │   │   ├── AISettingsPanel.jsx
+│   │   │   │   │   ├── SettingsActions.jsx
+│   │   │   │   │   ├── SettingsHeader.jsx
+│   │   │   │   │   ├── SettingsInput.jsx
+│   │   │   │   │   ├── SettingsSelect.jsx
+│   │   │   │   │   ├── SettingsTextarea.jsx
+│   │   │   │   │   └── SettingsToggle.jsx
+│   │   │   │   ├── tickets
+│   │   │   │   │   ├── TicketPagination.jsx
+│   │   │   │   │   ├── TicketSearch.jsx
+│   │   │   │   │   ├── TicketStatusBadge.jsx
+│   │   │   │   │   ├── TicketTable.jsx
+│   │   │   │   │   └── TicketsSection.jsx
+│   │   │   │   └── upload
+│   │   │   │       ├── UploadDropzone.jsx
+│   │   │   │       ├── UploadMobileCard.jsx
+│   │   │   │       ├── UploadPagination.jsx
+│   │   │   │       ├── UploadSection.jsx
+│   │   │   │       ├── UploadStatusBadge.jsx
+│   │   │   │       ├── UploadTable.jsx
+│   │   │   │       └── UploadTableRow.jsx
+│   │   │   ├── constants
+│   │   │   │   ├── adminSections.js
+│   │   │   │   └── navigation.js
+│   │   │   ├── data
+│   │   │   │   └── aiModels.js
+│   │   │   ├── hooks
+│   │   │   │   ├── useAISettings.js
+│   │   │   │   ├── useFileUpload.js
+│   │   │   │   └── useTickets.js
+│   │   │   ├── layouts
+│   │   │   │   └── AdminLayout.jsx
+│   │   │   ├── pages
+│   │   │   │   ├── AdminDashboard.jsx
+│   │   │   │   └── LoginPage.jsx
+│   │   │   └── services
+│   │   │       ├── aiSettingsService.js
+│   │   │       ├── pipelineDebugService.js
+│   │   │       ├── ticketAdminService.js
+│   │   │       └── uploadService.js
+│   │   ├── assets
+│   │   │   ├── hero.png
+│   │   │   ├── react.svg
+│   │   │   └── vite.svg
+│   │   ├── index.css
+│   │   ├── main.jsx
+│   │   └── shared
+│   │       ├── api
+│   │       │   ├── client.js
+│   │       │   └── endpoints.js
+│   │       ├── components
+│   │       │   ├── EmptyState.jsx
+│   │       │   ├── ErrorState.jsx
+│   │       │   └── LoadingSpinner.jsx
+│   │       ├── config
+│   │       │   └── sqlVariables.js
+│   │       └── hooks
+│   │           └── useHorizontalDragScroll.js
+│   ├── tailwind.config.js
+│   └── vite.config.js
+├── frontend-bubble
+│   ├── .gitignore
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── assets
+│   │   │   ├── hero.png
+│   │   │   ├── react.svg
+│   │   │   └── vite.svg
+│   │   ├── bubble-chat
+│   │   │   ├── BubbleChat.jsx
+│   │   │   ├── components
+│   │   │   │   ├── ChatBubble.jsx
+│   │   │   │   ├── ChatFooter
+│   │   │   │   │   ├── ChatFooter.jsx
+│   │   │   │   │   ├── ChatFooterFAQ.jsx
+│   │   │   │   │   ├── ChatFooterInput.jsx
+│   │   │   │   │   └── ChatFooterResolved.jsx
+│   │   │   │   ├── ChatHeader.jsx
+│   │   │   │   ├── ChatMenu.jsx
+│   │   │   │   ├── ChatMessage.jsx
+│   │   │   │   ├── ChatMessages.jsx
+│   │   │   │   ├── ChatWindow.jsx
+│   │   │   │   ├── ModalShell.jsx
+│   │   │   │   ├── TicketDropdown.jsx
+│   │   │   │   ├── TicketField.jsx
+│   │   │   │   └── TicketTextarea.jsx
+│   │   │   ├── constants
+│   │   │   │   └── chatConfig.js
+│   │   │   ├── hooks
+│   │   │   │   ├── useBubbleDrag.js
+│   │   │   │   ├── useChatMessages.js
+│   │   │   │   ├── useConversationHistory.js
+│   │   │   │   ├── useHorizontalDragScroll.js
+│   │   │   │   └── useTicketForm.js
+│   │   │   ├── modals
+│   │   │   │   ├── AboutHelpDeskModal.jsx
+│   │   │   │   ├── CallAgentModal.jsx
+│   │   │   │   ├── ChatHistoryModal.jsx
+│   │   │   │   ├── ClearConversationModal.jsx
+│   │   │   │   ├── ResolveConversationModal.jsx
+│   │   │   │   └── SubmitTicketModal.jsx
+│   │   │   ├── services
+│   │   │   │   ├── chatbotService.js
+│   │   │   │   └── ticketService.js
+│   │   │   └── utils
+│   │   │       └── snapPosition.js
+│   │   ├── config
+│   │   │   └── sqlVariables.js
+│   │   ├── index.css
+│   │   └── main.jsx
+│   ├── tailwind.config.js
+│   └── vite.config.js
 ├── project_summary.txt
 ├── requirements.txt
 ├── sample.py
@@ -93,132 +274,21 @@ Earl/
 │   ├── createtablecbot.sql
 │   ├── helpdeskdev.sql
 │   └── helpdeskdevaluation.sql
+├── src
+│   └── admin
+│       └── components
+│           ├── manual-entries
+│           │   └── ManualEntriesSection.jsx
+│           └── resolved-chats
+│               └── ResolvedChatsSection.jsx
 ├── streamlit_app.py
 ├── streamlit_chat_history.py
 ├── subcat.csv
-├── subcatresults.csv
-├── targeted_backend_summary.txt
-├── test-sdk.html
-├── webhook.txt
-└── zartup-guide.txt
+└── webhook.txt
 
 ================================================
 FILE CONTENTS
 ================================================
-
---- FILE: apply_changes.py ---
-import os
-import re
-import sys
-from pathlib import Path
-
-def apply_changes(ai_output_file):
-    if not os.path.exists(ai_output_file):
-        print(f"❌ Could not find file: {ai_output_file}")
-        return
-
-    with open(ai_output_file, 'r', encoding='utf-8') as f:
-        content = f.read()
-
-    # Regex to match the exact format the AI will use
-    pattern = r'<<<< FILE:\s*(.*?)\s*>>>>\n(.*?)(?=\n<<<< END FILE >>>>)'
-    matches = list(re.finditer(pattern, content, re.DOTALL))
-    
-    if not matches:
-        print("⚠️ No valid file blocks found. Did the AI use the <<<< FILE: path >>>> format?")
-        return
-
-    print("================================================")
-    print(" APPLYING AI CHANGES")
-    print("================================================\n")
-
-    for match in matches:
-        file_path_str = match.group(1).strip()
-        
-        # Clean up markdown code block ticks if the AI accidentally adds them
-        new_code = match.group(2)
-        if new_code.startswith("```python\n"):
-            new_code = new_code[10:]
-        elif new_code.startswith("```\n"):
-            new_code = new_code[4:]
-        if new_code.endswith("\n```"):
-            new_code = new_code[:-4]
-
-        # Resolve the full path
-        full_path = Path.cwd() / file_path_str
-        
-        # Ensure directories exist
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        # Write the new file content
-        with open(full_path, 'w', encoding='utf-8') as code_file:
-            code_file.write(new_code)
-            
-        print(f"✅ Updated: {file_path_str}")
-        
-    print(f"\n🎉 Successfully updated {len(matches)} files!\n")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python apply_changes.py <path_to_ai_response.txt>")
-    else:
-        apply_changes(sys.argv[1])
-
---- FILE: apply_json.py ---
-import json
-import sys
-import os
-from pathlib import Path
-
-def apply_changes(json_file):
-    if not os.path.exists(json_file):
-        print(f"❌ File not found: {json_file}")
-        return
-
-    # Load and parse the JSON file
-    with open(json_file, 'r', encoding='utf-8') as f:
-        try:
-            data = json.load(f)
-        except json.JSONDecodeError as e:
-            print(f"❌ Invalid JSON format: {e}")
-            print("Make sure you copied the entire JSON block from the AI.")
-            return
-
-    updates = data.get("updates", [])
-    if not updates:
-        print("⚠️ No 'updates' array found in JSON.")
-        return
-
-    print("================================================")
-    print(" APPLYING AI CHANGES (JSON MODE)")
-    print("================================================\n")
-
-    root_path = Path.cwd()
-    for update in updates:
-        file_path_str = update.get("file")
-        new_code = update.get("code")
-
-        if not file_path_str or new_code is None:
-            print("⚠️ Skipping invalid entry (missing 'file' or 'code').")
-            continue
-
-        # Resolve path and ensure parent directories exist
-        full_path = root_path / file_path_str
-        full_path.parent.mkdir(parents=True, exist_ok=True)
-
-        # Write the new code
-        with open(full_path, 'w', encoding='utf-8') as code_file:
-            code_file.write(new_code)
-        
-        print(f"✅ Updated: {file_path_str}")
-
-    print(f"\n🎉 Successfully applied {len(updates)} file updates!\n")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python apply_json.py <path_to_ai_response.json>")
-    else:
-        apply_changes(sys.argv[1])
 
 --- FILE: ch.py ---
 import os
@@ -287,58 +357,13 @@ def pack_project():
 if __name__ == "__main__":
     pack_project()
 
---- FILE: fetch_files.py ---
-import sys
-import os
-from pathlib import Path
-
-OUTPUT_FILE = "ai_context.txt"
-
-def fetch_files(file_paths):
-    if not file_paths:
-        print("Usage: python fetch_files.py <path1> <path2> ...")
-        return
-
-    root_path = Path.cwd()
-    success_count = 0
-    
-    with open(OUTPUT_FILE, 'w', encoding='utf-8') as out_file:
-        out_file.write("================================================\n")
-        out_file.write("REQUESTED FILE CONTENTS\n")
-        out_file.write("================================================\n\n")
-        
-        for path_str in file_paths:
-            clean_path = path_str.strip('\'" ,')
-            file_path = root_path / clean_path
-            
-            if file_path.is_file():
-                try:
-                    with open(file_path, 'r', encoding='utf-8', errors='ignore') as in_file:
-                        out_file.write(f"--- FILE: {clean_path} ---\n")
-                        out_file.write(in_file.read())
-                        out_file.write("\n\n")
-                        print(f"✅ Packed: {clean_path}")
-                        success_count += 1
-                except Exception as e:
-                    print(f"❌ Error reading {clean_path}: {e}")
-            else:
-                print(f"❌ Not found or not a file: {clean_path}")
-
-    print("================================================")
-    print(f"🎉 Packed {success_count} files into '{OUTPUT_FILE}'")
-    print("================"
-    "================================")
-
-if __name__ == "__main__":
-    fetch_files(sys.argv[1:])
-
 --- FILE: sample.py ---
 import os
 from pathlib import Path
 
 # --- Configuration ---
 OUTPUT_FILE = "project_summary.txt"
-EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend', 'frontend-admin', 'frontend-bubble'}
+EXCLUDE_DIRS = {'.venv', 'venv', '.git', '__pycache__', '.env', '.idea', '.vscode', 'LemonSquare_ChatBot', 'frontend', 'oldbackend'}
 EXCLUDE_FILES = {OUTPUT_FILE, '.DS_Store', '.env'}
 
 # Add a set of allowed extensions for text/code files
@@ -1003,44 +1028,43 @@ if __name__ == "__main__":
 
 --- FILE: backend\app\main.py ---
 """
-FastAPI application factory (PRODUCTION SAFE VERSION)
+FastAPI application factory.
 
-Fixes:
-- consistent routing
-- removes double-prefix confusion
-- cleaner API structure
-- prevents full backend shutdown on AI/Qdrant failure
-- keeps auth + health routes alive during partial failures
+This file's ONLY responsibilities:
+  1. Create the FastAPI application.
+  2. Configure middleware.
+  3. Register routers.
+  4. Register exception handlers.
+  5. Run startup / shutdown logic (lifespan).
+
+There is zero business logic here.
+
+Previously, main.py contained 200+ lines including all admin route
+handlers (documents, tickets, settings) and inline ORM queries. That
+violated the Single Responsibility Principle and made the entry point
+the hardest file to navigate in the project.
 """
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 
 import uvicorn
+from app.api.routers import auth
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
+from app.api.routers import analytics  
 
-from app.api.routers import (
-    auth,
-    analytics,
-    chat,
-    documents,
-    settings,
-    tickets,
-    explorer,
-    self_knowledge,
-    maintenance,
-    routing,
-    admin_auth,
-)
-
+from app.api.routers import chat, documents, settings, tickets, explorer
 from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.services.ingestion_service import DocumentIngestionService
 from app.services.orchestrator import SupportOrchestrator
+from app.api.routers import self_knowledge
+from app.api.routers import maintenance, routing
 
 configure_logging()
 logger = logging.getLogger(__name__)
@@ -1048,97 +1072,74 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Application startup and shutdown logic.
+
+    On startup:
+      - Verify Qdrant is reachable and the required collection exists.
+      - Load the SupportOrchestrator (downloads ML models if not cached).
+      - Load the DocumentIngestionService (shares the same embedding model).
+
+    Loading ML models in the lifespan:
+      This is intentional. Models are expensive (~1-3 GB, 30-120 seconds to
+      load). By loading them once here and storing them in app.state, every
+      request reuses the same in-memory model rather than reloading per request.
+      The app exits immediately if startup fails, providing a clear error.
+    """
     logger.info("Starting up — running pre-flight checks...")
 
-    # ========================================
-    # DEFAULT SAFE APP STATE
-    # ========================================
-
-    app.state.ai_available = False
-    app.state.orchestrator = None
-    app.state.ingestion_service = None
-
-    # ========================================
-    # QDRANT CHECK
-    # ========================================
-
+    # ── Qdrant health check ───────────────────────────────────────────────
     try:
         qdrant_client = QdrantClient(
             url=app_settings.QDRANT_URL,
             api_key=app_settings.QDRANT_API_KEY,
             timeout=app_settings.QDRANT_TIMEOUT,
         )
-
-        if not qdrant_client.collection_exists(
-            app_settings.QDRANT_COLLECTION
-        ):
-            logger.error(
-                "Qdrant collection missing: %s",
+        if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
+            logger.critical(
+                "FATAL: Qdrant collection '%s' does not exist. "
+                "Run scripts/ingest_tickets.py first.",
                 app_settings.QDRANT_COLLECTION,
             )
-        else:
-            logger.info("Qdrant OK")
-
+            sys.exit(1)
+        logger.info("Qdrant OK — collection '%s' verified.", app_settings.QDRANT_COLLECTION)
     except Exception as exc:
-        logger.error(
-            "Qdrant connection failed: %s",
-            exc,
-            exc_info=True,
-        )
+        logger.critical("Qdrant connection failed: %s", exc)
+        sys.exit(1)
 
-    # ========================================
-    # AI SERVICE INITIALIZATION
-    # ========================================
-
+    # ── Load ML services (expensive — done once here, not per-request) ────
     db = SessionChatbot()
-
     try:
-        logger.info("Loading AI services...")
-
+        logger.info("Loading AI Orchestrator (embedding + reranker models)...")
         app.state.orchestrator = SupportOrchestrator(db=db)
 
-        app.state.ingestion_service = (
-            DocumentIngestionService(db=db)
-        )
-
-        app.state.ai_available = True
-
-        logger.info("AI services loaded successfully")
-
+        logger.info("Loading Document Ingestion Service (embedding model)...")
+        app.state.ingestion_service = DocumentIngestionService(db=db)
     except Exception as exc:
-        logger.error(
-            "AI initialization failed: %s",
-            exc,
-            exc_info=True,
-        )
-
-        # IMPORTANT:
-        # Do NOT kill the backend.
-        # Auth + health endpoints should still function.
-
-        app.state.ai_available = False
-
+        logger.critical("Failed to initialise AI services: %s", exc, exc_info=True)
+        sys.exit(1)
     finally:
         db.close()
 
-    logger.info("Startup complete")
-
+    logger.info("Application startup complete.")
     yield
 
-    logger.info("Shutdown")
+    # ── Shutdown ──────────────────────────────────────────────────────────
+    logger.info("Application shutting down.")
 
 
 def create_app() -> FastAPI:
+    """Create and configure the FastAPI application instance."""
     app = FastAPI(
         title="IT Support AI",
+        description="Enterprise IT helpdesk RAG chatbot API.",
         version="2.0.0",
         lifespan=lifespan,
     )
 
-    # ========================================
-    # CORS
-    # ========================================
-
+    # ── CORS ──────────────────────────────────────────────────────────────
+    # Origins are configurable via CORS_ORIGINS in .env.
+    # Defaults to localhost only — NOT open to all origins.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.CORS_ORIGINS,
@@ -1147,38 +1148,27 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # ── Exception Handlers ────────────────────────────────────────────────
     register_exception_handlers(app)
 
-    # ========================================
-    # ROUTES
-    # ========================================
+    # ── Routers ───────────────────────────────────────────────────────────
+    PREFIX = "/api"
+    app.include_router(chat.router, prefix=PREFIX)
+    app.include_router(documents.router, prefix=PREFIX)
+    app.include_router(tickets.router, prefix=PREFIX)
+    app.include_router(settings.router, prefix=PREFIX)
+    app.include_router(explorer.router, prefix=PREFIX)
+    app.include_router(self_knowledge.router, prefix="/api")
+    app.include_router(auth.router, prefix=PREFIX)
+    app.include_router(analytics.router, prefix=PREFIX)
+    app.include_router(maintenance.router, prefix=PREFIX)
+    app.include_router(routing.router, prefix=PREFIX) 
 
-    app.include_router(chat.router, prefix="/api")
-    app.include_router(documents.router, prefix="/api")
-    app.include_router(tickets.router, prefix="/api")
-    app.include_router(settings.router, prefix="/api")
-    app.include_router(explorer.router, prefix="/api")
-    app.include_router(analytics.router, prefix="/api")
-    app.include_router(maintenance.router, prefix="/api")
-    app.include_router(routing.router, prefix="/api")
-
-    # AUTH
-    app.include_router(auth.router, prefix="/api")
-    app.include_router(admin_auth.router, prefix="/api")
-
-    # self knowledge already contains internal prefix
-    app.include_router(self_knowledge.router)
-
-    # ========================================
-    # HEALTH
-    # ========================================
-
-    @app.get("/health")
-    def health():
-        return {
-            "status": "ok",
-            "ai_available": app.state.ai_available,
-        }
+    # ── Health Check ──────────────────────────────────────────────────────
+    @app.get("/health", tags=["Health"])
+    def health_check():
+        """Liveness probe endpoint."""
+        return {"status": "ok"}
 
     return app
 
@@ -1186,12 +1176,8 @@ def create_app() -> FastAPI:
 app = create_app()
 
 if __name__ == "__main__":
-    uvicorn.run(
-        "app.main:app",
-        host="0.0.0.0",
-        port=8000,
-        reload=False,
-    )
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=False)
+
 
 --- FILE: backend\app\__init__.py ---
 # app/__init__.py
@@ -1250,258 +1236,6 @@ __all__ = [
 
 --- FILE: backend\app\api\__init__.py ---
 
-
---- FILE: backend\app\api\routers\admin_auth.py ---
-import logging
-import httpx
-
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-
-logger = logging.getLogger(__name__)
-
-router = APIRouter(
-    prefix="/admin",
-    tags=["Admin Auth"]
-)
-
-# ========================================
-# REQUEST MODEL
-# ========================================
-
-class AdminLoginRequest(BaseModel):
-    username: str
-    password: str
-
-
-# ========================================
-# EXTERNAL API
-# ========================================
-
-BIZPORTAL_LOGIN_URL = (
-    "https://lsbizportal.lemonsquare.com.ph/"
-    "testportal/api/chatbot/admin/login"
-)
-
-
-# ========================================
-# SAFE JSON PARSER
-# ========================================
-
-def safe_json(response: httpx.Response):
-    try:
-        if not response.text:
-            return {}
-
-        return response.json()
-
-    except Exception:
-        logger.error(
-            "BizPortal returned non-JSON response"
-        )
-
-        logger.error(
-            "RAW RESPONSE: %s",
-            response.text,
-        )
-
-        return {
-            "status": "error",
-            "message": "Invalid JSON response",
-            "raw_response": response.text,
-        }
-
-
-# ========================================
-# LOGIN ROUTE
-# ========================================
-
-@router.post(
-    "/login",
-    summary="Admin login via BizPortal"
-)
-async def admin_login(
-    payload: AdminLoginRequest
-):
-
-    # ========================================
-    # VALIDATION
-    # ========================================
-
-    username = payload.username.strip()
-    password = payload.password.strip()
-
-    if not username or not password:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Username and password required"
-            ),
-        )
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=30
-        ) as client:
-
-            response = await client.post(
-                BIZPORTAL_LOGIN_URL,
-                json={
-                    "username": username,
-                    "password": password,
-                },
-                headers={
-                    "Content-Type":
-                    "application/json"
-                },
-            )
-
-        logger.info(
-            "BizPortal login status: %s",
-            response.status_code,
-        )
-
-        data = safe_json(response)
-
-        logger.info(
-            "BizPortal login response: %s",
-            data,
-        )
-
-        # ========================================
-        # HTTP FAILURE
-        # ========================================
-
-        if response.status_code != 200:
-
-            error_message = (
-                data.get("message")
-                or data.get("error")
-                or data.get("detail")
-                or "Login failed"
-            )
-
-            logger.warning(
-                "BizPortal HTTP auth failure: %s",
-                error_message,
-            )
-
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=error_message,
-            )
-
-        # ========================================
-        # LOGICAL AUTH FAILURE
-        # ========================================
-
-        # IMPORTANT:
-        # BizPortal may still return 200
-        # even when credentials are invalid.
-        #
-        # We MUST validate response content.
-
-        if isinstance(data, dict):
-
-            status = str(
-                data.get("status", "")
-            ).lower()
-
-            success = data.get("success")
-
-            message = str(
-                data.get("message", "")
-            ).lower()
-
-            # Common failure patterns
-            auth_failed = any([
-                status == "error",
-                success is False,
-                "invalid" in message,
-                "incorrect" in message,
-                "unauthorized" in message,
-                "failed" in message,
-            ])
-
-            if auth_failed:
-
-                logger.warning(
-                    "BizPortal rejected credentials."
-                )
-
-                raise HTTPException(
-                    status_code=401,
-                    detail=(
-                        data.get("message")
-                        or data.get("error")
-                        or "Invalid credentials"
-                    ),
-                )
-
-        # ========================================
-        # RESPONSE STRUCTURE VALIDATION
-        # ========================================
-
-        # IMPORTANT:
-        # Ensure actual authenticated user exists
-
-        possible_user = (
-            data.get("data")
-            or data.get("response")
-            or data
-        )
-
-        if not isinstance(possible_user, dict):
-
-            logger.warning(
-                "No valid user object returned."
-            )
-
-            raise HTTPException(
-                status_code=401,
-                detail="Authentication failed",
-            )
-
-        # ========================================
-        # SUCCESS
-        # ========================================
-
-        return {
-            "success": True,
-            "message": "Login successful",
-            "data": possible_user,
-        }
-
-    except httpx.RequestError as exc:
-
-        logger.error(
-            "Connection error: %s",
-            exc,
-            exc_info=True,
-        )
-
-        raise HTTPException(
-            status_code=503,
-            detail=(
-                "Unable to connect to BizPortal"
-            ),
-        )
-
-    except HTTPException:
-        raise
-
-    except Exception as exc:
-
-        logger.error(
-            "Unexpected login error: %s",
-            exc,
-            exc_info=True,
-        )
-
-        raise HTTPException(
-            status_code=500,
-            detail="Internal server error",
-        )
 
 --- FILE: backend\app\api\routers\analytics.py ---
 import logging
@@ -2806,11 +2540,16 @@ async def whitelist_ticket(
         work_done=original_ticket.work_done or "None"
     )
 
+<<<<<<< HEAD
+    # 4. Push it back to Qdrant (The AI's Brain)
+    await ingestion_service.process_resolved_ticket(ticket_payload)
+=======
     # 4. Push it back to Qdrant
     await ingestion_service.process_resolved_ticket(
         ticket_payload.model_dump(),
         db_chatbot
     )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     
     return {
         "status": "success", 
@@ -3872,6 +3611,20 @@ def get_all_messages(
     )
 
 
+<<<<<<< HEAD
+
+
+import json
+import httpx
+from langchain_groq import ChatGroq
+from app.core.config import settings
+
+async def draft_ticket_escalation(session_id: str, db: Session) -> dict:
+    """Step 1: Uses the AI to summarize the chat and returns the draft to the frontend."""
+    messages = get_all_messages(db, session_id)
+    if not messages:
+        raise ValueError("Chat session is empty. Nothing to escalate.")
+=======
 async def draft_ticket_escalation(
     session_id: str,
     db: Session,
@@ -3912,21 +3665,32 @@ async def draft_ticket_escalation(
         raise ValidationError(
             "Chat session is empty. Nothing to escalate."
         )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
-    transcript = "\n".join(
-        [
-            f"{msg.SenderRole.upper()}: {msg.MessageContent}"
-            for msg in messages
-        ]
-    )
+    transcript = "\n".join([f"{msg.SenderRole.upper()}: {msg.MessageContent}" for msg in messages])
 
     llm = ChatGroq(
-        model="llama-3.1-8b-instant",
+        model="llama-3.1-8b-instant", 
         temperature=0.0,
         api_key=settings.GROQ_API_KEY,
     )
-
+    
     prompt = (
+<<<<<<< HEAD
+        "You are an expert Helpdesk Dispatcher. Read the chat transcript and extract the details to create a ticket.\n"
+        "You MUST output EXACTLY a valid JSON object with these two keys: 'summary' and 'description'.\n"
+        "\n"
+        "Rules for 'summary':\n"
+        "- A short, 3 to 6 word title of the issue.\n"
+        "\n"
+        "Rules for 'description':\n"
+        "- Keep it extremely concise and natural, like a technician's log (1 to 5 sentences maximum).\n"
+        "- Use a neutral, third-person perspective. NEVER use first-person pronouns (do NOT use 'kami', 'namin', 'I', or 'we').\n"
+        "- State exactly what the reported issue is and what the AI already attempted.\n"
+        "- Match the language of the transcript perfectly.\n"
+        "\n"
+        "Do NOT include markdown formatting. Output raw JSON only.\n\n"
+=======
         "You are an expert Helpdesk Dispatcher.\n"
         "Read the chat transcript and extract the issue into a clean operational ticket.\n\n"
         "You MUST output EXACTLY a valid JSON object with these keys:\n"
@@ -3946,22 +3710,29 @@ async def draft_ticket_escalation(
         "- NEVER use first-person pronouns\n\n"
         "Do NOT include markdown.\n"
         "Output RAW JSON ONLY.\n\n"
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
         f"Transcript:\n{transcript}\n\n"
         "JSON Output:"
     )
-
+    
     result = await llm.ainvoke(prompt)
-
     raw_output = result.content.strip()
+<<<<<<< HEAD
+    
+=======
 
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     if raw_output.startswith("```json"):
         raw_output = raw_output[7:-3].strip()
-
     elif raw_output.startswith("```"):
         raw_output = raw_output[3:-3].strip()
 
     try:
         extracted_data = json.loads(raw_output)
+<<<<<<< HEAD
+    except json.JSONDecodeError:
+        raise ValueError("AI failed to generate a valid summary for the ticket.")
+=======
 
     except json.JSONDecodeError as exc:
         logger.error(
@@ -4016,6 +3787,7 @@ async def submit_ticket_escalation(
         .filter(ChatSession.SessionID == session_id)
         .first()
     )
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
 
     if not session:
         raise ValidationError(
@@ -4068,8 +3840,13 @@ async def submit_ticket_escalation(
 
     return {
         "status": "success",
+<<<<<<< HEAD
+        "summary": extracted_data.get("summary", "AI Escalation Issue"),
+        "description": extracted_data.get("description", "Escalated from AI Chatbot")
+=======
         "message": "Ticket successfully sent to live agents.",
         "bizportal_response": response.text,
+>>>>>>> c8bc4acd8d637b942594f0beb8d8dec3c07381e1
     }
 
 
@@ -6151,249 +5928,79 @@ async def fetch_user_details(auth_token: str) -> dict:
     """
     Resolve an auth token to a user details dict.
 
-    Returns a dict with at minimum:
-    - id
-    - firstname
-    - lastname
-
-    Raises:
-    - AuthenticationError
-    - ExternalServiceError
+    Returns a dict with at minimum: id, firstname, lastname.
+    Raises AuthenticationError on invalid/expired token.
+    Raises ExternalServiceError if BizPortal is unreachable.
     """
 
-    # ========================================
-    # INPUT VALIDATION
-    # ========================================
-
-    if not auth_token:
-        raise AuthenticationError("Missing authentication token.")
-
-    auth_token = str(auth_token).strip()
-
-    # ========================================
-    # TEST USER BYPASS (LOCAL DEV ONLY)
-    # ========================================
-
-    if (
-        getattr(settings, "ALLOW_TEST_AUTH", False)
-        and auth_token.startswith("TEST_USER_")
-    ):
+    # ── Test-user bypass (local dev only) ────────────────────────────────
+    if getattr(settings, "ALLOW_TEST_AUTH", False) and str(auth_token).startswith("TEST_USER_"):
         try:
-            user_id = int(auth_token.split("_")[-1])
-
+            user_id = int(str(auth_token).split("_")[-1])
         except ValueError:
-            raise AuthenticationError(
-                "Malformed test token."
-            )
-
-        logger.debug(
-            "Test-auth bypass enabled for user #%d",
-            user_id,
-        )
-
+            raise AuthenticationError("Malformed test token.")
+        logger.debug("Test-auth bypass: simulating User #%d", user_id)
         return {
             "id": user_id,
             "firstname": "Local",
             "lastname": f"Tester {user_id}",
-            "email": "",
-            "department": "Development",
-            "department_acro": "DEV",
-            "company": "1",
         }
 
-    # ========================================
-    # BIZPORTAL AUTH REQUEST
-    # ========================================
-
+    # ──  BizPortal authentication ────────────────────────────────────
     headers = {
         "Accept": "application/json",
     }
-
-    # IMPORTANT:
-    # Verify actual required parameter name.
-    #
-    # You changed this from:
-    #   token/auth_token
-    #
-    # to:
-    #   user_id
-    #
-    # This may be the REAL BREAKING CHANGE.
-    #
-    # If BizPortal actually expects:
-    #   token
-    #
-    # auth will silently fail.
-    #
-    # Keeping BOTH for compatibility.
+    
+    # NEW FIX: Using 'user_id' as the query parameter key
     params = {
         "user_id": auth_token,
-        "token": auth_token,
     }
+    
+    logger.debug("Attempting BizPortal auth call to: %s", settings.BIZPORTAL_API_URL)
 
-    logger.debug(
-        "Attempting BizPortal auth call to: %s",
-        settings.BIZPORTAL_API_URL,
-    )
-
-    logger.debug(
-        "Auth params being sent: %s",
-        params,
-    )
-
-    try:
-        async with httpx.AsyncClient(
-            timeout=getattr(
-                settings,
-                "BIZPORTAL_TIMEOUT",
-                5.0,
-            )
-        ) as client:
-
+    async with httpx.AsyncClient() as client:
+        try:
             response = await client.get(
                 settings.BIZPORTAL_API_URL,
                 headers=headers,
                 params=params,
+                timeout=getattr(settings, "BIZPORTAL_TIMEOUT", 5.0),
             )
+            logger.debug("BizPortal response status: %d", response.status_code)
+            logger.debug("BizPortal response body: %s", response.text[:200])
 
-        logger.debug(
-            "BizPortal response status: %d",
-            response.status_code,
-        )
+            if response.status_code in (401, 403):
+                logger.warning("BizPortal returned %d for token: %s", response.status_code, str(auth_token)[:10])
+                raise AuthenticationError("Invalid or expired user token.")
 
-        logger.debug(
-            "BizPortal response preview: %s",
-            response.text[:500],
-        )
-
-        # ========================================
-        # AUTH FAILURES
-        # ========================================
-
-        if response.status_code in (401, 403):
-            logger.warning(
-                "BizPortal rejected token."
-            )
-
-            raise AuthenticationError(
-                "Invalid or expired user token."
-            )
-
-        response.raise_for_status()
-
-        # ========================================
-        # SAFE JSON PARSING
-        # ========================================
-
-        try:
+            response.raise_for_status()
             user_data = response.json()
+            logger.info("BizPortal raw response: %s", user_data)
+            
+            # Check if BizPortal returned an explicitly formatted error in the response body
+            if user_data.get("status") == "error":
+                error_msg = user_data.get("response", "Unknown error")
+                logger.warning("BizPortal error response: %s", error_msg)
+                raise AuthenticationError(f"BizPortal error: {error_msg}")
+            
+            # NEW FIX: Safely extract the inner user dictionary from the "response" key
+            if user_data.get("status") == "success" and "response" in user_data:
+                final_user_dict = user_data["response"]
+                logger.info("BizPortal auth successful, extracted user_data: %s", final_user_dict)
+                return final_user_dict
+            else:
+                raise AuthenticationError("User details not found in API response format.")
 
-        except Exception:
-            logger.error(
-                "BizPortal returned invalid JSON: %s",
-                response.text[:500],
-            )
-
+        except httpx.RequestError as exc:
+            logger.error("BizPortal unreachable (RequestError): %s", exc)
             raise ExternalServiceError(
-                "Authentication service returned invalid response."
+                "User authentication service is temporarily unavailable."
             )
-
-        logger.info(
-            "BizPortal raw response: %s",
-            user_data,
-        )
-
-        # ========================================
-        # STRUCTURED ERROR RESPONSE
-        # ========================================
-
-        if (
-            isinstance(user_data, dict)
-            and user_data.get("status") == "error"
-        ):
-            error_msg = user_data.get(
-                "response",
-                "Unknown authentication error",
+        except httpx.HTTPStatusError as exc:
+            logger.error("BizPortal HTTP error: %s", exc)
+            raise ExternalServiceError(
+                "User authentication service returned an error."
             )
-
-            logger.warning(
-                "BizPortal returned error response: %s",
-                error_msg,
-            )
-
-            raise AuthenticationError(str(error_msg))
-
-        # ========================================
-        # SUCCESS RESPONSE
-        # ========================================
-
-        if (
-            isinstance(user_data, dict)
-            and user_data.get("status") == "success"
-            and "response" in user_data
-            and isinstance(user_data["response"], dict)
-        ):
-            final_user_dict = user_data["response"]
-
-            logger.info(
-                "BizPortal authentication successful."
-            )
-
-            return final_user_dict
-
-        # ========================================
-        # FALLBACK DIRECT USER OBJECT
-        # ========================================
-
-        # Some APIs return the user object directly.
-        if (
-            isinstance(user_data, dict)
-            and (
-                "firstname" in user_data
-                or "lastname" in user_data
-                or "id" in user_data
-            )
-        ):
-            logger.info(
-                "Detected direct user object response."
-            )
-
-            return user_data
-
-        # ========================================
-        # UNKNOWN RESPONSE FORMAT
-        # ========================================
-
-        logger.error(
-            "Unexpected BizPortal response structure: %s",
-            user_data,
-        )
-
-        raise AuthenticationError(
-            "User details not found in API response."
-        )
-
-    except httpx.RequestError as exc:
-        logger.error(
-            "BizPortal unreachable: %s",
-            exc,
-            exc_info=True,
-        )
-
-        raise ExternalServiceError(
-            "User authentication service is temporarily unavailable."
-        )
-
-    except httpx.HTTPStatusError as exc:
-        logger.error(
-            "BizPortal HTTP error: %s",
-            exc,
-            exc_info=True,
-        )
-
-        raise ExternalServiceError(
-            "User authentication service returned an error."
-        )
 
 --- FILE: backend\app\services\__init__.py ---
 

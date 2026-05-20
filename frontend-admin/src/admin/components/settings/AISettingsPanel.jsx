@@ -5,9 +5,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react"
 
-import {
-  useAISettings,
-} from "../../hooks/useAISettings"
+import { useAISettings } from "../../hooks/useAISettings"
 
 import {
   llmOptions,
@@ -15,102 +13,26 @@ import {
   rerankerModels,
 } from "../../data/aiModels"
 
-import SettingsInput
-  from "./SettingsInput"
+import SettingsInput from "./SettingsInput"
+import SettingsSelect from "./SettingsSelect"
+import SettingsToggle from "./SettingsToggle"
+import SettingsTextarea from "./SettingsTextarea"
+import SettingsActions from "./SettingsActions"
 
-import SettingsSelect
-  from "./SettingsSelect"
-
-import SettingsToggle
-  from "./SettingsToggle"
-
-import SettingsTextarea
-  from "./SettingsTextarea"
-
-import SettingsActions
-  from "./SettingsActions"
-
-const ConfigCard = ({
-  title,
-  description,
-  icon: Icon,
-  children,
-}) => {
-
+/* ========================================
+   CONFIG CARD (UNCHANGED UI)
+======================================== */
+const ConfigCard = ({ title, description, icon: Icon, children }) => {
   return (
-    <div
-      className="
-        rounded-[30px]
-
-        border
-        border-[#26342f]
-
-        bg-[#101715]/95
-
-        p-6
-
-        shadow-[0_0_0_1px_rgba(255,255,255,0.02)]
-
-        backdrop-blur-xl
-      "
-    >
-      {/* HEADER */}
-      <div
-        className="
-          mb-6
-
-          flex
-          items-start
-          gap-4
-        "
-      >
-        <div
-          className="
-            flex
-            h-12
-            w-12
-            shrink-0
-            items-center
-            justify-center
-
-            rounded-2xl
-
-            bg-[#f5d547]/10
-          "
-        >
-          <Icon
-            className="
-              h-5
-              w-5
-
-              text-[#f5d547]
-            "
-          />
+    <div className="rounded-[30px] border border-[#26342f] bg-[#101715]/95 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-xl">
+      <div className="mb-6 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f5d547]/10">
+          <Icon className="h-5 w-5 text-[#f5d547]" />
         </div>
 
         <div>
-          <h3
-            className="
-              text-lg
-              font-semibold
-
-              text-white
-            "
-          >
-            {title}
-          </h3>
-
-          <p
-            className="
-              mt-1
-
-              text-sm
-
-              text-[#8ea59b]
-            "
-          >
-            {description}
-          </p>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="mt-1 text-sm text-[#8ea59b]">{description}</p>
         </div>
       </div>
 
@@ -120,70 +42,37 @@ const ConfigCard = ({
 }
 
 const AISettingsPanel = () => {
+  const { loading, saving, success, error, settings, update, saveSettings } =
+    useAISettings()
 
-  const {
-    loading,
-    saving,
-
-    success,
-    error,
-
-    settings,
-
-    update,
-
-    saveSettings,
-  } = useAISettings()
-
+  /* ========================================
+     LOADING STATE
+  ======================================== */
   if (loading) {
-
     return (
-      <div
-        className="
-          flex
-          items-center
-          justify-center
-
-          rounded-[32px]
-
-          border
-          border-[#26342f]
-
-          bg-[#101715]/95
-
-          p-16
-        "
-      >
-        <LoaderCircle
-          className="
-            h-8
-            w-8
-            animate-spin
-
-            text-[#f5d547]
-          "
-        />
+      <div className="flex items-center justify-center rounded-[32px] border border-[#26342f] bg-[#101715]/95 p-16">
+        <LoaderCircle className="h-8 w-8 animate-spin text-[#f5d547]" />
       </div>
     )
   }
+
+  /* ========================================
+     SAFE UPDATE HELPER (CLEANER HANDLERS)
+  ======================================== */
+  const bind = (key) => (value) => update(key, value)
 
   return (
     <div
       className="
         mx-auto
-
         flex
         h-full
         w-full
         max-w-[1700px]
         flex-col
-
         gap-6
-
         overflow-y-auto
-
         pr-2
-
         [scrollbar-width:none]
         [&::-webkit-scrollbar]:hidden
       "
@@ -192,285 +81,98 @@ const AISettingsPanel = () => {
       <ConfigCard
         title="AI Configuration"
         description="Manage retrieval, reranking, embeddings, and response behavior."
-
         icon={BrainCircuit}
       >
-        <div
-          className="
-            grid
-            gap-5
-
-            xl:grid-cols-2
-          "
-        >
-          {/* REFORMULATOR */}
+        <div className="grid gap-5 xl:grid-cols-2">
           <SettingsSelect
             label="Reformulator Model"
-
-            value={
-              settings.ReformulatorModel
-            }
-
-            onChange={(e) =>
-              update(
-                "ReformulatorModel",
-                e.target.value
-              )
-            }
-
+            value={settings.ReformulatorModel}
+            onChange={(e) => bind("ReformulatorModel")(e.target.value)}
             options={llmOptions}
           />
 
-          {/* EMBEDDING */}
           <SettingsSelect
             label="Embedding Model"
-
-            warning={`
-Changing the embedding model may invalidate
-existing vector embeddings and retrieval results.
-A full document and ticket re-index may be required.
-`}
-
-            value={
-              settings.EmbeddingModel
-            }
-
-            onChange={(e) =>
-              update(
-                "EmbeddingModel",
-                e.target.value
-              )
-            }
-
-            options={
-              embeddingModels
-            }
+            warning="Changing the embedding model may invalidate existing vector embeddings and retrieval results. A full re-index may be required."
+            value={settings.EmbeddingModel}
+            onChange={(e) => bind("EmbeddingModel")(e.target.value)}
+            options={embeddingModels}
           />
 
-          {/* RERANKER */}
           <SettingsSelect
             label="Reranker Model"
-
-            value={
-              settings.RerankerModel
-            }
-
-            onChange={(e) =>
-              update(
-                "RerankerModel",
-                e.target.value
-              )
-            }
-
-            options={
-              rerankerModels
-            }
+            value={settings.RerankerModel}
+            onChange={(e) => bind("RerankerModel")(e.target.value)}
+            options={rerankerModels}
           />
 
-          {/* TEMP */}
           <SettingsInput
             type="number"
-
             step="0.1"
-
             min="0"
             max="2"
-
             label="Temperature"
-
-            value={
-              settings.Temperature
-            }
-
-            onChange={(e) =>
-              update(
-                "Temperature",
-
-                Number(
-                  e.target.value
-                )
-              )
-            }
+            value={settings.Temperature}
+            onChange={(e) => bind("Temperature")(Number(e.target.value))}
           />
 
-          {/* TOP K */}
           <SettingsInput
             type="number"
-
             min="1"
             max="50"
-
             label="Top K Tickets"
-
-            value={
-              settings.TopK_Tickets
-            }
-
-            onChange={(e) =>
-              update(
-                "TopK_Tickets",
-
-                Number(
-                  e.target.value
-                )
-              )
-            }
+            value={settings.TopK_Tickets}
+            onChange={(e) => bind("TopK_Tickets")(Number(e.target.value))}
           />
 
-          {/* CONFIDENCE */}
           <SettingsInput
             type="number"
-
             step="0.01"
-
             min="0"
             max="1"
-
             label="Confidence Threshold"
-
-            value={
-              settings.ConfidenceThreshold
-            }
-
+            value={settings.ConfidenceThreshold}
             onChange={(e) =>
-              update(
-                "ConfidenceThreshold",
-
-                Number(
-                  e.target.value
-                )
-              )
+              bind("ConfidenceThreshold")(Number(e.target.value))
             }
           />
         </div>
       </ConfigCard>
 
-      {/* TOGGLES */}
+      {/* RETRIEVAL CONTROLS */}
       <ConfigCard
         title="Retrieval Controls"
         description="Enable or disable advanced AI processing modules."
-
         icon={SlidersHorizontal}
       >
-        <div
-          className="
-            grid
-            gap-5
-
-            xl:grid-cols-2
-          "
-        >
-          {/* REFORMULATOR */}
-          <div
-            className="
-              flex
-              items-center
-              justify-between
-
-              rounded-3xl
-
-              border
-              border-[#293731]
-
-              bg-[#141d1a]
-
-              p-5
-            "
-          >
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
             <div>
-              <p
-                className="
-                  text-sm
-                  font-semibold
-
-                  text-white
-                "
-              >
+              <p className="text-sm font-semibold text-white">
                 Use Reformulator
               </p>
-
-              <p
-                className="
-                  mt-1
-
-                  text-xs
-
-                  text-[#7e938a]
-                "
-              >
-                Enable intelligent
-                query reformulation.
+              <p className="mt-1 text-xs text-[#7e938a]">
+                Enable intelligent query reformulation.
               </p>
             </div>
 
             <SettingsToggle
-              value={
-                settings.UseReformulator
-              }
-
-              onChange={(value) =>
-                update(
-                  "UseReformulator",
-                  value
-                )
-              }
+              value={settings.UseReformulator}
+              onChange={bind("UseReformulator")}
             />
           </div>
 
-          {/* RERANKER */}
-          <div
-            className="
-              flex
-              items-center
-              justify-between
-
-              rounded-3xl
-
-              border
-              border-[#293731]
-
-              bg-[#141d1a]
-
-              p-5
-            "
-          >
+          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
             <div>
-              <p
-                className="
-                  text-sm
-                  font-semibold
-
-                  text-white
-                "
-              >
-                Use Reranker
-              </p>
-
-              <p
-                className="
-                  mt-1
-
-                  text-xs
-
-                  text-[#7e938a]
-                "
-              >
-                Improve response
-                relevance scoring.
+              <p className="text-sm font-semibold text-white">Use Reranker</p>
+              <p className="mt-1 text-xs text-[#7e938a]">
+                Improve response relevance scoring.
               </p>
             </div>
 
             <SettingsToggle
-              value={
-                settings.UseReranker
-              }
-
-              onChange={(value) =>
-                update(
-                  "UseReranker",
-                  value
-                )
-              }
+              value={settings.UseReranker}
+              onChange={bind("UseReranker")}
             />
           </div>
         </div>
@@ -480,87 +182,36 @@ A full document and ticket re-index may be required.
       <ConfigCard
         title="Prompt Engineering"
         description="Configure system prompts and retrieval behavior."
-
         icon={Sparkles}
       >
         <div className="space-y-5">
-
-          {/* SYSTEM PROMPT */}
           <SettingsTextarea
             rows={7}
-
             label="System Prompt"
-
-            value={
-              settings.SystemPrompt
-            }
-
-            onChange={(e) =>
-              update(
-                "SystemPrompt",
-                e.target.value
-              )
-            }
+            value={settings.SystemPrompt}
+            onChange={(e) => bind("SystemPrompt")(e.target.value)}
           />
 
-          {/* REFORMULATOR PROMPT */}
           <SettingsTextarea
             rows={5}
-
             label="Reformulator Prompt"
-
-            value={
-              settings.ReformulatorPrompt
-            }
-
-            onChange={(e) =>
-              update(
-                "ReformulatorPrompt",
-                e.target.value
-              )
-            }
+            value={settings.ReformulatorPrompt}
+            onChange={(e) => bind("ReformulatorPrompt")(e.target.value)}
           />
 
-          {/* CHAT EXTRACTION PROMPT */}
           <SettingsTextarea
             rows={5}
-
             label="Chat Extraction Prompt"
-
-            placeholder="
-Extract concise issue details, intent,
-priority, affected systems, and important
-technical context from user conversations.
-            "
-
-            value={
-              settings.ChatExtractionPrompt
-            }
-
-            onChange={(e) =>
-              update(
-                "ChatExtractionPrompt",
-                e.target.value
-              )
-            }
+            placeholder="Extract concise issue details, intent, priority, affected systems, and important technical context from user conversations."
+            value={settings.ChatExtractionPrompt}
+            onChange={(e) => bind("ChatExtractionPrompt")(e.target.value)}
           />
 
-          {/* ALLOWED CATEGORIES */}
           <SettingsTextarea
             rows={4}
-
             label="Allowed Categories"
-
-            value={
-              settings.AllowedCategories
-            }
-
-            onChange={(e) =>
-              update(
-                "AllowedCategories",
-                e.target.value
-              )
-            }
+            value={settings.AllowedCategories}
+            onChange={(e) => bind("AllowedCategories")(e.target.value)}
           />
         </div>
       </ConfigCard>
@@ -570,7 +221,6 @@ technical context from user conversations.
         saving={saving}
         success={success}
         error={error}
-
         onSave={saveSettings}
       />
     </div>
