@@ -40,6 +40,11 @@ export const useFileUpload =
     const mountedRef =
       useRef(true)
 
+    const rawFilesRef =
+      useRef(
+        new Map()
+      )
+
     /* =========================================
        INITIAL CACHE HYDRATION
     ========================================= */
@@ -53,30 +58,58 @@ export const useFileUpload =
        STATE
     ========================================= */
 
-    const [uploadedFiles, setUploadedFiles] =
-      useState(
-        initialUploads
-      )
+    const [
+      uploadedFiles,
+      setUploadedFiles,
+    ] = useState(
+      initialUploads
+    )
 
-    const [currentPage, setCurrentPage] =
-      useState(1)
+    const [
+      currentPage,
+      setCurrentPage,
+    ] = useState(1)
 
-    const [hasPendingUploads, setHasPendingUploads] =
-      useState(() =>
+    const [
+      hasPendingUploads,
+      setHasPendingUploads,
+    ] = useState(
+      () =>
         initialUploads.some(
           (file) =>
             file.statusType ===
             "pending"
         )
-      )
+    )
 
     const [
       selectedCategory,
       setSelectedCategory,
     ] = useState("")
 
-    const [categories, setCategories] =
-      useState([])
+    const [
+      categories,
+      setCategories,
+    ] = useState([])
+
+    /* =========================================
+       CACHE SANITIZER
+    ========================================= */
+
+    const sanitizeForCache =
+      useCallback(
+        (files) => {
+
+          return files.map(
+            ({
+              raw,
+              ...safeFile
+            }) =>
+              safeFile
+          )
+        },
+        []
+      )
 
     /* =========================================
        CACHE SYNC
@@ -88,10 +121,12 @@ export const useFileUpload =
 
           setCachedData(
             UPLOAD_CACHE_KEY,
-            files
+            sanitizeForCache(
+              files
+            )
           )
         },
-        []
+        [sanitizeForCache]
       )
 
     /* =========================================
@@ -106,7 +141,9 @@ export const useFileUpload =
       const unsubscribe =
         subscribeCache(
           UPLOAD_CACHE_KEY,
-          (updatedFiles) => {
+          (
+            updatedFiles
+          ) => {
 
             if (
               !mountedRef.current
@@ -121,13 +158,29 @@ export const useFileUpload =
                 ? updatedFiles
                 : []
 
+            const hydrated =
+              safe.map(
+                (
+                  file
+                ) => ({
+                  ...file,
+
+                  raw:
+                    rawFilesRef.current.get(
+                      file.id
+                    ) || null,
+                })
+              )
+
             setUploadedFiles(
-              safe
+              hydrated
             )
 
             setHasPendingUploads(
-              safe.some(
-                (file) =>
+              hydrated.some(
+                (
+                  file
+                ) =>
                   file.statusType ===
                   "pending"
               )
@@ -163,13 +216,18 @@ export const useFileUpload =
               settings?.AllowedCategories
                 ?.split(",")
 
-                ?.map((item) =>
-                  item.trim()
+                ?.map(
+                  (
+                    item
+                  ) =>
+                    item.trim()
                 )
 
                 ?.filter(Boolean) || []
 
-            setCategories(parsed)
+            setCategories(
+              parsed
+            )
 
           } catch (error) {
 
@@ -190,7 +248,9 @@ export const useFileUpload =
 
     const formatSize =
       useCallback(
-        (size) =>
+        (
+          size
+        ) =>
           `${(
             size /
             1024 /
@@ -211,11 +271,15 @@ export const useFileUpload =
         ) => {
 
           setUploadedFiles(
-            (prev) => {
+            (
+              prev
+            ) => {
 
               const updated =
                 prev.map(
-                  (file) =>
+                  (
+                    file
+                  ) =>
                     file.id === id
                       ? {
                           ...file,
@@ -241,11 +305,15 @@ export const useFileUpload =
 
     const refreshPendingState =
       useCallback(
-        (files) => {
+        (
+          files
+        ) => {
 
           const hasPending =
             files.some(
-              (file) =>
+              (
+                file
+              ) =>
                 file.statusType ===
                 "pending"
             )
@@ -264,6 +332,8 @@ export const useFileUpload =
     const clearFiles =
       useCallback(
         () => {
+
+          rawFilesRef.current.clear()
 
           setUploadedFiles([])
 
@@ -292,6 +362,15 @@ export const useFileUpload =
 
           try {
 
+            if (
+              !file
+            ) {
+
+              throw new Error(
+                "Original file reference is missing."
+              )
+            }
+
             const data =
               await uploadDocument(
                 file,
@@ -319,15 +398,40 @@ export const useFileUpload =
               error
             )
 
+            const message =
+              String(
+                error?.message ||
+                ""
+              ).toLowerCase()
+
+            /*
+              DUPLICATE FILE HANDLING
+            */
+
+            const alreadyExists =
+              message.includes(
+                "already"
+              ) ||
+              message.includes(
+                "exists"
+              ) ||
+              message.includes(
+                "duplicate"
+              )
+
             updateFile(
               localId,
               {
                 status:
-                  error.message ||
-                  "Upload Failed",
+                  alreadyExists
+                    ? "Already Exists"
+                    : error.message ||
+                      "Upload Failed",
 
                 statusType:
-                  "error",
+                  alreadyExists
+                    ? "warning"
+                    : "error",
               }
             )
           }
@@ -356,7 +460,9 @@ export const useFileUpload =
 
             const pending =
               uploadedFiles.filter(
-                (file) =>
+                (
+                  file
+                ) =>
                   file.statusType ===
                   "pending"
               )
@@ -373,7 +479,9 @@ export const useFileUpload =
 
             await Promise.all(
               pending.map(
-                async (file) => {
+                async (
+                  file
+                ) => {
 
                   updateFile(
                     file.id,
@@ -388,7 +496,9 @@ export const useFileUpload =
 
                   await uploadFile(
                     file.id,
-                    file.raw,
+                    rawFilesRef.current.get(
+                      file.id
+                    ),
                     file.category
                   )
                 }
@@ -401,11 +511,17 @@ export const useFileUpload =
               false
 
             setUploadedFiles(
-              (prev) => {
+              (
+                prev
+              ) => {
 
-                refreshPendingState(prev)
+                refreshPendingState(
+                  prev
+                )
 
-                syncCache(prev)
+                syncCache(
+                  prev
+                )
 
                 return prev
               }
@@ -427,13 +543,17 @@ export const useFileUpload =
 
     const handleFiles =
       useCallback(
-        (files) => {
+        (
+          files
+        ) => {
 
           const validFiles =
             Array.from(
               files
             ).filter(
-              (file) =>
+              (
+                file
+              ) =>
                 file.name
                   .toLowerCase()
                   .endsWith(
@@ -442,7 +562,8 @@ export const useFileUpload =
             )
 
           if (
-            validFiles.length === 0
+            validFiles.length ===
+            0
           ) {
             return
           }
@@ -451,56 +572,72 @@ export const useFileUpload =
             validFiles.map(
               (
                 file
-              ) => ({
-                id:
-                  crypto.randomUUID(),
+              ) => {
 
-                raw:
-                  file,
+                const id =
+                  crypto.randomUUID()
 
-                name:
-                  file.name,
+                rawFilesRef.current.set(
+                  id,
+                  file
+                )
 
-                size:
-                  formatSize(
-                    file.size
-                  ),
+                return {
+                  id,
 
-                type:
-                  file.name
-                    .split(".")
-                    .pop()
-                    ?.toUpperCase(),
+                  raw:
+                    file,
 
-                category:
-                  selectedCategory,
+                  name:
+                    file.name,
 
-                status:
-                  "Pending",
+                  size:
+                    formatSize(
+                      file.size
+                    ),
 
-                statusType:
-                  "pending",
+                  type:
+                    file.name
+                      .split(".")
+                      .pop()
+                      ?.toUpperCase(),
 
-                uploadedAt:
-                  new Date()
-                    .toLocaleString(),
-              })
+                  category:
+                    selectedCategory,
+
+                  status:
+                    "Pending",
+
+                  statusType:
+                    "pending",
+
+                  uploadedAt:
+                    new Date()
+                      .toLocaleString(),
+                }
+              }
             )
 
           setUploadedFiles(
-            (prev) => {
+            (
+              prev
+            ) => {
 
               const existingNames =
                 new Set(
                   prev.map(
-                    (file) =>
+                    (
+                      file
+                    ) =>
                       file.name
                   )
                 )
 
               const deduplicated =
                 mapped.filter(
-                  (file) =>
+                  (
+                    file
+                  ) =>
                     !existingNames.has(
                       file.name
                     )
@@ -534,7 +671,9 @@ export const useFileUpload =
 
     const handleInputChange =
       useCallback(
-        (event) => {
+        (
+          event
+        ) => {
 
           handleFiles(
             event.target.files
@@ -548,12 +687,15 @@ export const useFileUpload =
 
     const handleDrop =
       useCallback(
-        (event) => {
+        (
+          event
+        ) => {
 
           event.preventDefault()
 
           handleFiles(
-            event.dataTransfer
+            event
+              .dataTransfer
               .files
           )
         },
@@ -562,14 +704,24 @@ export const useFileUpload =
 
     const removeFile =
       useCallback(
-        (id) => {
+        (
+          id
+        ) => {
+
+          rawFilesRef.current.delete(
+            id
+          )
 
           setUploadedFiles(
-            (prev) => {
+            (
+              prev
+            ) => {
 
               const updated =
                 prev.filter(
-                  (file) =>
+                  (
+                    file
+                  ) =>
                     file.id !== id
                 )
 
@@ -592,14 +744,15 @@ export const useFileUpload =
       )
 
     const showTable =
-      uploadedFiles.length > 0
+      uploadedFiles.length >
+      0
 
     const totalPages =
       Math.max(
         1,
         Math.ceil(
           uploadedFiles.length /
-          ITEMS_PER_PAGE
+            ITEMS_PER_PAGE
         )
       )
 
@@ -649,5 +802,6 @@ export const useFileUpload =
 
       setCurrentPage,
     }
-
   }
+
+export default useFileUpload

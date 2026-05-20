@@ -5,7 +5,7 @@
 */
 
 const ENV = {
-  // 🚨 IMPORTANT FIX:
+  // 🚨 IMPORTANT FIX:  
   // REMOVE /api from BASE URL to prevent /api/api duplication
   API_BASE_URL:
     import.meta.env.VITE_API_BASE_URL ||
@@ -27,7 +27,7 @@ const ENV = {
 export const API_CONFIG = {
   BASE_URL: ENV.API_BASE_URL.replace(/\/$/, ""),
 
-  TIMEOUT: 30000,
+  TIMEOUT: 300000,
 
   CACHE_DURATION: 1000 * 20,
   POLLING_INTERVAL: 1000 * 15,

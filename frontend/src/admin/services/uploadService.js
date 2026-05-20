@@ -97,6 +97,18 @@ const uploadRequest =
             method:
               "POST",
 
+            /*
+              IMPORTANT FIX:
+              DO NOT manually set
+              Content-Type for FormData.
+
+              Browser automatically injects:
+              multipart/form-data; boundary=...
+
+              Setting JSON headers here causes:
+              422 Unprocessable Entity
+            */
+
             body:
               formData,
 
@@ -147,10 +159,17 @@ const uploadRequest =
       if (!response.ok) {
 
         const errorMessage =
-          responseData?.error ||
-          responseData?.detail ||
-          responseData?.message ||
-          `Upload failed with status ${response.status}`
+          typeof responseData?.detail ===
+          "string"
+            ? responseData.detail
+            : responseData?.error ||
+              responseData?.message ||
+              `Upload failed with status ${response.status}`
+
+        console.error(
+          "UPLOAD_BACKEND_ERROR",
+          responseData
+        )
 
         throw new Error(
           errorMessage
@@ -217,7 +236,10 @@ export const uploadDocument =
       file
     )
 
-    if (category) {
+    if (
+      category &&
+      String(category).trim()
+    ) {
 
       formData.append(
         "category",

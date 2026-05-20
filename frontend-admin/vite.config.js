@@ -10,18 +10,26 @@ export default defineConfig({
 
     proxy: {
       // ================================
-      // IMPORTANT FIX
+      // API ROUTES
       // ================================
-      // Ensures ALL /api requests go to FastAPI backend
-      // Prevents CORS issues in development
-      // Prevents hardcoded localhost fetch calls from breaking
+
       "/api": {
         target: "http://localhost:8000",
         changeOrigin: true,
         secure: false,
 
-        // IMPORTANT: DO NOT rewrite /api
-        // backend already expects /api prefix
+        rewrite: (path) => path,
+      },
+
+      // ================================
+      // SELF KNOWLEDGE ROUTES
+      // ================================
+
+      "/self_knowledge": {
+        target: "http://localhost:8000",
+        changeOrigin: true,
+        secure: false,
+
         rewrite: (path) => path,
       },
     },

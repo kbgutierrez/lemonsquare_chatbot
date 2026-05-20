@@ -7,21 +7,37 @@ import { API_CONFIG } from "../config/sqlVariables"
   - NO double prefixing anywhere
 */
 
-const REQUEST_TIMEOUT = API_CONFIG.TIMEOUT || 30000
+const REQUEST_TIMEOUT =
+  API_CONFIG.TIMEOUT || 30000
 
-const responseCache = new Map()
-const pendingRequests = new Map()
+const responseCache =
+  new Map()
+
+const pendingRequests =
+  new Map()
 
 /* ========================================
-   BUILD URL (FIXED — NO DOUBLE /api)
+   BUILD URL
 ======================================== */
 
-export const buildApiUrl = (endpoint, params = {}) => {
-  let url = endpoint // ✅ IMPORTANT: DO NOT prepend /api again
+export const buildApiUrl = (
+  endpoint,
+  params = {}
+) => {
 
-  Object.entries(params).forEach(([key, value]) => {
-    url = url.replace(`:${key}`, encodeURIComponent(value))
-  })
+  let url = endpoint
+
+  Object.entries(params)
+    .forEach(
+      ([key, value]) => {
+
+        url =
+          url.replace(
+            `:${key}`,
+            encodeURIComponent(value)
+          )
+      }
+    )
 
   return url
 }
@@ -30,98 +46,281 @@ export const buildApiUrl = (endpoint, params = {}) => {
    CORE REQUEST
 ======================================== */
 
-const request = async ({
-  endpoint,
-  method = "GET",
-  body,
-  headers = {},
-  isFormData = false,
-}) => {
-  const controller = new AbortController()
+const request =
+  async ({
+    endpoint,
+    method = "GET",
+    body,
+    headers = {},
+    isFormData = false,
+  }) => {
 
-  const timeout = setTimeout(
-    () => controller.abort(),
-    REQUEST_TIMEOUT
-  )
+    const controller =
+      new AbortController()
 
-  try {
-    console.log("API_REQUEST:", method, endpoint)
+    const timeout =
+      setTimeout(
+        () =>
+          controller.abort(),
+        REQUEST_TIMEOUT
+      )
 
-    // ✅ FINAL FIX: use endpoint directly (VITE handles /api)
-    const url = buildApiUrl(endpoint)
-
-    const response = await fetch(url, {
-      method,
-      signal: controller.signal,
-
-      headers: isFormData
-        ? headers
-        : {
-            ...API_CONFIG.HEADERS,
-            ...headers,
-          },
-
-      body: body
-        ? isFormData
-          ? body
-          : JSON.stringify(body)
-        : undefined,
-    })
-
-    const text = await response.text()
-
-    let data = null
     try {
-      data = text ? JSON.parse(text) : null
-    } catch {
-      data = text
-    }
 
-    if (!response.ok) {
-      throw new Error(
-        data?.detail ||
-        data?.message ||
-        `Request failed (${response.status})`
+      console.log(
+        "API_REQUEST:",
+        method,
+        endpoint
+      )
+
+      const url =
+        buildApiUrl(
+          endpoint
+        )
+
+      const finalHeaders =
+        isFormData
+          ? headers
+          : {
+              ...API_CONFIG.HEADERS,
+              ...headers,
+            }
+
+      const response =
+        await fetch(
+          url,
+          {
+            method,
+
+            signal:
+              controller.signal,
+
+            headers:
+              finalHeaders,
+
+            body:
+              body
+                ? isFormData
+                  ? body
+                  : JSON.stringify(
+                      body
+                    )
+                : undefined,
+          }
+        )
+
+      const rawText =
+        await response.text()
+
+      console.log(
+        "API_RESPONSE_STATUS:",
+        response.status
+      )
+
+      console.log(
+        "API_RESPONSE_RAW:",
+        rawText
+      )
+
+      let data = null
+
+      try {
+
+        data =
+          rawText
+            ? JSON.parse(
+                rawText
+              )
+            : null
+
+      } catch {
+
+        data = rawText
+      }
+
+      if (!response.ok) {
+
+        console.error(
+          "API_RESPONSE_ERROR:",
+          data
+        )
+
+        let errorMessage =
+          `Request failed (${response.status})`
+
+        /* ========================================
+           FASTAPI VALIDATION ARRAY
+        ======================================== */
+
+        if (
+          Array.isArray(
+            data?.detail
+          )
+        ) {
+
+          errorMessage =
+            data.detail
+              .map(
+                (
+                  item
+                ) =>
+                  item?.msg
+              )
+              .filter(Boolean)
+              .join(", ")
+
+        }
+
+        /* ========================================
+           FASTAPI STRING DETAIL
+        ======================================== */
+
+        else if (
+          typeof data?.detail ===
+          "string"
+        ) {
+
+          errorMessage =
+            data.detail
+        }
+
+        /* ========================================
+           CUSTOM BACKEND ERROR
+        ======================================== */
+
+        else if (
+          typeof data?.error ===
+          "string"
+        ) {
+
+          errorMessage =
+            data.error
+        }
+
+        /* ========================================
+           GENERIC MESSAGE
+        ======================================== */
+
+        else if (
+          data?.message
+        ) {
+
+          errorMessage =
+            data.message
+        }
+
+        throw new Error(
+          errorMessage
+        )
+      }
+
+      return data
+
+    } catch (err) {
+
+      if (
+        err.name ===
+        "AbortError"
+      ) {
+
+        throw new Error(
+          "Request timeout"
+        )
+      }
+
+      if (
+        err instanceof
+        TypeError
+      ) {
+
+        throw new Error(
+          "Unable to connect to backend server"
+        )
+      }
+
+      throw err
+
+    } finally {
+
+      clearTimeout(
+        timeout
       )
     }
-
-    return data
-
-  } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error("Request timeout")
-    }
-
-    if (err instanceof TypeError) {
-      throw new Error("Unable to connect to backend server")
-    }
-
-    throw err
-
-  } finally {
-    clearTimeout(timeout)
   }
-}
 
 /* ========================================
    API CLIENT
 ======================================== */
 
 export const apiClient = {
-  get: (e, o) =>
-    request({ endpoint: e, method: "GET", ...o }),
+  get: (
+    endpoint,
+    options
+  ) =>
+    request({
+      endpoint,
+      method: "GET",
+      ...options,
+    }),
 
-  post: (e, b, o) =>
-    request({ endpoint: e, method: "POST", body: b, ...o }),
+  post: (
+    endpoint,
+    body,
+    options
+  ) =>
+    request({
+      endpoint,
+      method: "POST",
+      body,
+      ...options,
+    }),
 
-  put: (e, b, o) =>
-    request({ endpoint: e, method: "PUT", body: b, ...o }),
+  put: (
+    endpoint,
+    body,
+    options
+  ) =>
+    request({
+      endpoint,
+      method: "PUT",
+      body,
+      ...options,
+    }),
 
-  patch: (e, b, o) =>
-    request({ endpoint: e, method: "PATCH", body: b, ...o }),
+  patch: (
+    endpoint,
+    body,
+    options
+  ) =>
+    request({
+      endpoint,
+      method: "PATCH",
+      body,
+      ...options,
+    }),
 
-  delete: (e, o) =>
-    request({ endpoint: e, method: "DELETE", ...o }),
+  delete: (
+    endpoint,
+    options
+  ) =>
+    request({
+      endpoint,
+      method: "DELETE",
+      ...options,
+    }),
+
+  upload: (
+    endpoint,
+    formData,
+    options = {}
+  ) =>
+    request({
+      endpoint,
+      method: "POST",
+      body: formData,
+      isFormData: true,
+      ...options,
+    }),
 }
 
 export default apiClient

@@ -8,7 +8,6 @@ import {
 } from "framer-motion"
 
 import {
-  Pencil,
   Trash2,
   AlertTriangle,
   X,
@@ -21,7 +20,6 @@ import {
 const ResolvedChatCard = ({
   item,
   index,
-  onEdit,
   onDelete,
 }) => {
 
@@ -169,48 +167,6 @@ const ResolvedChatCard = ({
 
           {/* ACTIONS */}
           <div className="flex items-center gap-2">
-
-            {/* EDIT */}
-            <motion.button
-              whileHover={{
-                scale: 1.05,
-              }}
-
-              whileTap={{
-                scale: 0.95,
-              }}
-
-              onClick={() =>
-                onEdit(item)
-              }
-
-              className="
-                flex
-                items-center
-                gap-2
-
-                rounded-xl
-
-                border
-                border-[#2b3934]
-
-                bg-[#202b27]
-
-                px-3
-                py-2
-
-                text-sm
-                text-white
-
-                transition-all
-
-                hover:border-[#f5d547]/20
-                hover:bg-[#2b3934]
-              "
-            >
-              <Pencil className="h-4 w-4" />
-              Edit
-            </motion.button>
 
             {/* DELETE */}
             <motion.button

@@ -95,7 +95,7 @@ export const useResolvedChats =
                 (item) => {
 
                   if (
-                    item.session_id ===
+                    item.id ===
                     sessionId
                   ) {
 
@@ -123,6 +123,16 @@ export const useResolvedChats =
                   sessionId,
                 }
               )
+
+            console.log(
+              "UPDATE_SESSION_ID:",
+              sessionId
+            )
+
+            console.log(
+              "UPDATE_ENDPOINT:",
+              endpoint
+            )
 
             await apiClient.put(
               endpoint,
@@ -173,18 +183,9 @@ export const useResolvedChats =
 
           try {
 
-            const optimistic =
-              items.filter(
-                (item) =>
-                  item.session_id !==
-                  sessionId
-              )
-
-            /* OPTIMISTIC CACHE */
-
-            setCachedData(
-              CACHE_KEY,
-              optimistic
+            console.log(
+              "DELETE_SESSION_ID:",
+              sessionId
             )
 
             const endpoint =
@@ -194,6 +195,25 @@ export const useResolvedChats =
                   sessionId,
                 }
               )
+
+            console.log(
+              "DELETE_ENDPOINT:",
+              endpoint
+            )
+
+            const optimistic =
+              items.filter(
+                (item) =>
+                  item.id !==
+                  sessionId
+              )
+
+            /* OPTIMISTIC CACHE */
+
+            setCachedData(
+              CACHE_KEY,
+              optimistic
+            )
 
             await apiClient.delete(
               endpoint
