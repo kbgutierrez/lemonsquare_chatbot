@@ -25,6 +25,7 @@ from app.schemas.chat import (
     ChatSessionMetaResponse,
     MessageRecord,
     ResolveChatResponse,
+    ResolutionCheckResponse,
 )
 from app.schemas.tickets import (
     TicketDraftResponse,
@@ -38,6 +39,8 @@ from app.services.external.user_service import fetch_user_details
 from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
+from app.services.resolution.conversation_resolver import ConversationResolutionService
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -91,10 +94,20 @@ async def handle_chat(
         content=ai_response,
     )
 
+    # ---Run the Conversation Resolution Analyzer ---
+    resolver = ConversationResolutionService(db)
+    resolution_data = await resolver.analyze_conversation(
+        user_query=chat_request.message,
+        ai_response=ai_response,
+        chat_history=history_text
+    )
+
     return ChatResponse(
         session_id=session_id,
         response=ai_response,
         ticket_ids_used=ticket_ids,
+        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
     )
 
 
@@ -267,3 +280,39 @@ def clear_all_user_chats(
         "status": "success",
         "message": f"Successfully cleared {count} chat sessions.",
     }
+
+
+
+from app.services.resolution.conversation_resolver import ConversationResolutionService
+
+@router.get("/{session_id}/check-resolution", response_model=ResolutionCheckResponse)
+async def check_chat_resolution(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db)
+):
+    """Analyzes the recent chat history to see if buttons should be shown."""
+    msg_svc = MessageService(db)
+    
+    # 1. Grab the latest history
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
+    messages = msg_svc.get_all_messages(session_id)
+    
+    if not messages:
+        return ResolutionCheckResponse(show_resolution_prompt=False, allow_ticket_submission=True)
+
+    # 2. Get the very last user message and AI response
+    user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
+    ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
+
+    # 3. Run the LLM Analyzer
+    resolver = ConversationResolutionService(db)
+    resolution_data = await resolver.analyze_conversation(
+        user_query=user_query,
+        ai_response=ai_response,
+        chat_history=history_text
+    )
+
+    return ResolutionCheckResponse(
+        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
+    )

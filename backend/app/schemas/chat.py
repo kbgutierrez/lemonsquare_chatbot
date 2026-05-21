@@ -14,6 +14,8 @@ class ChatResponse(BaseModel):
     session_id: str
     response: str
     ticket_ids_used: list[int] = Field(default_factory=list)
+    show_resolution_prompt: bool = False 
+    allow_ticket_submission: bool = True
 
 
 class MessageRecord(BaseModel):
@@ -44,3 +46,8 @@ class ResolveChatResponse(BaseModel):
     status: str
     session_id: str | None = None
     message: str
+
+
+class ResolutionCheckResponse(BaseModel):
+    show_resolution_prompt: bool
+    allow_ticket_submission: bool
