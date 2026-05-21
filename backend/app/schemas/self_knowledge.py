@@ -1,10 +1,9 @@
 from pydantic import BaseModel
 from typing import Any
 
-
 class AIKnowledgeItem(BaseModel):
     id: str
-    doc_type: str
+    doc_type: str  
     source: str | None = None
     category: str | None = None
     content: str | dict[str, Any]
