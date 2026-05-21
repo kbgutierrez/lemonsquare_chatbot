@@ -1,0 +1,260 @@
+Checking ticket, maintenance, and routing code so I can summarize the data path for each endpoint accurately.
+
+Read [](file:///c%3A/Users/su/Downloads/Earl/backend/app/api/routers/tickets.py)
+
+Read [](file:///c%3A/Users/su/Downloads/Earl/backend/app/api/routers/maintenance.py)
+
+Read [](file:///c%3A/Users/su/Downloads/Earl/backend/app/api/routers/routing.py)
+
+## Summary of Verified Endpoints
+
+All endpoints you listed are implemented in `backend/app/api/routers/*` and mounted under `/api` in main.py (`main.py:96-111`). `GET /health` is defined in `main.py:114`.
+
+---
+
+## Chat
+
+- `POST /api/chat` — `chat.py:44`
+  - user: returns `ChatResponse` with `session_id`, `response`, `ticket_ids_used`
+  - qdrant: yes, uses `SupportOrchestrator` for retrieval/RAG
+  - sql: yes, saves user + AI messages and session metadata
+
+- `GET /api/chat/history/{session_id}` — `chat.py:96`
+  - user: returns `ChatHistoryResponse` with `session_id` and message list
+  - qdrant: no
+  - sql: yes, reads chat message history
+
+- `GET /api/chat/user-sessions/{requester_id}` — `chat.py:130`
+  - user: returns list of session metadata
+  - qdrant: no
+  - sql: yes, lists user sessions
+
+- `GET /api/chat/all-sessions` — `chat.py:164`
+  - user: returns list of session metadata
+  - qdrant: no
+  - sql: yes, lists all sessions
+
+- `POST /api/chat/resolve/{session_id}` — `chat.py:189`
+  - user: returns `ResolveChatResponse`
+  - qdrant: yes, resolves chat into KB via ingestion service
+  - sql: yes, writes learned chat metadata
+
+- `GET /api/chat/escalate/draft/{session_id}` — `chat.py:206`
+  - user: returns ticket draft content
+  - qdrant: no
+  - sql: yes, reads session/escalation draft data
+
+- `POST /api/chat/escalate/submit` — `chat.py:219`
+  - user: returns `TicketEscalateResponse`
+  - qdrant: maybe no
+  - sql: yes, may persist escalation result or ticket draft state
+
+- `DELETE /api/chat/sessions/{session_id}` — `chat.py:234`
+  - user: returns success archive response
+  - qdrant: no
+  - sql: yes, archives chat session
+
+- `DELETE /api/chat/users/{requester_id}/sessions` — `chat.py:247`
+  - user: returns cleared-sessions response
+  - qdrant: no
+  - sql: yes, archives all sessions for the user
+
+---
+
+## Documents
+
+- `POST /api/documents/upload` — `documents.py:41`
+  - user: returns `DocumentUploadResponse`
+  - qdrant: yes, uploads PDF and ingests vectors
+  - sql: yes, saves `UploadedDocument` metadata
+
+- `POST /api/documents/debug/full-pipeline` — `documents.py:69`
+  - user: returns debug object with `original_query`, `reformulated_query`, `retrieval_results`, `final_answer`, `raw_debug`
+  - qdrant: yes, performs retrieval
+  - sql: no writes; debug-only path
+
+- `GET /api/documents` — `documents.py:115`
+  - user: returns list of `DocumentResponse`
+  - qdrant: no
+  - sql: yes, reads `UploadedDocument`
+
+- `DELETE /api/documents/{document_id}` — `documents.py:152`
+  - user: returns `DocumentDeleteResponse`
+  - qdrant: yes, deletes document vectors
+  - sql: yes, deletes or deactivates document record
+
+- `PUT /api/documents/{document_id}` — `documents.py:194`
+  - user: returns updated `DocumentResponse`
+  - qdrant: no
+  - sql: yes, updates document metadata
+
+- `POST /api/documents/manual` — `documents.py:174`
+  - user: returns manual knowledge creation result
+  - qdrant: yes, embeds manual text
+  - sql: yes, stores manual entry metadata
+
+- `GET /api/documents/manual` — `documents.py:230`
+  - user: returns list of manual rule objects
+  - qdrant: no
+  - sql: yes, reads `ManualKnowledgeEntry`
+
+- `PUT /api/documents/manual/{entry_id}` — `documents.py:260`
+  - user: returns updated manual rule
+  - qdrant: yes, updates manual rule vector
+  - sql: yes, updates manual entry record
+
+- `DELETE /api/documents/manual/{entry_id}` — `documents.py:276`
+  - user: returns deletion result
+  - qdrant: yes, removes rule vector
+  - sql: yes, marks manual entry deleted
+
+- `POST /api/documents/manual/{entry_id}/restore` — `documents.py:288`
+  - user: returns restore result
+  - qdrant: yes, restores vector
+  - sql: yes, reactivates manual entry
+
+---
+
+## Tickets
+
+- `GET /api/tickets` — `tickets.py:25`
+  - user: returns list of resolved tickets
+  - qdrant: no
+  - sql: yes, reads helpdesk tickets and blacklist status
+
+- `DELETE /api/tickets/{ticket_number}` — `tickets.py:48`
+  - user: returns delete confirmation
+  - qdrant: yes, deletes ticket vectors
+  - sql: yes, blacklists ticket in chatbot DB
+
+- `POST /api/tickets/sync` — `tickets.py:71`
+  - user: returns `TicketSyncResponse`
+  - qdrant: yes, ingests resolved ticket
+  - sql: yes, persists resolved ticket info
+
+- `POST /api/tickets/{ticket_number}/whitelist` — `tickets.py:81`
+  - user: returns whitelist success
+  - qdrant: yes, re-ingests ticket vectors
+  - sql: yes, removes blacklist and reads original ticket from helpdesk DB
+
+- `POST /api/tickets/bulk-sync` — `tickets.py:119`
+  - user: returns background-started response
+  - qdrant: yes, indirectly via background ingestion
+  - sql: yes, reads helpdesk DB in ingestion script
+
+---
+
+## Settings
+
+- `GET /api/settings` — `settings.py:22`
+  - user: returns `SettingsResponse`
+  - qdrant: no
+  - sql: yes, reads active AI settings
+
+- `POST /api/settings` — `settings.py:30`
+  - user: returns updated settings
+  - qdrant: no
+  - sql: yes, updates settings record
+
+- `POST /api/settings/default` — `settings.py:40`
+  - user: returns restored defaults
+  - qdrant: no
+  - sql: yes, resets settings row
+
+---
+
+## Explorer (Knowledge)
+
+- `GET /api/knowledge/explore` — `explorer.py:20`
+  - user: returns combined knowledge items
+  - qdrant: no
+  - sql: yes, reads from `ManualKnowledgeEntry`, `LearnedChat`, `UploadedDocument`, and helpdesk ticket tables
+
+---
+
+## Analytics
+
+- `GET /api/analytics/summary` — `analytics.py:15`
+  - user: returns summary metrics
+  - qdrant: no
+  - sql: yes, aggregates chatbot/helpdesk data
+
+---
+
+## Maintenance
+
+- `POST /api/maintenance/consolidate` — `maintenance.py:16`
+  - user: returns background-started response
+  - qdrant: likely yes via maintenance service
+  - sql: likely yes via consolidation service
+
+- `GET /api/maintenance/consolidate/status` — `maintenance.py:29`
+  - user: returns consolidation status
+  - qdrant: no
+  - sql: no direct query
+
+---
+
+## Routing Engine
+
+- `POST /api/routing/suggest` — `routing.py:16`
+  - user: returns routing prediction (`RoutingResponse`)
+  - qdrant: yes, uses embeddings/Qdrant via ingestion service
+  - sql: may read reference data through `db`
+
+---
+
+## Auth
+
+- `GET /api/auth/verify` — `auth.py:14`
+  - user: returns token validity info
+  - qdrant: no
+  - sql: no; external user service only
+
+---
+
+## Admin Auth
+
+- `POST /api/admin/login` — `admin_auth.py:20`
+  - user: returns login success/failure payload
+  - qdrant: no
+  - sql: no; external BizPortal auth only
+
+---
+
+## AI Knowledge (Self-knowledge)
+
+- `PUT /api/self_knowledge/chats/{session_id}` — `self_knowledge.py:13`
+  - user: returns update result
+  - qdrant: yes, may update learned chat vector
+  - sql: yes, updates learned chat metadata
+
+- `DELETE /api/self_knowledge/chats/{session_id}` — `self_knowledge.py:29`
+  - user: returns delete result
+  - qdrant: yes, removes learned chat vectors
+  - sql: yes, deletes or deactivates learned chat
+
+- `POST /api/self_knowledge/chats/{session_id}/restore` — `self_knowledge.py:39`
+  - user: returns restore result
+  - qdrant: yes, restores vectors
+  - sql: yes, reactivates learned chat
+
+---
+
+## Default / Health
+
+- `GET /health` — `main.py:114`
+  - user: returns `{"status":"ok","ai_available":...}`
+  - qdrant: no direct read
+  - sql: no direct use
+
+---
+
+## Conclusion
+
+- All listed endpoints exist in routers.
+- The routes are mounted under `/api` in main.py.
+- The summary above shows, for each endpoint:
+  - expected user-facing response type,
+  - whether it involves Qdrant,
+  - whether it involves SQL.

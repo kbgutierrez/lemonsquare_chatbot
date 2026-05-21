@@ -1,14 +1,10 @@
 """
 Normalized retrieval DTOs.
-
 This layer isolates the orchestrator from raw Qdrant payload structure.
 """
-
 from __future__ import annotations
-
 from dataclasses import dataclass
 from typing import Any
-
 from app.core.metadata_contract import (
     DOCUMENT_DOC_TYPES,
     TICKET_LIKE_DOC_TYPES,
@@ -25,9 +21,7 @@ class RetrievalDocument:
     @classmethod
     def from_qdrant(cls, hit) -> "RetrievalDocument":
         payload = getattr(hit, "payload", {}) or {}
-
         metadata = normalize_metadata(payload.get("metadata", {}))
-
         return cls(
             page_content=payload.get("page_content", ""),
             metadata=metadata,
@@ -80,11 +74,10 @@ class RetrievalDocument:
     def format_for_prompt(self) -> str:
         if self.is_document:
             return (
-                f"[SOURCE: OFFICIAL DOCUMENT — {self.source_name} "
+                f"[SOURCE: OFFICIAL DOCUMENT --- {self.source_name} "
                 f"| CATEGORY: {self.category}]\n"
                 f"{self.page_content}"
             )
-
         return (
             f"[SOURCE: RESOLVED KNOWLEDGE]\n"
             f"{self.page_content}"

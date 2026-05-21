@@ -11,11 +11,9 @@ endpoints. Extracting each feature into its own router module means:
 import asyncio
 import logging
 import uuid
-from qdrant_client.http.models import PointStruct
 
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
 from pydantic import BaseModel
-from qdrant_client.http import models as qdrant_models
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
@@ -32,10 +30,8 @@ from app.schemas.documents import (
     
 )
 
-
-
-from app.services.ingestion_service import DocumentIngestionService
-from app.services.orchestrator import SupportOrchestrator
+from app.services.ingestion.ingestion_service import DocumentIngestionService
+from app.services.rag.support_orchestrator import SupportOrchestrator
 
 
 logger = logging.getLogger(__name__)

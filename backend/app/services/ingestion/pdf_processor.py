@@ -1,0 +1,159 @@
+"""PDF ingestion processor."""
+from __future__ import annotations
+
+import logging
+import os
+import tempfile
+import uuid
+
+from fastapi import UploadFile
+from pypdf import PdfReader
+from qdrant_client.http.models import PointStruct
+from sqlalchemy.orm import Session
+
+from app.core.exceptions import ValidationError, VectorStoreError
+from app.core.metadata_contract import build_pdf_metadata, build_qdrant_payload
+from app.models.chatbot import AIChatbotSetting, UploadedDocument
+from app.services.ingestion.chunking_service import ChunkingService
+from app.services.ingestion.embedding_service import EmbeddingService
+from app.services.llm_client import create_llm
+from app.utils.text_utils import normalize_text, sha256_hash
+
+logger = logging.getLogger(__name__)
+
+_DEFAULT_CATEGORIES = [
+    "Network_Infrastructure",
+    "Hardware_Guide",
+    "Software_Documentation",
+    "HR_IT_Policy",
+    "Troubleshooting_Manual",
+    "General_IT",
+]
+_PDF_MAGIC = b"%PDF-"
+
+
+class PDFProcessor:
+    def __init__(self, db: Session, vector_store, embeddings) -> None:
+        self.db = db
+        self.vector_store = vector_store
+        self.embeddings = embeddings
+        self.chunker = ChunkingService()
+        self.embedding_service = EmbeddingService(embeddings)
+
+    def _allowed_categories(self) -> list[str]:
+        active_config = (
+            self.db.query(AIChatbotSetting)
+            .filter(AIChatbotSetting.IsActive == True)
+            .order_by(AIChatbotSetting.SettingID.desc())
+            .first()
+        )
+        raw = active_config.AllowedCategories if active_config and active_config.AllowedCategories else None
+        return [c.strip() for c in raw.split(",")] if raw else _DEFAULT_CATEGORIES
+
+    @staticmethod
+    def _validate_pdf_bytes(data: bytes) -> None:
+        if not data.startswith(_PDF_MAGIC):
+            raise ValidationError("Uploaded file is not a valid PDF. Only PDF files are supported.")
+
+    @staticmethod
+    def _document_id(file_name: str, raw_text: str, category: str) -> str:
+        key = sha256_hash(f"{normalize_text(file_name)} | {normalize_text(category)} | {normalize_text(raw_text)}")
+        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"document_{key}"))
+
+    async def _classify_document(self, text: str, allowed_categories: list[str]) -> str:
+        snippet = text[:3000]
+        try:
+            llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
+            prompt = (
+                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
+                f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
+                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
+            )
+            category = (await llm.ainvoke(prompt)).content.strip(" \"'\n")
+            if category in allowed_categories:
+                return category
+            logger.warning("AI returned invalid category '%s'; using General_IT.", category)
+        except Exception as exc:
+            logger.error("Document classification failed: %s", exc)
+        return "General_IT"
+
+    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
+        existing_doc = (
+            self.db.query(UploadedDocument)
+            .filter(UploadedDocument.FileName == file.filename)
+            .first()
+        )
+        if existing_doc:
+            raise ValidationError(
+                f"File '{file.filename}' already exists in the database. Document ID: {existing_doc.DocumentID}"
+            )
+
+        raw_bytes = await file.read()
+        self._validate_pdf_bytes(raw_bytes)
+
+        temp_file_path: str | None = None
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
+                tmp.write(raw_bytes)
+                temp_file_path = tmp.name
+
+            pdf_reader = PdfReader(temp_file_path)
+            raw_text = "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+            if not raw_text.strip():
+                raise ValidationError("Could not extract any text from the uploaded PDF.")
+
+            allowed_categories = self._allowed_categories()
+            if manual_category:
+                if manual_category not in allowed_categories:
+                    raise ValidationError(f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}")
+                category = manual_category
+            else:
+                category = await self._classify_document(raw_text, allowed_categories)
+
+            document_id = self._document_id(file.filename or "document.pdf", raw_text, category)
+            chunks = self.chunker.split_text(raw_text)
+            if not chunks:
+                raise ValidationError("Could not split extracted PDF text into chunks.")
+
+            vectors = await self.embedding_service.embed_documents(chunks)
+            points = []
+            cluster_key = sha256_hash(f"{document_id}:{file.filename}:{category}")
+            for index, chunk in enumerate(chunks):
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{index}"))
+                metadata = build_pdf_metadata(
+                    cluster_key=cluster_key,
+                    document_id=document_id,
+                    file_name=file.filename or "document.pdf",
+                    category=category,
+                    chunk_index=index,
+                )
+                metadata["is_active"] = True
+                points.append(PointStruct(
+                    id=chunk_id,
+                    vector=vectors[index],
+                    payload=build_qdrant_payload(page_content=chunk, metadata=metadata),
+                ))
+
+            try:
+                self.vector_store.upsert_points(points)
+            except Exception as exc:
+                raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
+
+            self.db.add(UploadedDocument(
+                DocumentID=document_id,
+                FileName=file.filename or "document.pdf",
+                Category=category,
+                ChunkCount=len(chunks),
+                IsActive=True,
+            ))
+            self.db.commit()
+
+            return {
+                "status": "success",
+                "document_id": document_id,
+                "category": category,
+                "chunks_processed": len(chunks),
+            }
+        finally:
+            if temp_file_path and os.path.exists(temp_file_path):
+                os.remove(temp_file_path)

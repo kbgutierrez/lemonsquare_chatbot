@@ -1,13 +1,4 @@
-"""
-Pydantic schemas for AI settings endpoints.
-
-WHY this is its own module:
-  Previously SettingsUpdate lived in api/chat.py and was imported back
-  into main.py, creating a dependency from the app entry point into a
-  feature-specific router. Settings schemas belong in their own schema
-  module, imported by the settings router.
-"""
-
+"""Pydantic schemas for AI settings endpoints."""
 from pydantic import BaseModel, Field
 
 

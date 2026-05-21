@@ -1,15 +1,21 @@
+"""
+Chat router — REFACTORED.
+All business logic extracted to chat domain services.
+Router is now pure HTTP: validates input, delegates, formats response.
+"""
 import logging
-from datetime import datetime
 
 from fastapi import APIRouter, Depends
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
+    get_current_user,
     get_chatbot_db,
     get_ingestion_service,
     get_orchestrator,
+    require_admin_user,
 )
+from app.core.exceptions import AuthorizationError
 from app.core.exceptions import AuthenticationError
 from app.schemas.chat import (
     ChatHistoryResponse,
@@ -24,37 +30,26 @@ from app.schemas.tickets import (
     TicketEscalateResponse,
     TicketSubmitRequest,
 )
-from app.services import chat_service
-from app.services.ingestion_service import DocumentIngestionService
-from app.services.orchestrator import SupportOrchestrator
-from app.services.user_service import fetch_user_details
+from app.services.chat.escalation_service import EscalationService
+from app.services.chat.message_service import MessageService
+from app.services.chat.session_manager import SessionManager
+from app.services.external.user_service import fetch_user_details
+from app.services.ingestion.ingestion_service import DocumentIngestionService
+from app.services.rag.support_orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
-
-router = APIRouter(
-    prefix="/chat",
-    tags=["Chat"],
-)
+router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
-@router.post(
-    "",
-    response_model=ChatResponse,
-)
+@router.post("", response_model=ChatResponse)
 async def handle_chat(
     request: ChatRequest,
     db: Session = Depends(get_chatbot_db),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
 ) -> ChatResponse:
     try:
-        user_data = await fetch_user_details(
-            request.user_token
-        )
-
-        user_id = int(
-            user_data.get("id") or 1
-        )
-
+        user_data = await fetch_user_details(request.user_token)
+        user_id = int(user_data.get("id") or 1)
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
             f"{user_data.get('lastname', 'User')}"
@@ -64,49 +59,31 @@ async def handle_chat(
         raise
 
     except Exception as exc:
-        logger.error(
-            "Authentication failure: %s",
-            exc,
-        )
+        logger.error("Authentication failure: %s", exc)
+        raise AuthenticationError("User authentication failed.") from exc
 
-        raise AuthenticationError(
-            "User authentication failed."
-        ) from exc
+    session_mgr = SessionManager(db)
+    msg_svc = MessageService(db)
 
-    session_id = chat_service.get_or_create_session(
-        db,
-        request.session_id,
-        user_id,
+    session_id = session_mgr.get_or_create(request.session_id, user_id)
+
+    msg_svc.save_user_message(
+        session_id=session_id,
+        content=request.message,
     )
 
-    chat_service.save_message(
-        db,
-        session_id,
-        "user",
-        request.message,
+    history_text = msg_svc.get_history_text(session_id)
+
+    ai_response, ticket_ids = await orchestrator.orchestrate(
+        user_query=request.message,
+        chat_history=history_text,
+        user_name=user_name,
+        db=db,
     )
 
-    history_text = (
-        chat_service.get_recent_history_text(
-            db,
-            session_id,
-        )
-    )
-
-    ai_response, ticket_ids = (
-        await orchestrator.orchestrate(
-            user_query=request.message,
-            chat_history=history_text,
-            user_name=user_name,
-            db=db,
-        )
-    )
-
-    chat_service.save_message(
-        db,
-        session_id,
-        "ai",
-        ai_response,
+    msg_svc.save_ai_message(
+        session_id=session_id,
+        content=ai_response,
     )
 
     return ChatResponse(
@@ -116,31 +93,20 @@ async def handle_chat(
     )
 
 
-@router.get(
-    "/history/{session_id}",
-    response_model=ChatHistoryResponse,
-)
+@router.get("/history/{session_id}", response_model=ChatHistoryResponse)
 async def get_chat_history(
     session_id: str,
     user_token: str,
     db: Session = Depends(get_chatbot_db),
 ) -> ChatHistoryResponse:
-    user_data = await fetch_user_details(
-        user_token
-    )
-
+    user_data = await fetch_user_details(user_token)
     user_id = user_data.get("id") or 1
 
-    chat_service.get_session_with_auth_check(
-        db,
-        session_id,
-        user_id,
-    )
+    session_mgr = SessionManager(db)
+    session_mgr.verify_ownership(session_id, user_id)
 
-    messages = chat_service.get_all_messages(
-        db,
-        session_id,
-    )
+    msg_svc = MessageService(db)
+    messages = msg_svc.get_all_messages(session_id)
 
     return ChatHistoryResponse(
         session_id=session_id,
@@ -168,42 +134,19 @@ async def get_chat_history(
 def get_user_chat_sessions(
     requester_id: str,
     limit: int = 20,
+    current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_chatbot_db),
 ):
-    from app.models.chatbot import (
-        ChatMessage,
-        ChatSession,
-    )
+    from app.repositories.chat_repository import ChatRepository
 
-    sessions = (
-        db.query(
-            ChatSession.SessionID,
-            ChatSession.SessionStatus,
-            ChatSession.StartTime,
-            ChatSession.RequesterUserID,
-            func.count(ChatMessage.MessageID).label(
-                "message_count"
-            ),
-        )
-        .outerjoin(
-            ChatMessage,
-            ChatSession.SessionID
-            == ChatMessage.SessionID,
-        )
-        .filter(
-            ChatSession.RequesterUserID
-            == requester_id
-        )
-        .filter(ChatSession.IsActive == True)
-        .group_by(
-            ChatSession.SessionID,
-            ChatSession.SessionStatus,
-            ChatSession.StartTime,
-            ChatSession.RequesterUserID,
-        )
-        .order_by(ChatSession.StartTime.desc())
-        .limit(limit)
-        .all()
+    current_user_id = str(current_user.get("id"))
+    is_admin = str(current_user.get("role", "")).lower() in {"admin", "administrator"} or bool(current_user.get("is_admin"))
+    if not is_admin and str(requester_id) != current_user_id:
+        raise AuthorizationError("You can only view your own chat sessions.")
+
+    sessions = ChatRepository(db).list_user_sessions(
+        requester_id,
+        limit,
     )
 
     return [
@@ -224,38 +167,12 @@ def get_user_chat_sessions(
 )
 def get_all_chat_sessions(
     limit: int = 50,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ):
-    from app.models.chatbot import (
-        ChatMessage,
-        ChatSession,
-    )
+    from app.repositories.chat_repository import ChatRepository
 
-    sessions = (
-        db.query(
-            ChatSession.SessionID,
-            ChatSession.SessionStatus,
-            ChatSession.StartTime,
-            ChatSession.RequesterUserID,
-            func.count(ChatMessage.MessageID).label(
-                "message_count"
-            ),
-        )
-        .outerjoin(
-            ChatMessage,
-            ChatSession.SessionID
-            == ChatMessage.SessionID,
-        )
-        .group_by(
-            ChatSession.SessionID,
-            ChatSession.SessionStatus,
-            ChatSession.StartTime,
-            ChatSession.RequesterUserID,
-        )
-        .order_by(ChatSession.StartTime.desc())
-        .limit(limit)
-        .all()
-    )
+    sessions = ChatRepository(db).list_all_sessions(limit)
 
     return [
         {
@@ -281,8 +198,8 @@ async def mark_chat_resolved(
     ),
 ):
     return await ingestion_service.process_resolved_chat(
-        session_id,
-        db,
+        session_id=session_id,
+        db=db,
     )
 
 
@@ -293,15 +210,8 @@ async def mark_chat_resolved(
 async def draft_escalation(
     session_id: str,
     db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(
-        get_ingestion_service
-    ),
 ):
-    result = await chat_service.draft_ticket_escalation(
-        session_id,
-        db,
-        ingestion_service,
-    )
+    result = await EscalationService(db).draft_escalation(session_id)
 
     return TicketDraftResponse(**result)
 
@@ -314,46 +224,33 @@ async def submit_escalation(
     request: TicketSubmitRequest,
     db: Session = Depends(get_chatbot_db),
 ):
-    result = await chat_service.submit_ticket_escalation(
-        request.model_dump(),
-        db,
+    result = await EscalationService(db).submit_escalation(
+        request.model_dump()
     )
 
     return TicketEscalateResponse(**result)
 
 
-@router.delete(
-    "/sessions/{session_id}",
-)
+@router.delete("/sessions/{session_id}")
 def delete_chat_session(
     session_id: str,
     db: Session = Depends(get_chatbot_db),
 ):
-    chat_service.archive_session(
-        db,
-        session_id,
-    )
+    SessionManager(db).archive(session_id)
 
     return {
         "status": "success",
-        "message": (
-            f"Session {session_id} "
-            f"archived successfully."
-        ),
+        "message": f"Session {session_id} archived successfully.",
     }
 
 
-@router.delete(
-    "/users/{requester_id}/sessions",
-)
+@router.delete("/users/{requester_id}/sessions")
 def clear_all_user_chats(
     requester_id: int,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ):
-    count = chat_service.archive_all_user_sessions(
-        db,
-        requester_id,
-    )
+    count = SessionManager(db).archive_all_for_user(requester_id)
 
     if count == 0:
         return {
@@ -363,8 +260,5 @@ def clear_all_user_chats(
 
     return {
         "status": "success",
-        "message": (
-            f"Successfully cleared "
-            f"{count} chat sessions."
-        ),
+        "message": f"Successfully cleared {count} chat sessions.",
     }

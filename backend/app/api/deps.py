@@ -1,48 +1,51 @@
 """
 FastAPI dependency providers.
-
-All injectable dependencies are declared here. Routes import from this
-module — they never instantiate services or sessions directly.
-
-WHY centralise deps here:
-  When dependencies are scattered (some in routes, some in services, some
-  inline), it becomes hard to swap implementations for testing. Having one
-  module for all providers means a test can override just these functions
-  and get clean isolation everywhere.
+All injectable dependencies declared here. Routes import from this module.
 """
-
-from fastapi import Depends, Request
+from fastapi import Depends, Query, Request
 from sqlalchemy.orm import Session
-
 from app.core.database import get_chatbot_db, get_helpdesk_db  # re-export
-from app.services.ingestion_service import DocumentIngestionService
-from app.services.orchestrator import SupportOrchestrator
+from app.core.exceptions import AuthorizationError
+from app.services.external.user_service import fetch_user_details
+from app.services.ingestion.ingestion_service import DocumentIngestionService
+from app.services.rag.support_orchestrator import SupportOrchestrator
 
 
 def get_orchestrator(request: Request) -> SupportOrchestrator:
-    """
-    Retrieve the SupportOrchestrator from app.state.
-
-    The orchestrator is created once during lifespan startup and stored
-    on app.state. This dependency provides it to any route that needs it
-    without re-instantiating the expensive ML models per request.
-    """
     return request.app.state.orchestrator
 
 
 def get_ingestion_service(request: Request) -> DocumentIngestionService:
-    """
-    Retrieve the DocumentIngestionService from app.state.
-
-    Same pattern as get_orchestrator — the embedding model is loaded once.
-    """
     return request.app.state.ingestion_service
 
 
-# Re-export DB dependencies so routes only need to import from deps.
+def _is_admin_user(user_data: dict) -> bool:
+    role_values = [
+        user_data.get("role"),
+        user_data.get("user_role"),
+        user_data.get("user_type"),
+        user_data.get("type"),
+        user_data.get("is_admin"),
+        user_data.get("admin"),
+    ]
+    return any(str(value).strip().lower() in {"admin", "administrator", "true", "1"} for value in role_values)
+
+
+async def get_current_user(user_token: str = Query(..., min_length=1)) -> dict:
+    return await fetch_user_details(user_token)
+
+
+async def require_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
+    if not _is_admin_user(current_user):
+        raise AuthorizationError("Admin access is required.")
+    return current_user
+
+
 __all__ = [
     "get_chatbot_db",
     "get_helpdesk_db",
     "get_orchestrator",
     "get_ingestion_service",
+    "get_current_user",
+    "require_admin_user",
 ]
