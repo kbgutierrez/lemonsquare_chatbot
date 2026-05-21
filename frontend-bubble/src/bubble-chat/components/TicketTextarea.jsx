@@ -6,15 +6,19 @@ const TicketTextarea = ({
   words,
   maxWords,
 }) => {
+
+  const limitReached =
+    words >= maxWords
+
   return (
-    <div className="min-w-0 max-w-full overflow-hidden">
+    <div className="min-w-0 overflow-hidden">
+
       {/* HEADER */}
       <div className="mb-2 flex items-center justify-between gap-3">
+
         <label
           className="
-            min-w-0
             truncate
-
             text-sm
             font-medium
             text-slate-700
@@ -26,11 +30,9 @@ const TicketTextarea = ({
         <span
           className={`
             shrink-0
-
             text-xs
-
             ${
-              words >= maxWords
+              limitReached
                 ? "text-red-500"
                 : "text-slate-400"
             }
@@ -38,28 +40,26 @@ const TicketTextarea = ({
         >
           {words}/{maxWords}
         </span>
+
       </div>
 
       {/* TEXTAREA */}
       <textarea
         rows={4}
         value={value}
-        onChange={(e) =>
-          onChange(e.target.value)
-        }
         placeholder={placeholder}
+        onChange={event =>
+          onChange(
+            event.target.value
+          )
+        }
         className="
           block
-
           min-h-[120px]
           max-h-[220px]
-
           w-full
-          min-w-0
-          max-w-full
 
           resize-none
-
           overflow-y-auto
           overflow-x-hidden
 
@@ -67,7 +67,6 @@ const TicketTextarea = ({
           break-words
 
           rounded-2xl
-
           border
           border-violet-200
 
@@ -88,13 +87,14 @@ const TicketTextarea = ({
           focus:border-violet-400
           focus:bg-white
 
-          [scrollbar-width:none]
-          [&::-webkit-scrollbar]:hidden
-
           [overflow-wrap:anywhere]
           [word-break:break-word]
+          [scrollbar-width:none]
+
+          [&::-webkit-scrollbar]:hidden
         "
       />
+
     </div>
   )
 }

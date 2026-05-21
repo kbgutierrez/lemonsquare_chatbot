@@ -6,14 +6,51 @@ import {
 
 import ChatMessage from "./ChatMessage.jsx"
 
+const getMessageKey = (
+  message,
+  index
+) =>
+  message?.id ||
+  `${message?.sender}-${index}-${message?.text}`
+
+const createWelcomeMessage =
+  () => {
+
+    const now =
+      new Date()
+
+    return {
+      id:
+        "default-welcome-message",
+
+      sender:
+        "agent",
+
+      text:
+        "What can I help you with today?",
+
+      time:
+        now.toLocaleTimeString(
+          [],
+          {
+            hour:
+              "2-digit",
+
+            minute:
+              "2-digit",
+          }
+        ),
+
+      createdAt:
+        now.toISOString(),
+    }
+  }
+
 const ChatMessages = ({
   messages = [],
 }) => {
 
   const messagesEndRef =
-    useRef(null)
-
-  const containerRef =
     useRef(null)
 
   const previousLengthRef =
@@ -23,84 +60,51 @@ const ChatMessages = ({
     useRef(true)
 
   /* ========================================
-     DEFAULT WELCOME MESSAGE
-  ======================================== */
-
-  const welcomeMessage = {
-    id: "default-welcome-message",
-
-    sender: "agent",
-
-    text:
-      "What can I help you with today?",
-
-    time:
-      new Date().toLocaleTimeString(
-        [],
-        {
-          hour:
-            "2-digit",
-
-          minute:
-            "2-digit",
-        }
-      ),
-
-    createdAt:
-      new Date().toISOString(),
-  }
-
-  /* ========================================
-     DEDUPE MESSAGES
+     DEDUPE + NORMALIZE
   ======================================== */
 
   const normalizedMessages =
-    useMemo(() => {
+    useMemo(
+      () => {
 
-      const seen =
-        new Set()
+        const seen =
+          new Set()
 
-      const deduped =
-        messages.filter(
-          (
-            message,
-            index
-          ) => {
+        const deduped =
+          messages.filter(
+            (
+              message,
+              index
+            ) => {
 
-            const key =
-              message?.id ||
-              `${message?.sender}-${index}-${message?.text}`
+              const key =
+                getMessageKey(
+                  message,
+                  index
+                )
 
-            if (
-              seen.has(key)
-            ) {
+              if (
+                seen.has(key)
+              ) {
 
-              return false
+                return false
+              }
+
+              seen.add(key)
+
+              return true
             }
+          )
 
-            seen.add(key)
+        return deduped.length
+          ? deduped
+          : [
+              createWelcomeMessage(),
+            ]
 
-            return true
-          }
-        )
-
-      /*
-        NEW CHAT:
-        Inject default AI greeting.
-      */
-
-      if (
-        deduped.length === 0
-      ) {
-
-        return [
-          welcomeMessage,
-        ]
-      }
-
-      return deduped
-
-    }, [messages])
+      },
+      [messages]
+    )
 
   /* ========================================
      AUTO SCROLL
@@ -108,41 +112,19 @@ const ChatMessages = ({
 
   useEffect(() => {
 
-    const container =
-      containerRef.current
+    const scrollBehavior =
+      initialLoadRef.current
+        ? "auto"
+        : "smooth"
 
-    if (!container) {
-      return
-    }
-
-    /*
-      Initial load:
-      instant scroll.
-    */
     if (
       initialLoadRef.current
     ) {
 
       initialLoadRef.current =
         false
-
-      messagesEndRef.current
-        ?.scrollIntoView({
-          behavior:
-            "auto",
-          block:
-            "end",
-        })
-
-      previousLengthRef.current =
-        normalizedMessages.length
-
-      return
     }
 
-    /*
-      Detect new messages.
-    */
     const hasNewMessage =
       normalizedMessages.length >
       previousLengthRef.current
@@ -157,7 +139,8 @@ const ChatMessages = ({
           messagesEndRef.current
             ?.scrollIntoView({
               behavior:
-                "smooth",
+                scrollBehavior,
+
               block:
                 "end",
             })
@@ -172,7 +155,6 @@ const ChatMessages = ({
 
   return (
     <div
-      ref={containerRef}
       className="
         flex
         h-full
@@ -190,6 +172,7 @@ const ChatMessages = ({
         [&::-webkit-scrollbar]:hidden
       "
     >
+
       {/* MESSAGES */}
       <div
         className="
@@ -198,6 +181,7 @@ const ChatMessages = ({
           gap-4
         "
       >
+
         {normalizedMessages.map(
           (
             message,
@@ -205,8 +189,10 @@ const ChatMessages = ({
           ) => (
             <ChatMessage
               key={
-                message.id ||
-                `${message.sender}-${index}-${message.text}`
+                getMessageKey(
+                  message,
+                  index
+                )
               }
               message={
                 message
@@ -214,12 +200,14 @@ const ChatMessages = ({
             />
           )
         )}
+
       </div>
 
-      {/* AUTO SCROLL TARGET */}
+      {/* SCROLL TARGET */}
       <div
         ref={messagesEndRef}
       />
+
     </div>
   )
 }

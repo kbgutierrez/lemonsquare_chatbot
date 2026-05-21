@@ -11,17 +11,13 @@ const useHorizontalDragScroll =
     const scrollRef =
       useRef(null)
 
-    const isDragging =
-      useRef(false)
-
-    const hasDragged =
-      useRef(false)
-
-    const startX =
-      useRef(0)
-
-    const scrollLeft =
-      useRef(0)
+    const dragState =
+      useRef({
+        isDragging: false,
+        hasDragged: false,
+        startX: 0,
+        scrollLeft: 0,
+      })
 
     useEffect(() => {
 
@@ -32,6 +28,9 @@ const useHorizontalDragScroll =
         return
       }
 
+      const state =
+        dragState.current
+
       /* ========================================
          POINTER DOWN
       ======================================== */
@@ -39,16 +38,16 @@ const useHorizontalDragScroll =
       const handlePointerDown =
         (event) => {
 
-          isDragging.current =
+          state.isDragging =
             true
 
-          hasDragged.current =
+          state.hasDragged =
             false
 
-          startX.current =
+          state.startX =
             event.clientX
 
-          scrollLeft.current =
+          state.scrollLeft =
             container.scrollLeft
 
           container.style.cursor =
@@ -63,36 +62,28 @@ const useHorizontalDragScroll =
         (event) => {
 
           if (
-            !isDragging.current
+            !state.isDragging
           ) {
             return
           }
 
           const dx =
             event.clientX -
-            startX.current
-
-          /*
-            DETECT REAL DRAG
-          */
+            state.startX
 
           if (
             Math.abs(dx) >
             DRAG_THRESHOLD
           ) {
 
-            hasDragged.current =
+            state.hasDragged =
               true
           }
-
-          /*
-            PREVENT TEXT SELECT
-          */
 
           event.preventDefault()
 
           container.scrollLeft =
-            scrollLeft.current - dx
+            state.scrollLeft - dx
         }
 
       /* ========================================
@@ -102,7 +93,7 @@ const useHorizontalDragScroll =
       const stopDragging =
         () => {
 
-          isDragging.current =
+          state.isDragging =
             false
 
           container.style.cursor =
@@ -117,13 +108,14 @@ const useHorizontalDragScroll =
         (event) => {
 
           if (
-            hasDragged.current
+            !state.hasDragged
           ) {
-
-            event.preventDefault()
-
-            event.stopPropagation()
+            return
           }
+
+          event.preventDefault()
+
+          event.stopPropagation()
         }
 
       /* ========================================
@@ -192,7 +184,7 @@ const useHorizontalDragScroll =
         )
       }
 
-    })
+    }, [])
 
     return scrollRef
   }

@@ -5,353 +5,191 @@ import "../index.css"
 
 import BubbleChat from "../bubble-chat/BubbleChat.jsx"
 
-import {
-  updateRuntimeConfig,
-} from "../config/sqlVariables"
+import { updateRuntimeConfig } from "../config/sqlVariables"
 
-const widgetRoots =
-  new Map()
+const widgetRoots = new Map()
 
-const DEFAULT_ROOT_ID =
-  "lemonsquare-chat-root"
+const DEFAULT_ROOT_ID = "lemonsquare-chat-root"
+const DEFAULT_FALLBACK_USER = "11318"
 
-const DEFAULT_FALLBACK_USER =
-  "11318"
+const STORAGE_KEYS = [
+  "userToken",
+  "user_id",
+  "userid",
+  "employee_id",
+  "employeeId",
+  "currentUserId",
+]
+
+/* ========================================
+   HELPERS
+======================================== */
+
+const safeString = (value) =>
+  value &&
+  value !== "null" &&
+  value !== "undefined"
+    ? String(value)
+    : null
+
+const resolveFromStorage = (storage) => {
+  for (const key of STORAGE_KEYS) {
+    const value = safeString(
+      storage.getItem(key)
+    )
+
+    if (value) {
+      return value
+    }
+  }
+
+  return null
+}
 
 /* ========================================
    AUTO USER DETECTION
 ======================================== */
 
-const resolveUserToken =
-  (
-    incomingConfig = {}
-  ) => {
-
-    /*
-      PRIORITY 1:
-      MANUAL CONFIG OVERRIDE
-    */
-
-    if (
-      incomingConfig?.userToken
-    ) {
-      return String(
-        incomingConfig.userToken
-      )
-    }
-
-    /*
-      PRIORITY 2:
-      CUSTOM GLOBAL USER
-    */
-
-    if (
-      window?.CURRENT_USER_ID
-    ) {
-      return String(
-        window.CURRENT_USER_ID
-      )
-    }
-
-    /*
-      PRIORITY 3:
-      COMMON AUTH OBJECTS
-    */
-
-    if (
-      window?.currentUser?.id
-    ) {
-      return String(
-        window.currentUser.id
-      )
-    }
-
-    if (
-      window?.user?.id
-    ) {
-      return String(
-        window.user.id
-      )
-    }
-
-    if (
-      window?.authUser?.id
-    ) {
-      return String(
-        window.authUser.id
-      )
-    }
-
-    /*
-      PRIORITY 4:
-      LOCAL STORAGE
-    */
-
-    const localStorageKeys =
-      [
-        "userToken",
-        "user_id",
-        "userid",
-        "employee_id",
-        "employeeId",
-        "currentUserId",
-      ]
-
-    for (
-      const key
-      of localStorageKeys
-    ) {
-
-      const value =
-        localStorage.getItem(
-          key
-        )
-
-      if (
-        value &&
-        value !== "null" &&
-        value !== "undefined"
-      ) {
-        return String(
-          value
-        )
-      }
-    }
-
-    /*
-      PRIORITY 5:
-      SESSION STORAGE
-    */
-
-    for (
-      const key
-      of localStorageKeys
-    ) {
-
-      const value =
-        sessionStorage.getItem(
-          key
-        )
-
-      if (
-        value &&
-        value !== "null" &&
-        value !== "undefined"
-      ) {
-        return String(
-          value
-        )
-      }
-    }
-
-    /*
-      PRIORITY 6:
-      META TAG
-    */
-
-    const metaUser =
-      document.querySelector(
-        'meta[name="user-id"]'
-      )
-
-    if (
-      metaUser?.content
-    ) {
-      return String(
-        metaUser.content
-      )
-    }
-
-    /*
-      FINAL FALLBACK
-    */
-
-    return DEFAULT_FALLBACK_USER
-  }
+const resolveUserToken = (
+  incomingConfig = {}
+) =>
+  safeString(incomingConfig?.userToken) ||
+  safeString(window?.CURRENT_USER_ID) ||
+  safeString(window?.currentUser?.id) ||
+  safeString(window?.user?.id) ||
+  safeString(window?.authUser?.id) ||
+  resolveFromStorage(localStorage) ||
+  resolveFromStorage(sessionStorage) ||
+  safeString(
+    document.querySelector(
+      'meta[name="user-id"]'
+    )?.content
+  ) ||
+  DEFAULT_FALLBACK_USER
 
 /* ========================================
-   CREATE ROOT ELEMENT
+   ROOT MANAGEMENT
 ======================================== */
 
-const createContainer =
-  (
-    containerId =
-      DEFAULT_ROOT_ID
-  ) => {
+const createContainer = (
+  containerId = DEFAULT_ROOT_ID
+) => {
+  let element =
+    document.getElementById(
+      containerId
+    )
 
-    let element =
-      document.getElementById(
-        containerId
-      )
-
-    if (!element) {
-
-      element =
-        document.createElement(
-          "div"
-        )
-
-      element.id =
-        containerId
-
-      document.body.appendChild(
-        element
-      )
-    }
-
+  if (element) {
     return element
   }
 
-/* ========================================
-   DESTROY
-======================================== */
+  element = document.createElement(
+    "div"
+  )
 
-const destroy =
-  (
-    containerId =
-      DEFAULT_ROOT_ID
-  ) => {
+  element.id = containerId
 
-    const root =
-      widgetRoots.get(
-        containerId
-      )
+  document.body.appendChild(
+    element
+  )
 
-    if (!root) {
-      return
-    }
+  return element
+}
 
-    root.unmount()
+const destroy = (
+  containerId = DEFAULT_ROOT_ID
+) => {
+  const root =
+    widgetRoots.get(containerId)
 
-    widgetRoots.delete(
-      containerId
-    )
+  if (!root) {
+    return
   }
 
+  root.unmount()
+
+  widgetRoots.delete(
+    containerId
+  )
+}
+
 /* ========================================
-   UPDATE CONFIG
+   CONFIG
 ======================================== */
 
-const updateConfig =
-  (
-    nextConfig = {}
-  ) => {
-
-    /*
-      AUTO-RESOLVE USER TOKEN
-    */
-
-    const resolvedUserToken =
+const updateConfig = (
+  nextConfig = {}
+) => {
+  const finalConfig = {
+    ...nextConfig,
+    userToken:
       resolveUserToken(
         nextConfig
-      )
-
-    const finalConfig =
-      {
-        ...nextConfig,
-        userToken:
-          resolvedUserToken,
-      }
-
-    /*
-      GLOBAL WINDOW CONFIG
-    */
-
-    window.LemonSquareChatConfig =
-      {
-        ...(window.LemonSquareChatConfig || {}),
-        ...finalConfig,
-      }
-
-    /*
-      IMPORTANT:
-      UPDATE INTERNAL RUNTIME CONFIG
-    */
-
-    updateRuntimeConfig(
-      finalConfig
-    )
-
-    console.log(
-      "SDK_CONFIG_UPDATED",
-      window.LemonSquareChatConfig
-    )
+      ),
   }
+
+  window.LemonSquareChatConfig = {
+    ...(window.LemonSquareChatConfig ||
+      {}),
+    ...finalConfig,
+  }
+
+  updateRuntimeConfig(
+    finalConfig
+  )
+
+  console.log(
+    "SDK_CONFIG_UPDATED",
+    window.LemonSquareChatConfig
+  )
+}
 
 /* ========================================
    MOUNT
 ======================================== */
 
-const mount =
-  ({
-    containerId =
-      DEFAULT_ROOT_ID,
+const mount = ({
+  containerId = DEFAULT_ROOT_ID,
+  config = {},
+} = {}) => {
+  updateConfig(config)
 
-    config = {},
-  } = {}) => {
+  destroy(containerId)
 
-    /*
-      APPLY CONFIG FIRST
-    */
+  const container =
+    createContainer(containerId)
 
-    updateConfig(
-      config
-    )
+  container.classList.add(
+    "lemonsquare-chat-root"
+  )
 
-    /*
-      Prevent duplicate mounts
-    */
+  const root =
+    createRoot(container)
 
-    destroy(
-      containerId
-    )
+  root.render(<BubbleChat />)
 
-    const container =
-      createContainer(
-        containerId
-      )
+  widgetRoots.set(
+    containerId,
+    root
+  )
 
-    /*
-      IMPORTANT:
-      APPLY ROOT CLASS
-    */
-
-    container.classList.add(
-      "lemonsquare-chat-root"
-    )
-
-    const root =
-      createRoot(
-        container
-      )
-
-    root.render(
-      <BubbleChat />
-    )
-
-    widgetRoots.set(
-      containerId,
-      root
-    )
-
-    return {
-      destroy:
-        () =>
-          destroy(
-            containerId
-          ),
-    }
+  return {
+    destroy: () =>
+      destroy(containerId),
   }
+}
 
 /* ========================================
    GLOBAL SDK
 ======================================== */
 
-window.LemonSquareChat = {
+const LemonSquareChat = {
   mount,
   destroy,
   updateConfig,
 }
 
-export default
-  window.LemonSquareChat
+window.LemonSquareChat =
+  LemonSquareChat
+
+export default LemonSquareChat

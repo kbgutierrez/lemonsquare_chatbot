@@ -5,13 +5,44 @@ import {
 
 import ChatMenu from "./ChatMenu.jsx"
 
+const resolvedBadgeClass = `
+  flex
+  items-center
+  gap-1
+
+  rounded-full
+
+  border
+  border-white/20
+
+  bg-white/15
+
+  px-1.5
+  py-[2px]
+
+  text-[8px]
+  font-semibold
+  uppercase
+
+  tracking-[0.06em]
+
+  text-white
+
+  backdrop-blur-sm
+`
+
 const ChatHeader = ({
   resolved = false,
   onOpenModal,
 }) => {
 
+  const title =
+    resolved
+      ? "Resolved Conversation"
+      : "AI Assistance"
+
   return (
-    <div
+    <header
       className="
         relative
 
@@ -31,10 +62,7 @@ const ChatHeader = ({
       "
     >
 
-      {/* ====================================
-          SOFT LIGHT OVERLAY
-      ==================================== */}
-
+      {/* SOFT OVERLAY */}
       <div
         className="
           pointer-events-none
@@ -46,10 +74,7 @@ const ChatHeader = ({
         "
       />
 
-      {/* ====================================
-          LEFT
-      ==================================== */}
-
+      {/* LEFT */}
       <div
         className="
           relative
@@ -62,7 +87,6 @@ const ChatHeader = ({
       >
 
         {/* TITLE ROW */}
-
         <div
           className="
             flex
@@ -72,15 +96,12 @@ const ChatHeader = ({
         >
 
           {/* STATUS */}
-
           {resolved ? (
             <Lock
               className="
                 h-3.5
                 w-3.5
                 shrink-0
-
-                text-white
               "
             />
           ) : (
@@ -99,53 +120,27 @@ const ChatHeader = ({
           )}
 
           {/* TITLE */}
-
           <h2
             className="
               truncate
 
               text-[15px]
               font-extrabold
-              tracking-[0.01em]
 
-              text-white
+              tracking-[0.01em]
 
               drop-shadow-[0_1px_2px_rgba(0,0,0,0.18)]
             "
           >
-            {resolved
-              ? "Resolved Conversation"
-              : "AI Assistance"}
+            {title}
           </h2>
 
-          {/* RESOLVED BADGE */}
-
+          {/* BADGE */}
           {resolved && (
             <span
-              className="
-                flex
-                items-center
-                gap-1
-
-                rounded-full
-
-                border
-                border-white/20
-
-                bg-white/15
-
-                px-1.5
-                py-[2px]
-
-                text-[8px]
-                font-semibold
-                uppercase
-                tracking-[0.06em]
-
-                text-white
-
-                backdrop-blur-sm
-              "
+              className={
+                resolvedBadgeClass
+              }
             >
               <CheckCircle2
                 className="
@@ -162,10 +157,7 @@ const ChatHeader = ({
 
       </div>
 
-      {/* ====================================
-          RIGHT
-      ==================================== */}
-
+      {/* RIGHT */}
       <div
         className="
           relative
@@ -177,7 +169,6 @@ const ChatHeader = ({
       >
 
         {/* MENU */}
-
         <div
           className="
             rounded-xl
@@ -193,19 +184,14 @@ const ChatHeader = ({
           "
         >
           <ChatMenu
-            resolved={
-              resolved
-            }
-
-            onSelect={
-              onOpenModal
-            }
+            resolved={resolved}
+            onSelect={onOpenModal}
           />
         </div>
 
       </div>
 
-    </div>
+    </header>
   )
 }
 

@@ -14,38 +14,28 @@ import ChatFooterInput
 import ChatFooterResolved
   from "./ChatFooterResolved.jsx"
 
+const MAX_TEXTAREA_HEIGHT = 160
+
 const ChatFooter = ({
   onSendMessage,
-
-  /*
-    ONLY AI reply state.
-  */
   loading = false,
-
   resolved = false,
 }) => {
 
   const [message, setMessage] =
     useState("")
 
-  const [
-    showQuestions,
-    setShowQuestions,
-  ] = useState(true)
+  const [showQuestions, setShowQuestions] =
+    useState(true)
 
   const textareaRef =
     useRef(null)
-
-  /*
-    Prevent duplicate
-    manual sends.
-  */
 
   const sendingRef =
     useRef(false)
 
   /* ========================================
-     AUTO RESIZE TEXTAREA
+     AUTO RESIZE
   ======================================== */
 
   useEffect(() => {
@@ -53,8 +43,9 @@ const ChatFooter = ({
     const textarea =
       textareaRef.current
 
-    if (!textarea)
+    if (!textarea) {
       return
+    }
 
     textarea.style.height =
       "auto"
@@ -62,21 +53,18 @@ const ChatFooter = ({
     textarea.style.height =
       `${Math.min(
         textarea.scrollHeight,
-        160
+        MAX_TEXTAREA_HEIGHT
       )}px`
 
   }, [message])
 
   /* ========================================
-     RESET DRAFT ON RESOLVE
+     RESET ON RESOLVE
   ======================================== */
 
   useEffect(() => {
 
-    if (
-      resolved
-    ) {
-
+    if (resolved) {
       setMessage("")
     }
 
@@ -92,23 +80,8 @@ const ChatFooter = ({
         customMessage
       ) => {
 
-        /*
-          Hard block:
-          resolved chat
-        */
-
         if (
-          resolved
-        ) {
-          return
-        }
-
-        /*
-          Prevent spam double click
-          while request in-flight.
-        */
-
-        if (
+          resolved ||
           sendingRef.current
         ) {
           return
@@ -118,12 +91,9 @@ const ChatFooter = ({
           (
             customMessage ??
             message
-          )
-            ?.trim?.()
+          )?.trim()
 
-        if (
-          !finalMessage
-        ) {
+        if (!finalMessage) {
           return
         }
 
@@ -132,14 +102,9 @@ const ChatFooter = ({
           sendingRef.current =
             true
 
-          /*
-            Clear immediately
-            for smoother UX.
-          */
-
           setMessage("")
 
-          await onSendMessage(
+          await onSendMessage?.(
             finalMessage
           )
 
@@ -149,11 +114,6 @@ const ChatFooter = ({
             "CHAT_SEND_ERROR",
             error
           )
-
-          /*
-            Restore message
-            if failed.
-          */
 
           setMessage(
             finalMessage
@@ -173,25 +133,24 @@ const ChatFooter = ({
     )
 
   /* ========================================
-     ENTER
+     ENTER SEND
   ======================================== */
 
   const handleKeyDown =
     useCallback(
-      (
-        event
-      ) => {
+      (event) => {
 
         if (
-          event.key ===
-            "Enter" &&
-          !event.shiftKey
+          event.key !== "Enter" ||
+          event.shiftKey
         ) {
-
-          event.preventDefault()
-
-          handleSend()
+          return
         }
+
+        event.preventDefault()
+
+        handleSend()
+
       },
       [handleSend]
     )
@@ -202,20 +161,10 @@ const ChatFooter = ({
 
   const handleQuickQuestion =
     useCallback(
-      async (
-        question
-      ) => {
+      (question) =>
+        !resolved &&
+        handleSend(question),
 
-        if (
-          resolved
-        ) {
-          return
-        }
-
-        await handleSend(
-          question
-        )
-      },
       [
         resolved,
         handleSend,
@@ -241,61 +190,30 @@ const ChatFooter = ({
 
       <div className="relative z-10">
 
-        {/* ====================================
-            RESOLVED
-        ==================================== */}
-
+        {/* RESOLVED */}
         {resolved && (
           <ChatFooterResolved />
         )}
 
-        {/* ====================================
-            FAQ
-        ==================================== */}
-
+        {/* FAQ */}
         {!resolved && (
           <ChatFooterFAQ
-            loading={
-              loading
-            }
-            showQuestions={
-              showQuestions
-            }
-            setShowQuestions={
-              setShowQuestions
-            }
-            onQuestionClick={
-              handleQuickQuestion
-            }
+            loading={loading}
+            showQuestions={showQuestions}
+            setShowQuestions={setShowQuestions}
+            onQuestionClick={handleQuickQuestion}
           />
         )}
 
-        {/* ====================================
-            INPUT
-        ==================================== */}
-
+        {/* INPUT */}
         <ChatFooterInput
-          textareaRef={
-            textareaRef
-          }
-          message={
-            message
-          }
-          setMessage={
-            setMessage
-          }
-          loading={
-            loading
-          }
-          resolved={
-            resolved
-          }
-          onKeyDown={
-            handleKeyDown
-          }
-          onSend={
-            handleSend
-          }
+          textareaRef={textareaRef}
+          message={message}
+          setMessage={setMessage}
+          loading={loading}
+          resolved={resolved}
+          onKeyDown={handleKeyDown}
+          onSend={handleSend}
         />
 
       </div>

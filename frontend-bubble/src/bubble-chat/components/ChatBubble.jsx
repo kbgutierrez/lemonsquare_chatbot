@@ -1,6 +1,4 @@
-import {
-  motion,
-} from "framer-motion"
+import { motion } from "framer-motion"
 
 import bubblePillIcon
   from "../../assets/bubble-pill-icon.png"
@@ -8,11 +6,67 @@ import bubblePillIcon
 import expandedPillIcon
   from "../../assets/expanded-pill-icon.png"
 
+const buttonAnimation = {
+  whileHover: {
+    y: -5,
+    rotate: 1.2,
+    transition: {
+      duration: 0.18,
+      ease: "easeOut",
+    },
+  },
+
+  whileTap: {
+    y: 1,
+    rotate: -1,
+    transition: {
+      duration: 0.08,
+    },
+  },
+
+  transition: {
+    type: "spring",
+    stiffness: 340,
+    damping: 22,
+  },
+}
+
+const imageAnimation = {
+  initial: {
+    opacity: 0,
+    scale: 0.92,
+  },
+
+  animate: {
+    opacity: 1,
+    scale: 1,
+  },
+
+  transition: {
+    duration: 0.18,
+    ease: "easeOut",
+  },
+}
+
+const glowAnimation = {
+  initial: {
+    opacity: 0,
+  },
+
+  whileHover: {
+    opacity: 1,
+  },
+
+  transition: {
+    duration: 0.2,
+  },
+}
+
 const ChatBubble = ({
   isOpen,
 }) => {
 
-  const currentIcon =
+  const icon =
     isOpen
       ? expandedPillIcon
       : bubblePillIcon
@@ -28,6 +82,7 @@ const ChatBubble = ({
         pointer-events-none
       "
     >
+
       <motion.button
         type="button"
 
@@ -39,42 +94,14 @@ const ChatBubble = ({
 
         initial={false}
 
-        whileHover={{
-          y: -5,
-
-          rotate: 1.2,
-
-          transition: {
-            duration: 0.18,
-            ease: "easeOut",
-          },
-        }}
-
-        whileTap={{
-          y: 1,
-
-          rotate: -1,
-
-          transition: {
-            duration: 0.08,
-          },
-        }}
-
-        transition={{
-          type: "spring",
-          stiffness: 340,
-          damping: 22,
-        }}
-
         className="
           relative
 
           flex
-          items-center
-          justify-center
-
           h-16
           w-16
+          items-center
+          justify-center
 
           bg-transparent
 
@@ -82,10 +109,11 @@ const ChatBubble = ({
 
           pointer-events-auto
         "
+
+        {...buttonAnimation}
       >
 
         {/* GLOW */}
-
         <motion.div
           className="
             absolute
@@ -98,44 +126,18 @@ const ChatBubble = ({
             blur-xl
           "
 
-          initial={{
-            opacity: 0,
-          }}
-
-          whileHover={{
-            opacity: 1,
-          }}
-
-          transition={{
-            duration: 0.2,
-          }}
+          {...glowAnimation}
         />
 
         {/* ICON */}
-
         <motion.img
-          key={currentIcon}
+          key={icon}
 
-          src={currentIcon}
+          src={icon}
 
           alt="LemonSquare Chat Bubble"
 
           draggable={false}
-
-          initial={{
-            opacity: 0,
-            scale: 0.92,
-          }}
-
-          animate={{
-            opacity: 1,
-            scale: 1,
-          }}
-
-          transition={{
-            duration: 0.18,
-            ease: "easeOut",
-          }}
 
           className="
             relative
@@ -151,9 +153,12 @@ const ChatBubble = ({
 
             drop-shadow-[0_10px_25px_rgba(139,92,246,0.28)]
           "
+
+          {...imageAnimation}
         />
 
       </motion.button>
+
     </div>
   )
 }

@@ -1,0 +1,128 @@
+"""
+Document Ingestion Service — INTERFACE PRESERVED.
+This facade preserves the exact public interface expected by all routers
+delegating to focused sub-processors internally.
+
+Public methods preserved:
+  - process_pdf_upload(file, db, manual_category=None) -> dict
+  - process_manual_entry(title, content, manual_category, db) -> dict
+  - process_resolved_ticket(payload, db) -> dict
+  - process_resolved_chat(session_id, db) -> dict
+  - delete_document(document_id, db) -> dict
+  - update_document(document_id, updates, db) -> None
+  - update_manual_entry(entry_id, updates, db) -> dict
+  - delete_manual_entry(entry_id, db) -> dict
+  - restore_manual_entry(entry_id, db) -> dict
+  - update_learned_chat(session_id, updates, db) -> dict
+  - delete_learned_chat(session_id, db) -> dict
+  - restore_learned_chat(session_id, db) -> dict
+
+Properties preserved:
+  - qdrant (QdrantClient)
+  - embeddings (HuggingFaceEmbeddings)
+  - collection_name (str)
+"""
+import logging
+from langchain_huggingface import HuggingFaceEmbeddings
+from qdrant_client import QdrantClient
+from app.core.config import settings
+from app.services.retrieval.vector_store import VectorStoreService
+
+logger = logging.getLogger(__name__)
+
+
+class DocumentIngestionService:
+    """
+    Knowledge ingestion coordinator.
+    Preserves the exact interface used by all routers and the maintenance module.
+    Internally delegates to focused sub-processors.
+    """
+
+    def __init__(self, db=None):
+        self.vector_store = VectorStoreService()
+        self.embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
+        self.collection_name = settings.QDRANT_COLLECTION
+
+    # ── Properties for external access ─────────────────────────
+
+    @property
+    def qdrant(self):
+        return self.vector_store.qdrant
+
+    # ── PDF Upload ─────────────────────────────────────────────
+
+    async def process_pdf_upload(self, file, db, manual_category=None) -> dict:
+        # TODO: Implement using PDFProcessor
+        raise NotImplementedError("PDF upload requires implementation with sub-processors")
+
+    # ── Manual Entry ───────────────────────────────────────────
+
+    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db) -> dict:
+        from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
+        return await ManualEntryProcessor(db, self.vector_store, self.embeddings).process(
+            title=title, content=content, category=manual_category
+        )
+
+    async def update_manual_entry(self, entry_id: str, updates: dict, db) -> dict:
+        from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
+        return await ManualEntryProcessor(db, self.vector_store, self.embeddings).update(
+            entry_id=entry_id, updates=updates
+        )
+
+    async def delete_manual_entry(self, entry_id: str, db) -> dict:
+        from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
+        return await ManualEntryProcessor(db, self.vector_store, self.embeddings).delete(
+            entry_id=entry_id
+        )
+
+    async def restore_manual_entry(self, entry_id: str, db) -> dict:
+        from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
+        return await ManualEntryProcessor(db, self.vector_store, self.embeddings).restore(
+            entry_id=entry_id
+        )
+
+    # ── Resolved Ticket ────────────────────────────────────────
+
+    async def process_resolved_ticket(self, payload: dict, db) -> dict:
+        from app.services.ingestion.ticket_processor import TicketProcessor
+        return await TicketProcessor(db, self.vector_store, self.embeddings).process(payload)
+
+    # ── Resolved Chat ──────────────────────────────────────────
+
+    async def process_resolved_chat(self, session_id: str, db) -> dict:
+        from app.services.ingestion.chat_learning_processor import ChatLearningProcessor
+        return await ChatLearningProcessor(db, self.vector_store, self.embeddings).process(
+            session_id=session_id
+        )
+
+    async def update_learned_chat(self, session_id: str, updates: dict, db) -> dict:
+        from app.services.ingestion.chat_learning_processor import ChatLearningProcessor
+        return await ChatLearningProcessor(db, self.vector_store, self.embeddings).update(
+            session_id=session_id, updates=updates
+        )
+
+    async def delete_learned_chat(self, session_id: str, db) -> dict:
+        from app.services.ingestion.chat_learning_processor import ChatLearningProcessor
+        return await ChatLearningProcessor(db, self.vector_store, self.embeddings).delete(
+            session_id=session_id
+        )
+
+    async def restore_learned_chat(self, session_id: str, db) -> dict:
+        from app.services.ingestion.chat_learning_processor import ChatLearningProcessor
+        return await ChatLearningProcessor(db, self.vector_store, self.embeddings).restore(
+            session_id=session_id
+        )
+
+    # ── Document Management ────────────────────────────────────
+
+    async def delete_document(self, document_id: str, db) -> dict:
+        from app.services.ingestion.document_processor import DocumentProcessor
+        return await DocumentProcessor(db, self.vector_store, self.embeddings).delete(
+            document_id=document_id
+        )
+
+    async def update_document(self, document_id: str, updates: dict, db) -> None:
+        from app.services.ingestion.document_processor import DocumentProcessor
+        await DocumentProcessor(db, self.vector_store, self.embeddings).update(
+            document_id=document_id, updates=updates
+        )

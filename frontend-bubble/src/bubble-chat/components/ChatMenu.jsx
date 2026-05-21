@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -18,7 +19,7 @@ import {
 import menuBarBackground
   from "../../assets/menubar-background.png"
 
-const options = [
+const MENU_OPTIONS = [
   {
     id: "history",
     label: "Chat History",
@@ -56,6 +57,11 @@ const options = [
   },
 ]
 
+const menuTransitionClass = `
+  transition-all
+  duration-200
+`
+
 const ChatMenu = ({
   resolved = false,
   onSelect,
@@ -68,13 +74,13 @@ const ChatMenu = ({
     useRef(null)
 
   /* ========================================
-     OUTSIDE CLICK
+     CLOSE HELPERS
   ======================================== */
 
   useEffect(() => {
 
     const handleOutsideClick =
-      (event) => {
+      event => {
 
         if (
           menuRef.current &&
@@ -87,30 +93,12 @@ const ChatMenu = ({
         }
       }
 
-    window.addEventListener(
-      "mousedown",
-      handleOutsideClick
-    )
-
-    return () =>
-      window.removeEventListener(
-        "mousedown",
-        handleOutsideClick
-      )
-
-  }, [])
-
-  /* ========================================
-     ESC CLOSE
-  ======================================== */
-
-  useEffect(() => {
-
     const handleEscape =
-      (event) => {
+      event => {
 
         if (
-          event.key === "Escape"
+          event.key ===
+          "Escape"
         ) {
 
           setOpen(false)
@@ -118,15 +106,27 @@ const ChatMenu = ({
       }
 
     window.addEventListener(
+      "mousedown",
+      handleOutsideClick
+    )
+
+    window.addEventListener(
       "keydown",
       handleEscape
     )
 
-    return () =>
+    return () => {
+
+      window.removeEventListener(
+        "mousedown",
+        handleOutsideClick
+      )
+
       window.removeEventListener(
         "keydown",
         handleEscape
       )
+    }
 
   }, [])
 
@@ -135,7 +135,7 @@ const ChatMenu = ({
   ======================================== */
 
   const handleSelect =
-    (id) => {
+    id => {
 
       if (
         resolved &&
@@ -150,6 +150,112 @@ const ChatMenu = ({
       setOpen(false)
     }
 
+  /* ========================================
+     OPTIONS
+  ======================================== */
+
+  const renderedOptions =
+    useMemo(
+      () =>
+        MENU_OPTIONS.map(
+          ({
+            id,
+            label,
+            icon: Icon,
+          }) => {
+
+            const isDisabled =
+              resolved &&
+              id === "resolve"
+
+            const RenderIcon =
+              isDisabled
+                ? Lock
+                : Icon
+
+            return (
+              <button
+                key={id}
+                type="button"
+                disabled={
+                  isDisabled
+                }
+                onClick={() =>
+                  handleSelect(id)
+                }
+                className={`
+                  group
+                  mb-1
+
+                  flex
+                  w-full
+                  items-center
+                  gap-2.5
+
+                  rounded-xl
+
+                  px-2.5
+                  py-2
+
+                  text-left
+
+                  transition-all
+                  duration-150
+
+                  ${
+                    isDisabled
+                      ? "cursor-not-allowed opacity-60"
+                      : "hover:bg-white/20 active:scale-[0.99]"
+                  }
+                `}
+              >
+
+                {/* ICON */}
+                <div
+                  className="
+                    flex
+                    h-7
+                    w-7
+                    items-center
+                    justify-center
+
+                    rounded-lg
+
+                    bg-white/15
+                  "
+                >
+                  <RenderIcon
+                    className="
+                      h-3.5
+                      w-3.5
+
+                      text-emerald-950
+                    "
+                  />
+                </div>
+
+                {/* TEXT */}
+                <span
+                  className="
+                    truncate
+
+                    text-[12px]
+                    font-medium
+
+                    text-emerald-950
+                  "
+                >
+                  {label}
+                </span>
+
+              </button>
+            )
+          }
+        ),
+
+      [resolved]
+    )
+
   return (
     <div
       ref={menuRef}
@@ -159,15 +265,14 @@ const ChatMenu = ({
       "
     >
 
-      {/* ====================================
-          BUTTON
-      ==================================== */}
-
+      {/* BUTTON */}
       <button
         type="button"
         aria-label="Chat menu"
         onClick={() =>
-          setOpen(prev => !prev)
+          setOpen(
+            prev => !prev
+          )
         }
         className={`
           flex
@@ -180,15 +285,14 @@ const ChatMenu = ({
 
           text-white
 
-          transition-all
-          duration-200
+          ${menuTransitionClass}
 
           hover:bg-white/12
           active:scale-95
 
           ${
             open
-              ? "bg-white/14 rotate-90"
+              ? "rotate-90 bg-white/14"
               : ""
           }
         `}
@@ -201,10 +305,7 @@ const ChatMenu = ({
         />
       </button>
 
-      {/* ====================================
-          DROPDOWN
-      ==================================== */}
-
+      {/* DROPDOWN */}
       <div
         className={`
           absolute
@@ -230,8 +331,7 @@ const ChatMenu = ({
 
           backdrop-blur-md
 
-          transition-all
-          duration-200
+          ${menuTransitionClass}
 
           ${
             open
@@ -251,15 +351,14 @@ const ChatMenu = ({
         `}
       >
 
-        {/* ====================================
-            BACKGROUND IMAGE (SOFTENED)
-        ==================================== */}
-
+        {/* BACKGROUND */}
         <div
           className="
             pointer-events-none
+
             absolute
             inset-0
+
             overflow-hidden
           "
         >
@@ -272,12 +371,17 @@ const ChatMenu = ({
               absolute
               left-1/2
               top-1/2
+
               h-[115%]
               w-[115%]
+
               -translate-x-1/2
               -translate-y-1/2
+
               object-cover
+
               opacity-[0.85]
+
               blur-[0.6px]
             "
           />
@@ -287,152 +391,62 @@ const ChatMenu = ({
               absolute
               inset-0
 
+              rounded-2xl
+
               bg-gradient-to-b
               from-white/20
               via-white/10
               to-white/25
-            "
-          />
 
-          <div
-            className="
-              absolute
-              inset-0
               ring-1
               ring-white/15
-              rounded-2xl
             "
           />
 
         </div>
 
-        {/* ====================================
-            HEADER (SIMPLIFIED)
-        ==================================== */}
-
+        {/* HEADER */}
         <div
           className="
             relative
             z-10
 
-            px-3
-            py-2
-
             border-b
             border-white/15
+
+            px-3
+            py-2
           "
         >
-
           <p
             className="
               text-[10px]
               font-semibold
               uppercase
+
               tracking-[0.18em]
+
               text-emerald-950
             "
           >
             Chat Options
           </p>
-
         </div>
 
-        {/* ====================================
-            OPTIONS
-        ==================================== */}
-
+        {/* OPTIONS */}
         <div
           className="
             relative
             z-10
+
             p-1.5
           "
         >
-
-          {options.map(
-            ({
-              id,
-              label,
-              icon: Icon,
-            }) => {
-
-              const isDisabled =
-                resolved && id === "resolve"
-
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  disabled={isDisabled}
-                  onClick={() => handleSelect(id)}
-                  className={`
-                    group
-                    mb-1
-
-                    flex
-                    w-full
-                    items-center
-                    gap-2.5
-
-                    rounded-xl
-
-                    px-2.5
-                    py-2
-
-                    text-left
-
-                    transition-all
-                    duration-150
-
-                    ${
-                      isDisabled
-                        ? "opacity-60 cursor-not-allowed"
-                        : "hover:bg-white/20 active:scale-[0.99]"
-                    }
-                  `}
-                >
-
-                  {/* ICON */}
-
-                  <div
-                    className="
-                      flex
-                      h-7
-                      w-7
-                      items-center
-                      justify-center
-                      rounded-lg
-                      bg-white/15
-                    "
-                  >
-                    {isDisabled ? (
-                      <Lock className="h-3.5 w-3.5 text-emerald-950" />
-                    ) : (
-                      <Icon className="h-3.5 w-3.5 text-emerald-950" />
-                    )}
-                  </div>
-
-                  {/* TEXT */}
-
-                  <span
-                    className="
-                      text-[12px]
-                      font-medium
-                      text-emerald-950
-                      truncate
-                    "
-                  >
-                    {label}
-                  </span>
-
-                </button>
-              )
-            }
-          )}
-
+          {renderedOptions}
         </div>
 
       </div>
+
     </div>
   )
 }

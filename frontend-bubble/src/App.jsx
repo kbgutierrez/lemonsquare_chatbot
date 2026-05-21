@@ -7,6 +7,10 @@ import {
 import BubbleChat
   from "./bubble-chat/BubbleChat.jsx"
 
+import {
+  updateRuntimeConfig,
+} from "./config/sqlVariables"
+
 /* ========================================
    SDK CONFIG HELPERS
 ======================================== */
@@ -17,7 +21,10 @@ const DEFAULT_CONFIG = {
       .VITE_API_BASE_URL ||
     "/api",
 
-  userToken: null,
+  userToken:
+    import.meta.env
+      .VITE_DEV_USER_TOKEN ||
+    "11318",
 
   environment:
     import.meta.env.MODE ||
@@ -74,21 +81,33 @@ const App = () => {
     const externalConfig =
       resolveGlobalConfig()
 
+    const mergedConfig = {
+      ...DEFAULT_CONFIG,
+      ...externalConfig,
+    }
+
     setSdkConfig(
-      (
-        previous
-      ) => ({
-        ...previous,
-        ...externalConfig,
-      })
+      mergedConfig
+    )
+
+    /*
+      CRITICAL FIX:
+      Sync runtime config back into
+      SDK_RUNTIME_CONFIG.
+
+      The frontend refactor removed
+      this synchronization path,
+      causing chatbotService to read
+      stale/null userToken values.
+    */
+
+    updateRuntimeConfig(
+      mergedConfig
     )
 
     console.log(
       "LEMONSQUARE_WIDGET_CONFIG",
-      {
-        ...DEFAULT_CONFIG,
-        ...externalConfig,
-      }
+      mergedConfig
     )
 
   }, [])
@@ -112,11 +131,7 @@ const App = () => {
         runtimeConfig.environment
       }
     >
-      <BubbleChat
-        runtimeConfig={
-          runtimeConfig
-        }
-      />
+      <BubbleChat />
     </div>
   )
 }

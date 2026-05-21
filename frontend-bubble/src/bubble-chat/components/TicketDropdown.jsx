@@ -8,23 +8,39 @@ const TicketDropdown = ({
   items,
   onChange,
 }) => {
+
   const [open, setOpen] =
     useState(false)
 
+  const toggleDropdown =
+    () => {
+
+      setOpen(
+        previous =>
+          !previous
+      )
+    }
+
+  const handleSelect =
+    item => {
+
+      onChange(item)
+
+      setOpen(false)
+    }
+
   return (
     <div className="relative z-[80]">
+
       <button
         type="button"
-        onClick={() =>
-          setOpen((prev) => !prev)
-        }
+        onClick={toggleDropdown}
         className="
           flex
           items-center
           gap-2
 
           rounded-2xl
-
           border
           border-violet-200
 
@@ -45,8 +61,15 @@ const TicketDropdown = ({
           hover:bg-violet-50
         "
       >
+
         {Icon && (
-          <Icon className="h-4 w-4 text-violet-500" />
+          <Icon
+            className="
+              h-4
+              w-4
+              text-violet-500
+            "
+          />
         )}
 
         {value}
@@ -66,6 +89,7 @@ const TicketDropdown = ({
             }
           `}
         />
+
       </button>
 
       <div
@@ -80,7 +104,6 @@ const TicketDropdown = ({
           overflow-hidden
 
           rounded-2xl
-
           border
           border-violet-100
 
@@ -106,14 +129,17 @@ const TicketDropdown = ({
           }
         `}
       >
-        {items.map((item) => (
+
+        {items.map(item => (
+
           <button
             key={item}
             type="button"
-            onClick={() => {
-              onChange(item)
-              setOpen(false)
-            }}
+            onClick={() =>
+              handleSelect(
+                item
+              )
+            }
             className="
               w-full
 
@@ -132,8 +158,11 @@ const TicketDropdown = ({
           >
             {item}
           </button>
+
         ))}
+
       </div>
+
     </div>
   )
 }

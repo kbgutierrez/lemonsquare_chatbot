@@ -5,149 +5,135 @@ import {
 } from "../../config/sqlVariables"
 
 /* ========================================
+   HELPERS
+======================================== */
+
+const log = (
+  label,
+  payload
+) =>
+  console.log(label, payload)
+
+const parseJsonSafely =
+  async (response) => {
+
+    try {
+      return await response.json()
+    } catch {
+      return null
+    }
+  }
+
+/* ========================================
    API REQUEST
 ======================================== */
 
-const apiRequest =
-  async ({
+const apiRequest = async ({
+  endpoint,
+  method = "GET",
+  body,
+  headers = {},
+}) => {
+
+  const response = await fetch(
     endpoint,
-    method = "GET",
-    body,
-    headers = {},
-  }) => {
+    {
+      method,
 
-    const response =
-      await fetch(
-        endpoint,
-        {
-          method,
+      headers: {
+        ...API_CONFIG.HEADERS,
+        ...headers,
+      },
 
-          headers: {
-            ...API_CONFIG.HEADERS,
-            ...headers,
-          },
-
-          body:
-            body
-              ? JSON.stringify(
-                  body
-                )
-              : undefined,
-        }
-      )
-
-    let data = null
-
-    try {
-
-      data =
-        await response.json()
-
-    } catch {
-
-      data = null
+      body:
+        body
+          ? JSON.stringify(body)
+          : undefined,
     }
+  )
 
-    if (
-      !response.ok
-    ) {
+  const data =
+    await parseJsonSafely(
+      response
+    )
 
-      throw new Error(
-        data?.detail ||
-        data?.message ||
-        "Request failed."
-      )
-    }
+  if (!response.ok) {
 
-    return data
+    throw new Error(
+      data?.detail ||
+      data?.message ||
+      "Request failed."
+    )
   }
 
+  return data
+}
+
 /* ========================================
-   GENERATE TICKET NUMBER
+   MESSAGE HELPERS
+======================================== */
+
+const getMessageContent = (
+  message
+) =>
+  message?.content ||
+  message?.text ||
+  message?.MessageContent ||
+  ""
+
+const getMessageRole = (
+  message
+) =>
+  message?.role ||
+  message?.sender ||
+  message?.SenderRole ||
+  ""
+
+const filterMessagesByRoles = (
+  messages,
+  allowedRoles
+) =>
+  messages.filter(message =>
+    allowedRoles.includes(
+      getMessageRole(message)
+    )
+  )
+
+/* ========================================
+   TICKET HELPERS
 ======================================== */
 
 const generateTicketNumber =
-  () => {
-
-    return `CHAT-${Date.now()}`
-  }
-
-/* ========================================
-   NORMALIZE MESSAGE
-======================================== */
-
-const getMessageContent =
-  (message) => {
-
-    return (
-      message?.content ||
-      message?.text ||
-      message?.MessageContent ||
-      ""
-    )
-  }
-
-const getMessageRole =
-  (message) => {
-
-    return (
-      message?.role ||
-      message?.sender ||
-      message?.SenderRole ||
-      ""
-    )
-  }
-
-/* ========================================
-   EXTRACT SUMMARY
-======================================== */
+  () =>
+    `CHAT-${Date.now()}`
 
 const extractConversationSummary =
   (messages = []) => {
 
     const userMessages =
-      messages.filter(
-        (message) => {
-
-          const role =
-            getMessageRole(
-              message
-            )
-
-          return (
-            role === "user"
-          )
-        }
+      filterMessagesByRoles(
+        messages,
+        ["user"]
       )
 
     const assistantMessages =
-      messages.filter(
-        (message) => {
-
-          const role =
-            getMessageRole(
-              message
-            )
-
-          return (
-            role === "assistant" ||
-            role === "agent" ||
-            role === "ai"
-          )
-        }
+      filterMessagesByRoles(
+        messages,
+        [
+          "assistant",
+          "agent",
+          "ai",
+        ]
       )
 
     const firstUserMessage =
       getMessageContent(
         userMessages[0]
-      ) ||
-      "User issue"
+      ) || "User issue"
 
     const latestAssistantMessage =
       getMessageContent(
-        assistantMessages[
-          assistantMessages.length - 1
-        ]
+        assistantMessages.at(-1)
       ) ||
       "Issue resolved."
 
@@ -176,7 +162,7 @@ const resolveTicket =
     messages,
   }) => {
 
-    console.log(
+    log(
       "RESOLVE_MESSAGES",
       messages
     )
@@ -209,7 +195,7 @@ const resolveTicket =
         extracted.work_done,
     }
 
-    console.log(
+    log(
       "SYNC_PAYLOAD",
       payload
     )
@@ -219,7 +205,7 @@ const resolveTicket =
         API_ENDPOINTS.TICKET_SYNC
       )
 
-    console.log(
+    log(
       "SYNC_ENDPOINT",
       endpoint
     )
@@ -231,14 +217,13 @@ const resolveTicket =
         body: payload,
       })
 
-    console.log(
+    log(
       "SYNC_RESPONSE",
       response
     )
 
     return {
       success: true,
-
       sessionId,
 
       ticketNumber:
@@ -249,20 +234,18 @@ const resolveTicket =
   }
 
 /* ========================================
-   GET ESCALATION DRAFT
+   ESCALATION
 ======================================== */
 
 const getEscalationDraft =
-  async (
-    sessionId
-  ) => {
+  async (sessionId) => {
 
     const endpoint =
       buildApiUrl(
         `/chat/escalate/draft/${sessionId}`
       )
 
-    console.log(
+    log(
       "ESCALATION_DRAFT_ENDPOINT",
       endpoint
     )
@@ -273,17 +256,13 @@ const getEscalationDraft =
         method: "GET",
       })
 
-    console.log(
+    log(
       "ESCALATION_DRAFT_RESPONSE",
       response
     )
 
     return response
   }
-
-/* ========================================
-   SUBMIT ESCALATION
-======================================== */
 
 const submitEscalation =
   async ({
@@ -302,7 +281,7 @@ const submitEscalation =
       description,
     }
 
-    console.log(
+    log(
       "ESCALATION_SUBMIT_PAYLOAD",
       payload
     )
@@ -312,7 +291,7 @@ const submitEscalation =
         "/chat/escalate/submit"
       )
 
-    console.log(
+    log(
       "ESCALATION_SUBMIT_ENDPOINT",
       endpoint
     )
@@ -324,7 +303,7 @@ const submitEscalation =
         body: payload,
       })
 
-    console.log(
+    log(
       "ESCALATION_SUBMIT_RESPONSE",
       response
     )
@@ -338,9 +317,7 @@ const submitEscalation =
 
 const ticketService = {
   resolveTicket,
-
   getEscalationDraft,
-
   submitEscalation,
 }
 

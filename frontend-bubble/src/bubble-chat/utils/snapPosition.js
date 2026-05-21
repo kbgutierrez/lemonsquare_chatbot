@@ -1,5 +1,59 @@
 import { CHAT_CONFIG } from "../constants/chatConfig"
 
+const {
+  EDGE_PADDING,
+  BUBBLE_SIZE,
+} = CHAT_CONFIG
+
+/* ========================================
+   HELPERS
+======================================== */
+
+const getScreenBounds = () => ({
+  width: window.innerWidth,
+  height: window.innerHeight,
+})
+
+const clamp = (
+  value,
+  min,
+  max
+) =>
+  Math.min(
+    Math.max(min, value),
+    max
+  )
+
+const getMaxX = (width) =>
+  width -
+  BUBBLE_SIZE -
+  EDGE_PADDING
+
+const getMaxY = (height) =>
+  height -
+  BUBBLE_SIZE -
+  EDGE_PADDING
+
+const clampX = (
+  x,
+  width
+) =>
+  clamp(
+    x,
+    EDGE_PADDING,
+    getMaxX(width)
+  )
+
+const clampY = (
+  y,
+  height
+) =>
+  clamp(
+    y,
+    EDGE_PADDING,
+    getMaxY(height)
+  )
+
 /* ========================================
    SNAP TO NEAREST SCREEN SIDE
    (USED FOR CLOSED BUBBLE)
@@ -11,138 +65,54 @@ export const getSideSnapPosition = (
 ) => {
 
   const {
-    EDGE_PADDING,
-    BUBBLE_SIZE,
-  } = CHAT_CONFIG
+    width,
+    height,
+  } = getScreenBounds()
 
-  const screenWidth =
-    window.innerWidth
-
-  const screenHeight =
-    window.innerHeight
-
-  /*
-    DISTANCE TO SIDES
-  */
-
-  const leftDistance =
-    x
-
-  const rightDistance =
-    screenWidth - x
-
-  const topDistance =
-    y
-
-  const bottomDistance =
-    screenHeight - y
-
-  const minDistance =
-    Math.min(
-      leftDistance,
-      rightDistance,
-      topDistance,
-      bottomDistance
-    )
-
-  /*
-    LEFT SIDE
-  */
-
-  if (
-    minDistance ===
-    leftDistance
-  ) {
-
-    return {
-      x: EDGE_PADDING,
-
-      y: Math.min(
-        Math.max(
-          EDGE_PADDING,
-          y
-        ),
-
-        screenHeight -
-          BUBBLE_SIZE -
-          EDGE_PADDING
-      ),
-    }
+  const distances = {
+    left: x,
+    right: width - x,
+    top: y,
+    bottom: height - y,
   }
 
-  /*
-    RIGHT SIDE
-  */
+  const nearestSide =
+    Object.entries(distances)
+      .sort(
+        (a, b) => a[1] - b[1]
+      )[0][0]
 
-  if (
-    minDistance ===
-    rightDistance
-  ) {
+  const clampedX =
+    clampX(x, width)
 
-    return {
-      x:
-        screenWidth -
-        BUBBLE_SIZE -
-        EDGE_PADDING,
+  const clampedY =
+    clampY(y, height)
 
-      y: Math.min(
-        Math.max(
-          EDGE_PADDING,
-          y
-        ),
+  switch (nearestSide) {
 
-        screenHeight -
-          BUBBLE_SIZE -
-          EDGE_PADDING
-      ),
-    }
-  }
+    case "left":
+      return {
+        x: EDGE_PADDING,
+        y: clampedY,
+      }
 
-  /*
-    TOP SIDE
-  */
+    case "right":
+      return {
+        x: getMaxX(width),
+        y: clampedY,
+      }
 
-  if (
-    minDistance ===
-    topDistance
-  ) {
+    case "top":
+      return {
+        x: clampedX,
+        y: EDGE_PADDING,
+      }
 
-    return {
-      x: Math.min(
-        Math.max(
-          EDGE_PADDING,
-          x
-        ),
-
-        screenWidth -
-          BUBBLE_SIZE -
-          EDGE_PADDING
-      ),
-
-      y: EDGE_PADDING,
-    }
-  }
-
-  /*
-    BOTTOM SIDE
-  */
-
-  return {
-    x: Math.min(
-      Math.max(
-        EDGE_PADDING,
-        x
-      ),
-
-      screenWidth -
-        BUBBLE_SIZE -
-        EDGE_PADDING
-    ),
-
-    y:
-      screenHeight -
-      BUBBLE_SIZE -
-      EDGE_PADDING,
+    default:
+      return {
+        x: clampedX,
+        y: getMaxY(height),
+      }
   }
 }
 
@@ -157,33 +127,19 @@ export const getCornerSnapPosition = (
 ) => {
 
   const {
-    EDGE_PADDING,
-    BUBBLE_SIZE,
-  } = CHAT_CONFIG
-
-  const screenWidth =
-    window.innerWidth
-
-  const screenHeight =
-    window.innerHeight
-
-  const snapLeft =
-    x < screenWidth / 2
-
-  const snapTop =
-    y < screenHeight / 2
+    width,
+    height,
+  } = getScreenBounds()
 
   return {
-    x: snapLeft
-      ? EDGE_PADDING
-      : screenWidth -
-        BUBBLE_SIZE -
-        EDGE_PADDING,
+    x:
+      x < width / 2
+        ? EDGE_PADDING
+        : getMaxX(width),
 
-    y: snapTop
-      ? EDGE_PADDING
-      : screenHeight -
-        BUBBLE_SIZE -
-        EDGE_PADDING,
+    y:
+      y < height / 2
+        ? EDGE_PADDING
+        : getMaxY(height),
   }
 }

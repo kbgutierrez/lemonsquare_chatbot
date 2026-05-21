@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
 } from "react"
 
 import {
@@ -41,6 +42,13 @@ const modalVariants = {
   },
 }
 
+const SIZE_CLASSES = {
+  sm: "max-w-md",
+  md: "max-w-xl",
+  lg: "max-w-2xl",
+  xl: "max-w-4xl",
+}
+
 const ModalShell = ({
   open = true,
 
@@ -67,10 +75,11 @@ const ModalShell = ({
   useEffect(() => {
 
     const handleKeyDown =
-      (event) => {
+      event => {
 
         if (
-          event.key === "Escape"
+          event.key ===
+          "Escape"
         ) {
 
           onClose?.()
@@ -92,16 +101,24 @@ const ModalShell = ({
 
   }, [onClose])
 
-  const sizeClass = {
-    sm: "max-w-md",
-    md: "max-w-xl",
-    lg: "max-w-2xl",
-    xl: "max-w-4xl",
-  }[size]
+  /* ========================================
+     SIZE CLASS
+  ======================================== */
+
+  const sizeClass =
+    useMemo(
+      () =>
+        SIZE_CLASSES[size] ||
+        SIZE_CLASSES.md,
+
+      [size]
+    )
 
   return (
     <AnimatePresence>
+
       {open && (
+
         <motion.div
           initial="hidden"
           animate="visible"
@@ -130,13 +147,17 @@ const ModalShell = ({
             backdrop-blur-[6px]
           "
         >
+
           {/* CLICK OUTSIDE */}
-          <div
+          <button
+            type="button"
+            aria-label="Close modal overlay"
+            onClick={onClose}
             className="
               absolute
               inset-0
+              cursor-default
             "
-            onClick={onClose}
           />
 
           {/* MODAL */}
@@ -162,8 +183,6 @@ const ModalShell = ({
               overflow-hidden
 
               rounded-[28px]
-              sm:rounded-[32px]
-
               border
               border-white/40
 
@@ -173,9 +192,12 @@ const ModalShell = ({
 
               backdrop-blur-2xl
 
+              sm:rounded-[32px]
+
               ${sizeClass}
             `}
           >
+
             {/* BACKGROUND */}
             <div
               className="
@@ -229,6 +251,7 @@ const ModalShell = ({
                 sm:px-5
               "
             >
+
               {/* LEFT */}
               <div
                 className="
@@ -238,6 +261,7 @@ const ModalShell = ({
                   gap-3
                 "
               >
+
                 {/* ICON */}
                 {icon && (
                   <div
@@ -262,6 +286,7 @@ const ModalShell = ({
 
                 {/* TEXT */}
                 <div className="min-w-0">
+
                   {subtitle && (
                     <p
                       className="
@@ -296,7 +321,9 @@ const ModalShell = ({
                       {title}
                     </h2>
                   )}
+
                 </div>
+
               </div>
 
               {/* ACTIONS */}
@@ -307,6 +334,7 @@ const ModalShell = ({
                   gap-2
                 "
               >
+
                 {headerActions}
 
                 {/* CLOSE */}
@@ -345,7 +373,9 @@ const ModalShell = ({
                     "
                   />
                 </button>
+
               </div>
+
             </div>
 
             {/* BODY */}
@@ -366,9 +396,13 @@ const ModalShell = ({
             >
               {children}
             </div>
+
           </motion.div>
+
         </motion.div>
+
       )}
+
     </AnimatePresence>
   )
 }
