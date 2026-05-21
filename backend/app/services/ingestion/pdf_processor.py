@@ -1,6 +1,7 @@
 """PDF ingestion processor."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -75,6 +76,12 @@ class PDFProcessor:
             logger.error("Document classification failed: %s", exc)
         return "General_IT"
 
+    @staticmethod
+    def _extract_pdf_text(filepath: str) -> str:
+        """Synchronous PDF extraction to be run in a thread."""
+        pdf_reader = PdfReader(filepath)
+        return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+
     async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
@@ -85,8 +92,9 @@ class PDFProcessor:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            pdf_reader = PdfReader(temp_file_path)
-            raw_text = "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+            # FIX: Offload the heavy PDF parsing to a separate thread
+            raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
+
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 

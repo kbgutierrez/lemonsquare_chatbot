@@ -479,6 +479,7 @@ Chat router — REFACTORED.
 All business logic extracted to chat domain services.
 Router is now pure HTTP: validates input, delegates, formats response.
 """
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -544,14 +545,15 @@ async def handle_chat(
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
 
-    session_id = session_mgr.get_or_create(chat_request.session_id, user_id)
+    session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
 
-    msg_svc.save_user_message(
+    await asyncio.to_thread(
+        msg_svc.save_user_message,
         session_id=session_id,
         content=chat_request.message,
     )
 
-    history_text = msg_svc.get_history_text(session_id)
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     ai_response, ticket_ids = await orchestrator.orchestrate(
         user_query=chat_request.message,
@@ -4553,6 +4555,7 @@ class ManualEntryProcessor:
 """PDF ingestion processor."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -4627,6 +4630,12 @@ class PDFProcessor:
             logger.error("Document classification failed: %s", exc)
         return "General_IT"
 
+    @staticmethod
+    def _extract_pdf_text(filepath: str) -> str:
+        """Synchronous PDF extraction to be run in a thread."""
+        pdf_reader = PdfReader(filepath)
+        return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+
     async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
@@ -4637,8 +4646,9 @@ class PDFProcessor:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            pdf_reader = PdfReader(temp_file_path)
-            raw_text = "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+            # FIX: Offload the heavy PDF parsing to a separate thread
+            raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
+
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 
@@ -5140,7 +5150,7 @@ class SupportOrchestrator:
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
-        raw_results = self.vector_store.federated_search(query_vector, limit=top_k)
+        raw_results = await asyncio.to_thread(self.vector_store.federated_search, query_vector, limit=top_k)
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
 
@@ -5158,7 +5168,7 @@ class SupportOrchestrator:
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
-            scored_results = self.reranker.rerank(search_query, retrieval_docs)
+            scored_results = await asyncio.to_thread(self.reranker.rerank, search_query, retrieval_docs)
         else:
             scored_results = sorted(
                 [(doc.score, doc) for doc in retrieval_docs],

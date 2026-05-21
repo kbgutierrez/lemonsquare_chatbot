@@ -169,7 +169,7 @@ class SupportOrchestrator:
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
-        raw_results = self.vector_store.federated_search(query_vector, limit=top_k)
+        raw_results = await asyncio.to_thread(self.vector_store.federated_search, query_vector, limit=top_k)
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
 
@@ -187,7 +187,7 @@ class SupportOrchestrator:
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
-            scored_results = self.reranker.rerank(search_query, retrieval_docs)
+            scored_results = await asyncio.to_thread(self.reranker.rerank, search_query, retrieval_docs)
         else:
             scored_results = sorted(
                 [(doc.score, doc) for doc in retrieval_docs],

@@ -3,6 +3,7 @@ Chat router — REFACTORED.
 All business logic extracted to chat domain services.
 Router is now pure HTTP: validates input, delegates, formats response.
 """
+import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -68,14 +69,15 @@ async def handle_chat(
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
 
-    session_id = session_mgr.get_or_create(chat_request.session_id, user_id)
+    session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
 
-    msg_svc.save_user_message(
+    await asyncio.to_thread(
+        msg_svc.save_user_message,
         session_id=session_id,
         content=chat_request.message,
     )
 
-    history_text = msg_svc.get_history_text(session_id)
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     ai_response, ticket_ids = await orchestrator.orchestrate(
         user_query=chat_request.message,
