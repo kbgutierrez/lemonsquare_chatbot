@@ -32,8 +32,10 @@ async def remove_learned_chat(
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service),
 ):
-    result = await ingestion_service.delete_learned_chat(session_id, db)
-    return result
+    try:
+        return await ingestion_service.delete_learned_chat(session_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/chats/{session_id}/restore", summary="Restore a deleted AI chat summary")

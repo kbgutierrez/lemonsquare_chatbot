@@ -126,6 +126,12 @@ class DocumentIngestionService:
             document_id=document_id
         )
 
+    async def restore_document(self, document_id: str, db) -> dict:
+        from app.services.ingestion.document_processor import DocumentProcessor
+        return await DocumentProcessor(db, self.vector_store, self.embeddings).restore(
+            document_id=document_id
+        )
+
     async def update_document(self, document_id: str, updates: dict, db) -> None:
         from app.services.ingestion.document_processor import DocumentProcessor
         await DocumentProcessor(db, self.vector_store, self.embeddings).update(

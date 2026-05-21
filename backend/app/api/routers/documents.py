@@ -85,6 +85,7 @@ async def debug_full_rag_pipeline(
         chat_history=chat_history,
         user_name=user_name,
         db=db,
+        limit=request.limit,
     )
     
     # Format the response for the frontend
@@ -169,6 +170,26 @@ async def delete_document(
         status=result.get("status", "success"),
         document_id=document_id
     )
+
+
+@router.post(
+    "/{document_id}/restore",
+    response_model=DocumentDeleteResponse,
+    summary="Restore a deleted document to the knowledge base",
+)
+async def restore_document(
+    document_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+) -> DocumentDeleteResponse:
+    try:
+        result = await ingestion_service.restore_document(document_id, db)
+        return DocumentDeleteResponse(
+            status=result.get("status", "success"),
+            document_id=document_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/manual", summary="Add manual text to KB")
