@@ -250,11 +250,27 @@ All endpoints you listed are implemented in `backend/app/api/routers/*` and moun
 
 ---
 
+## Runtime Configuration and Settings API
+
+- The settings API (`GET /api/settings`, `POST /api/settings`, `POST /api/settings/default`) now reads and writes AI configuration from the `AIChatbotSetting` SQL table.
+- Runtime settings are loaded through `SettingsRepository` and `RuntimeAIConfig`, so workflow services no longer hardcode prompt text or model names in service code.
+- Fields now managed in the DB include:
+  - `ActiveModel`, `ReformulatorModel`, `EmbeddingModel`, `RerankerModel`
+  - `SystemPrompt`, `ReformulatorPrompt`, `ChatExtractionPrompt`
+  - `EscalationDraftModel`, `EscalationDraftPrompt`
+  - `RoutingModel`, `RoutingPrompt`
+  - `DocumentClassifierModel`, `DocumentClassifierPrompt`
+  - `ConversationResolutionModel`, `ConversationResolutionPrompt`
+- This means the API for changing settings is the correct control plane for prompt/model updates.
+
+## Important implementation note
+
+- Most runtime prompt and model values are loaded dynamically from the active DB settings row per request.
+- One caveat: `SupportOrchestrator` resolves `EmbeddingModel` and `RerankerModel` at startup when it initializes. Changes to those two fields may not take effect until the orchestrator is recreated or the app restarts.
+
 ## Conclusion
 
 - All listed endpoints exist in routers.
 - The routes are mounted under `/api` in main.py.
-- The summary above shows, for each endpoint:
-  - expected user-facing response type,
-  - whether it involves Qdrant,
-  - whether it involves SQL.
+- The settings API does affect the AI runtime configuration, and prompt/model settings are now DB-backed.
+- The existing architecture appears correctly aligned with your enterprise runtime config goal, with a minor caveat for startup-loaded embedding/reranker models.

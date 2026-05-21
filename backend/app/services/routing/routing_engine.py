@@ -12,6 +12,7 @@ from app.services.prompts import build_routing_prompt
 from app.core.config import settings
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
 from app.utils.json_utils import clean_llm_json_output
+from app.services.settings.runtime_config import RuntimeAIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -89,14 +90,16 @@ async def suggest_route(
 
     # ── PHASE 2: REASONING ────────────────────────────────────
     valid_taxonomy_json = await get_live_taxonomy()
+    runtime_config = RuntimeAIConfig(db)
     prompt = build_routing_prompt(
+        prompt_template=runtime_config.routing_prompt,
         summary=request.summary,
         description=request.description,
         taxonomy_json=valid_taxonomy_json,
         retrieved_context=retrieved_context,
     )
 
-    llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
+    llm = create_llm(model=runtime_config.routing_model,temperature=0.0,)
 
     try:
         llm_result = await llm.ainvoke(prompt)

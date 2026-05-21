@@ -78,6 +78,19 @@ class AIChatbotSetting(BaseChatbot):
     CreatedDate = Column(DateTime, default=datetime.utcnow)
     UpdatedBy = Column(BigInteger)
 
+    EscalationDraftModel = Column(String(100))
+    EscalationDraftPrompt = Column(Text)
+
+    RoutingModel = Column(String(100))
+    RoutingPrompt = Column(Text)
+
+    DocumentClassifierModel = Column(String(100))
+    DocumentClassifierPrompt = Column(Text)
+
+    ConversationResolutionModel = Column(String(100))
+    ConversationResolutionPrompt = Column(Text)
+    
+
 
 class UploadedDocument(BaseChatbot):
     __tablename__ = "tbl_uploaded_documents"

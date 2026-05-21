@@ -43,6 +43,17 @@ def update_settings(
         UseReranker=new_settings.UseReranker,
         AllowedCategories=new_settings.AllowedCategories,
         ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
+        EscalationDraftModel=new_settings.EscalationDraftModel,
+        EscalationDraftPrompt=new_settings.EscalationDraftPrompt,
+
+        RoutingModel=new_settings.RoutingModel,
+        RoutingPrompt=new_settings.RoutingPrompt,
+
+        DocumentClassifierModel=new_settings.DocumentClassifierModel,
+        DocumentClassifierPrompt=new_settings.DocumentClassifierPrompt,
+
+        ConversationResolutionModel=new_settings.ConversationResolutionModel,
+        ConversationResolutionPrompt=new_settings.ConversationResolutionPrompt,
     )
 
 

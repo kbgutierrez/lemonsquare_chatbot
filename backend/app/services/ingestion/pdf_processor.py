@@ -13,7 +13,8 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationError, VectorStoreError
 from app.core.metadata_contract import build_pdf_metadata, build_qdrant_payload
-from app.models.chatbot import AIChatbotSetting, UploadedDocument
+from app.models.chatbot import UploadedDocument
+from app.services.settings.runtime_config import RuntimeAIConfig
 from app.services.ingestion.chunking_service import ChunkingService
 from app.services.ingestion.embedding_service import EmbeddingService
 from app.services.llm_client import create_llm
@@ -39,16 +40,17 @@ class PDFProcessor:
         self.embeddings = embeddings
         self.chunker = ChunkingService()
         self.embedding_service = EmbeddingService(embeddings)
+        self.runtime_config = RuntimeAIConfig(db)
 
     def _allowed_categories(self) -> list[str]:
-        active_config = (
-            self.db.query(AIChatbotSetting)
-            .filter(AIChatbotSetting.IsActive == True)
-            .order_by(AIChatbotSetting.SettingID.desc())
-            .first()
+        raw = self.runtime_config.settings.AllowedCategories
+
+        return (
+            [c.strip() for c in raw.split(",")]
+            if raw
+            else _DEFAULT_CATEGORIES
         )
-        raw = active_config.AllowedCategories if active_config and active_config.AllowedCategories else None
-        return [c.strip() for c in raw.split(",")] if raw else _DEFAULT_CATEGORIES
+
 
     @staticmethod
     def _validate_pdf_bytes(data: bytes) -> None:
@@ -63,12 +65,8 @@ class PDFProcessor:
     async def _classify_document(self, text: str, allowed_categories: list[str]) -> str:
         snippet = text[:3000]
         try:
-            llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
-            prompt = (
-                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
-                f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
-                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
-            )
+            llm = create_llm(model=self.runtime_config.document_classifier_model,temperature=0.0,)
+            prompt = self.runtime_config.document_classifier_prompt.format(snippet=snippet,allowed_categories=allowed_categories,)
             category = (await llm.ainvoke(prompt)).content.strip(" \"'\n")
             if category in allowed_categories:
                 return category
@@ -139,14 +137,26 @@ class PDFProcessor:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
-            self.db.add(UploadedDocument(
-                DocumentID=document_id,
-                FileName=file.filename or "document.pdf",
-                Category=category,
-                ChunkCount=len(chunks),
-                IsActive=True,
-            ))
-            self.db.commit()
+            try:
+                self.db.add(UploadedDocument(
+                    DocumentID=document_id,
+                    FileName=file.filename or "document.pdf",
+                    Category=category,
+                    ChunkCount=len(chunks),
+                    IsActive=True,
+                ))
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                try:
+                    self.vector_store.delete_points([point.id for point in points])
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to cleanup Qdrant points after DB failure for document %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+                raise
 
             return {
                 "status": "success",
