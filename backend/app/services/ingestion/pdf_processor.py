@@ -76,16 +76,6 @@ class PDFProcessor:
         return "General_IT"
 
     async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
-        existing_doc = (
-            self.db.query(UploadedDocument)
-            .filter(UploadedDocument.FileName == file.filename)
-            .first()
-        )
-        if existing_doc:
-            raise ValidationError(
-                f"File '{file.filename}' already exists in the database. Document ID: {existing_doc.DocumentID}"
-            )
-
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
 
@@ -137,6 +127,7 @@ class PDFProcessor:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
+            from sqlalchemy.exc import IntegrityError
             try:
                 self.db.add(UploadedDocument(
                     DocumentID=document_id,
@@ -146,6 +137,18 @@ class PDFProcessor:
                     IsActive=True,
                 ))
                 self.db.commit()
+            except IntegrityError as exc:
+                self.db.rollback()
+                # Clean up vectors if SQL insertion fails due to duplicate
+                try:
+                    self.vector_store.delete_points([point.id for point in points])
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to cleanup Qdrant points after duplicate DB failure for document %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+                raise ValidationError(f"File '{file.filename}' already exists in the database.") from exc
             except Exception as exc:
                 self.db.rollback()
                 try:

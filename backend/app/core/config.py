@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     BIZPORTAL_API_URL: str = (
         "http://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/user/details"
     )
+    BIZPORTAL_LOGIN_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/admin/login"
+    )
+    BIZPORTAL_TICKET_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
+    )
     BIZPORTAL_TIMEOUT: float = 5.0
 
     class Config:

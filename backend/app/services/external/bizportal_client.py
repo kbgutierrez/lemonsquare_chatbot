@@ -11,10 +11,7 @@ from app.utils.http_utils import safe_json
 logger = logging.getLogger(__name__)
 
 BIZPORTAL_USER_URL = settings.BIZPORTAL_API_URL
-BIZPORTAL_LOGIN_URL = (
-    "https://lsbizportal.lemonsquare.com.ph/"
-    "testportal/api/chatbot/admin/login"
-)
+BIZPORTAL_LOGIN_URL = settings.BIZPORTAL_LOGIN_URL
 
 
 class BizPortalClient:

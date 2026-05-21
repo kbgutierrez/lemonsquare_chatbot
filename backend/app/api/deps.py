@@ -3,6 +3,7 @@ FastAPI dependency providers.
 All injectable dependencies declared here. Routes import from this module.
 """
 from fastapi import Depends, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database import get_chatbot_db, get_helpdesk_db  # re-export
 from app.core.exceptions import AuthorizationError
@@ -10,6 +11,7 @@ from app.services.external.user_service import fetch_user_details
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
+security = HTTPBearer(auto_error=False)
 
 def get_orchestrator(request: Request) -> SupportOrchestrator:
     return request.app.state.orchestrator
@@ -31,8 +33,18 @@ def _is_admin_user(user_data: dict) -> bool:
     return any(str(value).strip().lower() in {"admin", "administrator", "true", "1"} for value in role_values)
 
 
-async def get_current_user(user_token: str = Query(..., min_length=1)) -> dict:
-    return await fetch_user_details(user_token)
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    if not credentials:
+        # Temporary fallback for Admin UI until it sends Bearer tokens
+        return {
+            "id": 9999,
+            "username": "kbgutierrez",
+            "role": "admin",
+            "firstname": "KB",
+            "lastname": "Gutierrez",
+            "is_admin": True
+        }
+    return await fetch_user_details(credentials.credentials)
 
 
 async def require_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
