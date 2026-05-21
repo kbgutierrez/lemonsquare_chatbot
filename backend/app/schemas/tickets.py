@@ -1,7 +1,5 @@
 """Pydantic schemas for ticket management endpoints."""
-
 from uuid import UUID
-
 from pydantic import BaseModel, Field
 
 
@@ -61,9 +59,7 @@ class TicketSubmitRequest(BaseModel):
     session_id: UUID
     requester_id: int
     company_id: int
-
     summary: str = Field(..., min_length=3, max_length=255)
     description: str = Field(..., min_length=3)
-
     department_id: int
     subcategory_id: int
