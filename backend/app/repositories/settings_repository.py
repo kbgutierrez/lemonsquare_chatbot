@@ -72,6 +72,18 @@ class SettingsRepository:
             UseReranker=overrides.get("UseReranker", source.UseReranker if source else True),
             AllowedCategories=overrides.get("AllowedCategories", source.AllowedCategories if source else None),
             ChatExtractionPrompt=overrides.get("ChatExtractionPrompt", source.ChatExtractionPrompt if source else None),
+            EscalationDraftModel=overrides.get("EscalationDraftModel", source.EscalationDraftModel if source else None),
+            EscalationDraftPrompt=overrides.get("EscalationDraftPrompt", source.EscalationDraftPrompt if source else None),
+
+            RoutingModel=overrides.get("RoutingModel", source.RoutingModel if source else None),
+            RoutingPrompt=overrides.get("RoutingPrompt", source.RoutingPrompt if source else None),
+
+            DocumentClassifierModel=overrides.get("DocumentClassifierModel", source.DocumentClassifierModel if source else None),
+            DocumentClassifierPrompt=overrides.get("DocumentClassifierPrompt", source.DocumentClassifierPrompt if source else None),
+
+            ConversationResolutionModel=overrides.get("ConversationResolutionModel", source.ConversationResolutionModel if source else None),
+            ConversationResolutionPrompt=overrides.get("ConversationResolutionPrompt", source.ConversationResolutionPrompt if source else None),
+                        
             IsActive=True,
             UpdatedBy=updated_by,
         )

@@ -4,7 +4,8 @@ Uses centralized LLM client and prompt templates.
 """
 import logging
 from app.services.llm_client import create_llm
-from app.services.prompts import CONVERSATION_RESOLUTION_PROMPT
+from sqlalchemy.orm import Session
+from app.services.settings.runtime_config import RuntimeAIConfig
 from app.utils.json_utils import safe_json_loads
 
 logger = logging.getLogger(__name__)
@@ -16,8 +17,13 @@ class ConversationResolutionService:
     Runs AFTER RAG generation. Does NOT affect retrieval or answers.
     """
 
-    def __init__(self) -> None:
-        self.llm = create_llm(temperature=0.0)
+    def __init__(self, db: Session) -> None:
+        self.runtime_config = RuntimeAIConfig(db)
+
+        self.llm = create_llm(
+            model=self.runtime_config.conversation_resolution_model,
+            temperature=0.0,
+        )
 
     async def analyze_conversation(
         self,
@@ -26,7 +32,7 @@ class ConversationResolutionService:
         chat_history: str,
     ) -> dict:
         try:
-            prompt = CONVERSATION_RESOLUTION_PROMPT.format(
+            prompt = self.runtime_config.conversation_resolution_prompt.format(
                 user_query=user_query,
                 ai_response=ai_response,
                 chat_history=chat_history or "No previous history.",
@@ -56,6 +62,3 @@ class ConversationResolutionService:
             "resolution_confidence": 0.0,
         }
 
-
-# Module-level singleton for import convenience
-conversation_resolution_service = ConversationResolutionService()

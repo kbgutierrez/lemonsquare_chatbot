@@ -98,6 +98,7 @@ backend\app/
 │   │   └── routing_engine.py
 │   ├── settings
 │   │   ├── __init__.py
+│   │   ├── runtime_config.py
 │   │   └── settings_service.py
 │   └── taxonomy
 │       ├── __init__.py
@@ -800,6 +801,7 @@ async def debug_full_rag_pipeline(
         chat_history=chat_history,
         user_name=user_name,
         db=db,
+        limit=request.limit,
     )
     
     # Format the response for the frontend
@@ -884,6 +886,26 @@ async def delete_document(
         status=result.get("status", "success"),
         document_id=document_id
     )
+
+
+@router.post(
+    "/{document_id}/restore",
+    response_model=DocumentDeleteResponse,
+    summary="Restore a deleted document to the knowledge base",
+)
+async def restore_document(
+    document_id: str,
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+) -> DocumentDeleteResponse:
+    try:
+        result = await ingestion_service.restore_document(document_id, db)
+        return DocumentDeleteResponse(
+            status=result.get("status", "success"),
+            document_id=document_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/manual", summary="Add manual text to KB")
@@ -1219,8 +1241,10 @@ async def remove_learned_chat(
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service),
 ):
-    result = await ingestion_service.delete_learned_chat(session_id, db)
-    return result
+    try:
+        return await ingestion_service.delete_learned_chat(session_id, db)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/chats/{session_id}/restore", summary="Restore a deleted AI chat summary")
@@ -1918,6 +1942,19 @@ class AIChatbotSetting(BaseChatbot):
     CreatedDate = Column(DateTime, default=datetime.utcnow)
     UpdatedBy = Column(BigInteger)
 
+    EscalationDraftModel = Column(String(100))
+    EscalationDraftPrompt = Column(Text)
+
+    RoutingModel = Column(String(100))
+    RoutingPrompt = Column(Text)
+
+    DocumentClassifierModel = Column(String(100))
+    DocumentClassifierPrompt = Column(Text)
+
+    ConversationResolutionModel = Column(String(100))
+    ConversationResolutionPrompt = Column(Text)
+    
+
 
 class UploadedDocument(BaseChatbot):
     __tablename__ = "tbl_uploaded_documents"
@@ -2416,6 +2453,18 @@ class SettingsRepository:
             UseReranker=overrides.get("UseReranker", source.UseReranker if source else True),
             AllowedCategories=overrides.get("AllowedCategories", source.AllowedCategories if source else None),
             ChatExtractionPrompt=overrides.get("ChatExtractionPrompt", source.ChatExtractionPrompt if source else None),
+            EscalationDraftModel=overrides.get("EscalationDraftModel", source.EscalationDraftModel if source else None),
+            EscalationDraftPrompt=overrides.get("EscalationDraftPrompt", source.EscalationDraftPrompt if source else None),
+
+            RoutingModel=overrides.get("RoutingModel", source.RoutingModel if source else None),
+            RoutingPrompt=overrides.get("RoutingPrompt", source.RoutingPrompt if source else None),
+
+            DocumentClassifierModel=overrides.get("DocumentClassifierModel", source.DocumentClassifierModel if source else None),
+            DocumentClassifierPrompt=overrides.get("DocumentClassifierPrompt", source.DocumentClassifierPrompt if source else None),
+
+            ConversationResolutionModel=overrides.get("ConversationResolutionModel", source.ConversationResolutionModel if source else None),
+            ConversationResolutionPrompt=overrides.get("ConversationResolutionPrompt", source.ConversationResolutionPrompt if source else None),
+                        
             IsActive=True,
             UpdatedBy=updated_by,
         )
@@ -2713,6 +2762,18 @@ class SettingsUpdate(BaseModel):
     UseReranker: bool
     ChatExtractionPrompt: str | None
     AllowedCategories: str = Field(..., min_length=1)
+    EscalationDraftModel: str | None
+    EscalationDraftPrompt: str | None
+
+    RoutingModel: str | None
+    RoutingPrompt: str | None
+
+    DocumentClassifierModel: str | None
+    DocumentClassifierPrompt: str | None
+
+    ConversationResolutionModel: str | None
+    ConversationResolutionPrompt: str | None
+    
 
 
 class SettingsResponse(BaseModel):
@@ -2731,6 +2792,18 @@ class SettingsResponse(BaseModel):
     UseReranker: bool | None
     AllowedCategories: str | None
     IsActive: bool
+
+    EscalationDraftModel: str | None
+    EscalationDraftPrompt: str | None
+
+    RoutingModel: str | None
+    RoutingPrompt: str | None
+
+    DocumentClassifierModel: str | None
+    DocumentClassifierPrompt: str | None
+
+    ConversationResolutionModel: str | None
+    ConversationResolutionPrompt: str | None
 
     class Config:
         from_attributes = True
@@ -2909,8 +2982,8 @@ ESCALATION_DRAFT_PROMPT = (
 # =========================================================
 # ROUTING
 # =========================================================
-def build_routing_prompt(summary: str, description: str, taxonomy_json: str, retrieved_context: str) -> str:
-    return (
+def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrieved_context: str,prompt_template: str | None = None,) -> str:
+    template = prompt_template or (
         "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
         "Department and Subcategory.\n\n"
         "CRITICAL RULES:\n"
@@ -2918,20 +2991,22 @@ def build_routing_prompt(summary: str, description: str, taxonomy_json: str, ret
         "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
         "department.\n"
         "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
-        f"VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
+        "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
         "REQUIRED JSON SCHEMA:\n"
-        "{\n"
+        "{{\n"
         '  "department_id": integer,\n'
         '  "subcategory_id": integer,\n'
         '  "department_name": "string",\n'
         '  "subcategory_name": "string",\n'
         '  "confidence": float (0.0 to 1.0),\n'
         '  "reasoning": "string" (1-sentence technical explanation)\n'
-        "}\n\n"
-        f"NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
-        f"HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+        "}}\n\n"
+        "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
+        "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
         "JSON OUTPUT:"
     )
+
+    return template.format(summary=summary,description=description,taxonomy_json=taxonomy_json,retrieved_context=retrieved_context)
 
 # =========================================================
 # CONVERSATION RESOLUTION
@@ -2988,6 +3063,21 @@ def build_consolidation_prompt(cluster_payloads: list[str]) -> str:
         "Output ONLY the finalized guide text. Do not use markdown blocks.\n\n"
         f"TICKETS TO MERGE:\n{combined}"
     )
+
+
+def build_document_classifier_prompt(snippet: str,allowed_categories: str,) -> str:
+        return (
+            "You are an IT categorization AI. "
+            "Read this document snippet:\n\n"
+            "{snippet}\n\n"
+            "Categorize it into EXACTLY ONE of these categories:\n"
+            "{allowed_categories}\n\n"
+            "Reply with ONLY the exact category name. "
+            "Do not add punctuation or extra words."
+        ).format(
+            snippet=snippet,
+            allowed_categories=allowed_categories,
+        )
 
 
 --- FILE: backend\app\services\analytics\__init__.py ---
@@ -3054,13 +3144,13 @@ import json
 import logging
 import httpx
 from sqlalchemy.orm import Session
-from app.core.config import settings
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
 from app.services.chat.message_service import MessageService
 from app.services.llm_client import create_llm
-from app.services.prompts import ESCALATION_DRAFT_PROMPT
+
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
+from app.services.settings.runtime_config import RuntimeAIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -3094,11 +3184,13 @@ class EscalationService:
         """
         session = self.repo.validate_session_for_escalation(session_id)
         transcript = self.message_svc.get_transcript(session_id)
+        runtime_config = RuntimeAIConfig(self.db)
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
-        prompt = ESCALATION_DRAFT_PROMPT.format(transcript=transcript)
+        llm = create_llm(model=runtime_config.escalation_draft_model,temperature=0.0,)
+        
+        prompt = runtime_config.escalation_draft_prompt.format(transcript=transcript,)
 
         result = await llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
@@ -3570,7 +3662,7 @@ import logging
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
 from app.models.chatbot import ChatMessage, ChatSession, LearnedChat
-from app.core.exceptions import ValidationError
+from app.core.exceptions import ValidationError, VectorStoreError
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
 logger = logging.getLogger(__name__)
@@ -3615,9 +3707,7 @@ class ChatLearningProcessor:
         learned.WorkDone = "Resolved via chat"
         learned.IsActive = True
         session.SessionStatus = "Resolved"
-        self.db.commit()
 
-        # Build and embed
         record = self.consolidator.build_chat_record(
             session_id=session_id,
             issue_reported=learned.IssueReported,
@@ -3628,11 +3718,29 @@ class ChatLearningProcessor:
 
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            self.db.rollback()
+            raise VectorStoreError(f"Failed to upsert learned chat to Qdrant: {exc}") from exc
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                self.vector_store.delete_points([record.point_id])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to cleanup Qdrant point after DB failure for learned chat %s: %s",
+                    session_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {
             "status": "success",
@@ -3644,14 +3752,18 @@ class ChatLearningProcessor:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
             raise ValueError(f"Learned chat '{session_id}' not found.")
+        if learned.IsActive is False:
+            raise ValueError(f"Learned chat '{session_id}' is inactive. Restore it before updating.")
+
+        original_reported = learned.IssueReported
+        original_found = learned.IssueFound
+        original_cause = learned.RootCause
+        original_work = learned.WorkDone
 
         for field in ["issue_reported", "issue_found", "issue_cause", "work_done"]:
             if field in updates and updates[field] is not None:
                 setattr(learned, field.replace("issue_cause", "RootCause").replace("issue_reported", "IssueReported").replace("issue_found", "IssueFound").replace("work_done", "WorkDone"), updates[field])
 
-        self.db.commit()
-
-        # Re-embed
         record = self.consolidator.build_chat_record(
             session_id=session_id,
             issue_reported=learned.IssueReported,
@@ -3659,45 +3771,102 @@ class ChatLearningProcessor:
             issue_cause=learned.RootCause,
             work_done=learned.WorkDone,
         )
+        record.metadata["is_active"] = bool(learned.IsActive)
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            self.db.rollback()
+            raise VectorStoreError(f"Failed to upsert updated learned chat to Qdrant: {exc}") from exc
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                old_record = self.consolidator.build_chat_record(
+                    session_id=session_id,
+                    issue_reported=original_reported,
+                    issue_found=original_found,
+                    issue_cause=original_cause,
+                    work_done=original_work,
+                )
+                old_record.metadata["is_active"] = bool(learned.IsActive)
+                old_vector = await asyncio.to_thread(self.embeddings.embed_query, old_record.page_content)
+                self.vector_store.upsert_points([PointStruct(
+                    id=old_record.point_id,
+                    vector=old_vector,
+                    payload={"page_content": old_record.page_content, "metadata": old_record.metadata}
+                )])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to revert Qdrant point after DB failure for learned chat %s: %s",
+                    session_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "message": f"Learned chat {session_id} updated."}
 
     async def delete(self, session_id: str) -> dict:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
-            raise ValueError(f"Learned chat '{session_id}' not found.")
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} was not found.",
+            }
+
+        if learned.IsActive is False:
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} is already inactive.",
+            }
+
+        try:
+            self.vector_store.soft_delete_by_metadata("source_id", session_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to soft delete learned chat in Qdrant: {exc}") from exc
 
         learned.IsActive = False
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                self.vector_store.restore_by_metadata("source_id", session_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to restore Qdrant point after DB failure for learned chat %s: %s",
+                    session_id,
+                    cleanup_exc,
+                )
+            raise
 
-        # Remove from Qdrant
-        record = self.consolidator.build_chat_record(
-            session_id=session_id,
-            issue_reported=learned.IssueReported,
-            issue_found=learned.IssueFound,
-            issue_cause=learned.RootCause,
-            work_done=learned.WorkDone,
-        )
-        self.vector_store.delete_points([record.point_id])
-
-        return {"status": "success", "message": f"Learned chat {session_id} deleted."}
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "message": f"Learned chat {session_id} was soft-deleted.",
+        }
 
     async def restore(self, session_id: str) -> dict:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
             raise ValueError(f"Learned chat '{session_id}' not found.")
+        if learned.IsActive is True:
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} is already active.",
+            }
 
-        learned.IsActive = True
-        self.db.commit()
-
-        # Rebuild vector
         record = self.consolidator.build_chat_record(
             session_id=session_id,
             issue_reported=learned.IssueReported,
@@ -3705,13 +3874,34 @@ class ChatLearningProcessor:
             issue_cause=learned.RootCause,
             work_done=learned.WorkDone,
         )
+        record.metadata["is_active"] = True
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+            self.vector_store.restore_by_metadata("source_id", session_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to restore learned chat in Qdrant: {exc}") from exc
+
+        learned.IsActive = True
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                self.vector_store.soft_delete_by_metadata("source_id", session_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to rollback Qdrant restore after DB failure for learned chat %s: %s",
+                    session_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "message": f"Learned chat {session_id} restored."}
 
@@ -3757,11 +3947,57 @@ class DocumentProcessor:
         doc = self.doc_repo.get_document_by_id(document_id)
         if not doc:
             return {"status": "error", "message": f"Document {document_id} not found."}
+        if doc.IsActive is False:
+            return {"status": "skipped", "document_id": document_id, "message": "Document is already inactive."}
+
+        try:
+            self.vector_store.soft_delete_by_metadata("document_id", document_id)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to soft delete document in Qdrant: {exc}") from exc
 
         doc.IsActive = False
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                self.vector_store.restore_by_metadata("document_id", document_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to rollback Qdrant document soft-delete after DB error for %s: %s",
+                    document_id,
+                    cleanup_exc,
+                )
+            raise
 
-        self.vector_store.soft_delete_by_metadata("document_id", document_id)
+        return {"status": "success", "document_id": document_id}
+
+    async def restore(self, document_id: str) -> dict:
+        doc = self.doc_repo.get_document_by_id(document_id)
+        if not doc:
+            raise ValueError(f"Document '{document_id}' not found.")
+        if doc.IsActive is True:
+            return {"status": "skipped", "document_id": document_id, "message": "Document is already active."}
+
+        try:
+            self.vector_store.restore_by_metadata("document_id", document_id)
+        except Exception as exc:
+            raise RuntimeError(f"Failed to restore document in Qdrant: {exc}") from exc
+
+        doc.IsActive = True
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            try:
+                self.vector_store.soft_delete_by_metadata("document_id", document_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to rollback Qdrant document restore after DB error for %s: %s",
+                    document_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "document_id": document_id}
 
@@ -3769,31 +4005,66 @@ class DocumentProcessor:
         doc = self.doc_repo.get_document_by_id(document_id)
         if not doc:
             raise ValueError(f"Document '{document_id}' not found.")
+        if doc.IsActive is False:
+            raise ValueError(f"Document '{document_id}' is inactive. Restore it before updating.")
+
+        original_file_name = doc.FileName
+        original_category = doc.Category
+        payload_updates = {}
 
         if "file_name" in updates and updates["file_name"]:
             doc.FileName = updates["file_name"]
+            payload_updates["source"] = updates["file_name"]
+            payload_updates["file_name"] = updates["file_name"]
         if "category" in updates and updates["category"]:
             doc.Category = updates["category"]
+            payload_updates["category"] = updates["category"]
 
-        self.db.commit()
-
-        payload_updates = {}
-        if "file_name" in updates and updates["file_name"]:
-            payload_updates["metadata.source"] = updates["file_name"]
-            payload_updates["metadata.file_name"] = updates["file_name"]
-        if "category" in updates and updates["category"]:
-            payload_updates["metadata.category"] = updates["category"]
         if payload_updates:
             from qdrant_client.http import models as qdrant_models
-            self.vector_store.set_payload_by_filter(
-                [
-                    qdrant_models.FieldCondition(
-                        key="metadata.document_id",
-                        match=qdrant_models.MatchValue(value=document_id),
+            try:
+                self.vector_store.update_metadata_by_filter(
+                    [
+                        qdrant_models.FieldCondition(
+                            key="metadata.document_id",
+                            match=qdrant_models.MatchValue(value=document_id),
+                        )
+                    ],
+                    payload_updates,
+                )
+            except Exception as exc:
+                self.db.rollback()
+                raise RuntimeError(f"Failed to update document metadata in Qdrant: {exc}") from exc
+
+        try:
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            if payload_updates:
+                try:
+                    rollback_updates = {}
+                    if "file_name" in updates and updates["file_name"]:
+                        rollback_updates["source"] = original_file_name
+                        rollback_updates["file_name"] = original_file_name
+                    if "category" in updates and updates["category"]:
+                        rollback_updates["category"] = original_category
+                    from qdrant_client.http import models as qdrant_models
+                    self.vector_store.update_metadata_by_filter(
+                        [
+                            qdrant_models.FieldCondition(
+                                key="metadata.document_id",
+                                match=qdrant_models.MatchValue(value=document_id),
+                            )
+                        ],
+                        rollback_updates,
                     )
-                ],
-                payload_updates,
-            )
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to rollback Qdrant document metadata update after DB error for %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+            raise
 
 
 --- FILE: backend\app\services\ingestion\embedding_service.py ---
@@ -3941,6 +4212,12 @@ class DocumentIngestionService:
             document_id=document_id
         )
 
+    async def restore_document(self, document_id: str, db) -> dict:
+        from app.services.ingestion.document_processor import DocumentProcessor
+        return await DocumentProcessor(db, self.vector_store, self.embeddings).restore(
+            document_id=document_id
+        )
+
     async def update_document(self, document_id: str, updates: dict, db) -> None:
         from app.services.ingestion.document_processor import DocumentProcessor
         await DocumentProcessor(db, self.vector_store, self.embeddings).update(
@@ -3954,10 +4231,11 @@ Manual knowledge entry processor.
 Handles create, update, delete, restore for manual KB rules.
 """
 import logging
+import uuid
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+from app.core.exceptions import VectorStoreError
 from app.models.chatbot import ManualKnowledgeEntry
-from app.repositories.document_repository import DocumentRepository
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
 logger = logging.getLogger(__name__)
@@ -3972,30 +4250,47 @@ class ManualEntryProcessor:
 
     async def process(self, title: str, content: str, category: str | None) -> dict:
         resolved_category = category or "General_IT"
+        entry_id = str(uuid.uuid4())
         entry = ManualKnowledgeEntry(
+            EntryID=entry_id,
             Title=title,
             Content=content,
             Category=resolved_category,
             IsActive=True,
         )
-        self.db.add(entry)
-        self.db.commit()
-        self.db.refresh(entry)
 
-        # Build and embed
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=title,
             content=content,
             category=resolved_category,
         )
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to upsert manual entry to Qdrant: {exc}") from exc
+
+        try:
+            self.db.add(entry)
+            self.db.commit()
+            self.db.refresh(entry)
+        except Exception as exc:
+            try:
+                self.vector_store.delete_points([record.point_id])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to cleanup Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {
             "entry_id": entry.EntryID,
@@ -4013,6 +4308,12 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is False:
+            raise ValueError(f"Manual entry '{entry_id}' is inactive. Restore it before updating.")
+
+        original_title = entry.Title
+        original_content = entry.Content
+        original_category = entry.Category
 
         if "title" in updates and updates["title"]:
             entry.Title = updates["title"]
@@ -4021,23 +4322,56 @@ class ManualEntryProcessor:
         if "category" in updates and updates["category"]:
             entry.Category = updates["category"]
 
-        self.db.commit()
-        self.db.refresh(entry)
-
-        # Re-embed
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=entry.Title,
             content=entry.Content,
             category=entry.Category,
         )
+        record.metadata["is_active"] = bool(entry.IsActive)
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            self.db.rollback()
+            raise VectorStoreError(f"Failed to upsert updated manual entry to Qdrant: {exc}") from exc
+
+        try:
+            self.db.commit()
+            self.db.refresh(entry)
+        except Exception as exc:
+            logger.warning(
+                "DB commit failed after Qdrant update for manual entry %s, attempting rollback.",
+                entry_id,
+            )
+            self.db.rollback()
+            try:
+                old_record = self.consolidator.build_manual_record(
+                    entry_id=entry.EntryID,
+                    title=original_title,
+                    content=original_content,
+                    category=original_category,
+                )
+                old_record.metadata["is_active"] = bool(entry.IsActive)
+                old_vector = await asyncio.to_thread(self.embeddings.embed_query, original_content)
+                self.vector_store.upsert_points([PointStruct(
+                    id=old_record.point_id,
+                    vector=old_vector,
+                    payload={"page_content": old_record.page_content, "metadata": old_record.metadata}
+                )])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to revert Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {
             "entry_id": entry.EntryID,
@@ -4053,20 +4387,30 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is False:
+            return {"status": "skipped", "message": f"Manual entry {entry_id} is already inactive."}
+
+        try:
+            self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to soft delete manual entry in Qdrant: {exc}") from exc
 
         entry.IsActive = False
-        self.db.commit()
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            try:
+                self.vector_store.restore_by_metadata("source_id", entry_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to restore Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
-        # Remove from Qdrant
-        record = self.consolidator.build_manual_record(
-            entry_id=entry.EntryID,
-            title=entry.Title,
-            content=entry.Content,
-            category=entry.Category,
-        )
-        self.vector_store.delete_points([record.point_id])
-
-        return {"status": "success", "message": f"Manual entry {entry_id} deleted."}
+        return {"status": "success", "message": f"Manual entry {entry_id} soft-deleted."}
 
     async def restore(self, entry_id: str) -> dict:
         entry = self.db.query(ManualKnowledgeEntry).filter(
@@ -4074,24 +4418,43 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is True:
+            return {"status": "skipped", "message": f"Manual entry {entry_id} is already active."}
 
-        entry.IsActive = True
-        self.db.commit()
-
-        # Rebuild vector
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=entry.Title,
             content=entry.Content,
             category=entry.Category,
         )
+        record.metadata["is_active"] = True
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+            self.vector_store.restore_by_metadata("source_id", entry_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to restore manual entry in Qdrant: {exc}") from exc
+
+        entry.IsActive = True
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            try:
+                self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to rollback Qdrant restore after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "message": f"Manual entry {entry_id} restored."}
 
@@ -4112,7 +4475,8 @@ from sqlalchemy.orm import Session
 
 from app.core.exceptions import ValidationError, VectorStoreError
 from app.core.metadata_contract import build_pdf_metadata, build_qdrant_payload
-from app.models.chatbot import AIChatbotSetting, UploadedDocument
+from app.models.chatbot import UploadedDocument
+from app.services.settings.runtime_config import RuntimeAIConfig
 from app.services.ingestion.chunking_service import ChunkingService
 from app.services.ingestion.embedding_service import EmbeddingService
 from app.services.llm_client import create_llm
@@ -4138,16 +4502,17 @@ class PDFProcessor:
         self.embeddings = embeddings
         self.chunker = ChunkingService()
         self.embedding_service = EmbeddingService(embeddings)
+        self.runtime_config = RuntimeAIConfig(db)
 
     def _allowed_categories(self) -> list[str]:
-        active_config = (
-            self.db.query(AIChatbotSetting)
-            .filter(AIChatbotSetting.IsActive == True)
-            .order_by(AIChatbotSetting.SettingID.desc())
-            .first()
+        raw = self.runtime_config.settings.AllowedCategories
+
+        return (
+            [c.strip() for c in raw.split(",")]
+            if raw
+            else _DEFAULT_CATEGORIES
         )
-        raw = active_config.AllowedCategories if active_config and active_config.AllowedCategories else None
-        return [c.strip() for c in raw.split(",")] if raw else _DEFAULT_CATEGORIES
+
 
     @staticmethod
     def _validate_pdf_bytes(data: bytes) -> None:
@@ -4162,12 +4527,8 @@ class PDFProcessor:
     async def _classify_document(self, text: str, allowed_categories: list[str]) -> str:
         snippet = text[:3000]
         try:
-            llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
-            prompt = (
-                f"You are an IT categorization AI. Read this document snippet: '{snippet}'. "
-                f"Categorize it into EXACTLY ONE of these categories: {allowed_categories}. "
-                "Reply with ONLY the exact category name. Do not add punctuation or extra words."
-            )
+            llm = create_llm(model=self.runtime_config.document_classifier_model,temperature=0.0,)
+            prompt = self.runtime_config.document_classifier_prompt.format(snippet=snippet,allowed_categories=allowed_categories,)
             category = (await llm.ainvoke(prompt)).content.strip(" \"'\n")
             if category in allowed_categories:
                 return category
@@ -4238,14 +4599,26 @@ class PDFProcessor:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
-            self.db.add(UploadedDocument(
-                DocumentID=document_id,
-                FileName=file.filename or "document.pdf",
-                Category=category,
-                ChunkCount=len(chunks),
-                IsActive=True,
-            ))
-            self.db.commit()
+            try:
+                self.db.add(UploadedDocument(
+                    DocumentID=document_id,
+                    FileName=file.filename or "document.pdf",
+                    Category=category,
+                    ChunkCount=len(chunks),
+                    IsActive=True,
+                ))
+                self.db.commit()
+            except Exception as exc:
+                self.db.rollback()
+                try:
+                    self.vector_store.delete_points([point.id for point in points])
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to cleanup Qdrant points after DB failure for document %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+                raise
 
             return {
                 "status": "success",
@@ -4444,6 +4817,7 @@ Rewrites vague user queries into specific IT search queries.
 Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
+import json
 from app.services.llm_client import create_llm
 from app.services.prompts import DEFAULT_REFORMULATOR_PROMPT
 
@@ -4481,7 +4855,24 @@ class QueryReformulator:
             user_query=user_query,
         )
         result = await llm.ainvoke(rewrite_prompt)
-        return result.content.strip(' "\'\n')
+        raw_output = result.content.strip()
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+
+        try:
+            parsed = json.loads(raw_output)
+            if isinstance(parsed, list):
+                candidates = [str(item).strip() for item in parsed if str(item).strip()]
+                if candidates:
+                    return candidates[0]
+            if isinstance(parsed, str) and parsed.strip():
+                return parsed.strip()
+        except Exception:
+            pass
+
+        return raw_output.strip(' "\'\n')
 
 
 --- FILE: backend\app\services\rag\support_orchestrator.py ---
@@ -4508,6 +4899,18 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MAIN_MODEL = "llama-3.3-70b-versatile"
 _DEFAULT_REFORMULATOR_MODEL = "llama-3.1-8b-instant"
+LOW_SIGNAL_QUERIES = {
+    "hi",
+    "hello",
+    "hey",
+    "thanks",
+    "thank you",
+    "ok",
+    "okay",
+    "good morning",
+    "good afternoon",
+    "good evening",
+}
 
 
 class SupportOrchestrator:
@@ -4569,10 +4972,18 @@ class SupportOrchestrator:
         chat_history: str,
         user_name: str,
         db: Session,
+        limit: int | None = None,
     ) -> dict:
         """Debug version with detailed pipeline info."""
         try:
-            return await self._run_pipeline(user_query, chat_history, user_name, db, debug=True)
+            return await self._run_pipeline(
+                user_query,
+                chat_history,
+                user_name,
+                db,
+                debug=True,
+                limit=limit,
+            )
         except Exception as exc:
             logger.error("Orchestrator debug pipeline failed: %s", exc, exc_info=True)
             raise AIProcessingError(f"AI debug pipeline error: {exc}") from exc
@@ -4584,14 +4995,29 @@ class SupportOrchestrator:
         user_name: str,
         db: Session,
         debug: bool = False,
+        limit: int | None = None,
     ):
         # ── 1. Load Dynamic Settings ──────────────────────────────
+        normalized_query = user_query.lower().strip()
+        if normalized_query in LOW_SIGNAL_QUERIES:
+            greeting_response = "Hello! How can I help you with your IT issue today?"
+            if debug:
+                return {
+                    "original_query": user_query,
+                    "reformulated_query": user_query,
+                    "retrieval_results": [],
+                    "final_answer": greeting_response,
+                    "ticket_ids_used": [],
+                }
+            return greeting_response, []
+
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
 
         use_reformulator = bool(config.UseReformulator if config and config.UseReformulator is not None else True)
         use_reranker = bool(config.UseReranker if config and config.UseReranker is not None else True)
-        top_k = config.TopK_Tickets if config and config.TopK_Tickets else 5
+        top_k = limit or (config.TopK_Tickets if config and config.TopK_Tickets else 5)
+        top_k = max(1, min(int(top_k), 20))
         main_model = config.ActiveModel if config else _DEFAULT_MAIN_MODEL
         reformulator_model = config.ReformulatorModel if config and config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL
         temperature = float(config.Temperature) if config else 0.2
@@ -4608,12 +5034,16 @@ class SupportOrchestrator:
         # ── 2. Query Reformulation ────────────────────────────────
         search_query = user_query
         if use_reformulator:
-            search_query = await self.reformulator.reformulate(
-                user_query=user_query,
-                chat_history=chat_history,
-                model=reformulator_model,
-                prompt_template=reformulator_prompt,
-            )
+            try:
+                search_query = await self.reformulator.reformulate(
+                    user_query=user_query,
+                    chat_history=chat_history,
+                    model=reformulator_model,
+                    prompt_template=reformulator_prompt,
+                )
+            except Exception as exc:
+                logger.warning("Reformulator failed; using original query. Error: %s", exc)
+                search_query = user_query
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
@@ -4747,7 +5177,8 @@ Uses centralized LLM client and prompt templates.
 """
 import logging
 from app.services.llm_client import create_llm
-from app.services.prompts import CONVERSATION_RESOLUTION_PROMPT
+from sqlalchemy.orm import Session
+from app.services.settings.runtime_config import RuntimeAIConfig
 from app.utils.json_utils import safe_json_loads
 
 logger = logging.getLogger(__name__)
@@ -4759,8 +5190,13 @@ class ConversationResolutionService:
     Runs AFTER RAG generation. Does NOT affect retrieval or answers.
     """
 
-    def __init__(self) -> None:
-        self.llm = create_llm(temperature=0.0)
+    def __init__(self, db: Session) -> None:
+        self.runtime_config = RuntimeAIConfig(db)
+
+        self.llm = create_llm(
+            model=self.runtime_config.conversation_resolution_model,
+            temperature=0.0,
+        )
 
     async def analyze_conversation(
         self,
@@ -4769,7 +5205,7 @@ class ConversationResolutionService:
         chat_history: str,
     ) -> dict:
         try:
-            prompt = CONVERSATION_RESOLUTION_PROMPT.format(
+            prompt = self.runtime_config.conversation_resolution_prompt.format(
                 user_query=user_query,
                 ai_response=ai_response,
                 chat_history=chat_history or "No previous history.",
@@ -4799,9 +5235,6 @@ class ConversationResolutionService:
             "resolution_confidence": 0.0,
         }
 
-
-# Module-level singleton for import convenience
-conversation_resolution_service = ConversationResolutionService()
 
 
 --- FILE: backend\app\services\retrieval\__init__.py ---
@@ -4928,19 +5361,27 @@ class VectorStoreService:
 
     def ensure_payload_indexes(self) -> None:
         """Create Qdrant payload indexes required by runtime filters."""
-        try:
-            self.qdrant.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="metadata.is_active",
-                field_schema=PayloadSchemaType.BOOL,
-            )
-            logger.info("Created Qdrant payload index for metadata.is_active.")
-        except Exception as exc:
-            message = str(exc).lower()
-            if "already exists" in message or "already" in message:
-                logger.info("Qdrant payload index for metadata.is_active already exists.")
-                return
-            logger.warning("Could not create metadata.is_active payload index: %s", exc)
+        indexes = {
+            "metadata.is_active": PayloadSchemaType.BOOL,
+            "metadata.doc_type": PayloadSchemaType.KEYWORD,
+            "metadata.source_id": PayloadSchemaType.KEYWORD,
+            "metadata.document_id": PayloadSchemaType.KEYWORD,
+            "metadata.ticket_number": PayloadSchemaType.KEYWORD,
+        }
+        for field_name, field_schema in indexes.items():
+            try:
+                self.qdrant.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field_name,
+                    field_schema=field_schema,
+                )
+                logger.info("Created Qdrant payload index for %s.", field_name)
+            except Exception as exc:
+                message = str(exc).lower()
+                if "already exists" in message or "already" in message:
+                    logger.info("Qdrant payload index for %s already exists.", field_name)
+                    continue
+                logger.warning("Could not create payload index for %s: %s", field_name, exc)
 
     def backfill_active_metadata(self, batch_size: int = 256) -> int:
         """
@@ -5068,6 +5509,32 @@ class VectorStoreService:
             points=qdrant_models.Filter(must=filter_conditions),
         )
 
+    def update_metadata_by_filter(self, filter_conditions: list, metadata_updates: dict) -> None:
+        """Update nested metadata fields without depending on dotted payload semantics."""
+        filter_selector = qdrant_models.Filter(must=filter_conditions)
+        offset = None
+        while True:
+            points, offset = self.qdrant.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=filter_selector,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+                with_vectors=True,
+            )
+            if not points:
+                break
+            updated = []
+            for point in points:
+                payload = dict(getattr(point, "payload", {}) or {})
+                metadata = normalize_metadata(payload.get("metadata", {}))
+                metadata.update(metadata_updates)
+                payload["metadata"] = metadata
+                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
+            self.upsert_points(updated)
+            if offset is None:
+                break
+
     def soft_delete_by_metadata(self, key: str, value) -> None:
         """Mark matching vectors inactive without removing them from Qdrant."""
         self._set_metadata_active_by_filter(key, value, is_active=False)
@@ -5085,28 +5552,12 @@ class VectorStoreService:
                 )
             ]
         )
-        offset = None
-        while True:
-            points, offset = self.qdrant.scroll(
-                collection_name=self.collection_name,
-                scroll_filter=filter_selector,
-                limit=100,
-                offset=offset,
-                with_payload=True,
-                with_vectors=True,
-            )
-            if not points:
-                break
-            updated = []
-            for point in points:
-                payload = dict(getattr(point, "payload", {}) or {})
-                metadata = normalize_metadata(payload.get("metadata", {}))
-                metadata["is_active"] = is_active
-                payload["metadata"] = metadata
-                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
-            self.upsert_points(updated)
-            if offset is None:
-                break
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload={"is_active": is_active},
+            points=filter_selector,
+            key="metadata",
+        )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
         """Hard-delete blacklisted ticket vectors through the central lifecycle layer."""
@@ -5142,6 +5593,7 @@ from app.services.prompts import build_routing_prompt
 from app.core.config import settings
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
 from app.utils.json_utils import clean_llm_json_output
+from app.services.settings.runtime_config import RuntimeAIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -5219,14 +5671,16 @@ async def suggest_route(
 
     # ── PHASE 2: REASONING ────────────────────────────────────
     valid_taxonomy_json = await get_live_taxonomy()
+    runtime_config = RuntimeAIConfig(db)
     prompt = build_routing_prompt(
+        prompt_template=runtime_config.routing_prompt,
         summary=request.summary,
         description=request.description,
         taxonomy_json=valid_taxonomy_json,
         retrieved_context=retrieved_context,
     )
 
-    llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
+    llm = create_llm(model=runtime_config.routing_model,temperature=0.0,)
 
     try:
         llm_result = await llm.ainvoke(prompt)
@@ -5301,6 +5755,104 @@ async def suggest_route(
 --- FILE: backend\app\services\settings\__init__.py ---
 
 
+--- FILE: backend\app\services\settings\runtime_config.py ---
+"""
+Runtime AI configuration access layer.
+
+Centralizes:
+- active AI settings loading
+- workflow-specific fallback logic
+- future cache insertion point
+
+This prevents workflow services from:
+- directly querying SQL
+- duplicating fallback logic
+- hardcoding models/prompts
+"""
+
+from sqlalchemy.orm import Session
+
+
+
+
+from app.repositories.settings_repository import SettingsRepository
+from app.services.prompts import (
+    ESCALATION_DRAFT_PROMPT,
+    CONVERSATION_RESOLUTION_PROMPT,
+    build_document_classifier_prompt,
+
+)
+
+
+DEFAULT_ROUTING_MODEL = "llama-3.1-8b-instant"
+DEFAULT_DOCUMENT_CLASSIFIER_MODEL = "llama-3.1-8b-instant"
+DEFAULT_ESCALATION_MODEL = "llama-3.1-8b-instant"
+DEFAULT_CONVERSATION_RESOLUTION_MODEL = "llama-3.1-8b-instant"
+
+
+class RuntimeAIConfig:
+
+    def __init__(self, db: Session):
+        self.settings = SettingsRepository(db).require_active_settings()
+
+    @property
+    def routing_model(self) -> str:
+        return (
+            self.settings.RoutingModel
+            or DEFAULT_ROUTING_MODEL
+        )
+
+    @property
+    def routing_prompt(self) -> str:
+        return (
+            self.settings.RoutingPrompt
+            or ""
+        )
+
+    @property
+    def escalation_draft_model(self) -> str:
+        return (
+            self.settings.EscalationDraftModel
+            or DEFAULT_ESCALATION_MODEL
+        )
+
+    @property
+    def escalation_draft_prompt(self) -> str:
+        return (
+            self.settings.EscalationDraftPrompt
+            or ESCALATION_DRAFT_PROMPT
+        )
+
+    @property
+    def document_classifier_model(self) -> str:
+        return (
+            self.settings.DocumentClassifierModel
+            or DEFAULT_DOCUMENT_CLASSIFIER_MODEL
+        )
+
+    @property
+    def document_classifier_prompt(self) -> str:
+        return (
+            self.settings.DocumentClassifierPrompt
+            or build_document_classifier_prompt(snippet="{snippet}",allowed_categories="{allowed_categories}",)
+        )
+
+    @property
+    def conversation_resolution_model(self) -> str:
+        return (
+            self.settings.ConversationResolutionModel
+            or DEFAULT_CONVERSATION_RESOLUTION_MODEL
+        )
+
+    @property
+    def conversation_resolution_prompt(self) -> str:
+        return (
+            self.settings.ConversationResolutionPrompt
+            or CONVERSATION_RESOLUTION_PROMPT
+        )
+    
+    
+
 --- FILE: backend\app\services\settings\settings_service.py ---
 """
 AI settings management service — REFACTORED.
@@ -5347,6 +5899,17 @@ def update_settings(
         UseReranker=new_settings.UseReranker,
         AllowedCategories=new_settings.AllowedCategories,
         ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
+        EscalationDraftModel=new_settings.EscalationDraftModel,
+        EscalationDraftPrompt=new_settings.EscalationDraftPrompt,
+
+        RoutingModel=new_settings.RoutingModel,
+        RoutingPrompt=new_settings.RoutingPrompt,
+
+        DocumentClassifierModel=new_settings.DocumentClassifierModel,
+        DocumentClassifierPrompt=new_settings.DocumentClassifierPrompt,
+
+        ConversationResolutionModel=new_settings.ConversationResolutionModel,
+        ConversationResolutionPrompt=new_settings.ConversationResolutionPrompt,
     )
 
 
