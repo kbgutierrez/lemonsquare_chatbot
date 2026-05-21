@@ -28,6 +28,8 @@ backend\app/
 │   ├── metadata_contract.py
 │   ├── rate_limit.py
 │   └── retrieval_models.py
+├── external
+│   └── groqapi.py
 ├── main.py
 ├── models
 │   ├── __init__.py
@@ -1951,6 +1953,26 @@ class RetrievalDocument:
         )
 
 
+--- FILE: backend\app\external\groqapi.py ---
+import os
+
+import requests
+from dotenv import load_dotenv
+
+
+load_dotenv("backend/.env")
+
+url = "https://api.groq.com/openai/v1/models"
+
+headers = {
+    "Authorization": f"Bearer {os.getenv('GROQ_API_KEY')}"
+}
+
+response = requests.get(url, headers=headers)
+
+print(response.status_code)
+print(response.json())
+
 --- FILE: backend\app\models\__init__.py ---
 
 
@@ -2686,6 +2708,8 @@ class ChatResponse(BaseModel):
     session_id: str
     response: str
     ticket_ids_used: list[int] = Field(default_factory=list)
+    show_resolution_prompt: bool = False 
+    allow_ticket_submission: bool = True
 
 
 class MessageRecord(BaseModel):
