@@ -57,19 +57,27 @@ class VectorStoreService:
 
     def ensure_payload_indexes(self) -> None:
         """Create Qdrant payload indexes required by runtime filters."""
-        try:
-            self.qdrant.create_payload_index(
-                collection_name=self.collection_name,
-                field_name="metadata.is_active",
-                field_schema=PayloadSchemaType.BOOL,
-            )
-            logger.info("Created Qdrant payload index for metadata.is_active.")
-        except Exception as exc:
-            message = str(exc).lower()
-            if "already exists" in message or "already" in message:
-                logger.info("Qdrant payload index for metadata.is_active already exists.")
-                return
-            logger.warning("Could not create metadata.is_active payload index: %s", exc)
+        indexes = {
+            "metadata.is_active": PayloadSchemaType.BOOL,
+            "metadata.doc_type": PayloadSchemaType.KEYWORD,
+            "metadata.source_id": PayloadSchemaType.KEYWORD,
+            "metadata.document_id": PayloadSchemaType.KEYWORD,
+            "metadata.ticket_number": PayloadSchemaType.KEYWORD,
+        }
+        for field_name, field_schema in indexes.items():
+            try:
+                self.qdrant.create_payload_index(
+                    collection_name=self.collection_name,
+                    field_name=field_name,
+                    field_schema=field_schema,
+                )
+                logger.info("Created Qdrant payload index for %s.", field_name)
+            except Exception as exc:
+                message = str(exc).lower()
+                if "already exists" in message or "already" in message:
+                    logger.info("Qdrant payload index for %s already exists.", field_name)
+                    continue
+                logger.warning("Could not create payload index for %s: %s", field_name, exc)
 
     def backfill_active_metadata(self, batch_size: int = 256) -> int:
         """
@@ -196,6 +204,32 @@ class VectorStoreService:
             payload=payload,
             points=qdrant_models.Filter(must=filter_conditions),
         )
+
+    def update_metadata_by_filter(self, filter_conditions: list, metadata_updates: dict) -> None:
+        """Update nested metadata fields without depending on dotted payload semantics."""
+        filter_selector = qdrant_models.Filter(must=filter_conditions)
+        offset = None
+        while True:
+            points, offset = self.qdrant.scroll(
+                collection_name=self.collection_name,
+                scroll_filter=filter_selector,
+                limit=100,
+                offset=offset,
+                with_payload=True,
+                with_vectors=True,
+            )
+            if not points:
+                break
+            updated = []
+            for point in points:
+                payload = dict(getattr(point, "payload", {}) or {})
+                metadata = normalize_metadata(payload.get("metadata", {}))
+                metadata.update(metadata_updates)
+                payload["metadata"] = metadata
+                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
+            self.upsert_points(updated)
+            if offset is None:
+                break
 
     def soft_delete_by_metadata(self, key: str, value) -> None:
         """Mark matching vectors inactive without removing them from Qdrant."""

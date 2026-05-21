@@ -4,6 +4,7 @@ Rewrites vague user queries into specific IT search queries.
 Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
+import json
 from app.services.llm_client import create_llm
 from app.services.prompts import DEFAULT_REFORMULATOR_PROMPT
 
@@ -41,4 +42,21 @@ class QueryReformulator:
             user_query=user_query,
         )
         result = await llm.ainvoke(rewrite_prompt)
-        return result.content.strip(' "\'\n')
+        raw_output = result.content.strip()
+        if raw_output.startswith("```json"):
+            raw_output = raw_output[7:-3].strip()
+        elif raw_output.startswith("```"):
+            raw_output = raw_output[3:-3].strip()
+
+        try:
+            parsed = json.loads(raw_output)
+            if isinstance(parsed, list):
+                candidates = [str(item).strip() for item in parsed if str(item).strip()]
+                if candidates:
+                    return candidates[0]
+            if isinstance(parsed, str) and parsed.strip():
+                return parsed.strip()
+        except Exception:
+            pass
+
+        return raw_output.strip(' "\'\n')

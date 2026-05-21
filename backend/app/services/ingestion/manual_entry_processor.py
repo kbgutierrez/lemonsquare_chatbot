@@ -62,6 +62,8 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is False:
+            raise ValueError(f"Manual entry '{entry_id}' is inactive. Restore it before updating.")
 
         if "title" in updates and updates["title"]:
             entry.Title = updates["title"]
@@ -80,6 +82,7 @@ class ManualEntryProcessor:
             content=entry.Content,
             category=entry.Category,
         )
+        record.metadata["is_active"] = bool(entry.IsActive)
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
         self.vector_store.upsert_points([PointStruct(
@@ -102,20 +105,15 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is False:
+            return {"status": "skipped", "message": f"Manual entry {entry_id} is already inactive."}
 
         entry.IsActive = False
         self.db.commit()
 
-        # Remove from Qdrant
-        record = self.consolidator.build_manual_record(
-            entry_id=entry.EntryID,
-            title=entry.Title,
-            content=entry.Content,
-            category=entry.Category,
-        )
-        self.vector_store.delete_points([record.point_id])
+        self.vector_store.soft_delete_by_metadata("source_id", entry_id)
 
-        return {"status": "success", "message": f"Manual entry {entry_id} deleted."}
+        return {"status": "success", "message": f"Manual entry {entry_id} soft-deleted."}
 
     async def restore(self, entry_id: str) -> dict:
         entry = self.db.query(ManualKnowledgeEntry).filter(
@@ -123,6 +121,8 @@ class ManualEntryProcessor:
         ).first()
         if not entry:
             raise ValueError(f"Manual entry '{entry_id}' not found.")
+        if entry.IsActive is True:
+            return {"status": "skipped", "message": f"Manual entry {entry_id} is already active."}
 
         entry.IsActive = True
         self.db.commit()
@@ -134,6 +134,7 @@ class ManualEntryProcessor:
             content=entry.Content,
             category=entry.Category,
         )
+        record.metadata["is_active"] = True
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
         self.vector_store.upsert_points([PointStruct(
@@ -141,5 +142,6 @@ class ManualEntryProcessor:
             vector=vector,
             payload={"page_content": record.page_content, "metadata": record.metadata}
         )])
+        self.vector_store.restore_by_metadata("source_id", entry_id)
 
         return {"status": "success", "message": f"Manual entry {entry_id} restored."}

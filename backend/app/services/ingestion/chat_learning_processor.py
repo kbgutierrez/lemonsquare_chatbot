@@ -80,6 +80,8 @@ class ChatLearningProcessor:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
             raise ValueError(f"Learned chat '{session_id}' not found.")
+        if learned.IsActive is False:
+            raise ValueError(f"Learned chat '{session_id}' is inactive. Restore it before updating.")
 
         for field in ["issue_reported", "issue_found", "issue_cause", "work_done"]:
             if field in updates and updates[field] is not None:
@@ -95,6 +97,7 @@ class ChatLearningProcessor:
             issue_cause=learned.RootCause,
             work_done=learned.WorkDone,
         )
+        record.metadata["is_active"] = bool(learned.IsActive)
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
         self.vector_store.upsert_points([PointStruct(
@@ -108,27 +111,40 @@ class ChatLearningProcessor:
     async def delete(self, session_id: str) -> dict:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
-            raise ValueError(f"Learned chat '{session_id}' not found.")
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} was not found.",
+            }
+
+        if learned.IsActive is False:
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} is already inactive.",
+            }
 
         learned.IsActive = False
         self.db.commit()
 
-        # Remove from Qdrant
-        record = self.consolidator.build_chat_record(
-            session_id=session_id,
-            issue_reported=learned.IssueReported,
-            issue_found=learned.IssueFound,
-            issue_cause=learned.RootCause,
-            work_done=learned.WorkDone,
-        )
-        self.vector_store.delete_points([record.point_id])
+        self.vector_store.soft_delete_by_metadata("source_id", session_id)
 
-        return {"status": "success", "message": f"Learned chat {session_id} deleted."}
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "message": f"Learned chat {session_id} was soft-deleted.",
+        }
 
     async def restore(self, session_id: str) -> dict:
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
             raise ValueError(f"Learned chat '{session_id}' not found.")
+        if learned.IsActive is True:
+            return {
+                "status": "skipped",
+                "session_id": session_id,
+                "message": f"Learned chat {session_id} is already active.",
+            }
 
         learned.IsActive = True
         self.db.commit()
@@ -141,6 +157,7 @@ class ChatLearningProcessor:
             issue_cause=learned.RootCause,
             work_done=learned.WorkDone,
         )
+        record.metadata["is_active"] = True
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
         self.vector_store.upsert_points([PointStruct(
@@ -148,5 +165,6 @@ class ChatLearningProcessor:
             vector=vector,
             payload={"page_content": record.page_content, "metadata": record.metadata}
         )])
+        self.vector_store.restore_by_metadata("source_id", session_id)
 
         return {"status": "success", "message": f"Learned chat {session_id} restored."}

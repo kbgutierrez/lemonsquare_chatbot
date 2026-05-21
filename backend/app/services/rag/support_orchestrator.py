@@ -21,6 +21,18 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MAIN_MODEL = "llama-3.3-70b-versatile"
 _DEFAULT_REFORMULATOR_MODEL = "llama-3.1-8b-instant"
+LOW_SIGNAL_QUERIES = {
+    "hi",
+    "hello",
+    "hey",
+    "thanks",
+    "thank you",
+    "ok",
+    "okay",
+    "good morning",
+    "good afternoon",
+    "good evening",
+}
 
 
 class SupportOrchestrator:
@@ -82,10 +94,18 @@ class SupportOrchestrator:
         chat_history: str,
         user_name: str,
         db: Session,
+        limit: int | None = None,
     ) -> dict:
         """Debug version with detailed pipeline info."""
         try:
-            return await self._run_pipeline(user_query, chat_history, user_name, db, debug=True)
+            return await self._run_pipeline(
+                user_query,
+                chat_history,
+                user_name,
+                db,
+                debug=True,
+                limit=limit,
+            )
         except Exception as exc:
             logger.error("Orchestrator debug pipeline failed: %s", exc, exc_info=True)
             raise AIProcessingError(f"AI debug pipeline error: {exc}") from exc
@@ -97,14 +117,29 @@ class SupportOrchestrator:
         user_name: str,
         db: Session,
         debug: bool = False,
+        limit: int | None = None,
     ):
         # ── 1. Load Dynamic Settings ──────────────────────────────
+        normalized_query = user_query.lower().strip()
+        if normalized_query in LOW_SIGNAL_QUERIES:
+            greeting_response = "Hello! How can I help you with your IT issue today?"
+            if debug:
+                return {
+                    "original_query": user_query,
+                    "reformulated_query": user_query,
+                    "retrieval_results": [],
+                    "final_answer": greeting_response,
+                    "ticket_ids_used": [],
+                }
+            return greeting_response, []
+
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
 
         use_reformulator = bool(config.UseReformulator if config and config.UseReformulator is not None else True)
         use_reranker = bool(config.UseReranker if config and config.UseReranker is not None else True)
-        top_k = config.TopK_Tickets if config and config.TopK_Tickets else 5
+        top_k = limit or (config.TopK_Tickets if config and config.TopK_Tickets else 5)
+        top_k = max(1, min(int(top_k), 20))
         main_model = config.ActiveModel if config else _DEFAULT_MAIN_MODEL
         reformulator_model = config.ReformulatorModel if config and config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL
         temperature = float(config.Temperature) if config else 0.2
@@ -121,12 +156,16 @@ class SupportOrchestrator:
         # ── 2. Query Reformulation ────────────────────────────────
         search_query = user_query
         if use_reformulator:
-            search_query = await self.reformulator.reformulate(
-                user_query=user_query,
-                chat_history=chat_history,
-                model=reformulator_model,
-                prompt_template=reformulator_prompt,
-            )
+            try:
+                search_query = await self.reformulator.reformulate(
+                    user_query=user_query,
+                    chat_history=chat_history,
+                    model=reformulator_model,
+                    prompt_template=reformulator_prompt,
+                )
+            except Exception as exc:
+                logger.warning("Reformulator failed; using original query. Error: %s", exc)
+                search_query = user_query
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
