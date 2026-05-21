@@ -1,325 +1,230 @@
-import { useState, useCallback } from "react"
 import {
   LoaderCircle,
-  Save,
-  RotateCcw,
+  Sparkles,
+  BrainCircuit,
+  SlidersHorizontal,
 } from "lucide-react"
 
 import { useAISettings } from "./useAISettings.js"
-import ModelSelector from "./ModelSelector.jsx"
-import ToggleSwitch from "./ToggleSwitch.jsx"
-import RangeSlider from "./RangeSlider.jsx"
+import { aiModels, llmOptions, embeddingModels, rerankerModels } from "./aiModels.js"
 
-import LoadingSpinner from "../../shared/components/LoadingSpinner.jsx"
-import ErrorState from "../../shared/components/ErrorState.jsx"
+import SettingsSelect from "./SettingsSelect.jsx"
+import SettingsInput from "./SettingsInput.jsx"
+import SettingsTextarea from "./SettingsTextarea.jsx"
+import SettingsToggle from "./SettingsToggle.jsx"
+import SettingsActions from "./SettingsActions.jsx"
+
+/* ========================================
+   CONFIG CARD
+======================================== */
+const ConfigCard = ({ title, description, icon: Icon, children }) => {
+  return (
+    <div className="rounded-[30px] border border-[#26342f] bg-[#101715]/95 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-xl">
+      <div className="mb-6 flex items-start gap-4">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f5d547]/10">
+          <Icon className="h-5 w-5 text-[#f5d547]" />
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-white">{title}</h3>
+          <p className="mt-1 text-sm text-[#8ea59b]">{description}</p>
+        </div>
+      </div>
+
+      {children}
+    </div>
+  )
+}
 
 const AISettingsPanel = () => {
   const {
-    settings,
     loading,
-    error,
-    refresh,
-    updateSettings,
     saving,
+    success,
+    error,
+    settings,
+    update,
+    selectModel,
+    saveSettings,
   } = useAISettings()
 
-  const [localSettings, setLocalSettings] =
-    useState(null)
+  /* ========================================
+     BIND HELPER — matches old frontend pattern
+  ======================================== */
+  const bind = (key) => (value) => update(key, value)
 
-  const getSettings = () =>
-    localSettings || settings || {}
-
-  const update = (key, value) => {
-    setLocalSettings((prev) => ({
-      ...(prev || settings || {}),
-      [key]: value,
-    }))
+  /* ========================================
+     HANDLE ACTIVE MODEL CHANGE (batch update)
+  ======================================== */
+  const handleActiveModelChange = (modelName) => {
+    const model = aiModels.find((m) => m.name === modelName)
+    if (model) {
+      selectModel(model)
+    }
   }
 
-  const handleSave = useCallback(async () => {
-    if (!localSettings) {
-      return
-    }
-
-    try {
-      await updateSettings(localSettings)
-
-      setLocalSettings(null)
-    } catch (e) {
-      alert(
-        e.message || "Failed to save settings"
-      )
-    }
-  }, [localSettings, updateSettings])
-
-  const handleReset = useCallback(() => {
-    if (
-      window.confirm(
-        "Reset all AI settings to defaults?"
-      )
-    ) {
-      const defaults = {
-        ActiveModel:
-          "llama-3.3-70b-versatile",
-
-        EmbeddingModel:
-          "multilingual-e5-large",
-
-        ReformulatorModel:
-          "llama-3.1-8b-instruct",
-
-        RerankerModel:
-          "bge-reranker-large",
-
-        Temperature: 0.7,
-
-        TopK_Tickets: 5,
-
-        ConfidenceThreshold: 0.75,
-
-        UseReformulator: true,
-
-        UseReranker: true,
-      }
-
-      setLocalSettings(defaults)
-    }
-  }, [])
-
-  if (loading && !settings) {
+  /* ========================================
+     LOADING STATE
+  ======================================== */
+  if (loading) {
     return (
-      <LoadingSpinner
-        label="Loading AI settings..."
-        fullScreen
-      />
+      <div className="flex flex-1 items-center justify-center py-20">
+        <LoaderCircle className="h-8 w-8 animate-spin text-[#f5d547]" />
+      </div>
     )
   }
-
-  if (error) {
-    return (
-      <ErrorState
-        title="Failed to load settings"
-        message={error}
-        onRetry={refresh}
-      />
-    )
-  }
-
-  const s = getSettings()
 
   return (
-    <div className="w-full space-y-6">
-      {/* Models */}
-      <div className="card-surface p-5 md:p-6">
-        <div className="flex flex-col gap-6">
-          {/* Header */}
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <span className="text-label">
-                Models
-              </span>
+    <div className="mx-auto flex w-full max-w-[1700px] flex-col gap-6">
+      {/* AI CONFIG */}
+      <ConfigCard
+        title="AI Configuration"
+        description="Manage retrieval, reranking, embeddings, and response behavior."
+        icon={BrainCircuit}
+      >
+        <div className="grid gap-5 xl:grid-cols-2">
+          <SettingsSelect
+            label="Active Model"
+            value={settings.ActiveModel}
+            onChange={(e) => handleActiveModelChange(e.target.value)}
+            options={llmOptions}
+          />
 
-              <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
-                Model Configuration
-              </h2>
+          <SettingsSelect
+            label="Reformulator Model"
+            value={settings.ReformulatorModel}
+            onChange={(e) => bind("ReformulatorModel")(e.target.value)}
+            options={llmOptions}
+          />
 
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#74877f]">
-                Configure the AI models used for
-                response generation, embeddings,
-                reformulation, and reranking.
+          <SettingsSelect
+            label="Embedding Model"
+            warning="Changing the embedding model may invalidate existing vector embeddings and retrieval results. A full re-index may be required."
+            value={settings.EmbeddingModel}
+            onChange={(e) => bind("EmbeddingModel")(e.target.value)}
+            options={embeddingModels}
+          />
+
+          <SettingsSelect
+            label="Reranker Model"
+            value={settings.RerankerModel}
+            onChange={(e) => bind("RerankerModel")(e.target.value)}
+            options={rerankerModels}
+          />
+
+          <SettingsInput
+            type="number"
+            step="0.1"
+            min="0"
+            max="2"
+            label="Temperature"
+            value={settings.Temperature}
+            onChange={(e) => bind("Temperature")(Number(e.target.value))}
+          />
+
+          <SettingsInput
+            type="number"
+            min="1"
+            max="50"
+            label="Top K Tickets"
+            value={settings.TopK_Tickets}
+            onChange={(e) => bind("TopK_Tickets")(Number(e.target.value))}
+          />
+
+          <SettingsInput
+            type="number"
+            step="0.01"
+            min="0"
+            max="1"
+            label="Confidence Threshold"
+            value={settings.ConfidenceThreshold}
+            onChange={(e) => bind("ConfidenceThreshold")(Number(e.target.value))}
+          />
+        </div>
+      </ConfigCard>
+
+      {/* RETRIEVAL CONTROLS */}
+      <ConfigCard
+        title="Retrieval Controls"
+        description="Enable or disable advanced AI processing modules."
+        icon={SlidersHorizontal}
+      >
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
+            <div>
+              <p className="text-sm font-semibold text-white">Use Reformulator</p>
+              <p className="mt-1 text-xs text-[#7e938a]">
+                Enable intelligent query reformulation.
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
-              <button
-                onClick={handleReset}
-                className="btn-secondary h-[50px] px-4"
-                title="Reset to defaults"
-              >
-                <RotateCcw className="h-4 w-4" />
-              </button>
+            <SettingsToggle
+              value={settings.UseReformulator}
+              onChange={bind("UseReformulator")}
+            />
+          </div>
 
-              <button
-                onClick={handleSave}
-                disabled={
-                  !localSettings || saving
-                }
-                className="btn-primary h-[50px] px-5"
-              >
-                {saving ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-
-                Save Changes
-              </button>
+          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
+            <div>
+              <p className="text-sm font-semibold text-white">Use Reranker</p>
+              <p className="mt-1 text-xs text-[#7e938a]">
+                Improve response relevance scoring.
+              </p>
             </div>
-          </div>
 
-          {/* Models Grid */}
-          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-            <ModelSelector
-              label="Active Model"
-              description="Primary LLM for responses"
-              value={s.ActiveModel || ""}
-              onChange={(v) =>
-                update("ActiveModel", v)
-              }
-            />
-
-            <ModelSelector
-              label="Embedding Model"
-              description="Text embedding model"
-              value={s.EmbeddingModel || ""}
-              onChange={(v) =>
-                update("EmbeddingModel", v)
-              }
-            />
-
-            <ModelSelector
-              label="Reformulator Model"
-              description="Query reformulation model"
-              value={s.ReformulatorModel || ""}
-              onChange={(v) =>
-                update(
-                  "ReformulatorModel",
-                  v
-                )
-              }
-            />
-
-            <ModelSelector
-              label="Reranker Model"
-              description="Context reranking model"
-              value={s.RerankerModel || ""}
-              onChange={(v) =>
-                update("RerankerModel", v)
-              }
+            <SettingsToggle
+              value={settings.UseReranker}
+              onChange={bind("UseReranker")}
             />
           </div>
         </div>
-      </div>
+      </ConfigCard>
 
-      {/* Parameters */}
-      <div className="card-surface p-5 md:p-6">
-        <div className="flex flex-col gap-6">
-          <div>
-            <span className="text-label">
-              Parameters
-            </span>
+      {/* PROMPTS */}
+      <ConfigCard
+        title="Prompt Engineering"
+        description="Configure system prompts and retrieval behavior."
+        icon={Sparkles}
+      >
+        <div className="space-y-5">
+          <SettingsTextarea
+            rows={7}
+            label="System Prompt"
+            value={settings.SystemPrompt}
+            onChange={(e) => bind("SystemPrompt")(e.target.value)}
+          />
 
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
-              Inference Parameters
-            </h2>
+          <SettingsTextarea
+            rows={5}
+            label="Reformulator Prompt"
+            value={settings.ReformulatorPrompt}
+            onChange={(e) => bind("ReformulatorPrompt")(e.target.value)}
+          />
 
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#74877f]">
-              Fine-tune retrieval quality,
-              randomness, and confidence behavior
-              for generated responses.
-            </p>
-          </div>
+          <SettingsTextarea
+            rows={5}
+            label="Chat Extraction Prompt"
+            placeholder="Extract concise issue details, intent, priority, affected systems, and important technical context from user conversations."
+            value={settings.ChatExtractionPrompt}
+            onChange={(e) => bind("ChatExtractionPrompt")(e.target.value)}
+          />
 
-          <div className="flex flex-col gap-7">
-            <RangeSlider
-              label="Temperature"
-              description="Controls randomness. Lower = more deterministic."
-              value={s.Temperature ?? 0.7}
-              min={0}
-              max={2}
-              step={0.01}
-              displayValue={(
-                s.Temperature ?? 0.7
-              ).toFixed(2)}
-              onChange={(v) =>
-                update("Temperature", v)
-              }
-            />
-
-            <RangeSlider
-              label="Top K (Tickets)"
-              description="Maximum tickets to retrieve per query."
-              value={s.TopK_Tickets ?? 5}
-              min={1}
-              max={20}
-              step={1}
-              onChange={(v) =>
-                update("TopK_Tickets", v)
-              }
-            />
-
-            <RangeSlider
-              label="Confidence Threshold"
-              description="Minimum confidence score for responses."
-              value={
-                s.ConfidenceThreshold ?? 0.75
-              }
-              min={0}
-              max={1}
-              step={0.01}
-              displayValue={`${Math.round(
-                (s.ConfidenceThreshold ??
-                  0.75) * 100
-              )}%`}
-              onChange={(v) =>
-                update(
-                  "ConfidenceThreshold",
-                  v
-                )
-              }
-              format={(v) =>
-                `${Math.round(v * 100)}%`
-              }
-            />
-          </div>
+          <SettingsTextarea
+            rows={4}
+            label="Allowed Categories"
+            value={settings.AllowedCategories}
+            onChange={(e) => bind("AllowedCategories")(e.target.value)}
+          />
         </div>
-      </div>
+      </ConfigCard>
 
-      {/* Features */}
-      <div className="card-surface p-5 md:p-6">
-        <div className="flex flex-col gap-6">
-          <div>
-            <span className="text-label">
-              Features
-            </span>
-
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-white">
-              Feature Toggles
-            </h2>
-
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[#74877f]">
-              Enable or disable AI pipeline
-              behaviors and retrieval enhancement
-              features.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <ToggleSwitch
-              label="Use Reformulator"
-              description="Automatically reformulate user queries for better retrieval."
-              checked={
-                s.UseReformulator ?? true
-              }
-              onChange={(v) =>
-                update(
-                  "UseReformulator",
-                  v
-                )
-              }
-            />
-
-            <ToggleSwitch
-              label="Use Reranker"
-              description="Rerank retrieved documents for better context selection."
-              checked={s.UseReranker ?? true}
-              onChange={(v) =>
-                update("UseReranker", v)
-              }
-            />
-          </div>
-        </div>
-      </div>
+      {/* ACTIONS */}
+      <SettingsActions
+        saving={saving}
+        success={success}
+        error={error}
+        onSave={saveSettings}
+      />
     </div>
   )
 }

@@ -1,28 +1,74 @@
 export const API_ENDPOINTS = {
-  AUTH_VERIFY: "/auth/verify",
-  LSBIZPORTAL_LOGIN: "/admin/login",
-  ANALYTICS_SUMMARY: "/analytics/summary",
-  DOCUMENTS: "/documents",
-  DOCUMENT_UPLOAD: "/documents/upload",
-  DOCUMENT_DELETE: "/documents/:documentId",
-  DOCUMENT_DEBUG_PIPELINE: "/documents/debug/full-pipeline",
-  DOCUMENT_MANUAL_ENTRY: "/documents/manual",
-  DOCUMENT_MANUAL_ENTRY_UPDATE: "/documents/manual/:entryId",
-  DOCUMENT_MANUAL_ENTRY_DELETE: "/documents/manual/:entryId",
-  KNOWLEDGE_EXPLORE: "/knowledge/explore",
-  CHAT_SEND: "/chat",
-  CHAT_HISTORY: "/chat/history/:sessionId",
-  CHAT_USER_SESSIONS: "/chat/user-sessions/:requesterId",
-  CHAT_RESOLVE: "/chat/resolve/:sessionId",
-  CHAT_DELETE_SESSION: "/chat/sessions/:sessionId",
-  CHAT_CLEAR_ALL: "/chat/users/:requesterId/sessions",
-  SELF_KNOWLEDGE_UPDATE: "/self_knowledge/chats/:sessionId",
-  SELF_KNOWLEDGE_DELETE: "/self_knowledge/chats/:sessionId",
-  TICKETS: "/tickets",
-  TICKET_DELETE: "/tickets/:ticketNumber",
-  TICKET_SYNC: "/tickets/sync",
-  TICKET_WHITELIST: "/tickets/:ticketNumber/whitelist",
-  AI_SETTINGS: "/settings",
+  AUTH_VERIFY: "/api/auth/verify",
+
+  LSBIZPORTAL_LOGIN:
+    "/api/admin/login",
+
+  ANALYTICS_SUMMARY:
+    "/api/analytics/summary",
+
+  DOCUMENTS:
+    "/api/documents",
+
+  DOCUMENT_UPLOAD:
+    "/api/documents/upload",
+
+  DOCUMENT_DELETE:
+    "/api/documents/:documentId",
+
+  DOCUMENT_DEBUG_PIPELINE:
+    "/api/documents/debug/full-pipeline",
+
+  DOCUMENT_MANUAL_ENTRY:
+    "/api/documents/manual",
+
+  DOCUMENT_MANUAL_ENTRY_UPDATE:
+    "/api/documents/manual/:entryId",
+
+  DOCUMENT_MANUAL_ENTRY_DELETE:
+    "/api/documents/manual/:entryId",
+
+  KNOWLEDGE_EXPLORE:
+    "/api/knowledge/explore",
+
+  CHAT_SEND:
+    "/api/chat",
+
+  CHAT_HISTORY:
+    "/api/chat/history/:sessionId",
+
+  CHAT_USER_SESSIONS:
+    "/api/chat/user-sessions/:requesterId",
+
+  CHAT_RESOLVE:
+    "/api/chat/resolve/:sessionId",
+
+  CHAT_DELETE_SESSION:
+    "/api/chat/sessions/:sessionId",
+
+  CHAT_CLEAR_ALL:
+    "/api/chat/users/:requesterId/sessions",
+
+  SELF_KNOWLEDGE_UPDATE:
+    "/api/self_knowledge/chats/:sessionId",
+
+  SELF_KNOWLEDGE_DELETE:
+    "/api/self_knowledge/chats/:sessionId",
+
+  TICKETS:
+    "/api/tickets",
+
+  TICKET_DELETE:
+    "/api/tickets/:ticketNumber",
+
+  TICKET_SYNC:
+    "/api/tickets/sync",
+
+  TICKET_WHITELIST:
+    "/api/tickets/:ticketNumber/whitelist",
+
+  AI_SETTINGS:
+    "/api/settings",
 }
 
 export default API_ENDPOINTS

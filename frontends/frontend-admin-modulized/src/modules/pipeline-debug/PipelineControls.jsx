@@ -1,4 +1,4 @@
-import { useRef } from "react"
+import { useRef, useState } from "react"
 import {
   Play,
   Square,
@@ -14,16 +14,40 @@ const PipelineControls = ({
   onRun,
   onCancel,
 }) => {
-  const controllerRef = useRef(null)
+  const controllerRef =
+    useRef(null)
 
-  const handleRun = async () => {
-    controllerRef.current =
-      new AbortController()
+  const [
+    sessionId,
+    setSessionId,
+  ] = useState("")
 
-    await onRun(
-      controllerRef.current.signal
-    )
-  }
+  const [
+    token,
+    setToken,
+  ] = useState(
+    localStorage.getItem(
+      "admin_user_token"
+    ) || ""
+  )
+
+  const handleRun =
+    async () => {
+      controllerRef.current =
+        new AbortController()
+
+      await onRun({
+        signal:
+          controllerRef.current
+            .signal,
+
+        sessionId:
+          sessionId.trim(),
+
+        token:
+          token.trim(),
+      })
+    }
 
   return (
     <div className="card-surface p-5 md:p-6">
@@ -40,11 +64,54 @@ const PipelineControls = ({
             </h2>
 
             <p className="mt-2 max-w-4xl text-sm leading-relaxed text-[#74877f]">
-              Test the entire AI processing flow
-              including reformulation, embeddings,
-              retrieval, reranking, and final
-              generation.
+              Test the entire AI
+              processing flow
+              including
+              reformulation,
+              embeddings,
+              retrieval,
+              reranking, and
+              final generation.
             </p>
+          </div>
+        </div>
+
+        {/* Auth Controls */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#74877f]">
+              Bearer Token
+            </label>
+
+            <input
+              type="text"
+              value={token}
+              onChange={(e) =>
+                setToken(
+                  e.target.value
+                )
+              }
+              placeholder="Auth Token"
+              className="input-base rounded-2xl px-4 py-3 text-sm"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[#74877f]">
+              Session ID
+            </label>
+
+            <input
+              type="text"
+              value={sessionId}
+              onChange={(e) =>
+                setSessionId(
+                  e.target.value
+                )
+              }
+              placeholder="Optional session ID"
+              className="input-base rounded-2xl px-4 py-3 text-sm"
+            />
           </div>
         </div>
 
@@ -53,7 +120,9 @@ const PipelineControls = ({
           <textarea
             value={text}
             onChange={(e) =>
-              setText(e.target.value)
+              setText(
+                e.target.value
+              )
             }
             rows={10}
             placeholder="Enter text to process..."
@@ -63,8 +132,12 @@ const PipelineControls = ({
           {/* Actions */}
           <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={handleRun}
-              disabled={loading}
+              onClick={
+                handleRun
+              }
+              disabled={
+                loading
+              }
               className="btn-primary min-w-[180px]"
             >
               {loading ? (
@@ -99,8 +172,11 @@ const PipelineControls = ({
           <div className="rounded-2xl border border-[#2a3a33] bg-[#141d1a] p-4">
             <div className="mb-3 flex items-center justify-between gap-4 text-xs">
               <span className="font-medium text-[#74877f]">
-                Stage {activeStage} of{" "}
-                {stages.length}
+                Stage{" "}
+                {activeStage} of{" "}
+                {
+                  stages.length
+                }
               </span>
 
               <span className="font-semibold text-white">
@@ -108,7 +184,8 @@ const PipelineControls = ({
                   stages[
                     Math.min(
                       activeStage,
-                      stages.length - 1
+                      stages.length -
+                        1
                     )
                   ]
                 }
