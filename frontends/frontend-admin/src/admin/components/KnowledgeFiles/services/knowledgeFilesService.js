@@ -20,10 +20,12 @@ const API_URL =
 ======================================== */
 
 export const getKnowledgeFiles =
-  async () => {
+  async (
+    status = "active"
+  ) => {
 
     return apiClient.get(
-      API_URL
+      `${API_URL}?status=${status}`
     )
   }
 
@@ -88,6 +90,35 @@ export const deleteKnowledgeFile =
   }
 
 /* ========================================
+   RESTORE FILE
+======================================== */
+
+export const restoreKnowledgeFile =
+  async (
+    documentId
+  ) => {
+
+    if (!documentId) {
+
+      throw new Error(
+        "Document ID is required."
+      )
+    }
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.DOCUMENT_RESTORE,
+        {
+          documentId,
+        }
+      )
+
+    return apiClient.post(
+      endpoint
+    )
+  }
+
+/* ========================================
    EXPORT
 ======================================== */
 
@@ -95,6 +126,7 @@ const knowledgeFilesService = {
   getKnowledgeFiles,
   updateKnowledgeFile,
   deleteKnowledgeFile,
+  restoreKnowledgeFile,
 }
 
 export default knowledgeFilesService

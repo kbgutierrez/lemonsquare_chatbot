@@ -28,7 +28,6 @@ from app.schemas.documents import (
     DocumentUpdateRequest,
     ManualEntryResponse,
     ManualEntryUpdateRequest,
-    
 )
 
 from app.services.ingestion.ingestion_service import DocumentIngestionService
@@ -37,6 +36,7 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
+
 
 @router.post(
     "/upload",
@@ -72,30 +72,46 @@ async def upload_document(
         upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
 
         bg_db = SessionChatbot()
+
         try:
-            # We need to recreate the ingestion_service for the background task to use the new db session
             bg_ingestion_service = DocumentIngestionService(db=bg_db)
-            await bg_ingestion_service.process_pdf_upload(upload_obj, bg_db, manual_category=category)
-            logger.info(f"Background upload completed for {filename}")
+
+            await bg_ingestion_service.process_pdf_upload(
+                upload_obj,
+                bg_db,
+                manual_category=category,
+            )
+
+            logger.info(
+                "Background upload completed for %s",
+                filename,
+            )
+
         except Exception as e:
-            logger.error(f"Background upload failed for {filename}: {e}")
+            logger.error(
+                "Background upload failed for %s: %s",
+                filename,
+                e,
+            )
+
         finally:
             bg_db.close()
 
-    background_tasks.add_task(process_pdf_in_background)
+    background_tasks.add_task(
+        process_pdf_in_background
+    )
 
     return DocumentUploadResponse(
         status="processing",
         document_id="pending",
         category=category or "pending",
-        chunks_processed=0
+        chunks_processed=0,
     )
 
 
 class VectorSearchRequest(BaseModel):
     query: str
     limit: int = 5
-
 
 
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
@@ -109,10 +125,9 @@ async def debug_full_rag_pipeline(
     Debug the complete RAG pipeline: Query → Reformulation → Retrieval → Answer
     Returns detailed debug info without saving anything.
     """
-    # Use empty chat history for debug
     chat_history = ""
     user_name = "Debug User"
-    
+
     debug_result = await orchestrator.debug_orchestrate(
         user_query=request.query,
         chat_history=chat_history,
@@ -120,8 +135,7 @@ async def debug_full_rag_pipeline(
         db=db,
         limit=request.limit,
     )
-    
-    # Format the response for the frontend
+
     return {
         "original_query": debug_result["original_query"],
         "reformulated_query": debug_result["reformulated_query"],
@@ -143,9 +157,6 @@ async def debug_full_rag_pipeline(
     }
 
 
-
-
-
 @router.get(
     "",
     response_model=list[DocumentResponse],
@@ -153,19 +164,43 @@ async def debug_full_rag_pipeline(
 )
 def get_documents(
     category: str | None = None,
+    status: str = "active",
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_chatbot_db),
 ) -> list[DocumentResponse]:
     """
-    Fetch active uploaded documents, optionally filtered by category.
+    Fetch uploaded documents filtered by lifecycle status.
+
+    status:
+      - active
+      - inactive
+      - all
     """
-    query = db.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+
+    query = db.query(UploadedDocument)
+
+    normalized_status = status.lower().strip()
+
+    if normalized_status == "active":
+        query = query.filter(
+            UploadedDocument.IsActive == True
+        )
+
+    elif normalized_status == "inactive":
+        query = query.filter(
+            UploadedDocument.IsActive == False
+        )
+
     if category:
-        query = query.filter(UploadedDocument.Category == category)
+        query = query.filter(
+            UploadedDocument.Category == category
+        )
 
     documents = (
-        query.order_by(UploadedDocument.UploadedAt.desc())
+        query.order_by(
+            UploadedDocument.UploadedAt.desc()
+        )
         .offset(skip)
         .limit(limit)
         .all()
@@ -178,6 +213,7 @@ def get_documents(
             category=doc.Category,
             chunk_count=doc.ChunkCount,
             uploaded_at=doc.UploadedAt,
+            is_active=bool(doc.IsActive),
         )
         for doc in documents
     ]
@@ -194,14 +230,19 @@ async def delete_document(
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentDeleteResponse:
     """
-    Remove a document's vectors from Qdrant and its metadata from SQL.
+    Soft-delete a document:
+      - SQL -> IsActive=False
+      - Qdrant -> metadata.is_active=False
     """
-    result = await ingestion_service.delete_document(document_id, db)
-    
-    # ── FIX: Manually inject the document_id to satisfy the Pydantic schema ──
+
+    result = await ingestion_service.delete_document(
+        document_id,
+        db,
+    )
+
     return DocumentDeleteResponse(
         status=result.get("status", "success"),
-        document_id=document_id
+        document_id=document_id,
     )
 
 
@@ -215,34 +256,39 @@ async def restore_document(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentDeleteResponse:
+
     try:
-        result = await ingestion_service.restore_document(document_id, db)
+        result = await ingestion_service.restore_document(
+            document_id,
+            db,
+        )
+
         return DocumentDeleteResponse(
             status=result.get("status", "success"),
             document_id=document_id,
         )
+
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
-    db: Session = Depends(get_chatbot_db), 
-    ingestion_service = Depends(get_ingestion_service)
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service=Depends(get_ingestion_service)
 ):
-    """Embeds raw text into Qdrant, auto-categorizing if necessary."""
-    
-    # Hand the data over to the service!
     result = await ingestion_service.process_manual_entry(
         title=request.title,
         content=request.content,
         manual_category=request.category,
         db=db
     )
-    
-    return result
 
+    return result
 
 
 @router.put(
@@ -256,46 +302,68 @@ async def update_document_metadata(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentResponse:
+
     from fastapi import HTTPException
     from app.models.chatbot import UploadedDocument
-    
+
     try:
-        # Pass the updates to the service
-        await ingestion_service.update_document(document_id, request.model_dump(exclude_unset=True), db)
-        
-        # Fetch the fresh data
-        updated_doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
-        
-        # THE FIX: Manually map the PascalCase SQL columns to the snake_case Pydantic schema
+        await ingestion_service.update_document(
+            document_id,
+            request.model_dump(exclude_unset=True),
+            db,
+        )
+
+        updated_doc = (
+            db.query(UploadedDocument)
+            .filter(
+                UploadedDocument.DocumentID == document_id
+            )
+            .first()
+        )
+
         return DocumentResponse(
             document_id=updated_doc.DocumentID,
             file_name=updated_doc.FileName,
             category=updated_doc.Category,
             chunk_count=updated_doc.ChunkCount,
             uploaded_at=updated_doc.UploadedAt,
+            is_active=bool(updated_doc.IsActive),
         )
-        
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
 
 from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
 
+
 @router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
 def get_manual_entries(
-    skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_chatbot_db)
 ):
-    """Fetch manual entries securely from SQL instead of Qdrant."""
-    from app.models.chatbot import ManualKnowledgeEntry
-    
-    entries = db.query(ManualKnowledgeEntry).filter(
-        ManualKnowledgeEntry.IsActive == True
-    ).order_by(
-        ManualKnowledgeEntry.CreatedAt.desc()
-    ).offset(skip).limit(limit).all()
 
-    # Map the PascalCase SQL fields to the snake_case Pydantic schema
+    from app.models.chatbot import ManualKnowledgeEntry
+
+    entries = (
+        db.query(ManualKnowledgeEntry)
+        .filter(
+            ManualKnowledgeEntry.IsActive == True
+        )
+        .order_by(
+            ManualKnowledgeEntry.CreatedAt.desc()
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
     mapped_results = []
+
     for entry in entries:
         mapped_results.append(
             ManualEntryResponse(
@@ -304,10 +372,11 @@ def get_manual_entries(
                 content=entry.Content,
                 category=entry.Category,
                 created_at=entry.CreatedAt,
-                updated_at=entry.UpdatedAt
+                updated_at=entry.UpdatedAt,
+                is_active=bool(entry.IsActive),
             )
         )
-        
+
     return mapped_results
 
 
@@ -318,13 +387,21 @@ async def update_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Updates the rule in SQL and replaces its brain vector in Qdrant."""
+
     try:
-        # Pass exclude_unset=True so we only update the fields the user actually changed
-        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
+        result = await ingestion_service.update_manual_entry(
+            entry_id,
+            request.model_dump(exclude_unset=True),
+            db,
+        )
+
         return result
+
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 
 @router.delete("/manual/{entry_id}", summary="Delete a manual rule")
@@ -333,10 +410,13 @@ async def delete_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Deletes the rule from SQL and scrubs it from the AI's Qdrant brain."""
-    result = await ingestion_service.delete_manual_entry(entry_id, db)
-    return result
 
+    result = await ingestion_service.delete_manual_entry(
+        entry_id,
+        db,
+    )
+
+    return result
 
 
 @router.post("/manual/{entry_id}/restore", summary="Restore a deleted manual rule")
@@ -345,9 +425,17 @@ async def restore_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Restores the rule in SQL and completely rebuilds its vector in Qdrant."""
+
     try:
-        result = await ingestion_service.restore_manual_entry(entry_id, db)
+        result = await ingestion_service.restore_manual_entry(
+            entry_id,
+            db,
+        )
+
         return result
+
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )

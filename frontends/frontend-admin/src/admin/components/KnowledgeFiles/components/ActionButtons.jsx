@@ -1,5 +1,6 @@
 import {
   Pencil,
+  RotateCcw,
   Trash2,
 } from "lucide-react"
 
@@ -28,7 +29,11 @@ const ActionButtons = ({
   deleting,
   onEdit,
   onDelete,
+  onRestore,
 }) => {
+
+  const isInactive =
+    file?.is_active === false
 
   return (
     <div
@@ -40,56 +45,87 @@ const ActionButtons = ({
       "
     >
       {/* EDIT */}
-      <button
-        onClick={() =>
-          onEdit?.(file)
-        }
-        className={`
-          ${buttonBaseClass}
+      {!isInactive && (
+        <button
+          onClick={() =>
+            onEdit?.(file)
+          }
+          className={`
+            ${buttonBaseClass}
 
-          border-[#2d3b35]
+            border-[#2d3b35]
 
-          bg-[#18211f]
+            bg-[#18211f]
 
-          text-white
+            text-white
 
-          hover:bg-[#202b27]
-        `}
-      >
-        <Pencil className="h-3.5 w-3.5" />
+            hover:bg-[#202b27]
+          `}
+        >
+          <Pencil className="h-3.5 w-3.5" />
 
-        Edit
-      </button>
+          Edit
+        </button>
+      )}
 
       {/* DELETE */}
-      <button
-        disabled={deleting}
+      {!isInactive && (
+        <button
+          disabled={deleting}
 
-        onClick={() =>
-          onDelete?.(
-            file.document_id
-          )
-        }
+          onClick={() =>
+            onDelete?.(
+              file.document_id
+            )
+          }
 
-        className={`
-          ${buttonBaseClass}
+          className={`
+            ${buttonBaseClass}
 
-          border-red-500/20
+            border-red-500/20
 
-          bg-red-500/10
+            bg-red-500/10
 
-          text-red-400
+            text-red-400
 
-          hover:bg-red-500/20
+            hover:bg-red-500/20
 
-          disabled:cursor-not-allowed
-          disabled:opacity-60
-        `}
-      >
-        <Trash2 className="h-3.5 w-3.5" />
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+          `}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
 
-        Delete
-      </button>
+          Delete
+        </button>
+      )}
+
+      {/* RESTORE */}
+      {isInactive && (
+        <button
+          onClick={() =>
+            onRestore?.(
+              file.document_id
+            )
+          }
+
+          className={`
+            ${buttonBaseClass}
+
+            border-emerald-500/20
+
+            bg-emerald-500/10
+
+            text-emerald-400
+
+            hover:bg-emerald-500/20
+          `}
+        >
+          <RotateCcw className="h-3.5 w-3.5" />
+
+          Restore
+        </button>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -7,6 +8,7 @@ import {
 import {
   ChevronDown,
   Check,
+  X,
 } from "lucide-react"
 
 const UploadCategorySelector = ({
@@ -14,30 +16,73 @@ const UploadCategorySelector = ({
   selectedCategory = "",
   setSelectedCategory,
 }) => {
-
   const [
-    dropdownOpen,
-    setDropdownOpen,
+    modalOpen,
+    setModalOpen,
   ] = useState(false)
 
-  const dropdownRef =
+  const modalCardRef =
     useRef(null)
 
+  /* ========================================
+     BODY SCROLL LOCK
+  ======================================== */
   useEffect(() => {
+    if (!modalOpen) return
+
+    const originalOverflow =
+      document.body.style.overflow
+
+    document.body.style.overflow =
+      "hidden"
+
+    return () => {
+      document.body.style.overflow =
+        originalOverflow
+    }
+  }, [modalOpen])
+
+  /* ========================================
+     ESC CLOSE
+  ======================================== */
+  useEffect(() => {
+    if (!modalOpen) return
+
+    const handleEscape =
+      (event) => {
+        if (event.key === "Escape") {
+          setModalOpen(false)
+        }
+      }
+
+    document.addEventListener(
+      "keydown",
+      handleEscape
+    )
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleEscape
+      )
+    }
+  }, [modalOpen])
+
+  /* ========================================
+     CLICK OUTSIDE
+  ======================================== */
+  useEffect(() => {
+    if (!modalOpen) return
 
     const handleClickOutside =
       (event) => {
-
         if (
-          dropdownRef.current &&
-          !dropdownRef.current.contains(
+          modalCardRef.current &&
+          !modalCardRef.current.contains(
             event.target
           )
         ) {
-
-          setDropdownOpen(
-            false
-          )
+          setModalOpen(false)
         }
       }
 
@@ -47,36 +92,42 @@ const UploadCategorySelector = ({
     )
 
     return () => {
-
       document.removeEventListener(
         "mousedown",
         handleClickOutside
       )
     }
+  }, [modalOpen])
 
-  }, [])
-
+  /* ========================================
+     LABEL
+  ======================================== */
   const categoryLabel =
-    selectedCategory ||
-    "Auto Detect Category"
+    useMemo(() => {
+      return (
+        selectedCategory ||
+        "Auto Detect Category"
+      )
+    }, [selectedCategory])
+
+  /* ========================================
+     SELECT
+  ======================================== */
+  const handleSelect =
+    (value) => {
+      setSelectedCategory(value)
+      setModalOpen(false)
+    }
 
   return (
-    <div
-      ref={dropdownRef}
-      className="
-        relative
-        w-full
-      "
-    >
+    <>
+      {/* TRIGGER */}
       <button
         type="button"
         onClick={() =>
-          setDropdownOpen(
-            (prev) =>
-              !prev
-          )
+          setModalOpen(true)
         }
-        className="
+        className={`
           flex
           h-11
           w-full
@@ -86,36 +137,66 @@ const UploadCategorySelector = ({
           rounded-2xl
 
           border
-          border-[#2f3c36]
-
-          bg-[#1a2320]
 
           px-4
 
           text-left
           text-sm
-          text-white
 
           transition-all
           duration-300
 
-          hover:border-[#46544e]
-        "
-      >
-        <span
-          className={
-            selectedCategory
-              ? "text-white"
-              : "text-[#8ea59b]"
+          ${
+            modalOpen
+              ? `
+                border-[#d8b93d]/50
+                bg-[#1f2925]
+                shadow-[0_0_0_4px_rgba(216,185,61,0.08)]
+              `
+              : `
+                border-[#2f3c36]
+                bg-[#1a2320]
+                hover:border-[#46544e]
+              `
           }
-        >
-          {categoryLabel}
-        </span>
+        `}
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          <div
+            className={`
+              h-2.5
+              w-2.5
+              shrink-0
+              rounded-full
+
+              ${
+                selectedCategory
+                  ? "bg-[#f5d547]"
+                  : "bg-[#6f847b]"
+              }
+            `}
+          />
+
+          <span
+            className={`
+              truncate
+
+              ${
+                selectedCategory
+                  ? "text-white"
+                  : "text-[#8ea59b]"
+              }
+            `}
+          >
+            {categoryLabel}
+          </span>
+        </div>
 
         <ChevronDown
           className={`
             h-4
             w-4
+            shrink-0
 
             text-[#8ea59b]
 
@@ -123,7 +204,7 @@ const UploadCategorySelector = ({
             duration-300
 
             ${
-              dropdownOpen
+              modalOpen
                 ? "rotate-180"
                 : ""
             }
@@ -131,154 +212,366 @@ const UploadCategorySelector = ({
         />
       </button>
 
-      {/* DROPDOWN */}
+      {/* MODAL */}
       <div
         className={`
-          absolute
-          left-0
-          right-0
-          top-[calc(100%+10px)]
-          z-50
+          fixed
+          inset-0
+          z-[120]
 
-          overflow-hidden
+          flex
+          items-center
+          justify-center
 
-          rounded-2xl
-
-          border
-          border-[#2d3b35]
-
-          bg-[#18211f]
-
-          shadow-[0_20px_60px_rgba(0,0,0,0.45)]
+          px-4
 
           transition-all
           duration-300
 
           ${
-            dropdownOpen
+            modalOpen
               ? `
                 pointer-events-auto
-                translate-y-0
                 opacity-100
               `
               : `
                 pointer-events-none
-                -translate-y-2
                 opacity-0
               `
           }
         `}
       >
+        {/* BACKDROP */}
+        <div
+          className={`
+            absolute
+            inset-0
 
-        {/* AUTO DETECT */}
-        <button
-          type="button"
-          onClick={() => {
+            bg-black/70
+            backdrop-blur-md
 
-            setSelectedCategory(
-              ""
-            )
+            transition-opacity
+            duration-300
 
-            setDropdownOpen(
-              false
-            )
-          }}
-          className="
+            ${
+              modalOpen
+                ? "opacity-100"
+                : "opacity-0"
+            }
+          `}
+        />
+
+        {/* CARD */}
+        <div
+          ref={modalCardRef}
+          className={`
+            relative
+            z-10
+
             flex
             w-full
-            items-center
-            justify-between
+            max-w-[520px]
+            flex-col
 
-            border-b
-            border-[#22302b]
+            overflow-hidden
 
-            px-4
-            py-3
+            rounded-[28px]
 
-            text-sm
-            text-white
+            border
+            border-[#2f3c36]
 
-            hover:bg-[#202b27]
-          "
+            bg-[#141c1a]
+
+            shadow-[0_30px_80px_rgba(0,0,0,0.55)]
+
+            transition-all
+            duration-300
+
+            ${
+              modalOpen
+                ? `
+                  translate-y-0
+                  scale-100
+                  opacity-100
+                `
+                : `
+                  translate-y-3
+                  scale-[0.98]
+                  opacity-0
+                `
+            }
+          `}
         >
-          <span>
-            Auto Detect Category
-          </span>
+          {/* HEADER */}
+          <div
+            className="
+              flex
+              items-start
+              justify-between
+              gap-4
 
-          {!selectedCategory && (
-            <Check
+              border-b
+              border-[#24312b]
+
+              px-5
+              py-5
+            "
+          >
+            <div>
+              <h3
+                className="
+                  text-lg
+                  font-bold
+                  text-white
+                "
+              >
+                Select Category
+              </h3>
+
+              <p
+                className="
+                  mt-1
+                  text-sm
+                  text-[#8ea59b]
+                "
+              >
+                Choose a category or use automatic AI detection.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() =>
+                setModalOpen(false)
+              }
               className="
-                h-4
-                w-4
-                text-[#f5d547]
+                flex
+                h-10
+                w-10
+                shrink-0
+                items-center
+                justify-center
+
+                rounded-xl
+
+                border
+                border-[#2d3b35]
+
+                bg-[#18211f]
+
+                text-[#8ea59b]
+
+                transition-all
+                duration-200
+
+                hover:border-[#46544e]
+                hover:text-white
               "
-            />
-          )}
-        </button>
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
 
-        {/* CATEGORIES */}
-        <div
-          className="
-            max-h-[220px]
-            overflow-y-auto
-          "
-        >
-          {categories.map(
-            (category) => {
+          {/* OPTIONS */}
+          <div
+            className="
+              max-h-[420px]
+              overflow-y-auto
 
-              const active =
-                selectedCategory ===
-                category
+              p-3
+            "
+          >
+            {/* AUTO DETECT */}
+            <button
+              type="button"
+              onClick={() =>
+                handleSelect("")
+              }
+              className={`
+                mb-2
 
-              return (
-                <button
-                  key={category}
-                  type="button"
-                  onClick={() => {
+                flex
+                w-full
+                items-center
+                justify-between
 
-                    setSelectedCategory(
-                      category
-                    )
+                rounded-2xl
 
-                    setDropdownOpen(
-                      false
-                    )
-                  }}
+                border
+
+                px-4
+                py-4
+
+                text-left
+
+                transition-all
+                duration-200
+
+                ${
+                  !selectedCategory
+                    ? `
+                      border-[#d8b93d]/30
+                      bg-[#d8b93d]/10
+                    `
+                    : `
+                      border-transparent
+                      bg-[#18211f]
+
+                      hover:border-[#2f3c36]
+                      hover:bg-[#1d2724]
+                    `
+                }
+              `}
+            >
+              <div>
+                <p
                   className="
-                    flex
-                    w-full
-                    items-center
-                    justify-between
-
-                    px-4
-                    py-3
-
                     text-sm
+                    font-semibold
                     text-white
-
-                    hover:bg-[#202b27]
                   "
                 >
-                  <span>
-                    {category}
-                  </span>
+                  Auto Detect Category
+                </p>
 
-                  {active && (
-                    <Check
-                      className="
-                        h-4
-                        w-4
-                        text-[#f5d547]
-                      "
-                    />
-                  )}
-                </button>
-              )
-            }
-          )}
+                <p
+                  className="
+                    mt-1
+                    text-xs
+                    text-[#8ea59b]
+                  "
+                >
+                  Let the AI automatically determine the best category.
+                </p>
+              </div>
+
+              {!selectedCategory && (
+                <div
+                  className="
+                    flex
+                    h-7
+                    w-7
+                    items-center
+                    justify-center
+
+                    rounded-full
+
+                    bg-[#f5d547]
+                  "
+                >
+                  <Check
+                    className="
+                      h-4
+                      w-4
+                      text-[#111917]
+                    "
+                  />
+                </div>
+              )}
+            </button>
+
+            {/* CATEGORY LIST */}
+            <div className="space-y-2">
+              {categories.map(
+                (category) => {
+                  const active =
+                    selectedCategory ===
+                    category
+
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() =>
+                        handleSelect(category)
+                      }
+                      className={`
+                        flex
+                        w-full
+                        items-center
+                        justify-between
+
+                        rounded-2xl
+
+                        border
+
+                        px-4
+                        py-4
+
+                        text-left
+
+                        transition-all
+                        duration-200
+
+                        ${
+                          active
+                            ? `
+                              border-[#d8b93d]/30
+                              bg-[#d8b93d]/10
+                            `
+                            : `
+                              border-transparent
+                              bg-[#18211f]
+
+                              hover:border-[#2f3c36]
+                              hover:bg-[#1d2724]
+                            `
+                        }
+                      `}
+                    >
+                      <div
+                        className="
+                          min-w-0
+                          flex-1
+                        "
+                      >
+                        <p
+                          className="
+                            truncate
+                            text-sm
+                            font-medium
+                            text-white
+                          "
+                        >
+                          {category}
+                        </p>
+                      </div>
+
+                      {active && (
+                        <div
+                          className="
+                            ml-4
+
+                            flex
+                            h-7
+                            w-7
+                            shrink-0
+                            items-center
+                            justify-center
+
+                            rounded-full
+
+                            bg-[#f5d547]
+                          "
+                        >
+                          <Check
+                            className="
+                              h-4
+                              w-4
+                              text-[#111917]
+                            "
+                          />
+                        </div>
+                      )}
+                    </button>
+                  )
+                }
+              )}
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }
 

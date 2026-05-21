@@ -51,7 +51,7 @@ const UploadDropzone = ({
   ======================================== */
   if (hasFiles) {
     return (
-      <div className="flex h-full flex-col overflow-hidden rounded-[24px] border border-[#26332d] bg-[#141c1a]">
+      <div className="flex h-full flex-col rounded-[24px] border border-[#26332d] bg-[#141c1a]">
         {/* HEADER */}
         <div className="shrink-0 border-b border-[#24312b] p-4">
           <div className="flex items-center justify-between gap-3">
@@ -71,7 +71,7 @@ const UploadDropzone = ({
         </div>
 
         {/* BODY */}
-        <div className="flex-1 p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           <UploadCategorySelector
             categories={categories}
             selectedCategory={selectedCategory}
@@ -121,36 +121,29 @@ const UploadDropzone = ({
       onDrop={onDrop}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
-      className={`
-        group relative w-full overflow-hidden rounded-[24px] border-2 border-dashed px-6 py-8 sm:px-8 sm:py-10 transition-all duration-300
-        ${
-          isDragging
-            ? "scale-[1.005] border-[#d8b93d] bg-[#1a241f] shadow-[0_0_0_4px_rgba(216,185,61,0.08)]"
-            : "border-[#2c3b35] bg-[#141c1a] hover:border-[#44524c] hover:bg-[#17211e]"
-        }
-      `}
+      className={`group relative w-full rounded-[24px] border-2 border-dashed px-6 py-8 sm:px-8 sm:py-10 transition-all duration-300 ${
+        isDragging
+          ? "scale-[1.005] border-[#d8b93d] bg-[#1a241f] shadow-[0_0_0_4px_rgba(216,185,61,0.08)]"
+          : "border-[#2c3b35] bg-[#141c1a] hover:border-[#44524c] hover:bg-[#17211e]"
+      }`}
     >
       {/* BACKGROUND GLOW */}
-      <div className="pointer-events-none absolute inset-0">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[24px]">
         <div
-          className={`
-            absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl transition-all duration-500
-            ${isDragging ? "bg-[#d8b93d]/10" : "bg-[#d8b93d]/[0.03]"}
-          `}
+          className={`absolute left-1/2 top-1/2 h-32 w-32 -translate-x-1/2 -translate-y-1/2 rounded-full blur-3xl transition-all duration-500 ${
+            isDragging ? "bg-[#d8b93d]/10" : "bg-[#d8b93d]/[0.03]"
+          }`}
         />
       </div>
 
       <div className="relative z-10 flex flex-col items-center justify-center text-center">
         {/* ICON */}
         <div
-          className={`
-            mb-4 flex h-12 w-12 items-center justify-center rounded-[18px] border transition-all duration-500
-            ${
-              isDragging
-                ? "border-[#d8b93d]/40 bg-[#d8b93d]/15"
-                : "border-[#2f3c36] bg-[#1a2320]"
-            }
-          `}
+          className={`mb-4 flex h-12 w-12 items-center justify-center rounded-[18px] border transition-all duration-500 ${
+            isDragging
+              ? "border-[#d8b93d]/40 bg-[#d8b93d]/15"
+              : "border-[#2f3c36] bg-[#1a2320]"
+          }`}
         >
           {isDragging ? (
             <FileUp className="h-6 w-6 text-[#d8b93d]" />

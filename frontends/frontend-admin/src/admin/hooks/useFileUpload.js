@@ -8,6 +8,7 @@ import {
 
 import { uploadDocument } from "../services/uploadService"
 import aiSettingsService from "../services/aiSettingsService"
+import { getKnowledgeFiles } from "../components/KnowledgeFiles/services/knowledgeFilesService.js"
 
 import {
   getCachedData,
@@ -94,19 +95,30 @@ export const useFileUpload = () => {
   }, [computePending])
 
   /* ========================================
-     LOAD CATEGORIES
+     LOAD CATEGORIES (ALL AVAILABLE)
   ======================================== */
   useEffect(() => {
     const loadCategories = async () => {
       try {
-        const settings = await aiSettingsService.getSettings()
+        const [settings, documents] = await Promise.all([
+          aiSettingsService.getSettings(),
+          getKnowledgeFiles(),
+        ])
 
-        const parsed =
+        const allowedCategories =
           settings?.AllowedCategories?.split(",")
             ?.map((x) => x.trim())
             ?.filter(Boolean) || []
 
-        setCategories(parsed)
+        const fileCategories = [...new Set(
+          (Array.isArray(documents) ? documents : [])
+            .map((f) => f.category)
+            .filter(Boolean)
+        )]
+
+        const merged = [...new Set([...allowedCategories, ...fileCategories])].sort()
+
+        setCategories(merged)
       } catch (error) {
         console.error("LOAD_CATEGORIES_ERROR", error)
       }

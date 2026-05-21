@@ -9,6 +9,7 @@ class DocumentResponse(BaseModel):
     category: str
     chunk_count: int
     uploaded_at: datetime
+    is_active: bool = True
 
     class Config:
         from_attributes = True
