@@ -25,7 +25,7 @@ async def get_live_taxonomy() -> str:
     taxonomy = []
 
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient() as client:
             dept_res = await client.get(dept_url)
             dept_res.raise_for_status()
             departments = dept_res.json().get("data", [])

@@ -95,7 +95,7 @@ class AIChatbotSetting(BaseChatbot):
 class UploadedDocument(BaseChatbot):
     __tablename__ = "tbl_uploaded_documents"
     DocumentID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    FileName = Column(String(255), nullable=False)
+    FileName = Column(String(255), nullable=False, unique=True)
     Category = Column(String(100), nullable=False)
     ChunkCount = Column(Integer, nullable=False)
     UploadedAt = Column(DateTime, default=datetime.utcnow)
