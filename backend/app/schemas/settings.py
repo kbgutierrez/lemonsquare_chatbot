@@ -16,6 +16,18 @@ class SettingsUpdate(BaseModel):
     UseReranker: bool
     ChatExtractionPrompt: str | None
     AllowedCategories: str = Field(..., min_length=1)
+    EscalationDraftModel: str | None
+    EscalationDraftPrompt: str | None
+
+    RoutingModel: str | None
+    RoutingPrompt: str | None
+
+    DocumentClassifierModel: str | None
+    DocumentClassifierPrompt: str | None
+
+    ConversationResolutionModel: str | None
+    ConversationResolutionPrompt: str | None
+    
 
 
 class SettingsResponse(BaseModel):
@@ -34,6 +46,18 @@ class SettingsResponse(BaseModel):
     UseReranker: bool | None
     AllowedCategories: str | None
     IsActive: bool
+
+    EscalationDraftModel: str | None
+    EscalationDraftPrompt: str | None
+
+    RoutingModel: str | None
+    RoutingPrompt: str | None
+
+    DocumentClassifierModel: str | None
+    DocumentClassifierPrompt: str | None
+
+    ConversationResolutionModel: str | None
+    ConversationResolutionPrompt: str | None
 
     class Config:
         from_attributes = True

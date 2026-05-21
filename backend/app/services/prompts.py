@@ -48,8 +48,8 @@ ESCALATION_DRAFT_PROMPT = (
 # =========================================================
 # ROUTING
 # =========================================================
-def build_routing_prompt(summary: str, description: str, taxonomy_json: str, retrieved_context: str) -> str:
-    return (
+def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrieved_context: str,prompt_template: str | None = None,) -> str:
+    template = prompt_template or (
         "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
         "Department and Subcategory.\n\n"
         "CRITICAL RULES:\n"
@@ -57,20 +57,22 @@ def build_routing_prompt(summary: str, description: str, taxonomy_json: str, ret
         "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
         "department.\n"
         "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
-        f"VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
+        "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
         "REQUIRED JSON SCHEMA:\n"
-        "{\n"
+        "{{\n"
         '  "department_id": integer,\n'
         '  "subcategory_id": integer,\n'
         '  "department_name": "string",\n'
         '  "subcategory_name": "string",\n'
         '  "confidence": float (0.0 to 1.0),\n'
         '  "reasoning": "string" (1-sentence technical explanation)\n'
-        "}\n\n"
-        f"NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
-        f"HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+        "}}\n\n"
+        "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
+        "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
         "JSON OUTPUT:"
     )
+
+    return template.format(summary=summary,description=description,taxonomy_json=taxonomy_json,retrieved_context=retrieved_context)
 
 # =========================================================
 # CONVERSATION RESOLUTION
@@ -127,3 +129,18 @@ def build_consolidation_prompt(cluster_payloads: list[str]) -> str:
         "Output ONLY the finalized guide text. Do not use markdown blocks.\n\n"
         f"TICKETS TO MERGE:\n{combined}"
     )
+
+
+def build_document_classifier_prompt(snippet: str,allowed_categories: str,) -> str:
+        return (
+            "You are an IT categorization AI. "
+            "Read this document snippet:\n\n"
+            "{snippet}\n\n"
+            "Categorize it into EXACTLY ONE of these categories:\n"
+            "{allowed_categories}\n\n"
+            "Reply with ONLY the exact category name. "
+            "Do not add punctuation or extra words."
+        ).format(
+            snippet=snippet,
+            allowed_categories=allowed_categories,
+        )

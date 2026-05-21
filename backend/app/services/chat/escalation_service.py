@@ -7,13 +7,13 @@ import json
 import logging
 import httpx
 from sqlalchemy.orm import Session
-from app.core.config import settings
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
 from app.services.chat.message_service import MessageService
 from app.services.llm_client import create_llm
-from app.services.prompts import ESCALATION_DRAFT_PROMPT
+
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
+from app.services.settings.runtime_config import RuntimeAIConfig
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,13 @@ class EscalationService:
         """
         session = self.repo.validate_session_for_escalation(session_id)
         transcript = self.message_svc.get_transcript(session_id)
+        runtime_config = RuntimeAIConfig(self.db)
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        llm = create_llm(model="llama-3.1-8b-instant", temperature=0.0)
-        prompt = ESCALATION_DRAFT_PROMPT.format(transcript=transcript)
+        llm = create_llm(model=runtime_config.escalation_draft_model,temperature=0.0,)
+        
+        prompt = runtime_config.escalation_draft_prompt.format(transcript=transcript,)
 
         result = await llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)

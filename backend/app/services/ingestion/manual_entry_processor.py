@@ -3,10 +3,11 @@ Manual knowledge entry processor.
 Handles create, update, delete, restore for manual KB rules.
 """
 import logging
+import uuid
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+from app.core.exceptions import VectorStoreError
 from app.models.chatbot import ManualKnowledgeEntry
-from app.repositories.document_repository import DocumentRepository
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
 logger = logging.getLogger(__name__)
@@ -21,30 +22,47 @@ class ManualEntryProcessor:
 
     async def process(self, title: str, content: str, category: str | None) -> dict:
         resolved_category = category or "General_IT"
+        entry_id = str(uuid.uuid4())
         entry = ManualKnowledgeEntry(
+            EntryID=entry_id,
             Title=title,
             Content=content,
             Category=resolved_category,
             IsActive=True,
         )
-        self.db.add(entry)
-        self.db.commit()
-        self.db.refresh(entry)
 
-        # Build and embed
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=title,
             content=content,
             category=resolved_category,
         )
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to upsert manual entry to Qdrant: {exc}") from exc
+
+        try:
+            self.db.add(entry)
+            self.db.commit()
+            self.db.refresh(entry)
+        except Exception as exc:
+            try:
+                self.vector_store.delete_points([record.point_id])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to cleanup Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {
             "entry_id": entry.EntryID,
@@ -65,6 +83,10 @@ class ManualEntryProcessor:
         if entry.IsActive is False:
             raise ValueError(f"Manual entry '{entry_id}' is inactive. Restore it before updating.")
 
+        original_title = entry.Title
+        original_content = entry.Content
+        original_category = entry.Category
+
         if "title" in updates and updates["title"]:
             entry.Title = updates["title"]
         if "content" in updates and updates["content"]:
@@ -72,10 +94,6 @@ class ManualEntryProcessor:
         if "category" in updates and updates["category"]:
             entry.Category = updates["category"]
 
-        self.db.commit()
-        self.db.refresh(entry)
-
-        # Re-embed
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=entry.Title,
@@ -83,13 +101,49 @@ class ManualEntryProcessor:
             category=entry.Category,
         )
         record.metadata["is_active"] = bool(entry.IsActive)
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            self.db.rollback()
+            raise VectorStoreError(f"Failed to upsert updated manual entry to Qdrant: {exc}") from exc
+
+        try:
+            self.db.commit()
+            self.db.refresh(entry)
+        except Exception as exc:
+            logger.warning(
+                "DB commit failed after Qdrant update for manual entry %s, attempting rollback.",
+                entry_id,
+            )
+            self.db.rollback()
+            try:
+                old_record = self.consolidator.build_manual_record(
+                    entry_id=entry.EntryID,
+                    title=original_title,
+                    content=original_content,
+                    category=original_category,
+                )
+                old_record.metadata["is_active"] = bool(entry.IsActive)
+                old_vector = await asyncio.to_thread(self.embeddings.embed_query, original_content)
+                self.vector_store.upsert_points([PointStruct(
+                    id=old_record.point_id,
+                    vector=old_vector,
+                    payload={"page_content": old_record.page_content, "metadata": old_record.metadata}
+                )])
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to revert Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {
             "entry_id": entry.EntryID,
@@ -108,10 +162,25 @@ class ManualEntryProcessor:
         if entry.IsActive is False:
             return {"status": "skipped", "message": f"Manual entry {entry_id} is already inactive."}
 
-        entry.IsActive = False
-        self.db.commit()
+        try:
+            self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to soft delete manual entry in Qdrant: {exc}") from exc
 
-        self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+        entry.IsActive = False
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            try:
+                self.vector_store.restore_by_metadata("source_id", entry_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to restore Qdrant point after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "message": f"Manual entry {entry_id} soft-deleted."}
 
@@ -124,10 +193,6 @@ class ManualEntryProcessor:
         if entry.IsActive is True:
             return {"status": "skipped", "message": f"Manual entry {entry_id} is already active."}
 
-        entry.IsActive = True
-        self.db.commit()
-
-        # Rebuild vector
         record = self.consolidator.build_manual_record(
             entry_id=entry.EntryID,
             title=entry.Title,
@@ -135,13 +200,32 @@ class ManualEntryProcessor:
             category=entry.Category,
         )
         record.metadata["is_active"] = True
+
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
-        self.vector_store.restore_by_metadata("source_id", entry_id)
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+            self.vector_store.restore_by_metadata("source_id", entry_id)
+        except Exception as exc:
+            raise VectorStoreError(f"Failed to restore manual entry in Qdrant: {exc}") from exc
+
+        entry.IsActive = True
+        try:
+            self.db.commit()
+        except Exception as exc:
+            self.db.rollback()
+            try:
+                self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+            except Exception as cleanup_exc:
+                logger.error(
+                    "Failed to rollback Qdrant restore after DB failure for manual entry %s: %s",
+                    entry_id,
+                    cleanup_exc,
+                )
+            raise
 
         return {"status": "success", "message": f"Manual entry {entry_id} restored."}

@@ -248,28 +248,12 @@ class VectorStoreService:
                 )
             ]
         )
-        offset = None
-        while True:
-            points, offset = self.qdrant.scroll(
-                collection_name=self.collection_name,
-                scroll_filter=filter_selector,
-                limit=100,
-                offset=offset,
-                with_payload=True,
-                with_vectors=True,
-            )
-            if not points:
-                break
-            updated = []
-            for point in points:
-                payload = dict(getattr(point, "payload", {}) or {})
-                metadata = normalize_metadata(payload.get("metadata", {}))
-                metadata["is_active"] = is_active
-                payload["metadata"] = metadata
-                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
-            self.upsert_points(updated)
-            if offset is None:
-                break
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload={"is_active": is_active},
+            points=filter_selector,
+            key="metadata",
+        )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
         """Hard-delete blacklisted ticket vectors through the central lifecycle layer."""
