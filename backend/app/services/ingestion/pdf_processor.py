@@ -1,6 +1,7 @@
 """PDF ingestion processor."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -75,17 +76,13 @@ class PDFProcessor:
             logger.error("Document classification failed: %s", exc)
         return "General_IT"
 
-    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
-        existing_doc = (
-            self.db.query(UploadedDocument)
-            .filter(UploadedDocument.FileName == file.filename)
-            .first()
-        )
-        if existing_doc:
-            raise ValidationError(
-                f"File '{file.filename}' already exists in the database. Document ID: {existing_doc.DocumentID}"
-            )
+    @staticmethod
+    def _extract_pdf_text(filepath: str) -> str:
+        """Synchronous PDF extraction to be run in a thread."""
+        pdf_reader = PdfReader(filepath)
+        return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
 
+    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
 
@@ -95,8 +92,9 @@ class PDFProcessor:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            pdf_reader = PdfReader(temp_file_path)
-            raw_text = "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+            # FIX: Offload the heavy PDF parsing to a separate thread
+            raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
+
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 
@@ -137,6 +135,7 @@ class PDFProcessor:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
+            from sqlalchemy.exc import IntegrityError
             try:
                 self.db.add(UploadedDocument(
                     DocumentID=document_id,
@@ -146,6 +145,18 @@ class PDFProcessor:
                     IsActive=True,
                 ))
                 self.db.commit()
+            except IntegrityError as exc:
+                self.db.rollback()
+                # Clean up vectors if SQL insertion fails due to duplicate
+                try:
+                    self.vector_store.delete_points([point.id for point in points])
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to cleanup Qdrant points after duplicate DB failure for document %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+                raise ValidationError(f"File '{file.filename}' already exists in the database.") from exc
             except Exception as exc:
                 self.db.rollback()
                 try:

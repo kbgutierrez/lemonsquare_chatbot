@@ -53,14 +53,14 @@ def delete_ticket_from_ai(
 ) -> TicketDeleteResponse:
     logger.info("Blacklisting ticket %s...", ticket_number)
 
+    repo = TicketRepository(db_chatbot, None)
+    repo.add_to_blacklist(ticket_number)
+
     try:
         ingestion_service.delete_ticket_vectors(ticket_number)
         logger.info("Qdrant vectors deleted for ticket %s.", ticket_number)
     except Exception as exc:
         raise VectorStoreError(f"Qdrant deletion failed for ticket {ticket_number}: {exc}") from exc
-
-    repo = TicketRepository(db_chatbot, None)
-    repo.add_to_blacklist(ticket_number)
 
     return TicketDeleteResponse(
         status="success",
@@ -118,11 +118,12 @@ async def whitelist_ticket(
 
 @router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")
 async def trigger_bulk_sync(background_tasks: BackgroundTasks):
-    def run_bulk_ingestion_background():
+    async def run_bulk_ingestion_background():
+        import asyncio
         try:
             from scripts.ingest_tickets import run_ingestion
             logger.info("Starting background bulk ticket sync...")
-            run_ingestion()
+            await asyncio.to_thread(run_ingestion)
             logger.info("Background bulk ticket sync completed.")
         except Exception as e:
             logger.error("Background bulk ingestion failed: %s", e, exc_info=True)

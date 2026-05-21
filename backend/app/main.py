@@ -13,6 +13,16 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
+
+try:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+except ImportError:  # pragma: no cover
+    _rate_limit_exceeded_handler = None
+    RateLimitExceeded = None
+
+from app.core.rate_limit import limiter
+
 from app.api.routers import (
     auth,
     analytics,
@@ -87,6 +97,10 @@ def create_app() -> FastAPI:
         version="2.0.0",
         lifespan=lifespan,
     )
+    
+    app.state.limiter = limiter
+    if _rate_limit_exceeded_handler and RateLimitExceeded:
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # CORS
     app.add_middleware(

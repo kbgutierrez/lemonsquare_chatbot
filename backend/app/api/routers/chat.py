@@ -3,9 +3,10 @@ Chat router — REFACTORED.
 All business logic extracted to chat domain services.
 Router is now pure HTTP: validates input, delegates, formats response.
 """
+import asyncio
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -34,6 +35,7 @@ from app.services.chat.escalation_service import EscalationService
 from app.services.chat.message_service import MessageService
 from app.services.chat.session_manager import SessionManager
 from app.services.external.user_service import fetch_user_details
+from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
@@ -42,13 +44,15 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("", response_model=ChatResponse)
+@limiter.limit("20/minute")
 async def handle_chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
     db: Session = Depends(get_chatbot_db),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
 ) -> ChatResponse:
     try:
-        user_data = await fetch_user_details(request.user_token)
+        user_data = await fetch_user_details(chat_request.user_token)
         user_id = int(user_data.get("id") or 1)
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
@@ -65,17 +69,18 @@ async def handle_chat(
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
 
-    session_id = session_mgr.get_or_create(request.session_id, user_id)
+    session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
 
-    msg_svc.save_user_message(
+    await asyncio.to_thread(
+        msg_svc.save_user_message,
         session_id=session_id,
-        content=request.message,
+        content=chat_request.message,
     )
 
-    history_text = msg_svc.get_history_text(session_id)
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     ai_response, ticket_ids = await orchestrator.orchestrate(
-        user_query=request.message,
+        user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
         db=db,

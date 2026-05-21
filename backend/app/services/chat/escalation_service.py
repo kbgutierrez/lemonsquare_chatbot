@@ -15,6 +15,8 @@ from app.services.llm_client import create_llm
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Fallback routing when AI routing is unavailable
@@ -27,9 +29,7 @@ FALLBACK_ROUTING = {
     "routing_source": "fallback_default",
 }
 
-BIZPORTAL_TICKET_URL = (
-    "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
-)
+BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
 
 
 class EscalationService:

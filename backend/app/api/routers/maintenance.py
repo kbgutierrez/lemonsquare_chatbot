@@ -5,7 +5,7 @@ Uses MaintenanceService facade for consolidation operations.
 import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_ingestion_service, require_admin_user
 from app.core.database import SessionChatbot
 from app.services.maintenance.maintenance_service import MaintenanceService
 
@@ -16,6 +16,7 @@ router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
 @router.post("/consolidate", summary="Run safe knowledge-base maintenance")
 async def trigger_knowledge_consolidation(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service),
 ):

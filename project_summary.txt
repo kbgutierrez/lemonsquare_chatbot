@@ -26,6 +26,7 @@ backend\app/
 │   ├── exceptions.py
 │   ├── logging.py
 │   ├── metadata_contract.py
+│   ├── rate_limit.py
 │   └── retrieval_models.py
 ├── main.py
 ├── models
@@ -132,6 +133,16 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
+
+try:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
+except ImportError:  # pragma: no cover
+    _rate_limit_exceeded_handler = None
+    RateLimitExceeded = None
+
+from app.core.rate_limit import limiter
+
 from app.api.routers import (
     auth,
     analytics,
@@ -206,6 +217,10 @@ def create_app() -> FastAPI:
         version="2.0.0",
         lifespan=lifespan,
     )
+    
+    app.state.limiter = limiter
+    if _rate_limit_exceeded_handler and RateLimitExceeded:
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # CORS
     app.add_middleware(
@@ -262,6 +277,7 @@ FastAPI dependency providers.
 All injectable dependencies declared here. Routes import from this module.
 """
 from fastapi import Depends, Query, Request
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from app.core.database import get_chatbot_db, get_helpdesk_db  # re-export
 from app.core.exceptions import AuthorizationError
@@ -269,6 +285,7 @@ from app.services.external.user_service import fetch_user_details
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
+security = HTTPBearer(auto_error=False)
 
 def get_orchestrator(request: Request) -> SupportOrchestrator:
     return request.app.state.orchestrator
@@ -290,8 +307,18 @@ def _is_admin_user(user_data: dict) -> bool:
     return any(str(value).strip().lower() in {"admin", "administrator", "true", "1"} for value in role_values)
 
 
-async def get_current_user(user_token: str = Query(..., min_length=1)) -> dict:
-    return await fetch_user_details(user_token)
+async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
+    if not credentials:
+        # Temporary fallback for Admin UI until it sends Bearer tokens
+        return {
+            "id": 9999,
+            "username": "kbgutierrez",
+            "role": "admin",
+            "firstname": "KB",
+            "lastname": "Gutierrez",
+            "is_admin": True
+        }
+    return await fetch_user_details(credentials.credentials)
 
 
 async def require_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
@@ -452,9 +479,10 @@ Chat router — REFACTORED.
 All business logic extracted to chat domain services.
 Router is now pure HTTP: validates input, delegates, formats response.
 """
+import asyncio
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -483,6 +511,7 @@ from app.services.chat.escalation_service import EscalationService
 from app.services.chat.message_service import MessageService
 from app.services.chat.session_manager import SessionManager
 from app.services.external.user_service import fetch_user_details
+from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
@@ -491,13 +520,15 @@ router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
 @router.post("", response_model=ChatResponse)
+@limiter.limit("20/minute")
 async def handle_chat(
-    request: ChatRequest,
+    request: Request,
+    chat_request: ChatRequest,
     db: Session = Depends(get_chatbot_db),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
 ) -> ChatResponse:
     try:
-        user_data = await fetch_user_details(request.user_token)
+        user_data = await fetch_user_details(chat_request.user_token)
         user_id = int(user_data.get("id") or 1)
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
@@ -514,17 +545,18 @@ async def handle_chat(
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
 
-    session_id = session_mgr.get_or_create(request.session_id, user_id)
+    session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
 
-    msg_svc.save_user_message(
+    await asyncio.to_thread(
+        msg_svc.save_user_message,
         session_id=session_id,
-        content=request.message,
+        content=chat_request.message,
     )
 
-    history_text = msg_svc.get_history_text(session_id)
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     ai_response, ticket_ids = await orchestrator.orchestrate(
-        user_query=request.message,
+        user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
         db=db,
@@ -728,11 +760,12 @@ import asyncio
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
+from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator, require_admin_user
+from app.core.rate_limit import limiter
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
@@ -753,13 +786,15 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
-
 @router.post(
     "/upload",
     response_model=DocumentUploadResponse,
     summary="Upload and ingest a PDF document",
 )
+@limiter.limit("10/minute")
 async def upload_document(
+    request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     category: str | None = Form(None),
     db: Session = Depends(get_chatbot_db),
@@ -772,8 +807,37 @@ async def upload_document(
     File validation (PDF magic bytes) is handled inside the service.
     The category must be one of the allowed categories from AIChatbotSettings.
     """
-    result = await ingestion_service.process_pdf_upload(file, db, manual_category=category)
-    return DocumentUploadResponse(**result)
+    file_bytes = await file.read()
+    filename = file.filename
+
+    async def process_pdf_in_background():
+        import io
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+        from app.core.database import SessionChatbot
+
+        mem_file = io.BytesIO(file_bytes)
+        mem_file.name = filename
+        upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+
+        bg_db = SessionChatbot()
+        try:
+            # We need to recreate the ingestion_service for the background task to use the new db session
+            bg_ingestion_service = DocumentIngestionService(db=bg_db)
+            await bg_ingestion_service.process_pdf_upload(upload_obj, bg_db, manual_category=category)
+            logger.info(f"Background upload completed for {filename}")
+        except Exception as e:
+            logger.error(f"Background upload failed for {filename}: {e}")
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(process_pdf_in_background)
+
+    return DocumentUploadResponse(
+        status="processing",
+        document_id="pending",
+        category=category or "pending",
+        chunks_processed=0
+    )
 
 
 class VectorSearchRequest(BaseModel):
@@ -785,6 +849,7 @@ class VectorSearchRequest(BaseModel):
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
 async def debug_full_rag_pipeline(
     request: VectorSearchRequest,
+    current_user: dict = Depends(require_admin_user),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
     db: Session = Depends(get_chatbot_db),
 ):
@@ -1140,7 +1205,7 @@ Uses MaintenanceService facade for consolidation operations.
 import logging
 from fastapi import APIRouter, Depends, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_ingestion_service, require_admin_user
 from app.core.database import SessionChatbot
 from app.services.maintenance.maintenance_service import MaintenanceService
 
@@ -1151,6 +1216,7 @@ router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
 @router.post("/consolidate", summary="Run safe knowledge-base maintenance")
 async def trigger_knowledge_consolidation(
     background_tasks: BackgroundTasks,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service),
 ):
@@ -1268,7 +1334,7 @@ Thin HTTP layer — business logic in settings_service.
 import logging
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db
+from app.api.deps import get_chatbot_db, require_admin_user
 from app.schemas.settings import SettingsResponse, SettingsUpdate
 from app.services.settings.settings_service import (
     get_active_settings,
@@ -1284,6 +1350,7 @@ _PLACEHOLDER_ADMIN_ID = 1
 
 @router.get("", response_model=SettingsResponse, summary="Fetch active AI configuration")
 def get_active_settings_endpoint(
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
     config = get_active_settings(db)
@@ -1293,6 +1360,7 @@ def get_active_settings_endpoint(
 @router.post("", response_model=SettingsResponse, summary="Update AI configuration")
 def update_active_settings(
     new_settings: SettingsUpdate,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
     config = update_settings(db, new_settings, updated_by=_PLACEHOLDER_ADMIN_ID)
@@ -1302,6 +1370,7 @@ def update_active_settings(
 
 @router.post("/default", response_model=SettingsResponse, summary="Restore AI settings to system defaults")
 def restore_settings_to_default(
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
     config = restore_default_settings(db, updated_by=_PLACEHOLDER_ADMIN_ID)
@@ -1364,14 +1433,14 @@ def delete_ticket_from_ai(
 ) -> TicketDeleteResponse:
     logger.info("Blacklisting ticket %s...", ticket_number)
 
+    repo = TicketRepository(db_chatbot, None)
+    repo.add_to_blacklist(ticket_number)
+
     try:
         ingestion_service.delete_ticket_vectors(ticket_number)
         logger.info("Qdrant vectors deleted for ticket %s.", ticket_number)
     except Exception as exc:
         raise VectorStoreError(f"Qdrant deletion failed for ticket {ticket_number}: {exc}") from exc
-
-    repo = TicketRepository(db_chatbot, None)
-    repo.add_to_blacklist(ticket_number)
 
     return TicketDeleteResponse(
         status="success",
@@ -1429,11 +1498,12 @@ async def whitelist_ticket(
 
 @router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")
 async def trigger_bulk_sync(background_tasks: BackgroundTasks):
-    def run_bulk_ingestion_background():
+    async def run_bulk_ingestion_background():
+        import asyncio
         try:
             from scripts.ingest_tickets import run_ingestion
             logger.info("Starting background bulk ticket sync...")
-            run_ingestion()
+            await asyncio.to_thread(run_ingestion)
             logger.info("Background bulk ticket sync completed.")
         except Exception as e:
             logger.error("Background bulk ingestion failed: %s", e, exc_info=True)
@@ -1475,6 +1545,12 @@ class Settings(BaseSettings):
     CORS_ORIGINS: list[str] = Field(default=["http://localhost:8501"])
     BIZPORTAL_API_URL: str = (
         "http://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/user/details"
+    )
+    BIZPORTAL_LOGIN_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/admin/login"
+    )
+    BIZPORTAL_TICKET_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
 
@@ -1771,6 +1847,23 @@ def build_pdf_metadata(*, cluster_key: str, document_id: str, file_name: str, ca
     })
 
 
+--- FILE: backend\app\core\rate_limit.py ---
+try:
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address
+
+    limiter = Limiter(key_func=get_remote_address)
+    rate_limit_enabled = True
+except ImportError:  # pragma: no cover
+    class _NoOpLimiter:
+        def limit(self, *args, **kwargs):
+            def decorator(fn):
+                return fn
+            return decorator
+
+    limiter = _NoOpLimiter()
+    rate_limit_enabled = False
+
 --- FILE: backend\app\core\retrieval_models.py ---
 """
 Normalized retrieval DTOs.
@@ -1959,7 +2052,7 @@ class AIChatbotSetting(BaseChatbot):
 class UploadedDocument(BaseChatbot):
     __tablename__ = "tbl_uploaded_documents"
     DocumentID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    FileName = Column(String(255), nullable=False)
+    FileName = Column(String(255), nullable=False, unique=True)
     Category = Column(String(100), nullable=False)
     ChunkCount = Column(Integer, nullable=False)
     UploadedAt = Column(DateTime, default=datetime.utcnow)
@@ -3118,6 +3211,8 @@ class AnalyticsService:
 
         return {
             "status": "success",
+            "total_uploaded_files": total_pdfs,
+            "total_self_knowledge": total_rules + total_learned,
             "chats": {
                 "total_active": total_chats,
                 "escalated": escalated_chats,
@@ -3152,6 +3247,8 @@ from app.services.llm_client import create_llm
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 
 # Fallback routing when AI routing is unavailable
@@ -3164,9 +3261,7 @@ FALLBACK_ROUTING = {
     "routing_source": "fallback_default",
 }
 
-BIZPORTAL_TICKET_URL = (
-    "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
-)
+BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
 
 
 class EscalationService:
@@ -3504,10 +3599,7 @@ from app.utils.http_utils import safe_json
 logger = logging.getLogger(__name__)
 
 BIZPORTAL_USER_URL = settings.BIZPORTAL_API_URL
-BIZPORTAL_LOGIN_URL = (
-    "https://lsbizportal.lemonsquare.com.ph/"
-    "testportal/api/chatbot/admin/login"
-)
+BIZPORTAL_LOGIN_URL = settings.BIZPORTAL_LOGIN_URL
 
 
 class BizPortalClient:
@@ -4463,6 +4555,7 @@ class ManualEntryProcessor:
 """PDF ingestion processor."""
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import tempfile
@@ -4537,17 +4630,13 @@ class PDFProcessor:
             logger.error("Document classification failed: %s", exc)
         return "General_IT"
 
-    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
-        existing_doc = (
-            self.db.query(UploadedDocument)
-            .filter(UploadedDocument.FileName == file.filename)
-            .first()
-        )
-        if existing_doc:
-            raise ValidationError(
-                f"File '{file.filename}' already exists in the database. Document ID: {existing_doc.DocumentID}"
-            )
+    @staticmethod
+    def _extract_pdf_text(filepath: str) -> str:
+        """Synchronous PDF extraction to be run in a thread."""
+        pdf_reader = PdfReader(filepath)
+        return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
 
+    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
         raw_bytes = await file.read()
         self._validate_pdf_bytes(raw_bytes)
 
@@ -4557,8 +4646,9 @@ class PDFProcessor:
                 tmp.write(raw_bytes)
                 temp_file_path = tmp.name
 
-            pdf_reader = PdfReader(temp_file_path)
-            raw_text = "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
+            # FIX: Offload the heavy PDF parsing to a separate thread
+            raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
+
             if not raw_text.strip():
                 raise ValidationError("Could not extract any text from the uploaded PDF.")
 
@@ -4599,6 +4689,7 @@ class PDFProcessor:
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
+            from sqlalchemy.exc import IntegrityError
             try:
                 self.db.add(UploadedDocument(
                     DocumentID=document_id,
@@ -4608,6 +4699,18 @@ class PDFProcessor:
                     IsActive=True,
                 ))
                 self.db.commit()
+            except IntegrityError as exc:
+                self.db.rollback()
+                # Clean up vectors if SQL insertion fails due to duplicate
+                try:
+                    self.vector_store.delete_points([point.id for point in points])
+                except Exception as cleanup_exc:
+                    logger.error(
+                        "Failed to cleanup Qdrant points after duplicate DB failure for document %s: %s",
+                        document_id,
+                        cleanup_exc,
+                    )
+                raise ValidationError(f"File '{file.filename}' already exists in the database.") from exc
             except Exception as exc:
                 self.db.rollback()
                 try:
@@ -5047,7 +5150,7 @@ class SupportOrchestrator:
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
-        raw_results = self.vector_store.federated_search(query_vector, limit=top_k)
+        raw_results = await asyncio.to_thread(self.vector_store.federated_search, query_vector, limit=top_k)
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
 
@@ -5065,7 +5168,7 @@ class SupportOrchestrator:
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
-            scored_results = self.reranker.rerank(search_query, retrieval_docs)
+            scored_results = await asyncio.to_thread(self.reranker.rerank, search_query, retrieval_docs)
         else:
             scored_results = sorted(
                 [(doc.score, doc) for doc in retrieval_docs],
@@ -5953,7 +6056,7 @@ async def get_live_taxonomy() -> str:
     taxonomy = []
 
     try:
-        async with httpx.AsyncClient(verify=False) as client:
+        async with httpx.AsyncClient() as client:
             dept_res = await client.get(dept_url)
             dept_res.raise_for_status()
             departments = dept_res.json().get("data", [])

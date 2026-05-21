@@ -32,6 +32,8 @@ class AnalyticsService:
 
         return {
             "status": "success",
+            "total_uploaded_files": total_pdfs,
+            "total_self_knowledge": total_rules + total_learned,
             "chats": {
                 "total_active": total_chats,
                 "escalated": escalated_chats,

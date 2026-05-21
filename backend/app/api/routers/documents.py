@@ -12,11 +12,12 @@ import asyncio
 import logging
 import uuid
 
-from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException
+from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator
+from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator, require_admin_user
+from app.core.rate_limit import limiter
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
@@ -37,13 +38,15 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
-
 @router.post(
     "/upload",
     response_model=DocumentUploadResponse,
     summary="Upload and ingest a PDF document",
 )
+@limiter.limit("10/minute")
 async def upload_document(
+    request: Request,
+    background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     category: str | None = Form(None),
     db: Session = Depends(get_chatbot_db),
@@ -56,8 +59,37 @@ async def upload_document(
     File validation (PDF magic bytes) is handled inside the service.
     The category must be one of the allowed categories from AIChatbotSettings.
     """
-    result = await ingestion_service.process_pdf_upload(file, db, manual_category=category)
-    return DocumentUploadResponse(**result)
+    file_bytes = await file.read()
+    filename = file.filename
+
+    async def process_pdf_in_background():
+        import io
+        from starlette.datastructures import UploadFile as StarletteUploadFile
+        from app.core.database import SessionChatbot
+
+        mem_file = io.BytesIO(file_bytes)
+        mem_file.name = filename
+        upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+
+        bg_db = SessionChatbot()
+        try:
+            # We need to recreate the ingestion_service for the background task to use the new db session
+            bg_ingestion_service = DocumentIngestionService(db=bg_db)
+            await bg_ingestion_service.process_pdf_upload(upload_obj, bg_db, manual_category=category)
+            logger.info(f"Background upload completed for {filename}")
+        except Exception as e:
+            logger.error(f"Background upload failed for {filename}: {e}")
+        finally:
+            bg_db.close()
+
+    background_tasks.add_task(process_pdf_in_background)
+
+    return DocumentUploadResponse(
+        status="processing",
+        document_id="pending",
+        category=category or "pending",
+        chunks_processed=0
+    )
 
 
 class VectorSearchRequest(BaseModel):
@@ -69,6 +101,7 @@ class VectorSearchRequest(BaseModel):
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
 async def debug_full_rag_pipeline(
     request: VectorSearchRequest,
+    current_user: dict = Depends(require_admin_user),
     orchestrator: SupportOrchestrator = Depends(get_orchestrator),
     db: Session = Depends(get_chatbot_db),
 ):
