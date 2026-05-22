@@ -47,36 +47,16 @@ const createWelcomeMessage =
     }
   }
 
-const NeedTicketPrompt = ({ onOpenTicket }) => (
-  <div className="flex items-end gap-2 animate-[fadeIn_.15s_ease-out] justify-start">
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 ring-2 ring-violet-50">
-      <span className="text-[11px] font-semibold">!</span>
-    </div>
-
-    <div className="max-w-[85%] rounded-xl px-3 py-2.5 backdrop-blur-md border border-violet-100/60 bg-white/85 text-slate-800 shadow-[0_3px_10px_rgba(139,92,246,0.06)]">
-      <p className="text-[12px] leading-snug mb-2.5 font-medium text-slate-600">
-        This conversation should be escalated to a ticket.
-      </p>
-
-      <button
-        onClick={onOpenTicket}
-        className="flex items-center gap-1.5 rounded-lg bg-violet-50 px-2.5 py-1.5 text-[11px] font-semibold text-violet-700 transition-all hover:bg-violet-100 active:scale-95"
-      >
-        Submit Ticket
-      </button>
-    </div>
-  </div>
-)
-
 const ChatMessages = ({
   messages = [],
   loading = false,
   resolved = false,
   resolutionCheck = {
     showResolutionPrompt: false,
-    allowTicketSubmission: true,
+    allowTicketSubmission: false,
   },
   onResolve,
+  onDismiss,
   onOpenTicket,
 }) => {
 
@@ -232,15 +212,15 @@ const ChatMessages = ({
         )}
 
         {/* RESOLUTION PROMPT AS A MESSAGE */}
-        {(!resolved && resolutionCheck.resolutionAction === "need_ticket" && !loading) && (
-          <NeedTicketPrompt onOpenTicket={onOpenTicket} />
-        )}
-
-        {!resolved && resolutionCheck.showResolutionPrompt && !loading && (
+        {/* Render based on backend flags - text is now hardcoded in ResolutionPrompt */}
+        {!resolved && !loading && (resolutionCheck.showResolutionPrompt || resolutionCheck.allowTicketSubmission) && (
           <ResolutionPrompt
             onResolve={onResolve}
+            onDismiss={onDismiss}
             onOpenTicket={onOpenTicket}
+            showResolutionPrompt={resolutionCheck.showResolutionPrompt}
             allowTicketSubmission={resolutionCheck.allowTicketSubmission}
+            resolutionMessage={resolutionCheck.resolutionMessage}
           />
         )}
 

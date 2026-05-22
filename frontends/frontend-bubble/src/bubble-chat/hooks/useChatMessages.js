@@ -67,8 +67,11 @@ export const useChatMessages =
       setResolutionCheck,
     ] = useState({
       showResolutionPrompt: false,
-      allowTicketSubmission: true,      conversationStatus: "active",
-      resolutionAction: "active",    })
+      allowTicketSubmission: false,
+      conversationStatus: "active",
+      resolutionAction: "active",
+      resolutionMessage: null,
+    })
 
     /* ========================================
        REFS
@@ -386,6 +389,15 @@ export const useChatMessages =
               aiMessage,
             ])
 
+            // Apply resolution flags returned by the backend immediately
+            setResolutionCheck({
+              showResolutionPrompt: Boolean(response?.showResolutionPrompt),
+              allowTicketSubmission: Boolean(response?.allowTicketSubmission),
+              conversationStatus: response?.conversationStatus || "active",
+              resolutionAction: response?.resolutionAction || "active",
+              resolutionMessage: response?.resolutionMessage || null,
+            })
+
           } catch (error) {
 
             console.error(
@@ -482,19 +494,22 @@ export const useChatMessages =
 
             setResolutionCheck({
               showResolutionPrompt:
-                Boolean(
-                  data?.show_resolution_prompt
-                ),
+                Boolean(data?.show_resolution_prompt),
 
+              // Force strict boolean based on the new backend logic
               allowTicketSubmission:
-                data?.allow_ticket_submission !==
-                false,
+                Boolean(data?.allow_ticket_submission),
 
               conversationStatus:
                 data?.conversation_status || "active",
 
+              // FIXED: Must read from data.resolution_action
               resolutionAction:
                 data?.resolution_action || "active",
+
+              // FIXED: Must read from data.resolution_message
+              resolutionMessage:
+                data?.resolution_message || null,
             })
 
           } catch (error) {
@@ -517,9 +532,10 @@ export const useChatMessages =
 
         setResolutionCheck({
           showResolutionPrompt: false,
-          allowTicketSubmission: true,
+          allowTicketSubmission: false,
           conversationStatus: "active",
           resolutionAction: "active",
+          resolutionMessage: null,
         })
 
         return
@@ -593,6 +609,20 @@ export const useChatMessages =
         [state]
       )
 
+    const dismissResolution =
+      useCallback(
+        () => {
+          setResolutionCheck({
+            showResolutionPrompt: false,
+            allowTicketSubmission: false,
+            conversationStatus: "active",
+            resolutionAction: "active",
+            resolutionMessage: null,
+          })
+        },
+        []
+      )
+
     return {
       messages,
 
@@ -618,5 +648,7 @@ export const useChatMessages =
       restoreConversation,
 
       resolutionCheck,
-    }
-  }
+
+      dismissResolution,
+      }
+      }

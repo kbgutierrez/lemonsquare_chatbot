@@ -309,7 +309,7 @@ const validateChatResponse =
         Boolean(response.show_resolution_prompt),
 
       allowTicketSubmission:
-        response.allow_ticket_submission !== false,
+        Boolean(response.allow_ticket_submission),
 
       conversationStatus:
         response.conversation_status || "active",
@@ -321,6 +321,9 @@ const validateChatResponse =
         typeof response.resolution_confidence === "number"
           ? response.resolution_confidence
           : 0.0,
+
+      resolutionMessage:
+        response.resolution_message || null,
     }
   }
 
