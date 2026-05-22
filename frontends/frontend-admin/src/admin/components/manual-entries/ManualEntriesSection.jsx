@@ -17,8 +17,16 @@ import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 ======================================== */
 
 const ManualEntriesSection = () => {
-  const [showModal, setShowModal] = useState(false)
-  const [editingEntry, setEditingEntry] = useState(null)
+
+  const [
+    showModal,
+    setShowModal,
+  ] = useState(false)
+
+  const [
+    editingEntry,
+    setEditingEntry,
+  ] = useState(null)
 
   const {
     loading,
@@ -33,6 +41,8 @@ const ManualEntriesSection = () => {
     setPage,
 
     categories,
+    allowedCategories,
+
     activeCategory,
     setActiveCategory,
 
@@ -48,18 +58,27 @@ const ManualEntriesSection = () => {
      MODAL HANDLERS
   ======================================== */
 
-  const openCreateModal = useCallback(() => {
-    setEditingEntry(null)
-    setShowModal(true)
-  }, [])
+  const openCreateModal =
+    useCallback(() => {
 
-  const openEditModal = useCallback((item) => {
-    setEditingEntry(item)
-    setShowModal(true)
-  }, [])
+      setEditingEntry(null)
+
+      setShowModal(true)
+
+    }, [])
+
+  const openEditModal =
+    useCallback((item) => {
+
+      setEditingEntry(item)
+
+      setShowModal(true)
+
+    }, [])
 
   return (
     <div className="flex h-full flex-col gap-5">
+
       {/* HEADER */}
       <ManualEntriesHeader
         search={search}
@@ -84,11 +103,15 @@ const ManualEntriesSection = () => {
 
       {/* ERROR */}
       {error && !loading && (
-        <ErrorState title="Manual Entries Error" message={error} />
+        <ErrorState
+          title="Manual Entries Error"
+          message={error}
+        />
       )}
 
       {/* CONTENT */}
       <div className="flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
+
         {loading ? (
           <LoadingSpinner label="Loading manual entries..." />
         ) : paginatedItems.length === 0 ? (
@@ -98,22 +121,29 @@ const ManualEntriesSection = () => {
           />
         ) : (
           <div className="grid gap-4">
+
             {paginatedItems.map((item) => (
               <ManualEntryCard
                 key={item.id}
                 item={item}
                 submitting={submitting}
+                allowedCategories={allowedCategories}
                 handleUpdateEntry={handleUpdateEntry}
                 handleDeleteEntry={handleDeleteEntry}
                 openEditModal={openEditModal}
               />
             ))}
+
           </div>
         )}
       </div>
 
       {/* PAGINATION */}
-      <ManualEntriesPagination page={page} setPage={setPage} totalPages={totalPages} />
+      <ManualEntriesPagination
+        page={page}
+        setPage={setPage}
+        totalPages={totalPages}
+      />
 
       {/* MODAL */}
       <ManualEntryModal
@@ -131,4 +161,6 @@ const ManualEntriesSection = () => {
   )
 }
 
-export default memo(ManualEntriesSection)
+export default memo(
+  ManualEntriesSection
+)

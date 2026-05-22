@@ -25,99 +25,217 @@ import {
   deleteManualEntry,
 } from "../services/manualEntriesService"
 
+import aiSettingsService
+  from "../../../services/aiSettingsService"
+
 const ITEMS_PER_PAGE = 6
 const SUCCESS_TIMEOUT = 3500
 const CACHE_KEY = "manual_entries"
 
 const useManualEntries = () => {
+
   /* ========================================
      REFS
   ======================================== */
 
-  const mountedRef = useRef(true)
-  const successTimeoutRef = useRef(null)
+  const mountedRef =
+    useRef(true)
+
+  const successTimeoutRef =
+    useRef(null)
 
   /* ========================================
      UI STATE
   ======================================== */
 
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState("")
-  const [successMessage, setSuccessMessage] = useState("")
-  const [search, setSearch] = useState("")
-  const [page, setPage] = useState(1)
-  const [activeCategory, setActiveCategory] = useState("All")
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false)
+
+  const [
+    error,
+    setError,
+  ] = useState("")
+
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] = useState("")
+
+  const [
+    search,
+    setSearch,
+  ] = useState("")
+
+  const [
+    page,
+    setPage,
+  ] = useState(1)
+
+  const [
+    activeCategory,
+    setActiveCategory,
+  ] = useState("All")
 
   /* ========================================
      CLEANUP
   ======================================== */
 
   useEffect(() => {
+
     mountedRef.current = true
 
     return () => {
+
       mountedRef.current = false
 
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current)
+      if (
+        successTimeoutRef.current
+      ) {
+        clearTimeout(
+          successTimeoutRef.current
+        )
       }
     }
+
   }, [])
 
   /* ========================================
      FETCHER
   ======================================== */
 
-  const safeFetchManualEntries = useCallback(async () => {
-    const response = await fetchManualEntries()
+  const safeFetchManualEntries =
+    useCallback(async () => {
 
-    if (Array.isArray(response)) return response
-    if (Array.isArray(response?.data)) return response.data
+      const [
+        entriesResponse,
+        settings,
+      ] = await Promise.all([
+        fetchManualEntries(),
 
-    console.warn("INVALID_MANUAL_ENTRIES_RESPONSE", response)
-    return []
-  }, [])
+        aiSettingsService.getSettings(),
+      ])
+
+      let entries = []
+
+      if (
+        Array.isArray(
+          entriesResponse
+        )
+      ) {
+        entries = entriesResponse
+      } else if (
+        Array.isArray(
+          entriesResponse?.data
+        )
+      ) {
+        entries =
+          entriesResponse.data
+      } else {
+        console.warn(
+          "INVALID_MANUAL_ENTRIES_RESPONSE",
+          entriesResponse
+        )
+      }
+
+      const allowedCategories =
+        settings?.AllowedCategories
+          ?.split(",")
+          ?.map((c) =>
+            c.trim()
+          )
+          ?.filter(Boolean) || []
+
+      return {
+        items: entries,
+        allowedCategories,
+      }
+
+    }, [])
 
   /* ========================================
      LIVE QUERY
   ======================================== */
 
   const {
-    data: items,
+    data,
     loading,
     refreshing,
     refresh,
   } = useLiveQuery({
-    queryKey: CACHE_KEY,
-    queryFn: safeFetchManualEntries,
-    initialData: [],
-    refetchInterval: API_CONFIG.POLLING_INTERVAL,
-    staleWhileRevalidate: true,
+    queryKey:
+      CACHE_KEY,
+
+    queryFn:
+      safeFetchManualEntries,
+
+    initialData: {
+      items: [],
+      allowedCategories: [],
+    },
+
+    refetchInterval:
+      API_CONFIG.POLLING_INTERVAL,
+
+    staleWhileRevalidate:
+      true,
   })
 
-  const safeItems = useMemo(
-    () => (Array.isArray(items) ? items : []),
-    [items]
-  )
+  const safeItems =
+    useMemo(() => {
+
+      return Array.isArray(
+        data?.items
+      )
+        ? data.items
+        : []
+
+    }, [data])
+
+  const allowedCategories =
+    useMemo(() => {
+
+      return Array.isArray(
+        data?.allowedCategories
+      )
+        ? data.allowedCategories
+        : []
+
+    }, [data])
 
   /* ========================================
      SUCCESS AUTO CLEAR
   ======================================== */
 
   useEffect(() => {
-    if (!successMessage) return
 
-    successTimeoutRef.current = setTimeout(() => {
-      if (mountedRef.current) {
-        setSuccessMessage("")
-      }
-    }, SUCCESS_TIMEOUT)
+    if (!successMessage) {
+      return
+    }
+
+    successTimeoutRef.current =
+      setTimeout(() => {
+
+        if (
+          mountedRef.current
+        ) {
+          setSuccessMessage("")
+        }
+
+      }, SUCCESS_TIMEOUT)
 
     return () => {
-      if (successTimeoutRef.current) {
-        clearTimeout(successTimeoutRef.current)
+
+      if (
+        successTimeoutRef.current
+      ) {
+        clearTimeout(
+          successTimeoutRef.current
+        )
       }
     }
+
   }, [successMessage])
 
   /* ========================================
@@ -126,207 +244,444 @@ const useManualEntries = () => {
 
   useEffect(() => {
     setPage(1)
-  }, [search, activeCategory])
+  }, [
+    search,
+    activeCategory,
+  ])
 
   /* ========================================
-     CATEGORIES (DERIVED)
+     ENTRY CATEGORIES
   ======================================== */
 
-  const categories = useMemo(() => {
-    const unique = [
-      ...new Set(
-        safeItems
-          .map((i) => i.category)
-          .filter(Boolean)
-      ),
-    ]
+  const entryCategories =
+    useMemo(() => {
 
-    return ["All", ...unique]
-  }, [safeItems])
+      return [
+        ...new Set(
+          safeItems
+            .map((item) =>
+              item.category
+            )
+            .filter(Boolean)
+        ),
+      ]
+
+    }, [safeItems])
+
+  /* ========================================
+     CATEGORY MERGE
+  ======================================== */
+
+  const mergedCategories =
+    useMemo(() => {
+
+      const base =
+        allowedCategories.length
+
+          ? allowedCategories
+
+          : entryCategories
+
+      return [
+        ...new Set(base),
+      ]
+
+    }, [
+      allowedCategories,
+      entryCategories,
+    ])
+
+  /* ========================================
+     TABS CATEGORIES
+  ======================================== */
+
+  const categories =
+    useMemo(() => {
+
+      return [
+        "All",
+        ...mergedCategories,
+      ]
+
+    }, [mergedCategories])
 
   /* ========================================
      FILTER
   ======================================== */
 
-  const filtered = useMemo(() => {
-    const query = search.toLowerCase()
+  const filtered =
+    useMemo(() => {
 
-    return safeItems.filter((item) => {
-      const text = [
-        item.title,
-        item.content,
-        item.category,
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase()
+      const query =
+        search.toLowerCase()
 
-      const matchesSearch = text.includes(query)
-      const matchesCategory =
-        activeCategory === "All" ||
-        item.category === activeCategory
+      return safeItems.filter(
+        (item) => {
 
-      return matchesSearch && matchesCategory
-    })
-  }, [safeItems, search, activeCategory])
+          const text = [
+            item.title,
+            item.content,
+            item.category,
+          ]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase()
+
+          const matchesSearch =
+            text.includes(query)
+
+          const matchesCategory =
+            activeCategory ===
+              "All" ||
+
+            item.category ===
+              activeCategory
+
+          return (
+            matchesSearch &&
+            matchesCategory
+          )
+        }
+      )
+
+    }, [
+      safeItems,
+      search,
+      activeCategory,
+    ])
 
   /* ========================================
      PAGINATION
   ======================================== */
 
-  const totalPages = useMemo(
-    () => Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE)),
-    [filtered]
-  )
+  const totalPages =
+    useMemo(() => {
 
-  const paginatedItems = useMemo(
-    () =>
-      filtered.slice(
-        (page - 1) * ITEMS_PER_PAGE,
-        page * ITEMS_PER_PAGE
-      ),
-    [filtered, page]
-  )
+      return Math.max(
+        1,
+        Math.ceil(
+          filtered.length /
+            ITEMS_PER_PAGE
+        )
+      )
+
+    }, [filtered])
+
+  const paginatedItems =
+    useMemo(() => {
+
+      return filtered.slice(
+        (page - 1) *
+          ITEMS_PER_PAGE,
+
+        page *
+          ITEMS_PER_PAGE
+      )
+
+    }, [
+      filtered,
+      page,
+    ])
 
   /* ========================================
      CREATE (OPTIMISTIC)
   ======================================== */
 
-  const handleCreateEntry = useCallback(
-    async (form, resetForm, closeModal) => {
+  const handleCreateEntry =
+    useCallback(async (
+      form,
+      resetForm,
+      closeModal
+    ) => {
+
       setError("")
 
-      if (!form.title?.trim() || !form.content?.trim()) {
-        setError("Title and content are required.")
+      if (
+        !form.title?.trim() ||
+        !form.content?.trim()
+      ) {
+        setError(
+          "Title and content are required."
+        )
+
         return
       }
 
       try {
+
         setSubmitting(true)
 
         const optimistic = {
-          id: `temp-${Date.now()}`,
-          title: form.title,
-          content: form.content,
-          category: form.category || "General",
+          id:
+            `temp-${Date.now()}`,
+
+          title:
+            form.title,
+
+          content:
+            form.content,
+
+          category:
+            form.category ||
+            "General",
         }
 
-        setCachedData(CACHE_KEY, [optimistic, ...safeItems])
+        setCachedData(
+          CACHE_KEY,
+          {
+            ...data,
 
-        const response = await createManualEntry(form)
+            items: [
+              optimistic,
+              ...safeItems,
+            ],
+          }
+        )
 
-        invalidateCache(CACHE_KEY)
+        const response =
+          await createManualEntry(
+            form
+          )
+
+        invalidateCache(
+          CACHE_KEY
+        )
+
         await refresh()
 
-        if (mountedRef.current) {
+        if (
+          mountedRef.current
+        ) {
+
           setSuccessMessage(
             `✨ AI categorized entry as ${
-              response?.category || form?.category || "General"
+              response?.category ||
+              form?.category ||
+              "General"
             }`
           )
 
           resetForm?.()
+
           closeModal?.()
         }
+
       } catch (error) {
-        invalidateCache(CACHE_KEY)
-        await refresh()
 
-        if (mountedRef.current) {
-          setError(error.message || "Failed to create entry.")
-        }
-      } finally {
-        if (mountedRef.current) setSubmitting(false)
-      }
-    },
-    [safeItems, refresh]
-  )
-
-  /* ========================================
-     UPDATE (OPTIMISTIC + ROLLBACK CLEAN)
-  ======================================== */
-
-  const handleUpdateEntry = useCallback(
-    async (entryId, form, onFinish) => {
-      setError("")
-
-      const previous = safeItems
-
-      try {
-        setSubmitting(true)
-
-        const optimistic = safeItems.map((item) =>
-          item.id === entryId ? { ...item, ...form } : item
+        invalidateCache(
+          CACHE_KEY
         )
 
-        setCachedData(CACHE_KEY, optimistic)
-
-        await updateManualEntry(entryId, form)
-
-        invalidateCache(CACHE_KEY)
         await refresh()
 
-        if (mountedRef.current) {
-          setSuccessMessage("Entry updated successfully")
-          onFinish?.()
+        if (
+          mountedRef.current
+        ) {
+          setError(
+            error.message ||
+              "Failed to create entry."
+          )
         }
-      } catch (error) {
-        setCachedData(CACHE_KEY, previous)
 
-        if (mountedRef.current) {
-          setError(error.message || "Failed to update entry.")
-        }
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (
+          mountedRef.current
+        ) {
+          setSubmitting(false)
+        }
       }
-    },
-    [safeItems, refresh]
-  )
+
+    }, [
+      data,
+      safeItems,
+      refresh,
+    ])
 
   /* ========================================
-     DELETE (OPTIMISTIC)
+     UPDATE
   ======================================== */
 
-  const handleDeleteEntry = useCallback(
-    async (entryId) => {
+  const handleUpdateEntry =
+    useCallback(async (
+      entryId,
+      form,
+      onFinish
+    ) => {
+
       setError("")
 
-      const previous = safeItems
+      const previous = data
 
       try {
+
         setSubmitting(true)
 
-        const optimistic = safeItems.filter((i) => i.id !== entryId)
+        const optimistic =
+          safeItems.map(
+            (item) =>
 
-        setCachedData(CACHE_KEY, optimistic)
+              item.id ===
+              entryId
 
-        await deleteManualEntry(entryId)
+                ? {
+                    ...item,
+                    ...form,
+                  }
 
-        invalidateCache(CACHE_KEY)
+                : item
+          )
+
+        setCachedData(
+          CACHE_KEY,
+          {
+            ...data,
+            items: optimistic,
+          }
+        )
+
+        await updateManualEntry(
+          entryId,
+          form
+        )
+
+        invalidateCache(
+          CACHE_KEY
+        )
+
         await refresh()
 
-        if (mountedRef.current) {
-          setSuccessMessage("🗑️ Entry deleted successfully")
-        }
-      } catch (error) {
-        setCachedData(CACHE_KEY, previous)
+        if (
+          mountedRef.current
+        ) {
 
-        if (mountedRef.current) {
-          setError(error.message || "Failed to delete entry.")
+          setSuccessMessage(
+            "Entry updated successfully"
+          )
+
+          onFinish?.()
         }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (
+          mountedRef.current
+        ) {
+          setError(
+            error.message ||
+              "Failed to update entry."
+          )
+        }
+
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (
+          mountedRef.current
+        ) {
+          setSubmitting(false)
+        }
       }
-    },
-    [safeItems, refresh]
-  )
+
+    }, [
+      data,
+      safeItems,
+      refresh,
+    ])
+
+  /* ========================================
+     DELETE
+  ======================================== */
+
+  const handleDeleteEntry =
+    useCallback(async (
+      entryId
+    ) => {
+
+      setError("")
+
+      const previous = data
+
+      try {
+
+        setSubmitting(true)
+
+        const optimistic =
+          safeItems.filter(
+            (item) =>
+              item.id !==
+              entryId
+          )
+
+        setCachedData(
+          CACHE_KEY,
+          {
+            ...data,
+            items: optimistic,
+          }
+        )
+
+        await deleteManualEntry(
+          entryId
+        )
+
+        invalidateCache(
+          CACHE_KEY
+        )
+
+        await refresh()
+
+        if (
+          mountedRef.current
+        ) {
+
+          setSuccessMessage(
+            "🗑️ Entry deleted successfully"
+          )
+        }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (
+          mountedRef.current
+        ) {
+          setError(
+            error.message ||
+              "Failed to delete entry."
+          )
+        }
+
+      } finally {
+
+        if (
+          mountedRef.current
+        ) {
+          setSubmitting(false)
+        }
+      }
+
+    }, [
+      data,
+      safeItems,
+      refresh,
+    ])
 
   /* ========================================
      EXPORT
   ======================================== */
 
   return {
-    items: safeItems,
+    items:
+      safeItems,
 
     loading,
     refreshing,
@@ -343,6 +698,7 @@ const useManualEntries = () => {
     setPage,
 
     categories,
+    allowedCategories,
 
     activeCategory,
     setActiveCategory,
@@ -355,7 +711,9 @@ const useManualEntries = () => {
     handleDeleteEntry,
 
     setError,
-    reloadEntries: refresh,
+
+    reloadEntries:
+      refresh,
   }
 }
 
