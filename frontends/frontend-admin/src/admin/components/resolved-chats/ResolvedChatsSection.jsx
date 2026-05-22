@@ -62,9 +62,34 @@ const ResolvedChatsSection = () => {
     lifecycleFilter
   )
 
+  /*
+    UI STABILITY FIX:
+
+    Prevent layout bouncing
+    while refetching.
+
+    We preserve the last valid dataset
+    during loading transitions.
+  */
+
+  const [
+    stableItems,
+    setStableItems,
+  ] = useState([])
+
+  useEffect(() => {
+
+    if (
+      Array.isArray(items)
+    ) {
+      setStableItems(items)
+    }
+
+  }, [items])
+
   const safeItems =
-    Array.isArray(items)
-      ? items
+    Array.isArray(stableItems)
+      ? stableItems
       : []
 
   const [
@@ -345,15 +370,18 @@ const ResolvedChatsSection = () => {
       </div>
 
       {/* CONTENT */}
-      <div className="flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
+      <div className="relative flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
 
-        {loading ? (
-          <div className="flex h-full items-center justify-center">
+        {/* LOADING OVERLAY */}
+        {loading && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#121a18]/40 backdrop-blur-[1px]">
 
             <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#f5d547]/20 border-t-[#f5d547]" />
 
           </div>
-        ) : paginatedItems.length === 0 ? (
+        )}
+
+        {paginatedItems.length === 0 ? (
           <ResolvedChatsEmpty
             title={
               lifecycleFilter ===
@@ -375,7 +403,7 @@ const ResolvedChatsSection = () => {
         ) : (
           <div className="grid gap-4">
 
-            <AnimatePresence mode="popLayout">
+            <AnimatePresence initial={false} mode="sync">
 
               {paginatedItems.map(
                 (

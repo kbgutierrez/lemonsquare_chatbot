@@ -9,11 +9,12 @@ import {
 } from "framer-motion"
 
 import {
-  Trash2,
   AlertTriangle,
   X,
   RotateCcw,
   Archive,
+  ChevronRight,
+  Minimize2,
 } from "lucide-react"
 
 import {
@@ -21,7 +22,7 @@ import {
 } from "../utils/parseResolvedChat"
 
 /* ========================================
-   PARSED FIELD BLOCK
+   FIELD BLOCK
 ======================================== */
 
 const FieldBlock = ({
@@ -35,33 +36,37 @@ const FieldBlock = ({
   }
 
   return (
-    <div>
+    <div className="rounded-2xl border border-[#26332d] bg-[#131917] p-4">
+
       <h3
         className={`mb-2 text-sm font-semibold ${color}`}
       >
         {title}
       </h3>
 
-      <p className="text-sm leading-relaxed text-[#d7e0dc]">
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7e0dc]">
         {value}
       </p>
+
     </div>
   )
 }
 
 /* ========================================
-   CARD
+   COMPONENT
 ======================================== */
 
 const ResolvedChatCard = ({
   item,
-  index,
-
   lifecycle = "active",
-
   onDelete,
   onRestore,
 }) => {
+
+  const [
+    expanded,
+    setExpanded,
+  ] = useState(false)
 
   const [
     showDeleteModal,
@@ -77,6 +82,10 @@ const ResolvedChatCard = ({
     parseResolvedChat(
       item.content
     )
+
+  const isInactive =
+    lifecycle ===
+    "inactive"
 
   /* ========================================
      DELETE
@@ -96,6 +105,8 @@ const ResolvedChatCard = ({
         setShowDeleteModal(
           false
         )
+
+        setExpanded(false)
 
       } finally {
 
@@ -118,57 +129,46 @@ const ResolvedChatCard = ({
           item.id
         )
 
+        setExpanded(false)
+
       } finally {
 
         setLoading(false)
       }
     }
 
-  const isInactive =
-    lifecycle ===
-    "inactive"
-
   return (
     <>
 
-      {/* CARD */}
-      <motion.div
-        layout
-        initial={{
-          opacity: 0,
-          y: 20,
-        }}
-        animate={{
-          opacity: 1,
-          y: 0,
-        }}
-        exit={{
-          opacity: 0,
-          scale: 0.94,
-        }}
-        whileHover={{
-          y: -4,
-        }}
-        transition={{
-          delay:
-            index * 0.05,
+      {/* ========================================
+         LIST ITEM
+      ======================================== */}
 
-          duration: 0.35,
+      <motion.button
+        type="button"
+        onClick={() =>
+          setExpanded(true)
+        }
+        whileHover={{
+          scale: 1.005,
         }}
-        className={`group rounded-[28px] border p-5 transition-all duration-300 ${
+        whileTap={{
+          scale: 0.995,
+        }}
+        className={`group flex w-full items-center justify-between rounded-[24px] border px-5 py-4 text-left transition-all duration-200 ${
           isInactive
-            ? "border-[#38413d] bg-[#141917] opacity-[0.88] hover:border-[#4b5651]"
-            : "border-[#26332d] bg-[#18211f] hover:border-[#f5d547]/30 hover:shadow-[0_12px_50px_rgba(0,0,0,0.35)]"
+            ? "border-[#38413d] bg-[#141917] hover:border-[#4f5b55]"
+            : "border-[#26332d] bg-[#18211f] hover:border-[#f5d547]/30 hover:bg-[#1b2421]"
         }`}
       >
 
-        {/* HEADER */}
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {/* LEFT */}
+        <div className="min-w-0 flex-1">
 
           <div className="flex flex-wrap items-center gap-3">
 
             <span
-              className={`rounded-2xl border px-3 py-1 text-xs font-semibold ${
+              className={`rounded-xl border px-2.5 py-1 text-[11px] font-semibold ${
                 isInactive
                   ? "border-[#5f6c66]/20 bg-[#5f6c66]/10 text-[#c4d0ca]"
                   : "border-[#f5d547]/10 bg-[#f5d547]/10 text-[#f5d547]"
@@ -176,112 +176,222 @@ const ResolvedChatCard = ({
             >
 
               {isInactive
-                ? "Inactive Chat"
-                : "Resolved Chat"}
+                ? "Inactive"
+                : "Active"}
 
             </span>
 
-            <span className="text-xs text-[#8ea59b]">
+            <span className="truncate text-sm font-semibold text-white">
               {item.source}
             </span>
 
           </div>
 
-          {/* ACTION */}
-          {isInactive ? (
-            <motion.button
-              whileHover={{
-                scale: 1.03,
-              }}
-              whileTap={{
-                scale: 0.95,
-              }}
-              disabled={loading}
-              onClick={
-                handleRestore
-              }
-              className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-sm font-medium text-emerald-300 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
-            >
+          <p className="mt-2 line-clamp-1 text-sm text-[#8ea59b]">
 
-              <RotateCcw className="h-4 w-4" />
+            {parsed["Issue Reported"] ||
+              "No issue summary available."}
 
-              {loading
-                ? "Restoring..."
-                : "Restore"}
-
-            </motion.button>
-          ) : (
-            <motion.button
-              whileHover={{
-                scale: 1.03,
-              }}
-              whileTap={{
-                scale: 0.95,
-              }}
-              onClick={() =>
-                setShowDeleteModal(
-                  true
-                )
-              }
-              className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-300 transition-all hover:bg-red-500/20 hover:shadow-[0_0_25px_rgba(239,68,68,0.15)]"
-            >
-
-              <Archive className="h-4 w-4" />
-
-              Archive
-
-            </motion.button>
-          )}
+          </p>
 
         </div>
 
-        {/* CONTENT */}
-        <div className="space-y-5">
+        {/* RIGHT */}
+        <div className="ml-4 flex items-center gap-3">
 
-          <FieldBlock
-            title="Issue Reported"
-            value={
-              parsed[
-                "Issue Reported"
-              ]
-            }
-            color="text-[#f5d547]"
-          />
-
-          <FieldBlock
-            title="Issue Found"
-            value={
-              parsed[
-                "Issue Found"
-              ]
-            }
-            color="text-[#95c11f]"
-          />
-
-          <FieldBlock
-            title="Root Cause"
-            value={
-              parsed[
-                "Root Cause"
-              ]
-            }
-            color="text-[#ffb347]"
-          />
-
-          <FieldBlock
-            title="Work Done"
-            value={
-              parsed[
-                "Work Done"
-              ]
-            }
-            color="text-[#7dd3fc]"
-          />
+          <ChevronRight className="h-5 w-5 text-[#7f948c] transition-transform duration-200 group-hover:translate-x-1" />
 
         </div>
-      </motion.div>
 
-      {/* DELETE MODAL */}
+      </motion.button>
+
+      {/* ========================================
+         EXPANDED MODAL
+      ======================================== */}
+
+      <AnimatePresence>
+
+        {expanded && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-5 backdrop-blur-md"
+          >
+
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+              }}
+              transition={{
+                duration: 0.18,
+              }}
+              className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[34px] border border-[#2a3631] bg-[#161f1c] shadow-[0_25px_100px_rgba(0,0,0,0.55)]"
+            >
+
+              {/* HEADER */}
+              <div className="flex items-center justify-between border-b border-[#26332d] px-7 py-5">
+
+                <div>
+
+                  <div className="flex items-center gap-3">
+
+                    <span
+                      className={`rounded-xl border px-3 py-1 text-xs font-semibold ${
+                        isInactive
+                          ? "border-[#5f6c66]/20 bg-[#5f6c66]/10 text-[#c4d0ca]"
+                          : "border-[#f5d547]/10 bg-[#f5d547]/10 text-[#f5d547]"
+                      }`}
+                    >
+
+                      {isInactive
+                        ? "Inactive Chat"
+                        : "Resolved Chat"}
+
+                    </span>
+
+                    <span className="text-sm text-[#8ea59b]">
+                      {item.source}
+                    </span>
+
+                  </div>
+
+                  <h2 className="mt-3 text-2xl font-bold text-white">
+                    AI Learned Conversation
+                  </h2>
+
+                </div>
+
+                {/* MINIMIZE */}
+                <button
+                  onClick={() =>
+                    setExpanded(false)
+                  }
+                  className="rounded-2xl border border-[#2a3631] bg-[#1a2320] p-3 text-[#8ea59b] transition-all hover:bg-[#212c28] hover:text-white"
+                >
+
+                  <Minimize2 className="h-5 w-5" />
+
+                </button>
+
+              </div>
+
+              {/* CONTENT */}
+              <div className="flex-1 overflow-y-auto px-7 py-6">
+
+                <div className="space-y-5">
+
+                  <FieldBlock
+                    title="Issue Reported"
+                    value={
+                      parsed[
+                        "Issue Reported"
+                      ]
+                    }
+                    color="text-[#f5d547]"
+                  />
+
+                  <FieldBlock
+                    title="Issue Found"
+                    value={
+                      parsed[
+                        "Issue Found"
+                      ]
+                    }
+                    color="text-[#95c11f]"
+                  />
+
+                  <FieldBlock
+                    title="Root Cause"
+                    value={
+                      parsed[
+                        "Root Cause"
+                      ]
+                    }
+                    color="text-[#ffb347]"
+                  />
+
+                  <FieldBlock
+                    title="Work Done"
+                    value={
+                      parsed[
+                        "Work Done"
+                      ]
+                    }
+                    color="text-[#7dd3fc]"
+                  />
+
+                </div>
+
+              </div>
+
+              {/* FOOTER */}
+              <div className="border-t border-[#26332d] px-7 py-5">
+
+                {isInactive ? (
+                  <button
+                    disabled={loading}
+                    onClick={
+                      handleRestore
+                    }
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 py-4 text-sm font-semibold text-emerald-300 transition-all hover:bg-emerald-500/20 hover:shadow-[0_0_25px_rgba(16,185,129,0.15)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+
+                    <RotateCcw className="h-4 w-4" />
+
+                    {loading
+                      ? "Restoring..."
+                      : "Restore Chat"}
+
+                  </button>
+                ) : (
+                  <button
+                    disabled={loading}
+                    onClick={() =>
+                      setShowDeleteModal(
+                        true
+                      )
+                    }
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 py-4 text-sm font-semibold text-red-300 transition-all hover:bg-red-500/20 hover:shadow-[0_0_25px_rgba(239,68,68,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+
+                    <Archive className="h-4 w-4" />
+
+                    Archive Chat
+
+                  </button>
+                )}
+
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
+
+      {/* ========================================
+         DELETE MODAL
+      ======================================== */}
+
       <AnimatePresence>
 
         {showDeleteModal && (
@@ -295,29 +405,24 @@ const ResolvedChatCard = ({
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
           >
 
             <motion.div
               initial={{
                 opacity: 0,
-                scale: 0.9,
-                y: 20,
+                scale: 0.96,
               }}
               animate={{
                 opacity: 1,
                 scale: 1,
-                y: 0,
               }}
               exit={{
                 opacity: 0,
-                scale: 0.92,
-                y: 10,
+                scale: 0.96,
               }}
               transition={{
-                type: "spring",
-                damping: 20,
-                stiffness: 250,
+                duration: 0.18,
               }}
               className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-red-500/20 bg-[#161f1c] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.45)]"
             >
@@ -388,6 +493,7 @@ const ResolvedChatCard = ({
               </div>
 
             </motion.div>
+
           </motion.div>
         )}
 
