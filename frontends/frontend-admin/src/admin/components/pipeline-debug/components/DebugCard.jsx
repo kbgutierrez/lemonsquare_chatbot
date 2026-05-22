@@ -7,12 +7,9 @@ const DebugCard = ({
   return (
     <div
       className="
+        panel-base
+
         rounded-3xl
-
-        border
-        border-[#25332d]
-
-        bg-[#151d1b]
 
         p-5
       "
@@ -31,7 +28,7 @@ const DebugCard = ({
             h-4
             w-4
 
-            text-[#f5d547]
+            text-[var(--accent)]
           "
         />
 
@@ -40,7 +37,7 @@ const DebugCard = ({
             text-sm
             font-semibold
 
-            text-white
+            text-[var(--text-primary)]
           "
         >
           {title}
@@ -52,9 +49,19 @@ const DebugCard = ({
           whitespace-pre-wrap
           break-words
 
-          text-sm
+          rounded-2xl
 
-          text-[#b6c3bd]
+          bg-black/5
+
+          p-4
+
+          font-mono
+          text-sm
+          leading-relaxed
+
+          text-[var(--text-secondary)]
+
+          dark:bg-white/[0.03]
         "
       >
         {content}

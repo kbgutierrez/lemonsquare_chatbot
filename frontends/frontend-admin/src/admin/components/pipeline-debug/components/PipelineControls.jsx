@@ -18,14 +18,11 @@ const PipelineControls = ({
   return (
     <div
       className="
+        panel-base
+
         mb-4
 
         rounded-3xl
-
-        border
-        border-[#25332d]
-
-        bg-[#151d1b]
 
         p-4
       "
@@ -52,7 +49,7 @@ const PipelineControls = ({
               className="
                 text-xs
 
-                text-[#8ea59b]
+                text-[var(--text-secondary)]
               "
             >
               Pipeline configuration loaded
@@ -61,8 +58,9 @@ const PipelineControls = ({
             <span
               className="
                 text-sm
+                font-medium
 
-                text-white
+                text-[var(--text-primary)]
               "
             >
               Session:
@@ -80,19 +78,22 @@ const PipelineControls = ({
                 )
               }
               className="
+                hover-surface
+
                 rounded-2xl
 
                 border
-                border-[#2a3a33]
+                border-[var(--border)]
 
-                bg-[#101816]
+                bg-[var(--panel-light)]
 
                 px-4
                 py-3
 
                 text-sm
+                font-medium
 
-                text-white
+                text-[var(--text-primary)]
               "
             >
               Edit Config
@@ -100,10 +101,12 @@ const PipelineControls = ({
 
             <button
               onClick={handleRun}
+
               disabled={
                 loading ||
                 !prompt
               }
+
               className="
                 flex
                 items-center
@@ -111,7 +114,7 @@ const PipelineControls = ({
 
                 rounded-2xl
 
-                bg-[#f5d547]
+                bg-[var(--accent)]
 
                 px-4
                 py-3
@@ -119,7 +122,13 @@ const PipelineControls = ({
                 text-sm
                 font-semibold
 
-                text-[#111917]
+                text-[#1b211e]
+
+                transition-all
+
+                hover:brightness-105
+
+                disabled:opacity-50
               "
             >
               {loading ? (
@@ -157,62 +166,44 @@ const PipelineControls = ({
         >
           <input
             value={userToken}
+
             onChange={(e) =>
               setUserToken(
                 e.target.value
               )
             }
+
             placeholder="User Token"
+
             className="
-              rounded-2xl
-
-              border
-              border-[#2a3a33]
-
-              bg-[#101816]
-
-              px-4
-              py-3
-
-              text-sm
-              text-white
-
-              outline-none
+              input-base
             "
           />
 
           <input
             value={sessionId}
+
             onChange={(e) =>
               setSessionId(
                 e.target.value
               )
             }
+
             placeholder="Session ID"
+
             className="
-              rounded-2xl
-
-              border
-              border-[#2a3a33]
-
-              bg-[#101816]
-
-              px-4
-              py-3
-
-              text-sm
-              text-white
-
-              outline-none
+              input-base
             "
           />
 
           <button
             onClick={handleRun}
+
             disabled={
               loading ||
               !prompt
             }
+
             className="
               flex
               items-center
@@ -221,7 +212,7 @@ const PipelineControls = ({
 
               rounded-2xl
 
-              bg-[#f5d547]
+              bg-[var(--accent)]
 
               px-4
               py-3
@@ -229,11 +220,11 @@ const PipelineControls = ({
               text-sm
               font-semibold
 
-              text-[#111917]
+              text-[#1b211e]
 
               transition-all
 
-              hover:opacity-90
+              hover:brightness-105
 
               disabled:opacity-50
             "

@@ -7,8 +7,10 @@ const AdminLayout = ({ children }) => {
         h-[100dvh]
         min-h-[100dvh]
         overflow-hidden
-        bg-[#0b1311]
       "
+      style={{
+        background: "var(--background)",
+      }}
     >
       {/* BACKGROUND EFFECTS */}
       <div
@@ -28,9 +30,11 @@ const AdminLayout = ({ children }) => {
             h-[420px]
             w-[420px]
             rounded-full
-            bg-[#f5d547]/[0.04]
             blur-3xl
           "
+          style={{
+            background: "var(--bg-glow-primary)",
+          }}
         />
 
         {/* BOTTOM LIGHT GLOW */}
@@ -42,9 +46,11 @@ const AdminLayout = ({ children }) => {
             h-[420px]
             w-[420px]
             rounded-full
-            bg-[#95c11f]/[0.05]
             blur-3xl
           "
+          style={{
+            background: "var(--bg-glow-secondary)",
+          }}
         />
       </div>
 

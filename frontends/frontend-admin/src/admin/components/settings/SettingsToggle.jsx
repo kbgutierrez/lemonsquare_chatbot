@@ -29,12 +29,12 @@ const SettingsToggle = ({
         ${
           value
             ? `
-              border-[#f5d547]/30
-              bg-[#f5d547]
+              border-[var(--accent)]/25
+              bg-[var(--accent)]
             `
             : `
-              border-[#2d3b35]
-              bg-[#1a2421]
+              border-[var(--border)]
+              bg-[var(--panel-light)]
             `
         }
       `}
@@ -62,12 +62,12 @@ const SettingsToggle = ({
               ? `
                 left-[30px]
 
-                bg-[#111917]
+                bg-[#1b211e]
               `
               : `
                 left-1
 
-                bg-[#dce5e1]
+                bg-[var(--panel)]
               `
           }
         `}
@@ -81,8 +81,12 @@ const SettingsToggle = ({
 
             ${
               value
-                ? "bg-[#f5d547]"
-                : "bg-[#7f938a]"
+                ? `
+                  bg-[var(--accent)]
+                `
+                : `
+                  bg-[var(--text-secondary)]
+                `
             }
           `}
         />

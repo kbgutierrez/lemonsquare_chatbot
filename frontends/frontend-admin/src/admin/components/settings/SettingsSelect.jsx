@@ -22,78 +22,200 @@ const SettingsSelect = ({
   options = [],
   warning = "",
 }) => {
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef(null)
 
-  const selectedOption = options.find(
-    (option) => option.value === value
-  )
+  const [open, setOpen] =
+    useState(false)
+
+  const containerRef =
+    useRef(null)
+
+  const selectedOption =
+    options.find(
+      (option) =>
+        option.value === value
+    )
 
   /* ========================================
      OUTSIDE CLICK CLOSE
   ======================================== */
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(event.target)
-      ) {
-        setOpen(false)
-      }
-    }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
+  useEffect(() => {
+
+    const handleClickOutside =
+      (event) => {
+
+        if (
+          containerRef.current &&
+          !containerRef.current.contains(
+            event.target
+          )
+        ) {
+          setOpen(false)
+        }
+      }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    )
+
+    return () =>
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      )
   }, [])
 
-  const handleSelect = (selectedValue) => {
+  const handleSelect = (
+    selectedValue
+  ) => {
+
     onChange({
-      target: { value: selectedValue },
+      target: {
+        value: selectedValue,
+      },
     })
+
     setOpen(false)
   }
 
   return (
     <div className="space-y-3">
+
       {/* LABEL */}
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#74877f]">
+      <div
+        className="
+          flex
+          items-center
+          justify-between
+          gap-3
+        "
+      >
+        <p
+          className="
+            text-[11px]
+            font-semibold
+            uppercase
+
+            tracking-[0.18em]
+
+            text-[var(--text-secondary)]
+          "
+        >
           {label}
         </p>
 
         {warning && (
-          <div className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold text-amber-300">
-            <AlertTriangle className="h-3 w-3" />
+          <div
+            className="
+              inline-flex
+              items-center
+              gap-1.5
+
+              rounded-full
+
+              border
+              border-amber-600/35
+
+              bg-amber-100/90
+
+              px-2.5
+              py-1
+
+              text-[10px]
+              font-bold
+
+              text-amber-950
+
+              shadow-[0_4px_14px_rgba(245,158,11,0.12)]
+
+              dark:border-amber-400/20
+              dark:bg-amber-400/10
+              dark:text-amber-200
+            "
+          >
+            <AlertTriangle
+              className="
+                h-3
+                w-3
+              "
+            />
+
             Caution
           </div>
         )}
       </div>
 
       {/* SELECT */}
-      <div ref={containerRef} className="relative">
+      <div
+        ref={containerRef}
+        className="relative"
+      >
+
         {/* TRIGGER */}
         <button
           type="button"
-          onClick={() => setOpen((p) => !p)}
+
+          onClick={() =>
+            setOpen((p) => !p)
+          }
+
           className={`
-            group flex w-full items-center justify-between
-            rounded-3xl border px-5 py-4 text-left text-sm font-medium
-            transition-all duration-300
+            input-base
+
+            group
+
+            flex
+            items-center
+            justify-between
+
+            rounded-3xl
+
+            px-5
+            py-4
+
+            text-left
+            text-sm
+            font-medium
+
             ${
               open
-                ? "border-[#f5d547]/30 bg-[#18211f] shadow-[0_0_0_4px_rgba(245,213,71,0.06)]"
-                : "border-[#2a3732] bg-[#141d1a] hover:border-[#3a4a43]"
+                ? `
+                  border-[var(--accent)]/30
+                `
+                : ""
             }
           `}
         >
-          <span className="truncate text-white">
-            {selectedOption?.label || "Select option"}
+          <span
+            className="
+              truncate
+
+              text-[var(--text-primary)]
+            "
+          >
+            {
+              selectedOption?.label ||
+              "Select option"
+            }
           </span>
 
           <ChevronDown
-            className={`h-5 w-5 text-[#74877f] transition-transform duration-300 ${
-              open ? "rotate-180" : ""
-            }`}
+            className={`
+              h-5
+              w-5
+
+              text-[var(--text-secondary)]
+
+              transition-transform
+              duration-300
+
+              ${
+                open
+                  ? "rotate-180"
+                  : ""
+              }
+            `}
           />
         </button>
 
@@ -101,34 +223,110 @@ const SettingsSelect = ({
         <AnimatePresence>
           {open && (
             <motion.div
-              initial={{ opacity: 0, y: -10, scale: 0.98 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.98 }}
-              transition={{ duration: 0.18 }}
-              className="absolute z-50 mt-3 w-full overflow-hidden rounded-3xl border border-[#2b3933] bg-[#101715] shadow-[0_20px_60px_rgba(0,0,0,0.45)] backdrop-blur-xl"
+              initial={{
+                opacity: 0,
+                y: -10,
+                scale: 0.98,
+              }}
+
+              animate={{
+                opacity: 1,
+                y: 0,
+                scale: 1,
+              }}
+
+              exit={{
+                opacity: 0,
+                y: -8,
+                scale: 0.98,
+              }}
+
+              transition={{
+                duration: 0.18,
+              }}
+
+              className="
+                glass-panel
+
+                absolute
+                z-50
+
+                mt-3
+                w-full
+
+                overflow-hidden
+
+                rounded-3xl
+              "
             >
-              <div className="max-h-[280px] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <div
+                className="
+                  max-h-[280px]
+                  overflow-y-auto
+
+                  [scrollbar-width:none]
+
+                  [&::-webkit-scrollbar]:hidden
+                "
+              >
                 {options.map((option) => {
-                  const isSelected = option.value === value
+
+                  const isSelected =
+                    option.value === value
 
                   return (
                     <button
                       key={option.value}
+
                       type="button"
-                      onClick={() => handleSelect(option.value)}
+
+                      onClick={() =>
+                        handleSelect(
+                          option.value
+                        )
+                      }
+
                       className={`
-                        flex w-full items-center justify-between px-5 py-4 text-left text-sm
-                        transition-all duration-200
+                        flex
+                        w-full
+                        items-center
+                        justify-between
+
+                        px-5
+                        py-4
+
+                        text-left
+                        text-sm
+
+                        transition-all
+                        duration-200
+
                         ${
                           isSelected
-                            ? "bg-[#f5d547]/10 text-[#f5d547]"
-                            : "text-[#d7e2dd] hover:bg-[#18211f]"
+                            ? `
+                              bg-[var(--accent)]/10
+                              text-[var(--accent)]
+                            `
+                            : `
+                              text-[var(--text-primary)]
+
+                              hover:bg-[var(--hover)]
+                            `
                         }
                       `}
                     >
-                      <span className="truncate">{option.label}</span>
+                      <span className="truncate">
+                        {option.label}
+                      </span>
 
-                      {isSelected && <Check className="h-4 w-4" />}
+                      {isSelected && (
+                        <Check
+                          className="
+                            h-4
+                            w-4
+                          "
+                        />
+                      )}
                     </button>
                   )
                 })}
@@ -141,12 +339,47 @@ const SettingsSelect = ({
       {/* WARNING */}
       {warning && (
         <motion.div
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.25 }}
-          className="rounded-2xl border border-amber-500/15 bg-amber-500/5 p-4"
+          initial={{
+            opacity: 0,
+            y: 6,
+          }}
+
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
+
+          transition={{
+            duration: 0.25,
+          }}
+
+          className="
+            rounded-2xl
+
+            border
+            border-amber-600/30
+
+            bg-amber-100/85
+
+            p-4
+
+            shadow-[0_6px_24px_rgba(245,158,11,0.08)]
+
+            dark:border-amber-400/15
+            dark:bg-amber-400/5
+          "
         >
-          <p className="text-xs leading-relaxed text-amber-200">
+          <p
+            className="
+              text-xs
+              font-semibold
+              leading-relaxed
+
+              text-amber-950
+
+              dark:text-amber-200
+            "
+          >
             {warning}
           </p>
         </motion.div>

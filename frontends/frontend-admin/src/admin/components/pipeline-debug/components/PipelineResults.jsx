@@ -100,7 +100,7 @@ const PipelineResults = ({
         <DropdownCard
           title={`Used Documents (${documents.length})`}
           icon={FileText}
-          color="text-[#f5d547]"
+          color="text-[var(--accent)]"
         >
           <div className="space-y-3">
             {documents.map(
@@ -128,16 +128,26 @@ const PipelineResults = ({
         <DropdownCard
           title="Raw Debug Data"
           icon={Brain}
-          color="text-[#60a5fa]"
+          color="text-sky-500"
         >
           <pre
             className="
               whitespace-pre-wrap
               break-words
 
-              text-xs
+              rounded-2xl
 
-              text-[#b6c3bd]
+              bg-black/5
+
+              p-4
+
+              font-mono
+              text-xs
+              leading-relaxed
+
+              text-[var(--text-secondary)]
+
+              dark:bg-white/[0.03]
             "
           >
             {JSON.stringify(

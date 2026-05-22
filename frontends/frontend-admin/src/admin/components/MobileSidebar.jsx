@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion"
 import { Menu, X } from "lucide-react"
+
 import SidebarMenu from "./SidebarMenu.jsx"
 
 const MobileSidebar = ({
@@ -18,9 +19,6 @@ const MobileSidebar = ({
     setOpen(false)
   }
 
-  /* ========================================
-     RENDER
-  ======================================== */
   return (
     <>
       {/* MOBILE TOGGLE BUTTON */}
@@ -33,36 +31,25 @@ const MobileSidebar = ({
           left-4
           top-4
           z-[80]
-
           flex
           h-12
           w-12
           items-center
           justify-center
-
           rounded-2xl
-
-          border
-          border-white/10
-
-          bg-[#111917]/90
-
-          text-white
-
-          shadow-[0_10px_40px_rgba(0,0,0,0.35)]
-
           backdrop-blur-xl
-
           transition-all
           duration-300
-
           hover:scale-[1.03]
-          hover:bg-[#161f1d]
-
           active:scale-[0.98]
-
           lg:hidden
         "
+        style={{
+          border: "1px solid var(--border)",
+          background: "var(--glass-bg)",
+          color: "var(--text-primary)",
+          boxShadow: "var(--shadow-lg)",
+        }}
       >
         <Menu className="h-5 w-5" />
       </button>
@@ -82,10 +69,8 @@ const MobileSidebar = ({
                 fixed
                 inset-0
                 z-[90]
-
                 bg-black/50
                 backdrop-blur-sm
-
                 lg:hidden
               "
             />
@@ -105,13 +90,10 @@ const MobileSidebar = ({
                 left-0
                 top-0
                 z-[100]
-
                 h-full
                 w-[88vw]
                 max-w-[340px]
-
                 p-4
-
                 lg:hidden
               "
             >
@@ -126,25 +108,20 @@ const MobileSidebar = ({
                     right-4
                     top-4
                     z-20
-
                     flex
                     h-10
                     w-10
                     items-center
                     justify-center
-
                     rounded-xl
-
-                    bg-[#1b2421]
-
-                    text-[#b6c3bd]
-
                     transition-all
                     duration-200
-
-                    hover:bg-[#232f2a]
-                    hover:text-white
                   "
+                  style={{
+                    background: "var(--panel)",
+                    color: "var(--text-secondary)",
+                    border: "1px solid var(--border)",
+                  }}
                 >
                   <X className="h-5 w-5" />
                 </button>

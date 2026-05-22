@@ -24,12 +24,16 @@ const TicketStatusBadge = ({
             ? `
               border-red-500/20
               bg-red-500/10
-              text-red-400
+              text-red-600
+
+              dark:text-red-400
             `
             : `
               border-emerald-500/20
               bg-emerald-500/10
-              text-emerald-400
+              text-emerald-700
+
+              dark:text-emerald-400
             `
         }
       `}
@@ -43,8 +47,16 @@ const TicketStatusBadge = ({
 
           ${
             blacklisted
-              ? "bg-red-400"
-              : "bg-emerald-400"
+              ? `
+                bg-red-500
+
+                dark:bg-red-400
+              `
+              : `
+                bg-emerald-600
+
+                dark:bg-emerald-400
+              `
           }
         `}
       />

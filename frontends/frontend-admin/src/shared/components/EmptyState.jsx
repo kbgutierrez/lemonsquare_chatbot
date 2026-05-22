@@ -29,9 +29,10 @@ const EmptyState = ({
           text-center
         "
       >
-        {/* ICON */}
         <div
           className="
+            muted-card
+
             mb-4
 
             flex
@@ -41,11 +42,6 @@ const EmptyState = ({
             justify-center
 
             rounded-3xl
-
-            border
-            border-[#2b3933]
-
-            bg-[#18211f]
           "
         >
           {icon || (
@@ -56,25 +52,23 @@ const EmptyState = ({
 
                 rounded-full
 
-                bg-[#f5d547]
+                bg-[var(--accent)]
               "
             />
           )}
         </div>
 
-        {/* TITLE */}
         <h3
           className="
             text-sm
             font-semibold
 
-            text-white
+            text-[var(--text-primary)]
           "
         >
           {title}
         </h3>
 
-        {/* MESSAGE */}
         <p
           className="
             mt-2
@@ -82,14 +76,14 @@ const EmptyState = ({
             max-w-sm
 
             text-sm
+            leading-relaxed
 
-            text-[#81958c]
+            text-[var(--text-secondary)]
           "
         >
           {message}
         </p>
 
-        {/* ACTION */}
         {action && (
           <div className="mt-5">
             {action}

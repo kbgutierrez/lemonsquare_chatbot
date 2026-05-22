@@ -33,7 +33,7 @@ const TicketSearch = ({
 
             tracking-[0.22em]
 
-            text-[#74877f]
+            text-[var(--text-secondary)]
           "
         >
           Support Workspace
@@ -48,7 +48,7 @@ const TicketSearch = ({
 
             tracking-tight
 
-            text-white
+            text-[var(--text-primary)]
           "
         >
           Tickets
@@ -60,7 +60,7 @@ const TicketSearch = ({
 
             text-sm
 
-            text-[#8ea59b]
+            text-[var(--text-secondary)]
           "
         >
           Manage support requests,
@@ -90,9 +90,9 @@ const TicketSearch = ({
             rounded-2xl
 
             border
-            border-[#2b3933]
+            border-[var(--border)]
 
-            bg-[#141d1a]
+            bg-[var(--panel)]
 
             px-4
             py-3
@@ -100,8 +100,9 @@ const TicketSearch = ({
             transition-all
             duration-200
 
-            focus-within:border-[#f5d547]/30
-            focus-within:bg-[#18211f]
+            focus-within:border-[var(--accent)]/30
+            focus-within:bg-[var(--panel-light)]
+            focus-within:shadow-[0_0_0_4px_rgba(245,213,71,0.05)]
 
             lg:w-[340px]
           "
@@ -112,7 +113,7 @@ const TicketSearch = ({
               w-4
               shrink-0
 
-              text-[#74877f]
+              text-[var(--text-secondary)]
             "
           />
 
@@ -134,11 +135,11 @@ const TicketSearch = ({
 
               text-sm
 
-              text-white
+              text-[var(--text-primary)]
 
               outline-none
 
-              placeholder:text-[#74877f]
+              placeholder:text-[var(--text-secondary)]
             "
           />
         </div>
@@ -155,16 +156,13 @@ const TicketSearch = ({
           {/* TOTAL */}
           <div
             className="
+              muted-card
+
               flex
               items-center
               gap-3
 
               rounded-2xl
-
-              border
-              border-[#2b3933]
-
-              bg-[#141d1a]
 
               px-4
               py-3
@@ -180,7 +178,7 @@ const TicketSearch = ({
 
                 rounded-2xl
 
-                bg-[#f5d547]/10
+                bg-[var(--accent)]/10
               "
             >
               <Ticket
@@ -188,7 +186,7 @@ const TicketSearch = ({
                   h-5
                   w-5
 
-                  text-[#f5d547]
+                  text-[var(--accent)]
                 "
               />
             </div>
@@ -202,7 +200,7 @@ const TicketSearch = ({
 
                   tracking-[0.18em]
 
-                  text-[#74877f]
+                  text-[var(--text-secondary)]
                 "
               >
                 Total
@@ -215,7 +213,7 @@ const TicketSearch = ({
                   text-lg
                   font-bold
 
-                  text-white
+                  text-[var(--text-primary)]
                 "
               >
                 {totalTickets}
@@ -226,16 +224,13 @@ const TicketSearch = ({
           {/* STATUS */}
           <div
             className="
+              muted-card
+
               flex
               items-center
               gap-3
 
               rounded-2xl
-
-              border
-              border-[#2b3933]
-
-              bg-[#141d1a]
 
               px-4
               py-3
@@ -259,7 +254,9 @@ const TicketSearch = ({
                   h-5
                   w-5
 
-                  text-red-400
+                  text-red-600
+
+                  dark:text-red-400
                 "
               />
             </div>
@@ -273,7 +270,7 @@ const TicketSearch = ({
 
                   tracking-[0.18em]
 
-                  text-[#74877f]
+                  text-[var(--text-secondary)]
                 "
               >
                 Moderation
@@ -286,7 +283,7 @@ const TicketSearch = ({
                   text-sm
                   font-semibold
 
-                  text-white
+                  text-[var(--text-primary)]
                 "
               >
                 Active

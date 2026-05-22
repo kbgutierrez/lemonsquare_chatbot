@@ -8,6 +8,7 @@ import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 import EmptyState from "../../../shared/components/EmptyState"
 
 const TicketsSection = () => {
+
   const {
     loading,
     search,
@@ -21,9 +22,11 @@ const TicketsSection = () => {
   } = useTickets()
 
   /* ========================================
-     SIMPLE DERIVED STATE (FIXED)
+     SIMPLE DERIVED STATE
   ======================================== */
-  const hasTickets = paginatedTickets.length > 0
+
+  const hasTickets =
+    paginatedTickets.length > 0
 
   return (
     <div
@@ -48,33 +51,60 @@ const TicketsSection = () => {
       {/* TABLE CARD */}
       <div
         className="
+          glass-panel
+
           relative
           flex
           flex-1
           min-h-0
           flex-col
+
           overflow-hidden
+
           rounded-[32px]
-          border
-          border-[#26342f]
-          bg-[#101715]/95
-          shadow-[0_0_0_1px_rgba(255,255,255,0.02)]
-          backdrop-blur-xl
         "
       >
         {/* TOP LIGHT */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-white/5" />
+        <div
+          className="
+            pointer-events-none
+
+            absolute
+            inset-x-0
+            top-0
+
+            h-px
+
+            bg-white/5
+          "
+        />
 
         {/* LOADING */}
         {loading && (
-          <div className="flex flex-1 items-center justify-center">
-            <LoadingSpinner label="Loading tickets..." />
+          <div
+            className="
+              flex
+              flex-1
+              items-center
+              justify-center
+            "
+          >
+            <LoadingSpinner
+              label="Loading tickets..."
+            />
           </div>
         )}
 
-        {/* EMPTY STATE */}
+        {/* EMPTY */}
         {!loading && !hasTickets && (
-          <div className="flex flex-1 items-center justify-center">
+          <div
+            className="
+              flex
+              flex-1
+              items-center
+              justify-center
+            "
+          >
             <EmptyState
               title="No tickets found"
               message="No tickets matched your current search."
@@ -82,11 +112,21 @@ const TicketsSection = () => {
           </div>
         )}
 
-        {/* TABLE + PAGINATION */}
+        {/* TABLE */}
         {!loading && hasTickets && (
           <>
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <TicketTable tickets={paginatedTickets} blockTicket={blockTicket} />
+            <div
+              className="
+                flex-1
+                min-h-0
+
+                overflow-hidden
+              "
+            >
+              <TicketTable
+                tickets={paginatedTickets}
+                blockTicket={blockTicket}
+              />
             </div>
 
             <TicketPagination

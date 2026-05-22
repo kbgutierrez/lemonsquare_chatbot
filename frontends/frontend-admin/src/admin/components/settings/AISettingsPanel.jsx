@@ -3,6 +3,8 @@ import {
   Sparkles,
   BrainCircuit,
   SlidersHorizontal,
+  Moon,
+  Sun,
 } from "lucide-react"
 
 import { useAISettings } from "../../hooks/useAISettings"
@@ -13,6 +15,10 @@ import {
   rerankerModels,
 } from "../../data/aiModels"
 
+import {
+  useAdminTheme,
+} from "../../../shared/hooks/useAdminTheme"
+
 import SettingsInput from "./SettingsInput"
 import SettingsSelect from "./SettingsSelect"
 import SettingsToggle from "./SettingsToggle"
@@ -20,19 +26,69 @@ import SettingsTextarea from "./SettingsTextarea"
 import SettingsActions from "./SettingsActions"
 
 /* ========================================
-   CONFIG CARD (UNCHANGED UI)
+   CONFIG CARD
 ======================================== */
-const ConfigCard = ({ title, description, icon: Icon, children }) => {
+const ConfigCard = ({
+  title,
+  description,
+  icon: Icon,
+  children,
+}) => {
   return (
-    <div className="rounded-[30px] border border-[#26342f] bg-[#101715]/95 p-6 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] backdrop-blur-xl">
+    <div
+      className="
+        rounded-[30px]
+        border
+        p-6
+        shadow-[0_0_0_1px_rgba(255,255,255,0.02)]
+        backdrop-blur-xl
+      "
+      style={{
+        borderColor: "var(--border)",
+        background: "var(--glass-bg)",
+      }}
+    >
       <div className="mb-6 flex items-start gap-4">
-        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#f5d547]/10">
-          <Icon className="h-5 w-5 text-[#f5d547]" />
+        <div
+          className="
+            flex
+            h-12
+            w-12
+            shrink-0
+            items-center
+            justify-center
+            rounded-2xl
+          "
+          style={{
+            background: "rgba(245, 213, 71, 0.10)",
+          }}
+        >
+          <Icon
+            className="h-5 w-5"
+            style={{
+              color: "var(--accent)",
+            }}
+          />
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold text-white">{title}</h3>
-          <p className="mt-1 text-sm text-[#8ea59b]">{description}</p>
+          <h3
+            className="text-lg font-semibold"
+            style={{
+              color: "var(--text-primary)",
+            }}
+          >
+            {title}
+          </h3>
+
+          <p
+            className="mt-1 text-sm"
+            style={{
+              color: "var(--text-secondary)",
+            }}
+          >
+            {description}
+          </p>
         </div>
       </div>
 
@@ -42,22 +98,52 @@ const ConfigCard = ({ title, description, icon: Icon, children }) => {
 }
 
 const AISettingsPanel = () => {
-  const { loading, saving, success, error, settings, update, saveSettings } =
-    useAISettings()
+  const {
+    loading,
+    saving,
+    success,
+    error,
+    settings,
+    update,
+    saveSettings,
+  } = useAISettings()
+
+  const {
+    theme,
+    isDark,
+    toggleTheme,
+  } = useAdminTheme()
 
   /* ========================================
      LOADING STATE
   ======================================== */
   if (loading) {
     return (
-      <div className="flex items-center justify-center rounded-[32px] border border-[#26342f] bg-[#101715]/95 p-16">
-        <LoaderCircle className="h-8 w-8 animate-spin text-[#f5d547]" />
+      <div
+        className="
+          flex
+          items-center
+          justify-center
+          rounded-[32px]
+          p-16
+        "
+        style={{
+          border: "1px solid var(--border)",
+          background: "var(--glass-bg)",
+        }}
+      >
+        <LoaderCircle
+          className="h-8 w-8 animate-spin"
+          style={{
+            color: "var(--accent)",
+          }}
+        />
       </div>
     )
   }
 
   /* ========================================
-     SAFE UPDATE HELPER (CLEANER HANDLERS)
+     SAFE UPDATE HELPER
   ======================================== */
   const bind = (key) => (value) => update(key, value)
 
@@ -77,6 +163,88 @@ const AISettingsPanel = () => {
         [&::-webkit-scrollbar]:hidden
       "
     >
+      {/* THEME SETTINGS */}
+      <ConfigCard
+        title="Appearance"
+        description="Control the admin dashboard visual theme."
+        icon={isDark ? Moon : Sun}
+      >
+        <div
+          className="
+            flex
+            flex-col
+            gap-4
+            rounded-3xl
+            p-5
+            md:flex-row
+            md:items-center
+            md:justify-between
+          "
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--panel-light)",
+          }}
+        >
+          <div>
+            <p
+              className="text-sm font-semibold"
+              style={{
+                color: "var(--text-primary)",
+              }}
+            >
+              Current Theme
+            </p>
+
+            <p
+              className="mt-1 text-xs"
+              style={{
+                color: "var(--text-secondary)",
+              }}
+            >
+              {isDark
+                ? "Dark mode is currently active."
+                : "Light mode is currently active."}
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="
+              flex
+              items-center
+              justify-center
+              gap-2
+              rounded-2xl
+              px-5
+              py-3
+              text-sm
+              font-semibold
+              transition-all
+              duration-300
+              hover:scale-[1.02]
+              active:scale-[0.98]
+            "
+            style={{
+              background: "var(--accent)",
+              color: "#111917",
+            }}
+          >
+            {isDark ? (
+              <>
+                <Sun className="h-4 w-4" />
+                Switch to Light Mode
+              </>
+            ) : (
+              <>
+                <Moon className="h-4 w-4" />
+                Switch to Dark Mode
+              </>
+            )}
+          </button>
+        </div>
+      </ConfigCard>
+
       {/* AI CONFIG */}
       <ConfigCard
         title="AI Configuration"
@@ -146,12 +314,29 @@ const AISettingsPanel = () => {
         icon={SlidersHorizontal}
       >
         <div className="grid gap-5 xl:grid-cols-2">
-          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
+          <div
+            className="flex items-center justify-between rounded-3xl p-5"
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--panel-light)",
+            }}
+          >
             <div>
-              <p className="text-sm font-semibold text-white">
+              <p
+                className="text-sm font-semibold"
+                style={{
+                  color: "var(--text-primary)",
+                }}
+              >
                 Use Reformulator
               </p>
-              <p className="mt-1 text-xs text-[#7e938a]">
+
+              <p
+                className="mt-1 text-xs"
+                style={{
+                  color: "var(--text-secondary)",
+                }}
+              >
                 Enable intelligent query reformulation.
               </p>
             </div>
@@ -162,10 +347,29 @@ const AISettingsPanel = () => {
             />
           </div>
 
-          <div className="flex items-center justify-between rounded-3xl border border-[#293731] bg-[#141d1a] p-5">
+          <div
+            className="flex items-center justify-between rounded-3xl p-5"
+            style={{
+              border: "1px solid var(--border)",
+              background: "var(--panel-light)",
+            }}
+          >
             <div>
-              <p className="text-sm font-semibold text-white">Use Reranker</p>
-              <p className="mt-1 text-xs text-[#7e938a]">
+              <p
+                className="text-sm font-semibold"
+                style={{
+                  color: "var(--text-primary)",
+                }}
+              >
+                Use Reranker
+              </p>
+
+              <p
+                className="mt-1 text-xs"
+                style={{
+                  color: "var(--text-secondary)",
+                }}
+              >
                 Improve response relevance scoring.
               </p>
             </div>
