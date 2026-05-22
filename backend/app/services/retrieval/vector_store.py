@@ -55,30 +55,6 @@ class VectorStoreService:
             ],
         )
 
-    def ensure_payload_indexes(self) -> None:
-        """Create Qdrant payload indexes required by runtime filters."""
-        indexes = {
-            "metadata.is_active": PayloadSchemaType.BOOL,
-            "metadata.doc_type": PayloadSchemaType.KEYWORD,
-            "metadata.source_id": PayloadSchemaType.KEYWORD,
-            "metadata.document_id": PayloadSchemaType.KEYWORD,
-            "metadata.ticket_number": PayloadSchemaType.KEYWORD,
-        }
-        for field_name, field_schema in indexes.items():
-            try:
-                self.qdrant.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name=field_name,
-                    field_schema=field_schema,
-                )
-                logger.info("Created Qdrant payload index for %s.", field_name)
-            except Exception as exc:
-                message = str(exc).lower()
-                if "already exists" in message or "already" in message:
-                    logger.info("Qdrant payload index for %s already exists.", field_name)
-                    continue
-                logger.warning("Could not create payload index for %s: %s", field_name, exc)
-
     def backfill_active_metadata(self, batch_size: int = 256) -> int:
         """
         Ensure existing vectors have metadata.is_active=True.
@@ -122,7 +98,6 @@ class VectorStoreService:
 
     def prepare_collection(self) -> None:
         """Prepare existing Qdrant collection for indexed soft-delete filtering."""
-        self.ensure_payload_indexes()
         self.backfill_active_metadata()
 
     def search_tickets(

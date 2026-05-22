@@ -51,3 +51,5 @@ class ResolveChatResponse(BaseModel):
 class ResolutionCheckResponse(BaseModel):
     show_resolution_prompt: bool
     allow_ticket_submission: bool
+    conversation_status: str       
+    resolution_confidence: float   

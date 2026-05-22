@@ -264,6 +264,23 @@ const getEscalationDraft =
     return response
   }
 
+const getTaxonomy =
+  async () => {
+
+    const endpoint =
+      buildApiUrl(
+        "/chat/taxonomy"
+      )
+
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "GET",
+      })
+
+    return response
+  }
+
 const submitEscalation =
   async ({
     session_id,
@@ -271,6 +288,8 @@ const submitEscalation =
     company_id,
     summary,
     description,
+    department_id,
+    subcategory_id,
   }) => {
 
     const payload = {
@@ -279,6 +298,8 @@ const submitEscalation =
       company_id,
       summary,
       description,
+      department_id,
+      subcategory_id,
     }
 
     log(
@@ -318,6 +339,7 @@ const submitEscalation =
 const ticketService = {
   resolveTicket,
   getEscalationDraft,
+  getTaxonomy,
   submitEscalation,
 }
 

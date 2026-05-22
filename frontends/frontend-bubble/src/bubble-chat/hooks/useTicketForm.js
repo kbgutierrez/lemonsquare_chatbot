@@ -79,16 +79,51 @@ export const useTicketForm = ({
   const [aiSummary, setAiSummary] =
     useState(DEFAULT_SUMMARY)
 
+  const [taxonomy, setTaxonomy] =
+    useState([])
+
   const [form, setForm] =
     useState({
-      SessionID:
+      session_id:
         sessionId || "",
 
-      RequesterUserID:
+      requester_id:
         requesterId || "",
 
-      Description: "",
+      summary: "",
+      description: "",
+      department_id: "",
+      subcategory_id: "",
     })
+
+  /* ========================================
+     FETCH TAXONOMY
+  ======================================== */
+
+  useEffect(() => {
+
+    const loadTaxonomy =
+      async () => {
+
+        try {
+
+          const data =
+            await ticketService.getTaxonomy()
+
+          setTaxonomy(data)
+
+        } catch (error) {
+
+          console.error(
+            "TAXONOMY_FETCH_ERROR",
+            error
+          )
+        }
+      }
+
+    loadTaxonomy()
+
+  }, [])
 
   /* ========================================
      FETCH ESCALATION DRAFT
@@ -130,11 +165,22 @@ export const useTicketForm = ({
             return
           }
 
-          setAiSummary(
+          const normalized =
             normalizeSummary(
               response
             )
+
+          setAiSummary(
+            normalized
           )
+
+          setForm(prev => ({
+            ...prev,
+            summary: normalized.title,
+            description: normalized.summary,
+            department_id: response?.department_id || "",
+            subcategory_id: response?.subcategory_id || "",
+          }))
 
         } catch (error) {
 
@@ -185,10 +231,10 @@ export const useTicketForm = ({
     setForm(previous => ({
       ...previous,
 
-      SessionID:
+      session_id:
         sessionId || "",
 
-      RequesterUserID:
+      requester_id:
         requesterId || "",
     }))
 
@@ -204,10 +250,10 @@ export const useTicketForm = ({
   const words = useMemo(
     () =>
       countWords(
-        form.Description
+        form.description
       ),
 
-    [form.Description]
+    [form.description]
   )
 
   /* ========================================
@@ -221,7 +267,7 @@ export const useTicketForm = ({
 
     if (
       name ===
-      "Description"
+      "description"
     ) {
 
       const extracted =
@@ -282,20 +328,26 @@ export const useTicketForm = ({
 
         const payload = {
           session_id:
-            form.SessionID,
+            form.session_id,
 
           requester_id:
             Number(
-              form.RequesterUserID
+              form.requester_id
             ),
 
           company_id: 1,
 
           summary:
-            aiSummary.title,
+            form.summary,
 
           description:
-            aiSummary.summary,
+            form.description,
+
+          department_id:
+            Number(form.department_id),
+
+          subcategory_id:
+            Number(form.subcategory_id),
         }
 
         console.log(
@@ -338,6 +390,8 @@ export const useTicketForm = ({
 
   return {
     form,
+
+    taxonomy,
 
     loading,
 

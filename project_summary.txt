@@ -503,6 +503,7 @@ from app.schemas.chat import (
     ChatSessionMetaResponse,
     MessageRecord,
     ResolveChatResponse,
+    ResolutionCheckResponse,
 )
 from app.schemas.tickets import (
     TicketDraftResponse,
@@ -516,6 +517,8 @@ from app.services.external.user_service import fetch_user_details
 from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
+from app.services.resolution.conversation_resolver import ConversationResolutionService
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
@@ -569,10 +572,20 @@ async def handle_chat(
         content=ai_response,
     )
 
+    # ---Run the Conversation Resolution Analyzer ---
+    resolver = ConversationResolutionService(db)
+    resolution_data = await resolver.analyze_conversation(
+        user_query=chat_request.message,
+        ai_response=ai_response,
+        chat_history=history_text
+    )
+
     return ChatResponse(
         session_id=session_id,
         response=ai_response,
         ticket_ids_used=ticket_ids,
+        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
     )
 
 
@@ -746,6 +759,52 @@ def clear_all_user_chats(
         "message": f"Successfully cleared {count} chat sessions.",
     }
 
+
+
+from app.services.resolution.conversation_resolver import ConversationResolutionService
+
+from app.services.taxonomy.taxonomy_service import get_live_taxonomy
+
+@router.get("/taxonomy")
+async def get_taxonomy():
+    """Returns the live taxonomy (departments and subcategories)."""
+    import json
+    data = await get_live_taxonomy()
+    return json.loads(data)
+
+@router.get("/{session_id}/check-resolution", response_model=ResolutionCheckResponse)
+async def check_chat_resolution(
+    session_id: str,
+    db: Session = Depends(get_chatbot_db)
+):
+    """Analyzes the recent chat history to see if buttons should be shown."""
+    msg_svc = MessageService(db)
+    
+    # 1. Grab the latest history
+    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
+    messages = msg_svc.get_all_messages(session_id)
+    
+    if not messages:
+        return ResolutionCheckResponse(show_resolution_prompt=False, allow_ticket_submission=True)
+
+    # 2. Get the very last user message and AI response
+    user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
+    ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
+
+    # 3. Run the LLM Analyzer
+    resolver = ConversationResolutionService(db)
+    resolution_data = await resolver.analyze_conversation(
+        user_query=user_query,
+        ai_response=ai_response,
+        chat_history=history_text
+    )
+
+    return ResolutionCheckResponse(
+        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
+        conversation_status=resolution_data.get("conversation_status", "active"),
+        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0))
+    )
 
 --- FILE: backend\app\api\routers\documents.py ---
 """
@@ -2742,6 +2801,13 @@ class ResolveChatResponse(BaseModel):
     message: str
 
 
+class ResolutionCheckResponse(BaseModel):
+    show_resolution_prompt: bool
+    allow_ticket_submission: bool
+    conversation_status: str       
+    resolution_confidence: float   
+
+
 --- FILE: backend\app\schemas\documents.py ---
 """Pydantic schemas for document management endpoints."""
 from datetime import datetime
@@ -3130,29 +3196,27 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
 # =========================================================
 CONVERSATION_RESOLUTION_PROMPT = """
 You are a conversation resolution analyzer for an IT Helpdesk AI assistant.
-Your job is to determine whether the user's issue APPEARS to be resolved based on:
+Your job is to determine the current state of the troubleshooting session and whether resolution or escalation buttons should be shown based on:
 - the latest user message
 - the AI response
 - recent conversation history
 
 You MUST return ONLY valid JSON.
 Rules:
-- Be conservative.
-- Only mark as resolved_candidate if the user strongly implies:
-  - satisfaction
-  - completion
-  - success
-  - no more assistance needed
-  - gratitude after a solution
-  - confirmation that the issue worked
+1. Be conservative with "resolved_candidate". Only use it if the user implies satisfaction/completion.
+2. Set "show_resolution_prompt" to true if:
+  - "conversation_status" is "resolved_candidate"
+  - OR the AI proactively asks if the issue is resolved (e.g., "pwede na ba natin i-close 'tong chat?")
+  - OR the AI proactively suggests submitting a ticket (e.g., "Gusto mo na bang mag-submit ng ticket?")
+3. Set "allow_ticket_submission" to true if the issue is still ongoing, OR if the AI proactively offers a ticket. Set to false ONLY if the issue is 100% resolved and confirmed.
 
 Return EXACTLY this JSON schema:
-{
+{{
   "show_resolution_prompt": boolean,
   "allow_ticket_submission": boolean,
   "conversation_status": "active" | "resolved_candidate",
   "resolution_confidence": float
-}
+}}
 
 Conversation History:
 {chat_history}
@@ -5168,6 +5232,15 @@ class SupportOrchestrator:
                     model=reformulator_model,
                     prompt_template=reformulator_prompt,
                 )
+                
+                # --- DEBUG BLOCK ---
+                print("\n" + "="*50)
+                print("🔍 REFORMULATOR DEBUG:")
+                print(f"Original User Query: {user_query}")
+                print(f"Reformulated Query:  {search_query}")
+                print("="*50 + "\n")
+                # -------------------
+
             except Exception as exc:
                 logger.warning("Reformulator failed; using original query. Error: %s", exc)
                 search_query = user_query
@@ -5486,30 +5559,6 @@ class VectorStoreService:
             ],
         )
 
-    def ensure_payload_indexes(self) -> None:
-        """Create Qdrant payload indexes required by runtime filters."""
-        indexes = {
-            "metadata.is_active": PayloadSchemaType.BOOL,
-            "metadata.doc_type": PayloadSchemaType.KEYWORD,
-            "metadata.source_id": PayloadSchemaType.KEYWORD,
-            "metadata.document_id": PayloadSchemaType.KEYWORD,
-            "metadata.ticket_number": PayloadSchemaType.KEYWORD,
-        }
-        for field_name, field_schema in indexes.items():
-            try:
-                self.qdrant.create_payload_index(
-                    collection_name=self.collection_name,
-                    field_name=field_name,
-                    field_schema=field_schema,
-                )
-                logger.info("Created Qdrant payload index for %s.", field_name)
-            except Exception as exc:
-                message = str(exc).lower()
-                if "already exists" in message or "already" in message:
-                    logger.info("Qdrant payload index for %s already exists.", field_name)
-                    continue
-                logger.warning("Could not create payload index for %s: %s", field_name, exc)
-
     def backfill_active_metadata(self, batch_size: int = 256) -> int:
         """
         Ensure existing vectors have metadata.is_active=True.
@@ -5553,7 +5602,6 @@ class VectorStoreService:
 
     def prepare_collection(self) -> None:
         """Prepare existing Qdrant collection for indexed soft-delete filtering."""
-        self.ensure_payload_indexes()
         self.backfill_active_metadata()
 
     def search_tickets(

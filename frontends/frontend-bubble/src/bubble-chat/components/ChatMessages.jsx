@@ -5,6 +5,7 @@ import {
 } from "react"
 
 import ChatMessage from "./ChatMessage.jsx"
+import ResolutionPrompt from "./ResolutionPrompt.jsx"
 
 const getMessageKey = (
   message,
@@ -48,6 +49,14 @@ const createWelcomeMessage =
 
 const ChatMessages = ({
   messages = [],
+  loading = false,
+  resolved = false,
+  resolutionCheck = {
+    showResolutionPrompt: false,
+    allowTicketSubmission: true,
+  },
+  onResolve,
+  onOpenTicket,
 }) => {
 
   const messagesEndRef =
@@ -199,6 +208,15 @@ const ChatMessages = ({
               }
             />
           )
+        )}
+
+        {/* RESOLUTION PROMPT AS A MESSAGE */}
+        {!resolved && resolutionCheck.showResolutionPrompt && !loading && (
+          <ResolutionPrompt
+            onResolve={onResolve}
+            onOpenTicket={onOpenTicket}
+            allowTicketSubmission={resolutionCheck.allowTicketSubmission}
+          />
         )}
 
       </div>

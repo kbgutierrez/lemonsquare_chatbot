@@ -163,6 +163,15 @@ class SupportOrchestrator:
                     model=reformulator_model,
                     prompt_template=reformulator_prompt,
                 )
+                
+                # --- DEBUG BLOCK ---
+                print("\n" + "="*50)
+                print("🔍 REFORMULATOR DEBUG:")
+                print(f"Original User Query: {user_query}")
+                print(f"Reformulated Query:  {search_query}")
+                print("="*50 + "\n")
+                # -------------------
+
             except Exception as exc:
                 logger.warning("Reformulator failed; using original query. Error: %s", exc)
                 search_query = user_query
