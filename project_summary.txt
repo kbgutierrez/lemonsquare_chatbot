@@ -181,25 +181,33 @@ async def lifespan(app: FastAPI):
 
     # Qdrant check
     try:
+        logger.info("Starting Qdrant client and collection check...")
         qdrant_client = QdrantClient(
             url=app_settings.QDRANT_URL,
             api_key=app_settings.QDRANT_API_KEY,
             timeout=app_settings.QDRANT_TIMEOUT,
         )
+        logger.info("Qdrant client created, checking collection %s", app_settings.QDRANT_COLLECTION)
         if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
             logger.error("Qdrant collection missing: %s", app_settings.QDRANT_COLLECTION)
         else:
-            logger.info("Qdrant OK")
+            logger.info("Qdrant OK - collection exists")
+            logger.info("Preparing shared Qdrant vector store...")
             get_shared_vector_store().prepare_collection()
+            logger.info("Shared Qdrant vector store ready")
     except Exception as exc:
         logger.error("Qdrant connection failed: %s", exc, exc_info=True)
 
     # AI Service Initialization
     db = SessionChatbot()
     try:
-        logger.info("Loading AI services...")
+        logger.info("Starting AI service initialization...")
+        logger.info("Creating SupportOrchestrator...")
         app.state.orchestrator = SupportOrchestrator(db=db)
+        logger.info("SupportOrchestrator initialized")
+        logger.info("Creating DocumentIngestionService...")
         app.state.ingestion_service = DocumentIngestionService(db=db)
+        logger.info("DocumentIngestionService initialized")
         app.state.ai_available = True
         logger.info("AI services loaded successfully")
     except Exception as exc:
@@ -572,20 +580,13 @@ async def handle_chat(
         content=ai_response,
     )
 
-    # ---Run the Conversation Resolution Analyzer ---
-    resolver = ConversationResolutionService(db)
-    resolution_data = await resolver.analyze_conversation(
-        user_query=chat_request.message,
-        ai_response=ai_response,
-        chat_history=history_text
-    )
-
+    # We now let the GET /check-resolution endpoint handle the buttons!
     return ChatResponse(
         session_id=session_id,
         response=ai_response,
         ticket_ids_used=ticket_ids,
-        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
+        show_resolution_prompt=False, 
+        allow_ticket_submission=False 
     )
 
 
@@ -785,7 +786,13 @@ async def check_chat_resolution(
     messages = msg_svc.get_all_messages(session_id)
     
     if not messages:
-        return ResolutionCheckResponse(show_resolution_prompt=False, allow_ticket_submission=True)
+        return ResolutionCheckResponse(
+            show_resolution_prompt=False,
+            allow_ticket_submission=True,
+            conversation_status="active",
+            resolution_action="active",
+            resolution_confidence=0.0,
+        )
 
     # 2. Get the very last user message and AI response
     user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
@@ -803,7 +810,9 @@ async def check_chat_resolution(
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
         allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
         conversation_status=resolution_data.get("conversation_status", "active"),
-        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0))
+        resolution_action=resolution_data.get("resolution_action", "active"),
+        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
+        resolution_message=resolution_data.get("resolution_message")
     )
 
 --- FILE: backend\app\api\routers\documents.py ---
@@ -837,7 +846,6 @@ from app.schemas.documents import (
     DocumentUpdateRequest,
     ManualEntryResponse,
     ManualEntryUpdateRequest,
-    
 )
 
 from app.services.ingestion.ingestion_service import DocumentIngestionService
@@ -846,6 +854,7 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
+
 
 @router.post(
     "/upload",
@@ -881,30 +890,46 @@ async def upload_document(
         upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
 
         bg_db = SessionChatbot()
+
         try:
-            # We need to recreate the ingestion_service for the background task to use the new db session
             bg_ingestion_service = DocumentIngestionService(db=bg_db)
-            await bg_ingestion_service.process_pdf_upload(upload_obj, bg_db, manual_category=category)
-            logger.info(f"Background upload completed for {filename}")
+
+            await bg_ingestion_service.process_pdf_upload(
+                upload_obj,
+                bg_db,
+                manual_category=category,
+            )
+
+            logger.info(
+                "Background upload completed for %s",
+                filename,
+            )
+
         except Exception as e:
-            logger.error(f"Background upload failed for {filename}: {e}")
+            logger.error(
+                "Background upload failed for %s: %s",
+                filename,
+                e,
+            )
+
         finally:
             bg_db.close()
 
-    background_tasks.add_task(process_pdf_in_background)
+    background_tasks.add_task(
+        process_pdf_in_background
+    )
 
     return DocumentUploadResponse(
         status="processing",
         document_id="pending",
         category=category or "pending",
-        chunks_processed=0
+        chunks_processed=0,
     )
 
 
 class VectorSearchRequest(BaseModel):
     query: str
     limit: int = 5
-
 
 
 @router.post("/debug/full-pipeline", tags=["Documents", "Admin"])
@@ -918,10 +943,9 @@ async def debug_full_rag_pipeline(
     Debug the complete RAG pipeline: Query → Reformulation → Retrieval → Answer
     Returns detailed debug info without saving anything.
     """
-    # Use empty chat history for debug
     chat_history = ""
     user_name = "Debug User"
-    
+
     debug_result = await orchestrator.debug_orchestrate(
         user_query=request.query,
         chat_history=chat_history,
@@ -929,8 +953,7 @@ async def debug_full_rag_pipeline(
         db=db,
         limit=request.limit,
     )
-    
-    # Format the response for the frontend
+
     return {
         "original_query": debug_result["original_query"],
         "reformulated_query": debug_result["reformulated_query"],
@@ -952,9 +975,6 @@ async def debug_full_rag_pipeline(
     }
 
 
-
-
-
 @router.get(
     "",
     response_model=list[DocumentResponse],
@@ -962,19 +982,43 @@ async def debug_full_rag_pipeline(
 )
 def get_documents(
     category: str | None = None,
+    status: str = "active",
     skip: int = 0,
     limit: int = 50,
     db: Session = Depends(get_chatbot_db),
 ) -> list[DocumentResponse]:
     """
-    Fetch active uploaded documents, optionally filtered by category.
+    Fetch uploaded documents filtered by lifecycle status.
+
+    status:
+      - active
+      - inactive
+      - all
     """
-    query = db.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+
+    query = db.query(UploadedDocument)
+
+    normalized_status = status.lower().strip()
+
+    if normalized_status == "active":
+        query = query.filter(
+            UploadedDocument.IsActive == True
+        )
+
+    elif normalized_status == "inactive":
+        query = query.filter(
+            UploadedDocument.IsActive == False
+        )
+
     if category:
-        query = query.filter(UploadedDocument.Category == category)
+        query = query.filter(
+            UploadedDocument.Category == category
+        )
 
     documents = (
-        query.order_by(UploadedDocument.UploadedAt.desc())
+        query.order_by(
+            UploadedDocument.UploadedAt.desc()
+        )
         .offset(skip)
         .limit(limit)
         .all()
@@ -987,6 +1031,7 @@ def get_documents(
             category=doc.Category,
             chunk_count=doc.ChunkCount,
             uploaded_at=doc.UploadedAt,
+            is_active=bool(doc.IsActive),
         )
         for doc in documents
     ]
@@ -1003,14 +1048,19 @@ async def delete_document(
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentDeleteResponse:
     """
-    Remove a document's vectors from Qdrant and its metadata from SQL.
+    Soft-delete a document:
+      - SQL -> IsActive=False
+      - Qdrant -> metadata.is_active=False
     """
-    result = await ingestion_service.delete_document(document_id, db)
-    
-    # ── FIX: Manually inject the document_id to satisfy the Pydantic schema ──
+
+    result = await ingestion_service.delete_document(
+        document_id,
+        db,
+    )
+
     return DocumentDeleteResponse(
         status=result.get("status", "success"),
-        document_id=document_id
+        document_id=document_id,
     )
 
 
@@ -1024,34 +1074,39 @@ async def restore_document(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentDeleteResponse:
+
     try:
-        result = await ingestion_service.restore_document(document_id, db)
+        result = await ingestion_service.restore_document(
+            document_id,
+            db,
+        )
+
         return DocumentDeleteResponse(
             status=result.get("status", "success"),
             document_id=document_id,
         )
+
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
-    db: Session = Depends(get_chatbot_db), 
-    ingestion_service = Depends(get_ingestion_service)
+    db: Session = Depends(get_chatbot_db),
+    ingestion_service=Depends(get_ingestion_service)
 ):
-    """Embeds raw text into Qdrant, auto-categorizing if necessary."""
-    
-    # Hand the data over to the service!
     result = await ingestion_service.process_manual_entry(
         title=request.title,
         content=request.content,
         manual_category=request.category,
         db=db
     )
-    
-    return result
 
+    return result
 
 
 @router.put(
@@ -1065,46 +1120,68 @@ async def update_document_metadata(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentResponse:
+
     from fastapi import HTTPException
     from app.models.chatbot import UploadedDocument
-    
+
     try:
-        # Pass the updates to the service
-        await ingestion_service.update_document(document_id, request.model_dump(exclude_unset=True), db)
-        
-        # Fetch the fresh data
-        updated_doc = db.query(UploadedDocument).filter(UploadedDocument.DocumentID == document_id).first()
-        
-        # THE FIX: Manually map the PascalCase SQL columns to the snake_case Pydantic schema
+        await ingestion_service.update_document(
+            document_id,
+            request.model_dump(exclude_unset=True),
+            db,
+        )
+
+        updated_doc = (
+            db.query(UploadedDocument)
+            .filter(
+                UploadedDocument.DocumentID == document_id
+            )
+            .first()
+        )
+
         return DocumentResponse(
             document_id=updated_doc.DocumentID,
             file_name=updated_doc.FileName,
             category=updated_doc.Category,
             chunk_count=updated_doc.ChunkCount,
             uploaded_at=updated_doc.UploadedAt,
+            is_active=bool(updated_doc.IsActive),
         )
-        
+
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc))
-    
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
 
 from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
 
+
 @router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
 def get_manual_entries(
-    skip: int = 0, limit: int = 50, db: Session = Depends(get_chatbot_db)
+    skip: int = 0,
+    limit: int = 50,
+    db: Session = Depends(get_chatbot_db)
 ):
-    """Fetch manual entries securely from SQL instead of Qdrant."""
-    from app.models.chatbot import ManualKnowledgeEntry
-    
-    entries = db.query(ManualKnowledgeEntry).filter(
-        ManualKnowledgeEntry.IsActive == True
-    ).order_by(
-        ManualKnowledgeEntry.CreatedAt.desc()
-    ).offset(skip).limit(limit).all()
 
-    # Map the PascalCase SQL fields to the snake_case Pydantic schema
+    from app.models.chatbot import ManualKnowledgeEntry
+
+    entries = (
+        db.query(ManualKnowledgeEntry)
+        .filter(
+            ManualKnowledgeEntry.IsActive == True
+        )
+        .order_by(
+            ManualKnowledgeEntry.CreatedAt.desc()
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
     mapped_results = []
+
     for entry in entries:
         mapped_results.append(
             ManualEntryResponse(
@@ -1113,10 +1190,11 @@ def get_manual_entries(
                 content=entry.Content,
                 category=entry.Category,
                 created_at=entry.CreatedAt,
-                updated_at=entry.UpdatedAt
+                updated_at=entry.UpdatedAt,
+                is_active=bool(entry.IsActive),
             )
         )
-        
+
     return mapped_results
 
 
@@ -1127,13 +1205,21 @@ async def update_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Updates the rule in SQL and replaces its brain vector in Qdrant."""
+
     try:
-        # Pass exclude_unset=True so we only update the fields the user actually changed
-        result = await ingestion_service.update_manual_entry(entry_id, request.model_dump(exclude_unset=True), db)
+        result = await ingestion_service.update_manual_entry(
+            entry_id,
+            request.model_dump(exclude_unset=True),
+            db,
+        )
+
         return result
+
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 
 @router.delete("/manual/{entry_id}", summary="Delete a manual rule")
@@ -1142,10 +1228,13 @@ async def delete_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Deletes the rule from SQL and scrubs it from the AI's Qdrant brain."""
-    result = await ingestion_service.delete_manual_entry(entry_id, db)
-    return result
 
+    result = await ingestion_service.delete_manual_entry(
+        entry_id,
+        db,
+    )
+
+    return result
 
 
 @router.post("/manual/{entry_id}/restore", summary="Restore a deleted manual rule")
@@ -1154,13 +1243,20 @@ async def restore_manual_knowledge(
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
 ):
-    """Restores the rule in SQL and completely rebuilds its vector in Qdrant."""
-    try:
-        result = await ingestion_service.restore_manual_entry(entry_id, db)
-        return result
-    except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
 
+    try:
+        result = await ingestion_service.restore_manual_entry(
+            entry_id,
+            db,
+        )
+
+        return result
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=str(exc),
+        )
 
 --- FILE: backend\app\api\routers\explorer.py ---
 """
@@ -2769,6 +2865,9 @@ class ChatResponse(BaseModel):
     ticket_ids_used: list[int] = Field(default_factory=list)
     show_resolution_prompt: bool = False 
     allow_ticket_submission: bool = True
+    conversation_status: str = "active"
+    resolution_action: str = "active"
+    resolution_confidence: float = 0.0
 
 
 class MessageRecord(BaseModel):
@@ -2805,7 +2904,9 @@ class ResolutionCheckResponse(BaseModel):
     show_resolution_prompt: bool
     allow_ticket_submission: bool
     conversation_status: str       
-    resolution_confidence: float   
+    resolution_action: str
+    resolution_confidence: float
+    resolution_message: str | None = None
 
 
 --- FILE: backend\app\schemas\documents.py ---
@@ -2820,6 +2921,7 @@ class DocumentResponse(BaseModel):
     category: str
     chunk_count: int
     uploaded_at: datetime
+    is_active: bool = True
 
     class Config:
         from_attributes = True
@@ -2866,7 +2968,6 @@ class ManualEntryUpdateRequest(BaseModel):
 class DocumentUpdateRequest(BaseModel):
     file_name: str | None = None
     category: str | None = None
-
 
 --- FILE: backend\app\schemas\knowledge.py ---
 """Schemas for Knowledge Base Explorer API."""
@@ -3123,6 +3224,179 @@ and conversation_resolution_service.py.
 """
 
 # =========================================================
+# SYSTEM PROMPT
+# =========================================================
+DEFAULT_SYSTEM_PROMPT = """
+You are Lemon Square's Helpdesk Advisor.
+
+Your job is to answer workplace, HR, maintenance, and IT concerns naturally and professionally using ONLY the provided Retrieved Context.
+
+========================================
+1. STRICT CONTEXT RULES
+========================================
+
+- NEVER hallucinate.
+- NEVER invent troubleshooting steps, policies, approvals, or technical explanations.
+- ONLY answer using the Retrieved Context.
+- If the context does not clearly contain the answer, advise the user to contact the live Helpdesk staff.
+- Do NOT guess.
+
+========================================
+2. ROLE LIMITATIONS
+========================================
+
+You are only a virtual helpdesk advisor.
+
+You cannot:
+- physically repair devices
+- dispatch technicians
+- reset passwords yourself
+- access company systems
+- confirm actions were completed unless explicitly stated
+
+Only guide the user on what THEY should do.
+
+========================================
+3. TONE & CONVERSATION STYLE
+========================================
+
+- Sound like an actual Filipino office IT/helpdesk staff chatting naturally with a coworker.
+- Use natural Taglish commonly used in Philippine workplaces.
+- Keep responses simple, direct, and conversational.
+- Avoid deep Tagalog words, formal Filipino, or textbook wording.
+
+Avoid words like:
+- "maaaring"
+- "mangyaring"
+- "isyu"
+- "dulot"
+- "sumusunod na hakbang"
+
+Prefer natural workplace wording like:
+- "baka"
+- "parang"
+- "check mo"
+- "try mo"
+- "possible na"
+- "pa-check"
+- "di pa rin"
+- "ayaw gumana"
+
+GOOD:
+"Baka may problem sa LAN cable."
+
+GOOD:
+"Try mo muna i-restart yung PC."
+
+GOOD:
+"Kapag ayaw pa rin, pa-check na sa IT."
+
+BAD:
+"Maaaring may isyu sa network connectivity."
+
+BAD:
+"Mangyaring sundin ang mga sumusunod na hakbang."
+
+- Responses should feel like:
+  - internal company chat
+  - Filipino coworker conversation
+  - actual PH helpdesk support
+
+NOT:
+  - translated English
+  - customer service script
+  - government office memo
+  - textbook Filipino
+
+- Keep sentences short and natural.
+- Do not overexplain unless necessary.
+- Sound confident but casual.
+
+========================================
+4. LANGUAGE MATCHING
+========================================
+
+- English question [122;5u English response
+- Tagalog question [122;5u Tagalog/Taglish response
+- Match the user's communication style naturally.
+
+========================================
+5. CONVERSATION CONTINUITY
+========================================
+
+Before responding, silently determine:
+
+- Is the user reporting a new issue?
+- Following up on a previous issue?
+- Answering a previous question?
+- Greeting/chatting?
+- Confirming if something worked?
+
+If the assistant previously asked a question, treat short replies as answers to that question.
+
+Examples:
+- "Samsung A14"
+- "yes"
+- "no"
+- "di gumana"
+- "still not working"
+- "okay na"
+
+These are usually continuation replies.
+
+Do NOT restart troubleshooting from zero unless the conversation clearly changed topic.
+
+Do NOT repeat the same advice unnecessarily.
+
+If the user provides:
+- device model
+- serial number
+- branch
+- ticket number
+- error code
+- confirmation reply
+
+Treat it as contextual information related to the ongoing issue.
+
+Continue the troubleshooting flow naturally.
+
+========================================
+6. RESPONSE FORMAT
+========================================
+
+- Keep responses short and readable.
+- Use numbered steps only if needed.
+- Avoid walls of text.
+- Go straight to the point.
+
+========================================
+7. ESCALATION RULE
+========================================
+
+If the issue requires IT intervention (e.g., physical damage like a bloated battery, system access, or documented steps have failed), simply advise the user that the IT Helpdesk needs to check it.
+- NEVER say "I will submit a ticket for you."
+- NEVER ask the user for details to put in a ticket. 
+- Just tell them to reach out to IT or request support.
+
+Escalation Example: "Naku, kapag bloated na ang battery, kailangan na talaga 'yan palitan. Pa-check mo na agad sa IT para ma-replace."
+Escalation Example: "Since di nag-work yung reset, baka sa account side na yung problem. Kailangan na 'to ma-check ng Helpdesk."
+
+========================================
+8. FORBIDDEN
+========================================
+
+NEVER mention:
+- AI
+- database
+- retrieved context
+- system prompts
+- embeddings
+- internal retrieval systems
+
+Do not expose internal mechanics.
+"""
+
+# =========================================================
 # REFORMULATOR
 # =========================================================
 DEFAULT_REFORMULATOR_PROMPT = (
@@ -3196,26 +3470,40 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
 # =========================================================
 CONVERSATION_RESOLUTION_PROMPT = """
 You are a conversation resolution analyzer for an IT Helpdesk AI assistant.
-Your job is to determine the current state of the troubleshooting session and whether resolution or escalation buttons should be shown based on:
+Your job is to determine the current state of the troubleshooting session based on:
 - the latest user message
 - the AI response
 - recent conversation history
 
 You MUST return ONLY valid JSON.
-Rules:
-1. Be conservative with "resolved_candidate". Only use it if the user implies satisfaction/completion.
-2. Set "show_resolution_prompt" to true if:
-  - "conversation_status" is "resolved_candidate"
-  - OR the AI proactively asks if the issue is resolved (e.g., "pwede na ba natin i-close 'tong chat?")
-  - OR the AI proactively suggests submitting a ticket (e.g., "Gusto mo na bang mag-submit ng ticket?")
-3. Set "allow_ticket_submission" to true if the issue is still ongoing, OR if the AI proactively offers a ticket. Set to false ONLY if the issue is 100% resolved and confirmed.
+
+CRITICAL RULES:
+1. MUTUAL EXCLUSIVITY: "show_resolution_prompt" and "allow_ticket_submission" CANNOT both be true.
+2. THE "RESOLVED" TRIGGER:
+Set "show_resolution_prompt" to true ONLY IF:
+- "conversation_status" is "resolved_candidate"
+- OR the AI proactively asks if the issue is resolved (e.g., "pwede na ba natin i-close 'tong chat?")
+* If this is true, "allow_ticket_submission" MUST be false.
+
+3. THE "TICKET" TRIGGER:
+Set "allow_ticket_submission" to true ONLY IF:
+- the issue is still ongoing and unsolved.
+- OR the AI proactively suggests submitting a ticket (e.g., "Gusto mo na bang mag-submit ng ticket?", "Pa-check mo na agad sa IT").
+* If this is true, "show_resolution_prompt" MUST be false.
+
+4. THE "UI TRICK" MESSAGE:
+If you set either trigger to true, you MUST provide a "resolution_message".
+- This is a natural Taglish follow-up question from the AI (e.g., "Pwede na ba nating i-close 'tong chat?", "Gusto mo bang gawan na natin ng ticket 'to para ma-check ng IT?").
+- If the AI already asked a similar question in its latest response, set "resolution_message" to null.
+- If neither trigger is active, set "resolution_message" to null.
 
 Return EXACTLY this JSON schema:
 {{
   "show_resolution_prompt": boolean,
   "allow_ticket_submission": boolean,
   "conversation_status": "active" | "resolved_candidate",
-  "resolution_confidence": float
+  "resolution_confidence": float,
+  "resolution_message": string | null
 }}
 
 Conversation History:
@@ -3514,14 +3802,21 @@ class SessionManager:
 """
 Knowledge consolidation service.
 Builds canonical knowledge objects before embedding into Qdrant.
-Uses deterministic semantic-lite grouping by normalized content hash.
+
+Uses deterministic semantic-lite grouping
+by normalized content hash.
+
 Uses centralized text utilities.
 """
+
 from __future__ import annotations
+
 import hashlib
 import uuid
+
 from dataclasses import dataclass
 from typing import Any
+
 from app.core.metadata_contract import (
     DOC_TYPE_RAW_TICKET,
     DOC_TYPE_CANONICAL_TICKET,
@@ -3533,7 +3828,12 @@ from app.core.metadata_contract import (
     KNOWLEDGE_TYPE_MANUAL,
     KNOWLEDGE_TYPE_PDF,
 )
-from app.utils.text_utils import normalize_text, stable_text, sha256_hash
+
+from app.utils.text_utils import (
+    normalize_text,
+    stable_text,
+    sha256_hash,
+)
 
 
 @dataclass
@@ -3545,9 +3845,20 @@ class CanonicalRecord:
 
 
 class KnowledgeConsolidator:
-    """Builds canonical records for Qdrant embedding."""
+    """
+    Builds canonical records for Qdrant embedding.
+    """
 
-    def ticket_cluster_key(self, ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done) -> str:
+    def ticket_cluster_key(
+        self,
+        ticket_number,
+        issue_reported,
+        issue_found,
+        issue_cause,
+        work_done,
+        advanced_work_done,
+    ) -> str:
+
         parts = [
             normalize_text(issue_reported),
             normalize_text(issue_found),
@@ -3555,120 +3866,461 @@ class KnowledgeConsolidator:
             normalize_text(work_done),
             normalize_text(advanced_work_done),
         ]
+
         raw = " | ".join(parts)
+
         return sha256_hash(raw)
 
-    def manual_cluster_key(self, title: str, content: str, category: str) -> str:
-        raw = f"{normalize_text(title)} | {normalize_text(content)} | {normalize_text(category)}"
+    def manual_cluster_key(
+        self,
+        title: str,
+        content: str,
+        category: str,
+    ) -> str:
+
+        raw = (
+            f"{normalize_text(title)} "
+            f"| {normalize_text(content)} "
+            f"| {normalize_text(category)}"
+        )
+
         return sha256_hash(raw)
 
-    def chat_cluster_key(self, issue_reported, issue_found, issue_cause, work_done) -> str:
-        raw = " | ".join([normalize_text(issue_reported), normalize_text(issue_found), normalize_text(issue_cause), normalize_text(work_done)])
+    def chat_cluster_key(
+        self,
+        issue_reported,
+        issue_found,
+        issue_cause,
+        work_done,
+    ) -> str:
+
+        raw = " | ".join([
+            normalize_text(issue_reported),
+            normalize_text(issue_found),
+            normalize_text(issue_cause),
+            normalize_text(work_done),
+        ])
+
         return sha256_hash(raw)
 
-    def pdf_cluster_key(self, file_name: str, raw_text: str, category: str) -> str:
-        raw = f"{normalize_text(file_name)} | {normalize_text(category)} | {normalize_text(raw_text)}"
+    def pdf_cluster_key(
+        self,
+        file_name: str,
+        raw_text: str,
+        category: str,
+    ) -> str:
+
+        raw = (
+            f"{normalize_text(file_name)} "
+            f"| {normalize_text(category)} "
+            f"| {normalize_text(raw_text)}"
+        )
+
         return sha256_hash(raw)
 
-    def cluster_id(self, cluster_key: str) -> str:
-        return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"cluster_{cluster_key}"))
+    def cluster_id(
+        self,
+        cluster_key: str,
+    ) -> str:
 
-    def build_ticket_record(self, *, ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done) -> CanonicalRecord:
-        cluster_key = self.ticket_cluster_key(ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done)
-        point_id = self.cluster_id(cluster_key)
+        return str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"cluster_{cluster_key}",
+            )
+        )
+
+    def build_ticket_record(
+        self,
+        *,
+        ticket_number,
+        issue_reported,
+        issue_found,
+        issue_cause,
+        work_done,
+        advanced_work_done,
+    ) -> CanonicalRecord:
+
+        cluster_key = (
+            self.ticket_cluster_key(
+                ticket_number,
+                issue_reported,
+                issue_found,
+                issue_cause,
+                work_done,
+                advanced_work_done,
+            )
+        )
+
+        point_id = (
+            self.cluster_id(
+                cluster_key
+            )
+        )
+
         page_content = (
             "CANONICAL HELPDESK ISSUE\n"
             "========================\n"
-            f"REPRESENTATIVE TICKET NUMBER: {stable_text(ticket_number)}\n\n"
-            f"ISSUE REPORTED: {stable_text(issue_reported)}\n"
-            f"ACTUAL ISSUE FOUND: {stable_text(issue_found)}\n"
-            f"ROOT CAUSE: {stable_text(issue_cause)}\n"
-            f"RESOLUTION (WORK DONE): {stable_text(work_done)}\n"
-            f"ADVANCED RESOLUTION: {stable_text(advanced_work_done)}\n"
+            f"REPRESENTATIVE TICKET NUMBER: "
+            f"{stable_text(ticket_number)}\n\n"
+            f"ISSUE REPORTED: "
+            f"{stable_text(issue_reported)}\n"
+            f"ACTUAL ISSUE FOUND: "
+            f"{stable_text(issue_found)}\n"
+            f"ROOT CAUSE: "
+            f"{stable_text(issue_cause)}\n"
+            f"RESOLUTION (WORK DONE): "
+            f"{stable_text(work_done)}\n"
+            f"ADVANCED RESOLUTION: "
+            f"{stable_text(advanced_work_done)}\n"
         )
-        metadata = {
-            "doc_type": DOC_TYPE_CANONICAL_TICKET,
-            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
-            "cluster_key": cluster_key,
-            "source_id": stable_text(ticket_number),
-            "source_ids": [stable_text(ticket_number)],
-            "frequency": 1,
-        }
-        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
 
-    def build_raw_ticket_record(self, *, ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done) -> CanonicalRecord:
-        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket_number}"))
-        cluster_key = self.ticket_cluster_key(ticket_number, issue_reported, issue_found, issue_cause, work_done, advanced_work_done)
+        metadata = {
+            "doc_type":
+                DOC_TYPE_CANONICAL_TICKET,
+
+            "knowledge_type":
+                KNOWLEDGE_TYPE_TICKET,
+
+            "cluster_key":
+                cluster_key,
+
+            "source_id":
+                stable_text(ticket_number),
+
+            "source_ids": [
+                stable_text(ticket_number)
+            ],
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            page_content,
+            metadata,
+        )
+
+    def build_raw_ticket_record(
+        self,
+        *,
+        ticket_number,
+        issue_reported,
+        issue_found,
+        issue_cause,
+        work_done,
+        advanced_work_done,
+    ) -> CanonicalRecord:
+
+        point_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"raw_ticket_{ticket_number}",
+            )
+        )
+
+        cluster_key = (
+            self.ticket_cluster_key(
+                ticket_number,
+                issue_reported,
+                issue_found,
+                issue_cause,
+                work_done,
+                advanced_work_done,
+            )
+        )
+
         page_content = (
-            f"TICKET NUMBER: {stable_text(ticket_number)}\n"
-            f"ISSUE REPORTED: {stable_text(issue_reported)}\n"
-            f"ACTUAL ISSUE FOUND: {stable_text(issue_found)}\n"
-            f"ROOT CAUSE: {stable_text(issue_cause)}\n"
-            f"RESOLUTION (WORK DONE): {stable_text(work_done)}\n"
-            f"ADVANCED RESOLUTION: {stable_text(advanced_work_done)}\n"
+            f"TICKET NUMBER: "
+            f"{stable_text(ticket_number)}\n"
+
+            f"ISSUE REPORTED: "
+            f"{stable_text(issue_reported)}\n"
+
+            f"ACTUAL ISSUE FOUND: "
+            f"{stable_text(issue_found)}\n"
+
+            f"ROOT CAUSE: "
+            f"{stable_text(issue_cause)}\n"
+
+            f"RESOLUTION (WORK DONE): "
+            f"{stable_text(work_done)}\n"
+
+            f"ADVANCED RESOLUTION: "
+            f"{stable_text(advanced_work_done)}\n"
         )
-        metadata = {
-            "doc_type": DOC_TYPE_RAW_TICKET,
-            "knowledge_type": KNOWLEDGE_TYPE_TICKET,
-            "ticket_number": stable_text(ticket_number),
-            "cluster_key": cluster_key,
-            "source_id": stable_text(ticket_number),
-            "source_ids": [stable_text(ticket_number)],
-            "frequency": 1,
-        }
-        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
 
-    def build_manual_record(self, *, entry_id: str, title: str, content: str, category: str) -> CanonicalRecord:
-        cluster_key = self.manual_cluster_key(title, content, category)
-        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"manual_{entry_id}"))
-        page_content = f"TITLE: {title.strip()}\nCONTENT: {content.strip()}"
         metadata = {
-            "doc_type": DOC_TYPE_GENERAL_TEXT,
-            "knowledge_type": KNOWLEDGE_TYPE_MANUAL,
-            "cluster_key": cluster_key,
-            "source_id": entry_id,
-            "source_ids": [entry_id],
-            "title": title,
-            "category": category,
-            "frequency": 1,
-        }
-        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
+            "doc_type":
+                DOC_TYPE_RAW_TICKET,
 
-    def build_chat_record(self, *, session_id: str, issue_reported, issue_found, issue_cause, work_done) -> CanonicalRecord:
-        cluster_key = self.chat_cluster_key(issue_reported, issue_found, issue_cause, work_done)
-        point_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"resolved_chat_{session_id}"))
+            "knowledge_type":
+                KNOWLEDGE_TYPE_TICKET,
+
+            "ticket_number":
+                stable_text(ticket_number),
+
+            "cluster_key":
+                cluster_key,
+
+            "source_id":
+                stable_text(ticket_number),
+
+            "source_ids": [
+                stable_text(ticket_number)
+            ],
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            page_content,
+            metadata,
+        )
+
+    def build_manual_record(
+        self,
+        *,
+        entry_id: str,
+        title: str,
+        content: str,
+        category: str,
+    ) -> CanonicalRecord:
+
+        """
+        IMPORTANT:
+        Empty category means:
+        AI AUTO-DETECT MODE
+
+        We preserve empty string intentionally.
+        DO NOT fallback to General_IT.
+        """
+
+        normalized_category = (
+            (category or "")
+            .strip()
+        )
+
+        cluster_key = (
+            self.manual_cluster_key(
+                title,
+                content,
+                normalized_category,
+            )
+        )
+
+        point_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"manual_{entry_id}",
+            )
+        )
+
+        """
+        ========================================
+        PAGE CONTENT
+        ========================================
+        """
+
+        if normalized_category:
+
+            page_content = (
+                f"TITLE: "
+                f"{title.strip()}\n"
+
+                f"CATEGORY: "
+                f"{normalized_category}\n"
+
+                f"CONTENT: "
+                f"{content.strip()}"
+            )
+
+        else:
+
+            """
+            IMPORTANT:
+            Avoid poisoning embeddings
+            with fake category labels.
+            """
+
+            page_content = (
+                f"TITLE: "
+                f"{title.strip()}\n"
+
+                f"CONTENT: "
+                f"{content.strip()}"
+            )
+
+        metadata = {
+            "doc_type":
+                DOC_TYPE_GENERAL_TEXT,
+
+            "knowledge_type":
+                KNOWLEDGE_TYPE_MANUAL,
+
+            "cluster_key":
+                cluster_key,
+
+            "source_id":
+                entry_id,
+
+            "source_ids": [
+                entry_id
+            ],
+
+            "title":
+                title,
+
+            """
+            IMPORTANT:
+            Preserve empty category.
+            """
+            "category":
+                normalized_category,
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            page_content,
+            metadata,
+        )
+
+    def build_chat_record(
+        self,
+        *,
+        session_id: str,
+        issue_reported,
+        issue_found,
+        issue_cause,
+        work_done,
+    ) -> CanonicalRecord:
+
+        cluster_key = (
+            self.chat_cluster_key(
+                issue_reported,
+                issue_found,
+                issue_cause,
+                work_done,
+            )
+        )
+
+        point_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"resolved_chat_{session_id}",
+            )
+        )
+
         page_content = (
-            f"ISSUE REPORTED: {stable_text(issue_reported)}\n"
-            f"ACTUAL ISSUE FOUND: {stable_text(issue_found)}\n"
-            f"ROOT CAUSE: {stable_text(issue_cause)}\n"
-            f"RESOLUTION (WORK DONE): {stable_text(work_done)}"
+            f"ISSUE REPORTED: "
+            f"{stable_text(issue_reported)}\n"
+
+            f"ACTUAL ISSUE FOUND: "
+            f"{stable_text(issue_found)}\n"
+
+            f"ROOT CAUSE: "
+            f"{stable_text(issue_cause)}\n"
+
+            f"RESOLUTION (WORK DONE): "
+            f"{stable_text(work_done)}"
         )
-        metadata = {
-            "doc_type": DOC_TYPE_RESOLVED_CHAT,
-            "knowledge_type": KNOWLEDGE_TYPE_CHAT,
-            "cluster_key": cluster_key,
-            "source_id": session_id,
-            "source_ids": [session_id],
-            "frequency": 1,
-        }
-        return CanonicalRecord(cluster_key, point_id, page_content, metadata)
 
-    def build_pdf_record(self, *, document_id: str, file_name: str, raw_text: str, category: str) -> CanonicalRecord:
-        cluster_key = self.pdf_cluster_key(file_name, raw_text, category)
-        point_id = self.cluster_id(cluster_key)
         metadata = {
-            "doc_type": DOC_TYPE_OFFICIAL_DOCUMENT,
-            "knowledge_type": KNOWLEDGE_TYPE_PDF,
-            "cluster_key": cluster_key,
-            "document_id": document_id,
-            "source_id": document_id,
-            "source_ids": [document_id],
-            "file_name": file_name,
-            "category": category,
-            "frequency": 1,
-        }
-        return CanonicalRecord(cluster_key, point_id, raw_text, metadata)
+            "doc_type":
+                DOC_TYPE_RESOLVED_CHAT,
 
+            "knowledge_type":
+                KNOWLEDGE_TYPE_CHAT,
+
+            "cluster_key":
+                cluster_key,
+
+            "source_id":
+                session_id,
+
+            "source_ids": [
+                session_id
+            ],
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            page_content,
+            metadata,
+        )
+
+    def build_pdf_record(
+        self,
+        *,
+        document_id: str,
+        file_name: str,
+        raw_text: str,
+        category: str,
+    ) -> CanonicalRecord:
+
+        cluster_key = (
+            self.pdf_cluster_key(
+                file_name,
+                raw_text,
+                category,
+            )
+        )
+
+        point_id = (
+            self.cluster_id(
+                cluster_key
+            )
+        )
+
+        metadata = {
+            "doc_type":
+                DOC_TYPE_OFFICIAL_DOCUMENT,
+
+            "knowledge_type":
+                KNOWLEDGE_TYPE_PDF,
+
+            "cluster_key":
+                cluster_key,
+
+            "document_id":
+                document_id,
+
+            "source_id":
+                document_id,
+
+            "source_ids": [
+                document_id
+            ],
+
+            "file_name":
+                file_name,
+
+            "category":
+                category,
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            raw_text,
+            metadata,
+        )
 
 --- FILE: backend\app\services\external\__init__.py ---
 
@@ -4410,10 +5062,13 @@ class DocumentIngestionService:
 Manual knowledge entry processor.
 Handles create, update, delete, restore for manual KB rules.
 """
+
 import logging
 import uuid
+
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+
 from app.core.exceptions import VectorStoreError
 from app.models.chatbot import ManualKnowledgeEntry
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
@@ -4422,15 +5077,70 @@ logger = logging.getLogger(__name__)
 
 
 class ManualEntryProcessor:
-    def __init__(self, db: Session, vector_store, embeddings):
+
+    def __init__(
+        self,
+        db: Session,
+        vector_store,
+        embeddings,
+    ):
         self.db = db
         self.vector_store = vector_store
         self.embeddings = embeddings
-        self.consolidator = KnowledgeConsolidator()
+        self.consolidator = (
+            KnowledgeConsolidator()
+        )
 
-    async def process(self, title: str, content: str, category: str | None) -> dict:
-        resolved_category = category or "General_IT"
+    """
+    ========================================
+    CATEGORY RESOLUTION
+    ========================================
+    """
+
+    def _resolve_category(
+        self,
+        category: str | None,
+    ) -> str:
+
+        """
+        IMPORTANT:
+        Empty string / None means:
+        AUTO DETECT CATEGORY
+
+        We MUST NOT force
+        General_IT anymore.
+
+        The frontend intentionally sends:
+            category = ""
+
+        to trigger AI categorization.
+        """
+
+        if category is None:
+            return ""
+
+        cleaned = (
+            str(category)
+            .strip()
+        )
+
+        return cleaned
+
+    async def process(
+        self,
+        title: str,
+        content: str,
+        category: str | None,
+    ) -> dict:
+
+        resolved_category = (
+            self._resolve_category(
+                category
+            )
+        )
+
         entry_id = str(uuid.uuid4())
+
         entry = ManualKnowledgeEntry(
             EntryID=entry_id,
             Title=title,
@@ -4439,205 +5149,543 @@ class ManualEntryProcessor:
             IsActive=True,
         )
 
-        record = self.consolidator.build_manual_record(
-            entry_id=entry.EntryID,
-            title=title,
-            content=content,
-            category=resolved_category,
+        record = (
+            self.consolidator
+            .build_manual_record(
+                entry_id=entry.EntryID,
+                title=title,
+                content=content,
+                category=resolved_category,
+            )
         )
 
         import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, content)
-        try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-        except Exception as exc:
-            raise VectorStoreError(f"Failed to upsert manual entry to Qdrant: {exc}") from exc
+
+        vector = (
+            await asyncio.to_thread(
+                self.embeddings.embed_query,
+                content,
+            )
+        )
 
         try:
-            self.db.add(entry)
-            self.db.commit()
-            self.db.refresh(entry)
+
+            self.vector_store.upsert_points([
+                PointStruct(
+                    id=record.point_id,
+                    vector=vector,
+                    payload={
+                        "page_content":
+                            record.page_content,
+
+                        "metadata":
+                            record.metadata,
+                    },
+                )
+            ])
+
         except Exception as exc:
+
+            raise VectorStoreError(
+                f"Failed to upsert manual entry to Qdrant: {exc}"
+            ) from exc
+
+        try:
+
+            self.db.add(entry)
+
+            self.db.commit()
+
+            self.db.refresh(entry)
+
+        except Exception:
+
             try:
-                self.vector_store.delete_points([record.point_id])
+
+                self.vector_store.delete_points([
+                    record.point_id
+                ])
+
             except Exception as cleanup_exc:
+
                 logger.error(
-                    "Failed to cleanup Qdrant point after DB failure for manual entry %s: %s",
+                    (
+                        "Failed to cleanup "
+                        "Qdrant point after "
+                        "DB failure for "
+                        "manual entry %s: %s"
+                    ),
                     entry_id,
                     cleanup_exc,
                 )
+
             raise
 
         return {
-            "entry_id": entry.EntryID,
-            "title": entry.Title,
-            "content": entry.Content,
-            "category": entry.Category,
-            "created_at": entry.CreatedAt,
-            "updated_at": entry.UpdatedAt,
-            "is_active": entry.IsActive,
+            "entry_id":
+                entry.EntryID,
+
+            "title":
+                entry.Title,
+
+            "content":
+                entry.Content,
+
+            "category":
+                entry.Category,
+
+            "created_at":
+                entry.CreatedAt,
+
+            "updated_at":
+                entry.UpdatedAt,
+
+            "is_active":
+                entry.IsActive,
         }
 
-    async def update(self, entry_id: str, updates: dict) -> dict:
-        entry = self.db.query(ManualKnowledgeEntry).filter(
-            ManualKnowledgeEntry.EntryID == entry_id
-        ).first()
-        if not entry:
-            raise ValueError(f"Manual entry '{entry_id}' not found.")
-        if entry.IsActive is False:
-            raise ValueError(f"Manual entry '{entry_id}' is inactive. Restore it before updating.")
+    async def update(
+        self,
+        entry_id: str,
+        updates: dict,
+    ) -> dict:
 
-        original_title = entry.Title
-        original_content = entry.Content
-        original_category = entry.Category
-
-        if "title" in updates and updates["title"]:
-            entry.Title = updates["title"]
-        if "content" in updates and updates["content"]:
-            entry.Content = updates["content"]
-        if "category" in updates and updates["category"]:
-            entry.Category = updates["category"]
-
-        record = self.consolidator.build_manual_record(
-            entry_id=entry.EntryID,
-            title=entry.Title,
-            content=entry.Content,
-            category=entry.Category,
+        entry = (
+            self.db.query(
+                ManualKnowledgeEntry
+            )
+            .filter(
+                ManualKnowledgeEntry.EntryID
+                == entry_id
+            )
+            .first()
         )
-        record.metadata["is_active"] = bool(entry.IsActive)
+
+        if not entry:
+
+            raise ValueError(
+                f"Manual entry '{entry_id}' not found."
+            )
+
+        if entry.IsActive is False:
+
+            raise ValueError(
+                (
+                    f"Manual entry "
+                    f"'{entry_id}' is inactive. "
+                    f"Restore it before updating."
+                )
+            )
+
+        original_title = (
+            entry.Title
+        )
+
+        original_content = (
+            entry.Content
+        )
+
+        original_category = (
+            entry.Category
+        )
+
+        if (
+            "title" in updates
+            and updates["title"]
+        ):
+            entry.Title = (
+                updates["title"]
+            )
+
+        if (
+            "content" in updates
+            and updates["content"]
+        ):
+            entry.Content = (
+                updates["content"]
+            )
+
+        """
+        ========================================
+        PRESERVE EMPTY CATEGORY
+        ========================================
+        """
+
+        if "category" in updates:
+
+            entry.Category = (
+                self._resolve_category(
+                    updates["category"]
+                )
+            )
+
+        record = (
+            self.consolidator
+            .build_manual_record(
+                entry_id=entry.EntryID,
+                title=entry.Title,
+                content=entry.Content,
+                category=entry.Category,
+            )
+        )
+
+        record.metadata[
+            "is_active"
+        ] = bool(entry.IsActive)
 
         import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
-        try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-        except Exception as exc:
-            self.db.rollback()
-            raise VectorStoreError(f"Failed to upsert updated manual entry to Qdrant: {exc}") from exc
+
+        vector = (
+            await asyncio.to_thread(
+                self.embeddings.embed_query,
+                entry.Content,
+            )
+        )
 
         try:
-            self.db.commit()
-            self.db.refresh(entry)
+
+            self.vector_store.upsert_points([
+                PointStruct(
+                    id=record.point_id,
+                    vector=vector,
+                    payload={
+                        "page_content":
+                            record.page_content,
+
+                        "metadata":
+                            record.metadata,
+                    },
+                )
+            ])
+
         except Exception as exc:
+
+            self.db.rollback()
+
+            raise VectorStoreError(
+                (
+                    "Failed to upsert "
+                    "updated manual "
+                    f"entry to Qdrant: {exc}"
+                )
+            ) from exc
+
+        try:
+
+            self.db.commit()
+
+            self.db.refresh(entry)
+
+        except Exception:
+
             logger.warning(
-                "DB commit failed after Qdrant update for manual entry %s, attempting rollback.",
+                (
+                    "DB commit failed "
+                    "after Qdrant update "
+                    "for manual entry %s, "
+                    "attempting rollback."
+                ),
                 entry_id,
             )
+
             self.db.rollback()
+
             try:
-                old_record = self.consolidator.build_manual_record(
-                    entry_id=entry.EntryID,
-                    title=original_title,
-                    content=original_content,
-                    category=original_category,
+
+                old_record = (
+                    self.consolidator
+                    .build_manual_record(
+                        entry_id=entry.EntryID,
+                        title=original_title,
+                        content=original_content,
+                        category=original_category,
+                    )
                 )
-                old_record.metadata["is_active"] = bool(entry.IsActive)
-                old_vector = await asyncio.to_thread(self.embeddings.embed_query, original_content)
-                self.vector_store.upsert_points([PointStruct(
-                    id=old_record.point_id,
-                    vector=old_vector,
-                    payload={"page_content": old_record.page_content, "metadata": old_record.metadata}
-                )])
+
+                old_record.metadata[
+                    "is_active"
+                ] = bool(entry.IsActive)
+
+                old_vector = (
+                    await asyncio.to_thread(
+                        self.embeddings.embed_query,
+                        original_content,
+                    )
+                )
+
+                self.vector_store.upsert_points([
+                    PointStruct(
+                        id=old_record.point_id,
+                        vector=old_vector,
+                        payload={
+                            "page_content":
+                                old_record.page_content,
+
+                            "metadata":
+                                old_record.metadata,
+                        },
+                    )
+                ])
+
             except Exception as cleanup_exc:
+
                 logger.error(
-                    "Failed to revert Qdrant point after DB failure for manual entry %s: %s",
+                    (
+                        "Failed to revert "
+                        "Qdrant point after "
+                        "DB failure for "
+                        "manual entry %s: %s"
+                    ),
                     entry_id,
                     cleanup_exc,
                 )
+
             raise
 
         return {
-            "entry_id": entry.EntryID,
-            "title": entry.Title,
-            "content": entry.Content,
-            "category": entry.Category,
-            "updated_at": entry.UpdatedAt,
+            "entry_id":
+                entry.EntryID,
+
+            "title":
+                entry.Title,
+
+            "content":
+                entry.Content,
+
+            "category":
+                entry.Category,
+
+            "updated_at":
+                entry.UpdatedAt,
         }
 
-    async def delete(self, entry_id: str) -> dict:
-        entry = self.db.query(ManualKnowledgeEntry).filter(
-            ManualKnowledgeEntry.EntryID == entry_id
-        ).first()
+    async def delete(
+        self,
+        entry_id: str,
+    ) -> dict:
+
+        entry = (
+            self.db.query(
+                ManualKnowledgeEntry
+            )
+            .filter(
+                ManualKnowledgeEntry.EntryID
+                == entry_id
+            )
+            .first()
+        )
+
         if not entry:
-            raise ValueError(f"Manual entry '{entry_id}' not found.")
+
+            raise ValueError(
+                f"Manual entry '{entry_id}' not found."
+            )
+
         if entry.IsActive is False:
-            return {"status": "skipped", "message": f"Manual entry {entry_id} is already inactive."}
+
+            return {
+                "status":
+                    "skipped",
+
+                "message":
+                    (
+                        f"Manual entry "
+                        f"{entry_id} "
+                        "is already inactive."
+                    ),
+            }
 
         try:
-            self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+
+            self.vector_store.soft_delete_by_metadata(
+                "source_id",
+                entry_id,
+            )
+
         except Exception as exc:
-            raise VectorStoreError(f"Failed to soft delete manual entry in Qdrant: {exc}") from exc
+
+            raise VectorStoreError(
+                (
+                    "Failed to soft delete "
+                    f"manual entry in Qdrant: {exc}"
+                )
+            ) from exc
 
         entry.IsActive = False
+
         try:
+
             self.db.commit()
-        except Exception as exc:
+
+        except Exception:
+
             self.db.rollback()
+
             try:
-                self.vector_store.restore_by_metadata("source_id", entry_id)
+
+                self.vector_store.restore_by_metadata(
+                    "source_id",
+                    entry_id,
+                )
+
             except Exception as cleanup_exc:
+
                 logger.error(
-                    "Failed to restore Qdrant point after DB failure for manual entry %s: %s",
+                    (
+                        "Failed to restore "
+                        "Qdrant point after "
+                        "DB failure for "
+                        "manual entry %s: %s"
+                    ),
                     entry_id,
                     cleanup_exc,
                 )
+
             raise
 
-        return {"status": "success", "message": f"Manual entry {entry_id} soft-deleted."}
+        return {
+            "status":
+                "success",
 
-    async def restore(self, entry_id: str) -> dict:
-        entry = self.db.query(ManualKnowledgeEntry).filter(
-            ManualKnowledgeEntry.EntryID == entry_id
-        ).first()
-        if not entry:
-            raise ValueError(f"Manual entry '{entry_id}' not found.")
-        if entry.IsActive is True:
-            return {"status": "skipped", "message": f"Manual entry {entry_id} is already active."}
+            "message":
+                (
+                    f"Manual entry "
+                    f"{entry_id} "
+                    "soft-deleted."
+                ),
+        }
 
-        record = self.consolidator.build_manual_record(
-            entry_id=entry.EntryID,
-            title=entry.Title,
-            content=entry.Content,
-            category=entry.Category,
+    async def restore(
+        self,
+        entry_id: str,
+    ) -> dict:
+
+        entry = (
+            self.db.query(
+                ManualKnowledgeEntry
+            )
+            .filter(
+                ManualKnowledgeEntry.EntryID
+                == entry_id
+            )
+            .first()
         )
-        record.metadata["is_active"] = True
+
+        if not entry:
+
+            raise ValueError(
+                f"Manual entry '{entry_id}' not found."
+            )
+
+        if entry.IsActive is True:
+
+            return {
+                "status":
+                    "skipped",
+
+                "message":
+                    (
+                        f"Manual entry "
+                        f"{entry_id} "
+                        "is already active."
+                    ),
+            }
+
+        record = (
+            self.consolidator
+            .build_manual_record(
+                entry_id=entry.EntryID,
+                title=entry.Title,
+                content=entry.Content,
+                category=entry.Category,
+            )
+        )
+
+        record.metadata[
+            "is_active"
+        ] = True
 
         import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, entry.Content)
+
+        vector = (
+            await asyncio.to_thread(
+                self.embeddings.embed_query,
+                entry.Content,
+            )
+        )
+
         try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-            self.vector_store.restore_by_metadata("source_id", entry_id)
+
+            self.vector_store.upsert_points([
+                PointStruct(
+                    id=record.point_id,
+                    vector=vector,
+                    payload={
+                        "page_content":
+                            record.page_content,
+
+                        "metadata":
+                            record.metadata,
+                    },
+                )
+            ])
+
+            self.vector_store.restore_by_metadata(
+                "source_id",
+                entry_id,
+            )
+
         except Exception as exc:
-            raise VectorStoreError(f"Failed to restore manual entry in Qdrant: {exc}") from exc
+
+            raise VectorStoreError(
+                (
+                    "Failed to restore "
+                    f"manual entry in Qdrant: {exc}"
+                )
+            ) from exc
 
         entry.IsActive = True
+
         try:
+
             self.db.commit()
-        except Exception as exc:
+
+        except Exception:
+
             self.db.rollback()
+
             try:
-                self.vector_store.soft_delete_by_metadata("source_id", entry_id)
+
+                self.vector_store.soft_delete_by_metadata(
+                    "source_id",
+                    entry_id,
+                )
+
             except Exception as cleanup_exc:
+
                 logger.error(
-                    "Failed to rollback Qdrant restore after DB failure for manual entry %s: %s",
+                    (
+                        "Failed to rollback "
+                        "Qdrant restore after "
+                        "DB failure for "
+                        "manual entry %s: %s"
+                    ),
                     entry_id,
                     cleanup_exc,
                 )
+
             raise
 
-        return {"status": "success", "message": f"Manual entry {entry_id} restored."}
+        return {
+            "status":
+                "success",
 
+            "message":
+                (
+                    f"Manual entry "
+                    f"{entry_id} restored."
+                ),
+        }
 
 --- FILE: backend\app\services\ingestion\pdf_processor.py ---
 """PDF ingestion processor."""
@@ -5085,6 +6133,7 @@ from app.services.retrieval.embedding_provider import get_embedding_model
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.reranker_service import RerankerService
 from app.services.rag.answer_generator import AnswerGenerator
+from app.services.prompts import DEFAULT_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -5212,7 +6261,7 @@ class SupportOrchestrator:
         main_model = config.ActiveModel if config else _DEFAULT_MAIN_MODEL
         reformulator_model = config.ReformulatorModel if config and config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL
         temperature = float(config.Temperature) if config else 0.2
-        system_prompt = config.SystemPrompt if config else "You are an IT Support Agent."
+        system_prompt = config.SystemPrompt if config else DEFAULT_SYSTEM_PROMPT
 
         db_threshold = float(config.ConfidenceThreshold) if config and config.ConfidenceThreshold is not None else None
         if db_threshold is None or db_threshold <= -2.0:
@@ -5411,17 +6460,50 @@ class ConversationResolutionService:
                 chat_history=chat_history or "No previous history.",
             )
             result = await self.llm.ainvoke(prompt)
-            parsed = safe_json_loads(result.content, context="conversation_resolution")
+            raw_content = result.content
+            logger.info("🔍 RESOLUTION RAW OUTPUT: %s", raw_content)
+
+            parsed = safe_json_loads(raw_content, context="conversation_resolution")
 
             if not parsed:
+                logger.warning("⚠️ RESOLUTION PARSE FAILED - FALLBACK USED")
                 return self._fallback_response()
 
-            return {
-                "show_resolution_prompt": bool(parsed.get("show_resolution_prompt", False)),
-                "allow_ticket_submission": bool(parsed.get("allow_ticket_submission", True)),
-                "conversation_status": parsed.get("conversation_status", "active"),
-                "resolution_confidence": float(parsed.get("resolution_confidence", 0.0)),
+            # We now trust the LLM's boolean decisions directly if provided,
+            # but we still maintain the resolution_action and conversation_status 
+            # for backward compatibility with the schema.
+            
+            show_resolution_prompt = bool(parsed.get("show_resolution_prompt", False))
+            allow_ticket_submission = bool(parsed.get("allow_ticket_submission", True))
+            resolution_message = parsed.get("resolution_message")
+            conversation_status = str(parsed.get("conversation_status", "active")).strip().lower()
+            confidence = float(parsed.get("resolution_confidence", 0.0))
+
+            # --- MUTUAL EXCLUSIVITY SAFEGUARD ---
+            # If the AI wants to show the resolution prompt (Resolved button),
+            # we must NOT allow ticket submission in the same turn.
+            if show_resolution_prompt:
+                allow_ticket_submission = False
+            
+            # Map conversation_status to resolution_action for the legacy response_model
+            if conversation_status == "resolved_candidate":
+                resolution_action = "resolved_chat"
+            elif conversation_status == "need_ticket":
+                resolution_action = "need_ticket"
+            else:
+                resolution_action = "active"
+
+            response_data = {
+                "resolution_action": resolution_action,
+                "show_resolution_prompt": show_resolution_prompt,
+                "allow_ticket_submission": allow_ticket_submission,
+                "conversation_status": conversation_status,
+                "resolution_confidence": confidence,
+                "resolution_message": resolution_message,
             }
+
+            logger.info("✅ RESOLUTION ANALYZED: %s", response_data)
+            return response_data
         except Exception as exc:
             logger.error("Conversation resolution analysis failed: %s", exc, exc_info=True)
             return self._fallback_response()
@@ -5429,10 +6511,12 @@ class ConversationResolutionService:
     @staticmethod
     def _fallback_response() -> dict:
         return {
+            "resolution_action": "active",
             "show_resolution_prompt": False,
             "allow_ticket_submission": True,
             "conversation_status": "active",
             "resolution_confidence": 0.0,
+            "resolution_message": None,
         }
 
 
