@@ -147,281 +147,111 @@ const KnowledgeFilesSection = () => {
       "
     >
       {/* ========================================
-          STATUS TABS
-      ======================================== */}
+              STATUS TABS
+          ======================================== */}
 
-      <div
-        className="
-          relative
-
-          overflow-hidden
-
-          rounded-[20px]
-
-          border
-          border-[#26332d]
-
-          bg-[#121a18]
-
-          shadow-[0_10px_40px_rgba(0,0,0,0.32)]
-        "
-      >
-        {/* LEFT SHADOW */}
-        <div
-          className="
-            pointer-events-none
-
-            absolute
-            bottom-0
-            left-0
-            top-0
-
-            z-10
-            w-14
-
-            bg-gradient-to-r
-            from-[#121a18]
-            via-[#121a18]
-            to-transparent
-          "
-        />
-
-        {/* RIGHT SHADOW */}
-        <div
-          className="
-            pointer-events-none
-
-            absolute
-            bottom-0
-            right-0
-            top-0
-
-            z-10
-            w-14
-
-            bg-gradient-to-l
-            from-[#121a18]
-            via-[#121a18]
-            to-transparent
-          "
-        />
-
-        {/* LEFT BUTTON */}
-        <button
-          onClick={() =>
-            scrollStatusTabs(
-              "left"
-            )
-          }
-
-          className="
-            absolute
-            left-2
-            top-1/2
-            z-20
-
-            flex
-            h-8
-            w-8
-            -translate-y-1/2
-            items-center
-            justify-center
-
-            rounded-full
-
-            border
-            border-[#2d3b35]
-
-            bg-[#18211f]/95
-
-            text-[#8ca097]
-
-            backdrop-blur-sm
-
-            transition-all
-            duration-200
-
-            hover:text-white
-            hover:bg-[#202b27]
-          "
-        >
-          <ChevronLeft
-            className="h-4 w-4"
-          />
-        </button>
-
-        {/* RIGHT BUTTON */}
-        <button
-          onClick={() =>
-            scrollStatusTabs(
-              "right"
-            )
-          }
-
-          className="
-            absolute
-            right-2
-            top-1/2
-            z-20
-
-            flex
-            h-8
-            w-8
-            -translate-y-1/2
-            items-center
-            justify-center
-
-            rounded-full
-
-            border
-            border-[#2d3b35]
-
-            bg-[#18211f]/95
-
-            text-[#8ca097]
-
-            backdrop-blur-sm
-
-            transition-all
-            duration-200
-
-            hover:text-white
-            hover:bg-[#202b27]
-          "
-        >
-          <ChevronRight
-            className="h-4 w-4"
-          />
-        </button>
-
-        {/* STATUS TAB SCROLLER */}
-        <div
-          ref={statusTabsRef}
-
-          className="
-            cursor-grab
-
-            overflow-x-auto
-
-            px-14
-            py-3
-
-            active:cursor-grabbing
-
-            select-none
-
-            [scrollbar-width:none]
-            [&::-webkit-scrollbar]:hidden
-          "
-        >
           <div
             className="
-              flex
-              min-w-max
-              items-center
+              grid
+              grid-cols-2
               gap-3
             "
           >
-            {STATUS_TABS.map(
-              (tab) => {
+            {STATUS_TABS.map((tab) => {
 
-                const active =
-                  selectedStatus ===
-                  tab.id
+              const active =
+                selectedStatus ===
+                tab.id
 
-                return (
-                  <button
-                    key={tab.id}
+              return (
+                <button
+                  key={tab.id}
 
-                    onClick={() =>
-                      setSelectedStatus(
-                        tab.id
-                      )
+                  onClick={() =>
+                    setSelectedStatus(
+                      tab.id
+                    )
+                  }
+
+                  className={`
+                    relative
+
+                    flex
+                    items-center
+                    justify-center
+                    gap-2
+
+                    rounded-2xl
+
+                    border
+
+                    px-5
+                    py-4
+
+                    text-[13px]
+                    font-semibold
+
+                    transition-all
+                    duration-200
+
+                    ${
+                      active
+
+                        ? `
+                          border-[#3a4a43]
+
+                          bg-[#1b2522]
+
+                          text-white
+
+                          shadow-[0_8px_24px_rgba(0,0,0,0.28)]
+                        `
+
+                        : `
+                          border-[#26332d]
+
+                          bg-[#121a18]
+
+                          text-[#7f948b]
+
+                          hover:border-[#2d3b35]
+                          hover:bg-[#18211f]
+                          hover:text-white
+                        `
                     }
+                  `}
+                >
+                  <Database
+                    className="
+                      h-4
+                      w-4
+                    "
+                  />
 
-                    className={`
-                      relative
+                  {tab.label}
 
-                      flex
-                      shrink-0
-                      items-center
-                      gap-2
-
-                      rounded-2xl
-
-                      border
-
-                      px-5
-                      py-3
-
-                      text-[13px]
-                      font-semibold
-
-                      transition-all
-                      duration-200
-
-                      ${
-                        active
-
-                          ? `
-                            border-[#3a4a43]
-
-                            bg-[#1b2522]
-
-                            text-white
-
-                            shadow-[0_8px_24px_rgba(0,0,0,0.35)]
-                          `
-
-                          : `
-                            border-transparent
-
-                            bg-transparent
-
-                            text-[#7f948b]
-
-                            hover:border-[#2d3b35]
-                            hover:bg-[#18211f]
-                            hover:text-white
-                          `
-                      }
-                    `}
-                  >
-                    <Database
+                  {active && (
+                    <div
                       className="
-                        h-4
-                        w-4
+                        absolute
+                        bottom-0
+                        left-1/2
+
+                        h-[3px]
+                        w-[55%]
+
+                        -translate-x-1/2
+
+                        rounded-full
+
+                        bg-[#f5d547]
                       "
                     />
-
-                    {tab.label}
-
-                    {active && (
-                      <div
-                        className="
-                          absolute
-                          bottom-0
-                          left-1/2
-
-                          h-[3px]
-                          w-[65%]
-
-                          -translate-x-1/2
-
-                          rounded-full
-
-                          bg-[#f5d547]
-                        "
-                      />
-                    )}
-                  </button>
-                )
-              }
-            )}
+                  )}
+                </button>
+              )
+            })}
           </div>
-        </div>
-      </div>
-
       {/* ========================================
           CATEGORY TABS
       ======================================== */}
