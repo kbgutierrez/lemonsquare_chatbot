@@ -107,7 +107,10 @@ async def handle_chat(
         response=ai_response,
         ticket_ids_used=ticket_ids,
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
+        conversation_status=resolution_data.get("conversation_status", "active"),
+        resolution_action=resolution_data.get("resolution_action", "active"),
+        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
     )
 
 
@@ -307,7 +310,13 @@ async def check_chat_resolution(
     messages = msg_svc.get_all_messages(session_id)
     
     if not messages:
-        return ResolutionCheckResponse(show_resolution_prompt=False, allow_ticket_submission=True)
+        return ResolutionCheckResponse(
+            show_resolution_prompt=False,
+            allow_ticket_submission=True,
+            conversation_status="active",
+            resolution_action="active",
+            resolution_confidence=0.0,
+        )
 
     # 2. Get the very last user message and AI response
     user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
@@ -325,5 +334,6 @@ async def check_chat_resolution(
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
         allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
         conversation_status=resolution_data.get("conversation_status", "active"),
+        resolution_action=resolution_data.get("resolution_action", "active"),
         resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0))
     )

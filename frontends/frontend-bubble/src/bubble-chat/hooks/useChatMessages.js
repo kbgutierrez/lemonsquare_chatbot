@@ -67,8 +67,8 @@ export const useChatMessages =
       setResolutionCheck,
     ] = useState({
       showResolutionPrompt: false,
-      allowTicketSubmission: true,
-    })
+      allowTicketSubmission: true,      conversationStatus: "active",
+      resolutionAction: "active",    })
 
     /* ========================================
        REFS
@@ -489,6 +489,12 @@ export const useChatMessages =
               allowTicketSubmission:
                 data?.allow_ticket_submission !==
                 false,
+
+              conversationStatus:
+                data?.conversation_status || "active",
+
+              resolutionAction:
+                data?.resolution_action || "active",
             })
 
           } catch (error) {
@@ -512,6 +518,8 @@ export const useChatMessages =
         setResolutionCheck({
           showResolutionPrompt: false,
           allowTicketSubmission: true,
+          conversationStatus: "active",
+          resolutionAction: "active",
         })
 
         return

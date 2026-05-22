@@ -79,27 +79,29 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
 # =========================================================
 CONVERSATION_RESOLUTION_PROMPT = """
 You are a conversation resolution analyzer for an IT Helpdesk AI assistant.
-Your job is to determine the current state of the troubleshooting session based on:
-- the latest user message
-- the AI response
-- recent conversation history
+Your job is to determine whether the session should:
+- ask the user if the issue is resolved,
+- escalate to a ticket/helpdesk,
+- or continue as an active chat.
 
 You MUST return ONLY valid JSON.
 Rules:
-1. Be conservative.
-2. Only mark "conversation_status" as "resolved_candidate" if the user strongly implies:
-  - satisfaction, completion, success, or gratitude after a solution.
-3. Set "show_resolution_prompt" to true ONLY if "conversation_status" is "resolved_candidate".
-4. Set "allow_ticket_submission" to true if:
-  - the issue is still ongoing and unsolved.
-  - AND ESPECIALLY if the AI response indicates a dead end or advises the user to contact IT (e.g., "pa-check sa IT", "kailangan ma-check ng Helpdesk").
-  Set it to false if the issue is completely resolved.
+1. If the chat clearly needs a ticket, physical help from another team, or escalation to Helpdesk,
+   set "resolution_action" to "need_ticket".
+   In that case, do NOT ask the user if the issue is resolved.
+2. If the AI response appears sufficient and the issue looks resolved,
+   set "resolution_action" to "resolved_chat".
+   In that case, ask the user if this solved the problem.
+3. If the conversation should continue and is not ready for resolution or escalation,
+   set "resolution_action" to "active".
+4. Keep "resolution_confidence" as a float score from 0.0 to 1.0.
 
 Return EXACTLY this JSON schema:
 {{
+  "resolution_action": "need_ticket" | "resolved_chat" | "active",
   "show_resolution_prompt": boolean,
   "allow_ticket_submission": boolean,
-  "conversation_status": "active" | "resolved_candidate",
+  "conversation_status": "need_ticket" | "resolved_candidate" | "active",
   "resolution_confidence": float
 }}
 
