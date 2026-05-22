@@ -4,6 +4,14 @@ import UploadStatusBadge from "./UploadStatusBadge"
 const UploadTableRow = ({ file, removeFile }) => {
   const isUploading = file.statusType === "loading"
 
+  /* ========================================
+     CATEGORY LABEL
+  ======================================== */
+  const categoryLabel =
+    file.category?.trim()
+      ? file.category
+      : "Auto Detect"
+
   return (
     <tr
       className="
@@ -91,7 +99,7 @@ const UploadTableRow = ({ file, removeFile }) => {
             text-[#d7e2dd]
           "
         >
-          {file.category || "General"}
+          {categoryLabel}
         </div>
       </td>
 

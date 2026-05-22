@@ -29,6 +29,9 @@ export const API_ENDPOINTS = {
   DOCUMENT_DELETE:
     "/api/documents/:documentId",
 
+  DOCUMENT_RESTORE:
+    "/api/documents/:documentId/restore",
+
   DOCUMENT_DEBUG_PIPELINE:
     "/api/documents/debug/full-pipeline",
 

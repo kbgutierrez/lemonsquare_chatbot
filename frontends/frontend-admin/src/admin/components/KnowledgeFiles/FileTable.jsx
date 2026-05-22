@@ -22,7 +22,9 @@ import {
 const FileTable = ({
   files = [],
   categories = [],
+
   onDelete,
+  onRestore,
   onUpdate,
 }) => {
 
@@ -92,6 +94,10 @@ const FileTable = ({
 
                     onDelete={
                       onDelete
+                    }
+
+                    onRestore={
+                      onRestore
                     }
                   />
                 )

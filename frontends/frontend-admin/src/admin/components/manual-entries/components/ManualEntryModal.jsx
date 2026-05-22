@@ -1,11 +1,25 @@
-import { useEffect, useRef, useState, useCallback } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
-import { X, ChevronDown, Check, Trash2 } from "lucide-react"
+import ManualEntryModalBackdrop
+  from "./modal/layout/ManualEntryModalBackdrop"
+
+import ManualEntryModalContainer
+  from "./modal/ManualEntryModalContainer"
+
+import ManualEntryCategoryModal
+  from "./modal/category-selector/ManualEntryCategoryModal"
 
 const ManualEntryModal = ({
   showModal,
   setShowModal,
+
   categories,
+
   submitting,
   error,
 
@@ -15,221 +29,369 @@ const ManualEntryModal = ({
 
   editingEntry = null,
 }) => {
-  const dropdownRef = useRef(null)
 
-  const [dropdownOpen, setDropdownOpen] = useState(false)
+  /* ========================================
+     REFS
+  ======================================== */
 
-  const [form, setForm] = useState({
+  const modalCardRef =
+    useRef(null)
+
+  /* ========================================
+     STATE
+  ======================================== */
+
+  const [
+    categoryModalOpen,
+    setCategoryModalOpen,
+  ] = useState(false)
+
+  const [
+    form,
+    setForm,
+  ] = useState({
     title: "",
     category: "",
     content: "",
   })
 
-  const isEditMode = Boolean(editingEntry)
+  const isEditMode =
+    Boolean(editingEntry)
+
+  /* ========================================
+     MEMOS
+  ======================================== */
+
+  const selectableCategories =
+    useMemo(() => {
+
+      return categories.filter(
+        (category) =>
+          category !== "All"
+      )
+
+    }, [categories])
 
   /* ========================================
      SYNC EDIT DATA
   ======================================== */
 
   useEffect(() => {
+
     if (!editingEntry) {
-      setForm({ title: "", category: "", content: "" })
+
+      setForm({
+        title: "",
+        category: "",
+        content: "",
+      })
+
       return
     }
 
     setForm({
-      title: editingEntry.title || "",
-      category: editingEntry.category || "",
-      content: editingEntry.content || "",
+      title:
+        editingEntry.title || "",
+
+      category:
+        editingEntry.category || "",
+
+      content:
+        editingEntry.content || "",
     })
+
   }, [editingEntry])
 
   /* ========================================
-     CLOSE DROPDOWN OUTSIDE
+     BODY LOCK
   ======================================== */
 
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target)
-      ) {
-        setDropdownOpen(false)
-      }
+
+    if (!showModal) {
+      return
     }
 
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    const originalOverflow =
+      document.body.style.overflow
 
-  if (!showModal) return null
+    document.body.style.overflow =
+      "hidden"
+
+    return () => {
+      document.body.style.overflow =
+        originalOverflow
+    }
+
+  }, [showModal])
+
+  /* ========================================
+     ESC CLOSE
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!showModal) {
+      return
+    }
+
+    const handleEscape =
+      (event) => {
+
+        if (
+          event.key ===
+          "Escape"
+        ) {
+
+          /* ========================================
+             CLOSE CATEGORY MODAL FIRST
+          ======================================== */
+
+          if (
+            categoryModalOpen
+          ) {
+
+            setCategoryModalOpen(
+              false
+            )
+
+            return
+          }
+
+          closeModal()
+        }
+      }
+
+    document.addEventListener(
+      "keydown",
+      handleEscape
+    )
+
+    return () => {
+      document.removeEventListener(
+        "keydown",
+        handleEscape
+      )
+    }
+
+  }, [
+    showModal,
+    categoryModalOpen,
+  ])
+
+  /* ========================================
+     CLICK OUTSIDE
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!showModal) {
+      return
+    }
+
+    const handleClickOutside =
+      (event) => {
+
+        /* ========================================
+           DO NOT CLOSE MAIN MODAL
+           WHILE CATEGORY MODAL OPEN
+        ======================================== */
+
+        if (
+          categoryModalOpen
+        ) {
+          return
+        }
+
+        if (
+          modalCardRef.current &&
+          !modalCardRef.current.contains(
+            event.target
+          )
+        ) {
+          closeModal()
+        }
+      }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    )
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      )
+    }
+
+  }, [
+    showModal,
+    categoryModalOpen,
+  ])
 
   /* ========================================
      HELPERS
   ======================================== */
 
-  const resetForm = () =>
-    setForm({ title: "", category: "", content: "" })
+  const resetForm =
+    () => {
 
-  const closeModal = () => {
-    resetForm()
-    setShowModal(false)
-  }
+      setForm({
+        title: "",
+        category: "",
+        content: "",
+      })
+    }
 
-  const selectedCategory = form.category || "Auto Detect Category"
+  const closeModal =
+    () => {
+
+      resetForm()
+
+      setCategoryModalOpen(false)
+
+      setShowModal(false)
+    }
+
+  const handleSelectCategory =
+    (category) => {
+
+      setForm((prev) => ({
+        ...prev,
+        category,
+      }))
+
+      setCategoryModalOpen(false)
+    }
 
   /* ========================================
      ACTIONS
   ======================================== */
 
-  const handleSubmit = async () => {
-    if (isEditMode) {
-      await handleUpdateEntry(editingEntry?.id, form, closeModal)
-    } else {
-      await handleCreateEntry(form, resetForm, closeModal)
-    }
-  }
+  const handleSubmit =
+    async () => {
 
-  const handleDelete = async () => {
-    await handleDeleteEntry(editingEntry?.id)
-    closeModal()
-  }
+      /* ========================================
+         PRESERVE EMPTY CATEGORY
+         FOR AUTO-DETECT
+      ======================================== */
+
+      const payload = {
+        ...form,
+
+        category:
+          form.category?.trim()
+            || "",
+      }
+
+      if (isEditMode) {
+
+        await handleUpdateEntry(
+          editingEntry?.id,
+          payload,
+          closeModal
+        )
+
+      } else {
+
+        await handleCreateEntry(
+          payload,
+          resetForm,
+          closeModal
+        )
+      }
+    }
+
+  const handleDelete =
+    async () => {
+
+      await handleDeleteEntry(
+        editingEntry?.id
+      )
+
+      closeModal()
+    }
 
   /* ========================================
-     RENDER
+     CONDITIONAL RETURN
   ======================================== */
 
+  if (!showModal) {
+    return null
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-2xl rounded-[32px] border border-[#2a3a33] bg-[#111917] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.45)]">
-        {/* HEADER */}
-        <div className="mb-6 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">
-            {isEditMode ? "Edit Manual Entry" : "Add Manual Entry"}
-          </h2>
+    <>
+      {/* MAIN MODAL */}
+      <div
+        className="
+          fixed
+          inset-0
+          z-[110]
 
-          <button onClick={closeModal} className="rounded-xl p-2 hover:bg-white/5">
-            <X className="text-white" />
-          </button>
-        </div>
+          flex
+          items-center
+          justify-center
 
-        {/* ERROR */}
-        {error && (
-          <div className="mb-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {error}
-          </div>
-        )}
+          p-4
+        "
+      >
+        <ManualEntryModalBackdrop
+          onClose={() => {
 
-        {/* FORM */}
-        <div className="space-y-4">
-          {/* TITLE */}
-          <input
-            placeholder="Title"
-            value={form.title}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, title: e.target.value }))
+            /* ========================================
+               PREVENT BACKDROP CLOSE
+               WHILE CATEGORY MODAL OPEN
+            ======================================== */
+
+            if (
+              categoryModalOpen
+            ) {
+              return
             }
-            className="w-full rounded-2xl border border-[#2d3b35] bg-[#18211f] px-4 py-3 text-white outline-none focus:border-[#f5d547]"
+
+            closeModal()
+          }}
+        />
+
+        <div
+          ref={modalCardRef}
+          className="
+            relative
+            z-[130]
+          "
+        >
+          <ManualEntryModalContainer
+            form={form}
+            setForm={setForm}
+
+            error={error}
+
+            submitting={submitting}
+            isEditMode={isEditMode}
+
+            categoryModalOpen={categoryModalOpen}
+            setCategoryModalOpen={setCategoryModalOpen}
+
+            onClose={closeModal}
+            onDelete={handleDelete}
+            onSubmit={handleSubmit}
           />
-
-          {/* CATEGORY */}
-          <div ref={dropdownRef} className="relative">
-            <button
-              type="button"
-              onClick={() => setDropdownOpen((p) => !p)}
-              className="flex w-full items-center justify-between rounded-2xl border border-[#2d3b35] bg-[#18211f] px-4 py-3 text-white"
-            >
-              <span className={form.category ? "text-white" : "text-[#8ea59b]"}>
-                {selectedCategory}
-              </span>
-
-              <ChevronDown
-                className={`h-4 w-4 text-[#8ea59b] transition-transform ${
-                  dropdownOpen ? "rotate-180" : ""
-                }`}
-              />
-            </button>
-
-            {dropdownOpen && (
-              <div className="absolute left-0 right-0 top-[calc(100%+10px)] z-50 overflow-hidden rounded-2xl border border-[#2d3b35] bg-[#18211f]">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setForm((p) => ({ ...p, category: "" }))
-                    setDropdownOpen(false)
-                  }}
-                  className="flex w-full justify-between border-b border-[#22302b] px-4 py-3 text-sm text-white hover:bg-[#202b27]"
-                >
-                  Auto Detect Category
-                  {!form.category && <Check className="h-4 w-4 text-[#f5d547]" />}
-                </button>
-
-                <div className="max-h-[240px] overflow-y-auto">
-                  {categories
-                    .filter((c) => c !== "All")
-                    .map((category) => {
-                      const active = form.category === category
-
-                      return (
-                        <button
-                          key={category}
-                          type="button"
-                          onClick={() => {
-                            setForm((p) => ({ ...p, category }))
-                            setDropdownOpen(false)
-                          }}
-                          className="flex w-full justify-between px-4 py-3 text-sm text-white hover:bg-[#202b27]"
-                        >
-                          {category}
-                          {active && <Check className="h-4 w-4 text-[#f5d547]" />}
-                        </button>
-                      )
-                    })}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* CONTENT */}
-          <textarea
-            rows={8}
-            placeholder="Knowledge content..."
-            value={form.content}
-            onChange={(e) =>
-              setForm((p) => ({ ...p, content: e.target.value }))
-            }
-            className="w-full rounded-2xl border border-[#2d3b35] bg-[#18211f] px-4 py-3 text-white outline-none focus:border-[#f5d547]"
-          />
-
-          {/* ACTIONS */}
-          <div className="flex gap-3">
-            {isEditMode && (
-              <button
-                onClick={handleDelete}
-                disabled={submitting}
-                className="flex items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 px-5 text-red-300"
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-            )}
-
-            <button
-              onClick={handleSubmit}
-              disabled={submitting}
-              className="w-full rounded-2xl bg-[#f5d547] py-3 font-semibold text-[#111917]"
-            >
-              {submitting
-                ? isEditMode
-                  ? "Updating..."
-                  : "Creating..."
-                : isEditMode
-                ? "Update Entry"
-                : "Create Entry"}
-            </button>
-          </div>
         </div>
       </div>
-    </div>
+
+      {/* CATEGORY MODAL */}
+      <ManualEntryCategoryModal
+        open={categoryModalOpen}
+        categories={selectableCategories}
+        selectedCategory={form.category}
+        onClose={() =>
+          setCategoryModalOpen(false)
+        }
+        onSelect={handleSelectCategory}
+      />
+    </>
   )
 }
 

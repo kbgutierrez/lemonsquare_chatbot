@@ -10,8 +10,11 @@ import ActionButtons
 
 const FileTableRow = ({
   file,
+
   onEdit,
   onDelete,
+  onRestore,
+
   deleting,
 }) => {
 
@@ -161,9 +164,14 @@ const FileTableRow = ({
       >
         <ActionButtons
           file={file}
+
           deleting={deleting}
+
           onEdit={onEdit}
+
           onDelete={onDelete}
+
+          onRestore={onRestore}
         />
       </td>
     </tr>
