@@ -310,6 +310,17 @@ const validateChatResponse =
 
       allowTicketSubmission:
         response.allow_ticket_submission !== false,
+
+      conversationStatus:
+        response.conversation_status || "active",
+
+      resolutionAction:
+        response.resolution_action || "active",
+
+      resolutionConfidence:
+        typeof response.resolution_confidence === "number"
+          ? response.resolution_confidence
+          : 0.0,
     }
   }
 
