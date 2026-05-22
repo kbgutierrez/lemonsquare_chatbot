@@ -82,35 +82,46 @@ async def handle_chat(
 
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
-    ai_response, ticket_ids = await orchestrator.orchestrate(
+    display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
         user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
         db=db,
     )
 
+    # Persist only the human-visible assistant text
     msg_svc.save_ai_message(
         session_id=session_id,
-        content=ai_response,
+        content=display_text,
     )
 
-    # ---Run the Conversation Resolution Analyzer ---
-    resolver = ConversationResolutionService(db)
-    resolution_data = await resolver.analyze_conversation(
-        user_query=chat_request.message,
-        ai_response=ai_response,
-        chat_history=history_text
-    )
+    # Map action to UI flags
+    show_resolution_prompt = False
+    allow_ticket_submission = False
+    conversation_status = "active"
+    resolution_action = "active"
+
+    if str(action).lower() == "show_ticket":
+        show_resolution_prompt = False
+        allow_ticket_submission = True
+        conversation_status = "need_ticket"
+        resolution_action = "need_ticket"
+    elif str(action).lower() == "show_resolve":
+        show_resolution_prompt = True
+        allow_ticket_submission = False
+        conversation_status = "resolved_candidate"
+        resolution_action = "resolved_chat"
 
     return ChatResponse(
         session_id=session_id,
-        response=ai_response,
+        response=display_text,
         ticket_ids_used=ticket_ids,
-        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
-        conversation_status=resolution_data.get("conversation_status", "active"),
-        resolution_action=resolution_data.get("resolution_action", "active"),
-        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
+        show_resolution_prompt=show_resolution_prompt,
+        allow_ticket_submission=allow_ticket_submission,
+        conversation_status=conversation_status,
+        resolution_action=resolution_action,
+        resolution_confidence=1.0,
+        resolution_message=resolution_message,
     )
 
 
@@ -332,8 +343,9 @@ async def check_chat_resolution(
 
     return ResolutionCheckResponse(
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", False),
         conversation_status=resolution_data.get("conversation_status", "active"),
         resolution_action=resolution_data.get("resolution_action", "active"),
-        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0))
+        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
+        resolution_message=resolution_data.get("resolution_message")
     )

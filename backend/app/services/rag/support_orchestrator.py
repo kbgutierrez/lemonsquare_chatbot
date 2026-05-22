@@ -16,6 +16,8 @@ from app.services.retrieval.embedding_provider import get_embedding_model
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.reranker_service import RerankerService
 from app.services.rag.answer_generator import AnswerGenerator
+from app.services.prompts import DEFAULT_SYSTEM_PROMPT
+from app.utils.json_utils import safe_json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +82,8 @@ class SupportOrchestrator:
         chat_history: str,
         user_name: str,
         db: Session,
-    ) -> tuple[str, list[int]]:
-        """Run the full RAG pipeline. Returns (answer, ticket_ids)."""
+    ) -> tuple[str, str, str | None, list[int]]:
+        """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids)."""
         try:
             return await self._run_pipeline(user_query, chat_history, user_name, db, debug=False)
         except Exception as exc:
@@ -131,7 +133,8 @@ class SupportOrchestrator:
                     "final_answer": greeting_response,
                     "ticket_ids_used": [],
                 }
-            return greeting_response, []
+            # Non-debug: return standardized 4-tuple
+            return greeting_response, "none", None, []
 
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
@@ -143,7 +146,7 @@ class SupportOrchestrator:
         main_model = config.ActiveModel if config else _DEFAULT_MAIN_MODEL
         reformulator_model = config.ReformulatorModel if config and config.ReformulatorModel else _DEFAULT_REFORMULATOR_MODEL
         temperature = float(config.Temperature) if config else 0.2
-        system_prompt = config.SystemPrompt if config else "You are an IT Support Agent."
+        system_prompt = config.SystemPrompt if config else DEFAULT_SYSTEM_PROMPT
 
         db_threshold = float(config.ConfidenceThreshold) if config and config.ConfidenceThreshold is not None else None
         if db_threshold is None or db_threshold <= -2.0:
@@ -192,7 +195,8 @@ class SupportOrchestrator:
                     "final_answer": fallback_msg,
                     "ticket_ids_used": [],
                 }
-            return fallback_msg, []
+            # Non-debug: return standardized 4-tuple
+            return fallback_msg, "none", None, []
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
@@ -230,7 +234,8 @@ class SupportOrchestrator:
                     "final_answer": fallback_msg,
                     "ticket_ids_used": [],
                 }
-            return fallback_msg, []
+            # Non-debug: return standardized 4-tuple
+            return fallback_msg, "none", None, []
 
         doc_budget = max(2, int(top_k * 0.4))
         ticket_budget = top_k - doc_budget
@@ -277,7 +282,6 @@ class SupportOrchestrator:
             model=main_model,
             temperature=temperature,
         )
-
         if debug:
             debug_retrieval = []
             for hit in final_hits:
@@ -295,4 +299,19 @@ class SupportOrchestrator:
                 "ticket_ids_used": ticket_ids,
             }
 
-        return answer, ticket_ids
+        # Try to parse the final answer as the new JSON schema. If the LLM
+        # followed instructions, we'll get a dict with `response`, `action`,
+        # and `resolution_message`. Otherwise fall back to the plain text
+        # answer and use a 'none' action.
+        parsed = safe_json_loads(answer, context="final_answer")
+
+        if isinstance(parsed, dict) and parsed.get("response"):
+            display_text = str(parsed.get("response") or "")
+            action = str(parsed.get("action") or "none").strip().lower()
+            resolution_message = parsed.get("resolution_message")
+        else:
+            display_text = answer
+            action = "none"
+            resolution_message = None
+
+        return display_text, action, resolution_message, ticket_ids

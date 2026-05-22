@@ -19,6 +19,7 @@ class ChatResponse(BaseModel):
     conversation_status: str = "active"
     resolution_action: str = "active"
     resolution_confidence: float = 0.0
+    resolution_message: str | None = None
 
 
 class MessageRecord(BaseModel):
@@ -56,4 +57,5 @@ class ResolutionCheckResponse(BaseModel):
     allow_ticket_submission: bool
     conversation_status: str       
     resolution_action: str
-    resolution_confidence: float   
+    resolution_confidence: float
+    resolution_message: str | None = None

@@ -24,10 +24,12 @@ const ChatWindow = ({
   resolved = false,
   resolutionCheck = {
     showResolutionPrompt: false,
-    allowTicketSubmission: true,
+    allowTicketSubmission: false,
+    resolutionMessage: null,
   },
   onSendMessage,
   onResolveConversation,
+  onDismissResolution,
   onClose,
   onOpenModal,
   sessionKey,
@@ -182,6 +184,7 @@ const ChatWindow = ({
               resolved={resolved}
               resolutionCheck={resolutionCheck}
               onResolve={onResolveConversation}
+              onDismiss={onDismissResolution}
               onOpenTicket={() => onOpenModal("ticket")}
             />
           </div>

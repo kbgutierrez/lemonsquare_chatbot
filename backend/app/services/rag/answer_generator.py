@@ -49,6 +49,19 @@ class AnswerGenerator:
             f"User Query: {user_query}"
         )
 
+        # Append strict JSON output instruction so the main AI replies using
+        # the agreed schema. The LLM should output RAW JSON only.
+        json_instruction = (
+            "\n\nAfter producing the assistant reply, RETURN EXACTLY this JSON schema (RAW JSON ONLY):\n"
+            "{ \"response\": string, \"action\": \"show_ticket\" | \"show_resolve\" | \"none\", \"resolution_message\": string | null }\n"
+            "- `response`: the assistant text shown to the user.\n"
+            "- `action`: determines UI behavior.\n"
+            "- `resolution_message`: optional short Taglish message for the UI, or null.\n"
+            "DO NOT output any extra text, explanation, or markdown fences."
+        )
+
+        final_prompt = f"{final_prompt}{json_instruction}"
+
         llm = create_llm(model=model, temperature=temperature)
         result = await llm.ainvoke(final_prompt)
         return result.content
