@@ -22,7 +22,12 @@ const ChatWindow = ({
   messages = [],
   loading = false,
   resolved = false,
+  resolutionCheck = {
+    showResolutionPrompt: false,
+    allowTicketSubmission: true,
+  },
   onSendMessage,
+  onResolveConversation,
   onClose,
   onOpenModal,
   sessionKey,
@@ -174,6 +179,10 @@ const ChatWindow = ({
             <ChatMessages
               messages={messages}
               loading={loading}
+              resolved={resolved}
+              resolutionCheck={resolutionCheck}
+              onResolve={onResolveConversation}
+              onOpenTicket={() => onOpenModal("ticket")}
             />
           </div>
 

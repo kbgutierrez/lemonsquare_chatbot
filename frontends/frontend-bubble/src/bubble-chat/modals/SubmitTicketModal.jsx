@@ -99,6 +99,9 @@ const SubmitTicketModal = ({
 }) => {
 
   const {
+    form,
+    taxonomy,
+    update,
     loading,
     success,
     submit,
@@ -116,6 +119,12 @@ const SubmitTicketModal = ({
       }, 1200)
     },
   })
+
+  const selectedDept = taxonomy.find(
+    d => String(d.department_id) === String(form.department_id)
+  )
+
+  const subcategories = selectedDept?.subcategories || []
 
   const buttonContent =
     loading ? (
@@ -160,7 +169,7 @@ const SubmitTicketModal = ({
     <ModalShell
       onClose={onClose}
       title="Escalate to Human Agent"
-      subtitle="AI Generated Escalation Summary"
+      subtitle="Edit your escalation details below"
       size="md"
       icon={
         <MessageSquareWarning
@@ -172,6 +181,8 @@ const SubmitTicketModal = ({
     >
       <div
         className="
+          max-h-[70vh]
+          overflow-y-auto
           px-4 py-4
           sm:px-6 sm:py-5
         "
@@ -220,134 +231,90 @@ const SubmitTicketModal = ({
           </div>
         )}
 
-        {/* AI SUMMARY */}
-        <div
-          className="
-            overflow-hidden
-            rounded-3xl
-            border border-violet-100
-            bg-gradient-to-br
-            from-violet-50
-            to-indigo-50
-          "
-        >
-          <div
-            className="
-              flex items-start gap-4
-              p-5
-            "
-          >
-
-            <div
-              className="
-                flex h-12 w-12 shrink-0
-                items-center justify-center
-                rounded-2xl
-                bg-white
-                shadow-sm
-              "
-            >
-              {summaryLoading ? (
-                <LoaderCircle
-                  className="
-                    h-6 w-6
-                    animate-spin
-                    text-violet-600
-                  "
-                />
-              ) : (
-                <BrainCircuit
-                  className="
-                    h-6 w-6
-                    text-violet-600
-                  "
-                />
+        {/* EDITABLE FORM */}
+        <div className="space-y-4">
+          {/* SUMMARY */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Summary
+            </label>
+            <input
+              type="text"
+              value={form.summary}
+              onChange={e => update("summary", e.target.value)}
+              placeholder="Brief summary of the issue"
+              className={cn(
+                "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5",
+                "text-sm text-slate-900 outline-none transition-all",
+                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
               )}
+            />
+          </div>
+
+          {/* DESCRIPTION */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Description
+            </label>
+            <textarea
+              value={form.description}
+              onChange={e => update("description", e.target.value)}
+              placeholder="Detailed description..."
+              rows={4}
+              className={cn(
+                "w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5",
+                "text-sm text-slate-900 outline-none transition-all",
+                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+              )}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* DEPARTMENT */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Department
+              </label>
+              <select
+                value={form.department_id}
+                onChange={e => update("department_id", e.target.value)}
+                className={cn(
+                  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5",
+                  "text-sm text-slate-900 outline-none transition-all",
+                  "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+                )}
+              >
+                <option value="">Select Department</option>
+                {taxonomy.map(dept => (
+                  <option key={dept.department_id} value={dept.department_id}>
+                    {dept.department_name}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="min-w-0 flex-1">
-
-              <div
-                className="
-                  flex items-center gap-2
-                "
+            {/* SUBCATEGORY */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Subcategory
+              </label>
+              <select
+                value={form.subcategory_id}
+                onChange={e => update("subcategory_id", e.target.value)}
+                className={cn(
+                  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5",
+                  "text-sm text-slate-900 outline-none transition-all",
+                  "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+                )}
+                disabled={!form.department_id}
               >
-                <Sparkles
-                  className="
-                    h-4 w-4
-                    text-violet-500
-                  "
-                />
-
-                <p
-                  className="
-                    text-xs
-                    font-semibold
-                    uppercase
-                    tracking-[0.18em]
-                    text-violet-600
-                  "
-                >
-                  AI Conversation Summary
-                </p>
-              </div>
-
-              {summaryLoading ? (
-                <div className="mt-4">
-
-                  <div
-                    className="
-                      h-4 w-2/3
-                      animate-pulse
-                      rounded-full
-                      bg-violet-200
-                    "
-                  />
-
-                  <LoadingLines />
-
-                  <div
-                    className="
-                      mt-5
-                      flex items-center gap-2
-                      text-xs text-violet-600
-                    "
-                  >
-                    <LoaderCircle
-                      className="
-                        h-3.5 w-3.5
-                        animate-spin
-                      "
-                    />
-
-                    Generating escalation summary...
-                  </div>
-
-                </div>
-              ) : (
-                <>
-                  <h3
-                    className="
-                      mt-3
-                      text-sm font-semibold
-                      text-slate-900
-                    "
-                  >
-                    {aiSummary.title}
-                  </h3>
-
-                  <p
-                    className="
-                      mt-3
-                      whitespace-pre-wrap
-                      text-sm leading-relaxed
-                      text-slate-700
-                    "
-                  >
-                    {aiSummary.summary}
-                  </p>
-                </>
-              )}
+                <option value="">Select Subcategory</option>
+                {subcategories.map(sub => (
+                  <option key={sub.id} value={sub.id}>
+                    {sub.name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
@@ -355,11 +322,11 @@ const SubmitTicketModal = ({
         {/* PIPELINE INFO */}
         <div
           className="
-            mt-5
-            rounded-3xl
+            mt-6
+            rounded-2xl
             border border-amber-100
-            bg-amber-50/70
-            p-4
+            bg-amber-50/50
+            p-3
           "
         >
           <div
@@ -370,7 +337,7 @@ const SubmitTicketModal = ({
             <ShieldAlert
               className="
                 mt-0.5
-                h-5 w-5 shrink-0
+                h-4 w-4 shrink-0
                 text-amber-600
               "
             />
@@ -378,7 +345,7 @@ const SubmitTicketModal = ({
             <div>
               <p
                 className="
-                  text-sm font-semibold
+                  text-xs font-semibold
                   text-amber-800
                 "
               >
@@ -387,12 +354,12 @@ const SubmitTicketModal = ({
 
               <p
                 className="
-                  mt-1
-                  text-xs leading-relaxed
+                  mt-0.5
+                  text-[11px] leading-relaxed
                   text-amber-700
                 "
               >
-                The current conversation history and AI-generated
+                The current conversation history and your edited
                 summary will be forwarded to the live support workflow.
               </p>
             </div>
@@ -420,7 +387,11 @@ const SubmitTicketModal = ({
             onClick={submit}
             disabled={
               loading ||
-              summaryLoading
+              summaryLoading ||
+              !form.summary ||
+              !form.description ||
+              !form.department_id ||
+              !form.subcategory_id
             }
           >
             {buttonContent}

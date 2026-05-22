@@ -304,6 +304,12 @@ const validateChatResponse =
         )
           ? response.ticket_ids_used
           : [],
+
+      showResolutionPrompt:
+        Boolean(response.show_resolution_prompt),
+
+      allowTicketSubmission:
+        response.allow_ticket_submission !== false,
     }
   }
 
@@ -552,6 +558,23 @@ const resolveConversation =
       method: "POST",
     })
 
+const checkResolution =
+  async (
+    SessionID
+  ) =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.CHAT_CHECK_RESOLUTION,
+          {
+            sessionId:
+              SessionID,
+          }
+        ),
+
+      method: "GET",
+    })
+
 const verifyUserToken =
   async () => {
 
@@ -591,6 +614,7 @@ const chatbotService = {
   deleteConversation,
   clearAllSessions,
   resolveConversation,
+  checkResolution,
   loadAISettings,
   verifyUserToken,
   getUserToken,

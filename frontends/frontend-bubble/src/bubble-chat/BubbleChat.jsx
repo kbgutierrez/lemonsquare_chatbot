@@ -66,6 +66,7 @@ const BubbleChat = () => {
     clearConversation,
     restoreConversation,
     resolveConversation,
+    resolutionCheck,
   } = useChatMessages()
 
   useEffect(() => {
@@ -388,8 +389,12 @@ const BubbleChat = () => {
                   isResolvingConversation
                 }
                 resolved={resolved}
+                resolutionCheck={resolutionCheck}
                 onSendMessage={
                   sendMessage
+                }
+                onResolveConversation={
+                  handleResolveConversation
                 }
                 onClose={() =>
                   setOpen(false)

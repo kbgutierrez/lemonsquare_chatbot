@@ -285,6 +285,15 @@ def clear_all_user_chats(
 
 from app.services.resolution.conversation_resolver import ConversationResolutionService
 
+from app.services.taxonomy.taxonomy_service import get_live_taxonomy
+
+@router.get("/taxonomy")
+async def get_taxonomy():
+    """Returns the live taxonomy (departments and subcategories)."""
+    import json
+    data = await get_live_taxonomy()
+    return json.loads(data)
+
 @router.get("/{session_id}/check-resolution", response_model=ResolutionCheckResponse)
 async def check_chat_resolution(
     session_id: str,
@@ -314,5 +323,7 @@ async def check_chat_resolution(
 
     return ResolutionCheckResponse(
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True)
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
+        conversation_status=resolution_data.get("conversation_status", "active"),
+        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0))
     )

@@ -149,6 +149,9 @@ export const API_ENDPOINTS = {
   CHAT_RESOLVE:
     "/chat/resolve/:sessionId",
 
+  CHAT_CHECK_RESOLUTION:
+    "/chat/:sessionId/check-resolution",
+
   CHAT_DELETE_SESSION:
     "/chat/sessions/:sessionId",
 

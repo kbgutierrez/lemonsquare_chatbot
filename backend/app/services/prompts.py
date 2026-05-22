@@ -79,29 +79,29 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
 # =========================================================
 CONVERSATION_RESOLUTION_PROMPT = """
 You are a conversation resolution analyzer for an IT Helpdesk AI assistant.
-Your job is to determine whether the user's issue APPEARS to be resolved based on:
+Your job is to determine the current state of the troubleshooting session based on:
 - the latest user message
 - the AI response
 - recent conversation history
 
 You MUST return ONLY valid JSON.
 Rules:
-- Be conservative.
-- Only mark as resolved_candidate if the user strongly implies:
-  - satisfaction
-  - completion
-  - success
-  - no more assistance needed
-  - gratitude after a solution
-  - confirmation that the issue worked
+1. Be conservative.
+2. Only mark "conversation_status" as "resolved_candidate" if the user strongly implies:
+  - satisfaction, completion, success, or gratitude after a solution.
+3. Set "show_resolution_prompt" to true ONLY if "conversation_status" is "resolved_candidate".
+4. Set "allow_ticket_submission" to true if:
+  - the issue is still ongoing and unsolved.
+  - AND ESPECIALLY if the AI response indicates a dead end or advises the user to contact IT (e.g., "pa-check sa IT", "kailangan ma-check ng Helpdesk").
+  Set it to false if the issue is completely resolved.
 
 Return EXACTLY this JSON schema:
-{
+{{
   "show_resolution_prompt": boolean,
   "allow_ticket_submission": boolean,
   "conversation_status": "active" | "resolved_candidate",
   "resolution_confidence": float
-}
+}}
 
 Conversation History:
 {chat_history}

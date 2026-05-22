@@ -62,6 +62,14 @@ export const useChatMessages =
     const [resolved, setResolved] =
       useState(false)
 
+    const [
+      resolutionCheck,
+      setResolutionCheck,
+    ] = useState({
+      showResolutionPrompt: false,
+      allowTicketSubmission: true,
+    })
+
     /* ========================================
        REFS
     ======================================== */
@@ -445,6 +453,80 @@ export const useChatMessages =
       )
 
     /* ========================================
+       RESOLUTION CHECK
+    ======================================== */
+
+    const checkResolutionStatus =
+      useCallback(
+        async () => {
+
+          if (
+            !state.sessionId ||
+            resolved
+          ) {
+            return
+          }
+
+          try {
+
+            const data =
+              await chatbotService.checkResolution(
+                state.sessionId
+              )
+
+            if (
+              !state.mounted
+            ) {
+              return
+            }
+
+            setResolutionCheck({
+              showResolutionPrompt:
+                Boolean(
+                  data?.show_resolution_prompt
+                ),
+
+              allowTicketSubmission:
+                data?.allow_ticket_submission !==
+                false,
+            })
+
+          } catch (error) {
+
+            console.error(
+              "RESOLUTION_CHECK_ERROR",
+              error
+            )
+          }
+        },
+        [resolved, state]
+      )
+
+    useEffect(() => {
+
+      if (
+        !sessionId ||
+        resolved
+      ) {
+
+        setResolutionCheck({
+          showResolutionPrompt: false,
+          allowTicketSubmission: true,
+        })
+
+        return
+      }
+
+      checkResolutionStatus()
+
+    }, [
+      sessionId,
+      messages.length,
+      resolved,
+      checkResolutionStatus,
+    ])
+
+    /* ========================================
        RESTORE
     ======================================== */
 
@@ -526,5 +608,7 @@ export const useChatMessages =
       clearConversation,
 
       restoreConversation,
+
+      resolutionCheck,
     }
   }
