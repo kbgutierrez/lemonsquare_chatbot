@@ -13,6 +13,9 @@ import {
   Loader2,
   ChevronDown,
   Check,
+  RotateCcw,
+  Database,
+  DatabaseBackup,
 } from "lucide-react"
 
 const ManualEntryCard = ({
@@ -20,6 +23,7 @@ const ManualEntryCard = ({
   submitting,
   handleUpdateEntry,
   handleDeleteEntry,
+  handleRestoreEntry,
   allowedCategories = [],
 }) => {
 
@@ -172,8 +176,52 @@ const ManualEntryCard = ({
         {/* TOP */}
         <div className="mb-4 flex items-start justify-between gap-4">
 
-          <div className="rounded-2xl border border-[#95c11f]/10 bg-[#95c11f]/10 px-3 py-1 text-xs font-semibold text-[#95c11f]">
-            {form.category || "General"}
+          <div className="flex items-center gap-2">
+
+            <div className="rounded-2xl border border-[#95c11f]/10 bg-[#95c11f]/10 px-3 py-1 text-xs font-semibold text-[#95c11f]">
+              {form.category || "General"}
+            </div>
+
+            <div
+              className={`
+                flex
+                items-center
+                gap-1.5
+
+                rounded-2xl
+                border
+
+                px-3
+                py-1
+
+                text-[11px]
+                font-semibold
+
+                ${
+                  item.is_active
+                    ? `
+                      border-emerald-500/20
+                      bg-emerald-500/10
+                      text-emerald-300
+                    `
+                    : `
+                      border-red-500/20
+                      bg-red-500/10
+                      text-red-300
+                    `
+                }
+              `}
+            >
+              {item.is_active ? (
+                <Database className="h-3.5 w-3.5" />
+              ) : (
+                <DatabaseBackup className="h-3.5 w-3.5" />
+              )}
+
+              {item.is_active
+                ? "ACTIVE"
+                : "INACTIVE"}
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -189,14 +237,27 @@ const ManualEntryCard = ({
                   <Pencil className="h-4 w-4" />
                 </button>
 
-                <button
-                  onClick={() =>
-                    setShowDeleteModal(true)
-                  }
-                  className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-300 transition-all duration-200 hover:scale-105 hover:opacity-90"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {item.is_active ? (
+                  <button
+                    onClick={() =>
+                      setShowDeleteModal(true)
+                    }
+                    className="rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-red-300 transition-all duration-200 hover:scale-105 hover:opacity-90"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={() =>
+                      handleRestoreEntry(
+                        item.id
+                      )
+                    }
+                    className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2 text-emerald-300 transition-all duration-200 hover:scale-105 hover:opacity-90"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -293,7 +354,6 @@ const ManualEntryCard = ({
 
           <div className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-[32px] border border-[#2f3d37] bg-[#161f1c] shadow-[0_20px_80px_rgba(0,0,0,0.45)] animate-in zoom-in-95 slide-in-from-bottom-4 duration-300">
 
-            {/* HEADER */}
             <div className="shrink-0 border-b border-[#26332d] px-6 py-5">
 
               <h2 className="text-2xl font-bold text-white">
@@ -305,7 +365,6 @@ const ManualEntryCard = ({
               </p>
             </div>
 
-            {/* CATEGORY LIST */}
             <div className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
 
               <div className="space-y-2">
@@ -357,7 +416,6 @@ const ManualEntryCard = ({
               </div>
             </div>
 
-            {/* FOOTER */}
             <div className="shrink-0 border-t border-[#26332d] px-6 py-4">
 
               <button
@@ -390,7 +448,7 @@ const ManualEntryCard = ({
             </h2>
 
             <p className="mt-3 text-sm text-[#9cb0a8]">
-              This action cannot be undone.
+              This will mark the entry as inactive and remove it from retrieval/Qdrant usage.
             </p>
 
             <div className="mt-6 flex gap-3">
@@ -413,7 +471,7 @@ const ManualEntryCard = ({
                 {submitting ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
                 ) : (
-                  "Delete"
+                  "Deactivate"
                 )}
               </button>
 

@@ -1,4 +1,5 @@
 import { useRef } from "react"
+
 import {
   ChevronLeft,
   ChevronRight,
@@ -10,6 +11,7 @@ const ManualEntryTabs = ({
   setActiveCategory,
   setPage,
 }) => {
+
   const tabsRef = useRef(null)
 
   /* ========================================
@@ -17,6 +19,7 @@ const ManualEntryTabs = ({
   ======================================== */
 
   const scrollTabs = (direction) => {
+
     if (!tabsRef.current) return
 
     const amount = 260
@@ -32,6 +35,7 @@ const ManualEntryTabs = ({
 
   return (
     <div className="relative">
+
       {/* LEFT SHADOW */}
       <div
         className="
@@ -187,6 +191,7 @@ const ManualEntryTabs = ({
         >
           {categories.map(
             (category) => {
+
               const active =
                 activeCategory ===
                 category
@@ -195,6 +200,7 @@ const ManualEntryTabs = ({
                 <button
                   key={category}
                   onClick={() => {
+
                     setActiveCategory(
                       category
                     )

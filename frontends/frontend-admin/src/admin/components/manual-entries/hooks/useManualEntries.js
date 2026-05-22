@@ -23,6 +23,7 @@ import {
   createManualEntry,
   updateManualEntry,
   deleteManualEntry,
+  restoreManualEntry,
 } from "../services/manualEntriesService"
 
 import aiSettingsService
@@ -78,6 +79,18 @@ const useManualEntries = () => {
     setActiveCategory,
   ] = useState("All")
 
+  /*
+    IMPORTANT:
+    Default to ACTIVE because
+    your backend initially returns
+    active entries only.
+  */
+
+  const [
+    activityFilter,
+    setActivityFilter,
+  ] = useState("active")
+
   /* ========================================
      CLEANUP
   ======================================== */
@@ -108,11 +121,23 @@ const useManualEntries = () => {
   const safeFetchManualEntries =
     useCallback(async () => {
 
+      /*
+        CRITICAL FIX:
+        We now fetch a large limit
+        to ensure inactive entries
+        are included.
+
+        Your backend appears to use
+        soft delete visibility logic.
+      */
+
       const [
         entriesResponse,
         settings,
       ] = await Promise.all([
-        fetchManualEntries(),
+        fetchManualEntries({
+          limit: 9999,
+        }),
 
         aiSettingsService.getSettings(),
       ])
@@ -243,10 +268,13 @@ const useManualEntries = () => {
   ======================================== */
 
   useEffect(() => {
+
     setPage(1)
+
   }, [
     search,
     activeCategory,
+    activityFilter,
   ])
 
   /* ========================================
@@ -337,9 +365,29 @@ const useManualEntries = () => {
             item.category ===
               activeCategory
 
+          /*
+            CRITICAL FIX:
+            Explicit activity filtering
+          */
+
+          const matchesActivity =
+
+            activityFilter ===
+            "all"
+
+              ? true
+
+              : activityFilter ===
+                "active"
+
+                ? item.is_active === true
+
+                : item.is_active === false
+
           return (
             matchesSearch &&
-            matchesCategory
+            matchesCategory &&
+            matchesActivity
           )
         }
       )
@@ -348,6 +396,7 @@ const useManualEntries = () => {
       safeItems,
       search,
       activeCategory,
+      activityFilter,
     ])
 
   /* ========================================
@@ -384,7 +433,7 @@ const useManualEntries = () => {
     ])
 
   /* ========================================
-     CREATE (OPTIMISTIC)
+     CREATE
   ======================================== */
 
   const handleCreateEntry =
@@ -424,6 +473,8 @@ const useManualEntries = () => {
           category:
             form.category ||
             "General",
+
+          is_active: true,
         }
 
         setCachedData(
@@ -594,7 +645,7 @@ const useManualEntries = () => {
     ])
 
   /* ========================================
-     DELETE
+     DELETE / DEACTIVATE
   ======================================== */
 
   const handleDeleteEntry =
@@ -610,11 +661,25 @@ const useManualEntries = () => {
 
         setSubmitting(true)
 
+        /*
+          IMPORTANT:
+          Do NOT remove from array.
+          Mark inactive instead.
+        */
+
         const optimistic =
-          safeItems.filter(
+          safeItems.map(
             (item) =>
-              item.id !==
+
+              item.id ===
               entryId
+
+                ? {
+                    ...item,
+                    is_active: false,
+                  }
+
+                : item
           )
 
         setCachedData(
@@ -640,7 +705,7 @@ const useManualEntries = () => {
         ) {
 
           setSuccessMessage(
-            "🗑️ Entry deleted successfully"
+            "Entry moved to inactive"
           )
         }
 
@@ -656,7 +721,97 @@ const useManualEntries = () => {
         ) {
           setError(
             error.message ||
-              "Failed to delete entry."
+              "Failed to deactivate entry."
+          )
+        }
+
+      } finally {
+
+        if (
+          mountedRef.current
+        ) {
+          setSubmitting(false)
+        }
+      }
+
+    }, [
+      data,
+      safeItems,
+      refresh,
+    ])
+
+  /* ========================================
+     RESTORE
+  ======================================== */
+
+  const handleRestoreEntry =
+    useCallback(async (
+      entryId
+    ) => {
+
+      setError("")
+
+      const previous = data
+
+      try {
+
+        setSubmitting(true)
+
+        const optimistic =
+          safeItems.map(
+            (item) =>
+
+              item.id ===
+              entryId
+
+                ? {
+                    ...item,
+                    is_active: true,
+                  }
+
+                : item
+          )
+
+        setCachedData(
+          CACHE_KEY,
+          {
+            ...data,
+            items: optimistic,
+          }
+        )
+
+        await restoreManualEntry(
+          entryId
+        )
+
+        invalidateCache(
+          CACHE_KEY
+        )
+
+        await refresh()
+
+        if (
+          mountedRef.current
+        ) {
+
+          setSuccessMessage(
+            "Entry restored successfully"
+          )
+        }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (
+          mountedRef.current
+        ) {
+          setError(
+            error.message ||
+              "Failed to restore entry."
           )
         }
 
@@ -703,12 +858,16 @@ const useManualEntries = () => {
     activeCategory,
     setActiveCategory,
 
+    activityFilter,
+    setActivityFilter,
+
     paginatedItems,
     totalPages,
 
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleRestoreEntry,
 
     setError,
 

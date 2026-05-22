@@ -1,4 +1,13 @@
-import { useState, useCallback, memo } from "react"
+import {
+  useState,
+  useCallback,
+  memo,
+} from "react"
+
+import {
+  Database,
+  DatabaseBackup,
+} from "lucide-react"
 
 import useManualEntries from "./hooks/useManualEntries"
 
@@ -29,6 +38,8 @@ const ManualEntriesSection = () => {
   ] = useState(null)
 
   const {
+    items,
+
     loading,
     submitting,
     error,
@@ -46,13 +57,33 @@ const ManualEntriesSection = () => {
     activeCategory,
     setActiveCategory,
 
+    activityFilter,
+    setActivityFilter,
+
     paginatedItems,
     totalPages,
 
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleRestoreEntry,
   } = useManualEntries()
+
+  /* ========================================
+     COUNTS
+  ======================================== */
+
+  const activeCount =
+    items.filter(
+      (item) =>
+        item.is_active
+    ).length
+
+  const inactiveCount =
+    items.filter(
+      (item) =>
+        !item.is_active
+    ).length
 
   /* ========================================
      MODAL HANDLERS
@@ -86,7 +117,450 @@ const ManualEntriesSection = () => {
         setShowModal={openCreateModal}
       />
 
-      {/* TABS */}
+      {/* ========================================
+          ACTIVE / INACTIVE FILTER
+      ======================================== */}
+
+      <div
+        className="
+          grid
+          grid-cols-1
+          gap-4
+
+          lg:grid-cols-2
+        "
+      >
+
+        {/* ACTIVE */}
+        <button
+          onClick={() =>
+            setActivityFilter(
+              "active"
+            )
+          }
+          className={`
+            group
+            relative
+
+            overflow-hidden
+
+            rounded-[28px]
+            border
+
+            p-5
+
+            text-left
+
+            transition-all
+            duration-300
+
+            ${
+              activityFilter ===
+              "active"
+
+                ? `
+                  border-[#95c11f]/30
+                  bg-[#1b2418]
+                `
+
+                : `
+                  border-[#26332d]
+                  bg-[#151d1b]
+
+                  hover:border-[#3a4a43]
+                `
+            }
+          `}
+        >
+
+          {/* ACTIVE INDICATOR */}
+          <div
+            className={`
+              absolute
+
+              bottom-0
+              left-1/2
+
+              h-[3px]
+              w-[55%]
+
+              -translate-x-1/2
+
+              rounded-full
+
+              bg-[#f5d547]
+
+              transition-all
+              duration-300
+
+              ${
+                activityFilter ===
+                "active"
+
+                  ? "opacity-100"
+
+                  : "opacity-0"
+              }
+            `}
+          />
+
+          {/* CONTENT */}
+          <div
+            className="
+              relative
+              z-10
+
+              flex
+              items-center
+              justify-between
+              gap-4
+            "
+          >
+
+            <div
+              className="
+                flex
+                items-center
+                gap-3
+              "
+            >
+
+              <div
+                className={`
+                  flex
+                  h-12
+                  w-12
+                  items-center
+                  justify-center
+
+                  rounded-2xl
+
+                  border
+
+                  transition-all
+                  duration-300
+
+                  ${
+                    activityFilter ===
+                    "active"
+
+                      ? `
+                        border-[#95c11f]/20
+
+                        bg-[#95c11f]/10
+
+                        text-[#dff7a3]
+                      `
+
+                      : `
+                        border-[#26332d]
+
+                        bg-[#141c19]
+
+                        text-[#7f948b]
+
+                        group-hover:text-white
+                      `
+                  }
+                `}
+              >
+                <Database
+                  className="
+                    h-5
+                    w-5
+                  "
+                />
+              </div>
+
+              <div
+                className="
+                  flex
+                  flex-col
+                  items-start
+                "
+              >
+
+                <span
+                  className={`
+                    text-base
+                    font-semibold
+
+                    transition-colors
+                    duration-300
+
+                    ${
+                      activityFilter ===
+                      "active"
+
+                        ? "text-white"
+
+                        : "text-[#8ca29a] group-hover:text-white"
+                    }
+                  `}
+                >
+                  Active Entries
+                </span>
+
+                <span
+                  className={`
+                    text-xs
+
+                    transition-colors
+                    duration-300
+
+                    ${
+                      activityFilter ===
+                      "active"
+
+                        ? "text-[#c8d6d0]"
+
+                        : "text-[#5f746c]"
+                    }
+                  `}
+                >
+                  Currently indexed in Qdrant
+                </span>
+
+              </div>
+            </div>
+
+            <div
+              className="
+                rounded-2xl
+                border
+                border-[#95c11f]/20
+                bg-[#95c11f]/10
+
+                px-4
+                py-2
+
+                text-xl
+                font-bold
+                text-[#dff7a3]
+              "
+            >
+              {activeCount}
+            </div>
+
+          </div>
+        </button>
+
+        {/* INACTIVE */}
+        <button
+          onClick={() =>
+            setActivityFilter(
+              "inactive"
+            )
+          }
+          className={`
+            group
+            relative
+
+            overflow-hidden
+
+            rounded-[28px]
+            border
+
+            p-5
+
+            text-left
+
+            transition-all
+            duration-300
+
+            ${
+              activityFilter ===
+              "inactive"
+
+                ? `
+                  border-red-500/20
+                  bg-[#241818]
+                `
+
+                : `
+                  border-[#26332d]
+                  bg-[#151d1b]
+
+                  hover:border-[#3a4a43]
+                `
+            }
+          `}
+        >
+
+          {/* ACTIVE INDICATOR */}
+          <div
+            className={`
+              absolute
+
+              bottom-0
+              left-1/2
+
+              h-[3px]
+              w-[55%]
+
+              -translate-x-1/2
+
+              rounded-full
+
+              bg-red-400
+
+              transition-all
+              duration-300
+
+              ${
+                activityFilter ===
+                "inactive"
+
+                  ? "opacity-100"
+
+                  : "opacity-0"
+              }
+            `}
+          />
+
+          {/* CONTENT */}
+          <div
+            className="
+              relative
+              z-10
+
+              flex
+              items-center
+              justify-between
+              gap-4
+            "
+          >
+
+            <div
+              className="
+                flex
+                items-center
+                gap-3
+              "
+            >
+
+              <div
+                className={`
+                  flex
+                  h-12
+                  w-12
+                  items-center
+                  justify-center
+
+                  rounded-2xl
+
+                  border
+
+                  transition-all
+                  duration-300
+
+                  ${
+                    activityFilter ===
+                    "inactive"
+
+                      ? `
+                        border-red-500/20
+
+                        bg-red-500/10
+
+                        text-red-300
+                      `
+
+                      : `
+                        border-[#26332d]
+
+                        bg-[#141c19]
+
+                        text-[#7f948b]
+
+                        group-hover:text-white
+                      `
+                  }
+                `}
+              >
+                <DatabaseBackup
+                  className="
+                    h-5
+                    w-5
+                  "
+                />
+              </div>
+
+              <div
+                className="
+                  flex
+                  flex-col
+                  items-start
+                "
+              >
+
+                <span
+                  className={`
+                    text-base
+                    font-semibold
+
+                    transition-colors
+                    duration-300
+
+                    ${
+                      activityFilter ===
+                      "inactive"
+
+                        ? "text-white"
+
+                        : "text-[#8ca29a] group-hover:text-white"
+                    }
+                  `}
+                >
+                  Inactive Entries
+                </span>
+
+                <span
+                  className={`
+                    text-xs
+
+                    transition-colors
+                    duration-300
+
+                    ${
+                      activityFilter ===
+                      "inactive"
+
+                        ? "text-[#d8bcbc]"
+
+                        : "text-[#5f746c]"
+                    }
+                  `}
+                >
+                  Removed from Qdrant retrieval
+                </span>
+
+              </div>
+            </div>
+
+            <div
+              className="
+                rounded-2xl
+                border
+                border-red-500/20
+                bg-red-500/10
+
+                px-4
+                py-2
+
+                text-xl
+                font-bold
+                text-red-300
+              "
+            >
+              {inactiveCount}
+            </div>
+
+          </div>
+        </button>
+      </div>
+
+      {/* CATEGORY TABS */}
       <ManualEntryTabs
         categories={categories}
         activeCategory={activeCategory}
@@ -130,6 +604,7 @@ const ManualEntriesSection = () => {
                 allowedCategories={allowedCategories}
                 handleUpdateEntry={handleUpdateEntry}
                 handleDeleteEntry={handleDeleteEntry}
+                handleRestoreEntry={handleRestoreEntry}
                 openEditModal={openEditModal}
               />
             ))}
