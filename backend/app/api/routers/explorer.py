@@ -3,91 +3,388 @@ Knowledge Base Explorer router.
 Queries SQL databases directly for the Admin Dashboard.
 Preserved from original with repository usage.
 """
+
 import json
 import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_helpdesk_db
-from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry, LearnedChat, BlacklistedTicket
-from app.models.helpdesk import TicketEvaluation
-from app.schemas.knowledge import KnowledgeExplorerResponse
-from app.repositories.ticket_repository import TicketRepository
+
+from app.api.deps import (
+    get_chatbot_db,
+    get_helpdesk_db,
+)
+
+from app.models.chatbot import (
+    UploadedDocument,
+    ManualKnowledgeEntry,
+    LearnedChat,
+)
+
+from app.models.helpdesk import (
+    TicketEvaluation,
+)
+
+from app.schemas.knowledge import (
+    KnowledgeExplorerResponse,
+)
+
+from app.repositories.ticket_repository import (
+    TicketRepository,
+)
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/knowledge", tags=["Explorer"])
+
+router = APIRouter(
+    prefix="/knowledge",
+    tags=["Explorer"],
+)
 
 
-@router.get("/explore", response_model=list[KnowledgeExplorerResponse], summary="Browse Knowledge Base (SQL Source of Truth)")
+@router.get(
+    "/explore",
+    response_model=list[KnowledgeExplorerResponse],
+    summary="Browse Knowledge Base (SQL Source of Truth)",
+)
 async def explore_knowledge_base(
     doc_type: str | None = None,
     category: str | None = None,
+
+    # =====================================
+    # LIFECYCLE FILTER
+    #
+    # SUPPORTED:
+    # ?lifecycle=active
+    # ?lifecycle=inactive
+    #
+    # DEFAULT:
+    # active
+    # =====================================
+
+    lifecycle: str = "active",
+
     limit: int = 100,
-    db_chatbot: Session = Depends(get_chatbot_db),
-    db_helpdesk: Session = Depends(get_helpdesk_db),
+
+    db_chatbot: Session = Depends(
+        get_chatbot_db
+    ),
+
+    db_helpdesk: Session = Depends(
+        get_helpdesk_db
+    ),
 ):
+
     results = []
 
-    # 1. Manual Knowledge
-    if doc_type in [None, "general_text"]:
-        query = db_chatbot.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True)
-        if category:
-            query = query.filter(ManualKnowledgeEntry.Category == category)
-        for m in query.order_by(ManualKnowledgeEntry.CreatedAt.desc()).limit(limit).all():
-            results.append({"id": m.EntryID, "doc_type": "general_text", "source": m.Title, "category": m.Category, "content": m.Content})
+    normalized_lifecycle = (
+        lifecycle or "active"
+    ).strip().lower()
 
-    # 2. AI-Learned Chats
-    if doc_type in [None, "resolved_chat"] and (category is None or category == "AI Extraction"):
-        chats = db_chatbot.query(LearnedChat).filter(LearnedChat.IsActive == True).order_by(LearnedChat.LearnedAt.desc()).limit(limit).all()
+    include_active = (
+        normalized_lifecycle
+        == "active"
+    )
+
+    include_inactive = (
+        normalized_lifecycle
+        == "inactive"
+    )
+
+    # =====================================
+    # 1. MANUAL KNOWLEDGE
+    # =====================================
+
+    if doc_type in [
+        None,
+        "general_text",
+    ]:
+
+        query = db_chatbot.query(
+            ManualKnowledgeEntry
+        )
+
+        if include_active:
+
+            query = query.filter(
+                ManualKnowledgeEntry.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                ManualKnowledgeEntry.IsActive == False
+            )
+
+        if category:
+
+            query = query.filter(
+                ManualKnowledgeEntry.Category
+                == category
+            )
+
+        for m in (
+            query
+            .order_by(
+                ManualKnowledgeEntry.CreatedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        ):
+
+            results.append({
+                "id":
+                    m.EntryID,
+
+                "doc_type":
+                    "general_text",
+
+                "source":
+                    m.Title,
+
+                "category":
+                    m.Category,
+
+                "content":
+                    m.Content,
+
+                "is_active":
+                    bool(m.IsActive),
+            })
+
+    # =====================================
+    # 2. AI LEARNED CHATS
+    # =====================================
+
+    if (
+        doc_type in [
+            None,
+            "resolved_chat",
+        ]
+        and (
+            category is None
+            or category == "AI Extraction"
+        )
+    ):
+
+        query = db_chatbot.query(
+            LearnedChat
+        )
+
+        if include_active:
+
+            query = query.filter(
+                LearnedChat.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                LearnedChat.IsActive == False
+            )
+
+        chats = (
+            query
+            .order_by(
+                LearnedChat.LearnedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        )
+
         for c in chats:
+
             content_dict = {
-                "Issue Reported": c.IssueReported,
-                "Issue Found": c.IssueFound,
-                "Root Cause": c.RootCause,
-                "Work Done": c.WorkDone,
+                "Issue Reported":
+                    c.IssueReported,
+
+                "Issue Found":
+                    c.IssueFound,
+
+                "Root Cause":
+                    c.RootCause,
+
+                "Work Done":
+                    c.WorkDone,
             }
+
             results.append({
-                "id": c.SessionID,
-                "doc_type": "resolved_chat",
-                "source": f"Chat Session {c.SessionID[:8]}",
-                "category": "AI Extraction",
-                "content": json.dumps(content_dict, indent=2),
+                "id":
+                    c.SessionID,
+
+                "doc_type":
+                    "resolved_chat",
+
+                "source":
+                    f"Chat Session {c.SessionID[:8]}",
+
+                "category":
+                    "AI Extraction",
+
+                "content":
+                    json.dumps(
+                        content_dict,
+                        indent=2,
+                    ),
+
+                "is_active":
+                    bool(c.IsActive),
             })
 
-    # 3. Official Documents / PDFs
-    if doc_type in [None, "official_document"]:
-        query = db_chatbot.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+    # =====================================
+    # 3. OFFICIAL DOCUMENTS
+    # =====================================
+
+    if doc_type in [
+        None,
+        "official_document",
+    ]:
+
+        query = db_chatbot.query(
+            UploadedDocument
+        )
+
+        if include_active:
+
+            query = query.filter(
+                UploadedDocument.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                UploadedDocument.IsActive == False
+            )
+
         if category:
-            query = query.filter(UploadedDocument.Category == category)
-        for d in query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all():
+
+            query = query.filter(
+                UploadedDocument.Category
+                == category
+            )
+
+        for d in (
+            query
+            .order_by(
+                UploadedDocument.UploadedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        ):
+
             results.append({
-                "id": d.DocumentID,
-                "doc_type": "official_document",
-                "source": d.FileName,
-                "category": d.Category,
-                "content": f"[PDF Document containing {d.ChunkCount} vector chunks. AI reads this dynamically during chat.]",
+                "id":
+                    d.DocumentID,
+
+                "doc_type":
+                    "official_document",
+
+                "source":
+                    d.FileName,
+
+                "category":
+                    d.Category,
+
+                "content":
+                    (
+                        "[PDF Document containing "
+                        f"{d.ChunkCount} vector chunks. "
+                        "AI reads this dynamically during chat.]"
+                    ),
+
+                "is_active":
+                    bool(d.IsActive),
             })
 
-    # 4. Helpdesk Tickets
-    if doc_type in [None, "helpdesk_ticket"] and (category is None or category == "IT Helpdesk Sync"):
-        repo = TicketRepository(db_chatbot, db_helpdesk)
-        blacklisted = repo.get_blacklisted_numbers()
-        tickets = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None)).order_by(TicketEvaluation.id.desc()).limit(limit * 2).all()
+    # =====================================
+    # 4. HELPDESK TICKETS
+    # =====================================
+
+    if (
+        doc_type in [
+            None,
+            "helpdesk_ticket",
+        ]
+        and (
+            category is None
+            or category
+            == "IT Helpdesk Sync"
+        )
+    ):
+
+        repo = TicketRepository(
+            db_chatbot,
+            db_helpdesk,
+        )
+
+        blacklisted = (
+            repo.get_blacklisted_numbers()
+        )
+
+        tickets = (
+            db_helpdesk.query(
+                TicketEvaluation
+            )
+            .filter(
+                TicketEvaluation.work_done.isnot(None)
+            )
+            .order_by(
+                TicketEvaluation.id.desc()
+            )
+            .limit(limit * 2)
+            .all()
+        )
+
         valid_added = 0
+
         for t in tickets:
-            if t.ticket_number in blacklisted:
+
+            if (
+                t.ticket_number
+                in blacklisted
+            ):
                 continue
+
             if valid_added >= limit:
                 break
+
             results.append({
-                "id": str(t.id),
-                "doc_type": "helpdesk_ticket",
-                "source": f"Ticket {t.ticket_number}",
-                "category": "IT Helpdesk Sync",
-                "content": f"REPORTED: {t.issue_reported}\n\nRESOLUTION: {t.work_done}",
+                "id":
+                    str(t.id),
+
+                "doc_type":
+                    "helpdesk_ticket",
+
+                "source":
+                    f"Ticket {t.ticket_number}",
+
+                "category":
+                    "IT Helpdesk Sync",
+
+                "content":
+                    (
+                        f"REPORTED: {t.issue_reported}\n\n"
+                        f"RESOLUTION: {t.work_done}"
+                    ),
+
+                # =================================
+                # Tickets are always active
+                # from explorer perspective
+                # =================================
+
+                "is_active":
+                    True,
             })
+
             valid_added += 1
 
-    if doc_type is None and category is None:
+    # =====================================
+    # GLOBAL LIMIT SAFETY
+    # =====================================
+
+    if (
+        doc_type is None
+        and category is None
+    ):
         results = results[:limit]
 
     return results

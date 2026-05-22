@@ -22,7 +22,9 @@ const CACHE_KEY =
   "resolved_chats"
 
 export const useResolvedChats =
-  () => {
+  (
+    lifecycle = "active"
+  ) => {
 
     /* ========================================
        FETCHER
@@ -37,9 +39,16 @@ export const useResolvedChats =
               API_ENDPOINTS.KNOWLEDGE_EXPLORE
             )
 
+          /*
+            BACKEND NOW SUPPORTS:
+
+            ?lifecycle=active
+            ?lifecycle=inactive
+          */
+
           const response =
             await apiClient.get(
-              `${endpoint}?doc_type=resolved_chat`
+              `${endpoint}?doc_type=resolved_chat&lifecycle=${lifecycle}`
             )
 
           return Array.isArray(
@@ -48,7 +57,9 @@ export const useResolvedChats =
             ? response
             : []
         },
-        []
+        [
+          lifecycle,
+        ]
       )
 
     /* ========================================
@@ -62,7 +73,7 @@ export const useResolvedChats =
       refresh,
     } = useLiveQuery({
       queryKey:
-        CACHE_KEY,
+        `${CACHE_KEY}_${lifecycle}`,
 
       queryFn:
         fetchResolvedChats,
@@ -112,7 +123,7 @@ export const useResolvedChats =
             /* OPTIMISTIC CACHE */
 
             setCachedData(
-              CACHE_KEY,
+              `${CACHE_KEY}_${lifecycle}`,
               optimistic
             )
 
@@ -140,7 +151,7 @@ export const useResolvedChats =
             )
 
             invalidateCache(
-              CACHE_KEY
+              `${CACHE_KEY}_${lifecycle}`
             )
 
             await refresh()
@@ -155,7 +166,7 @@ export const useResolvedChats =
             /* ROLLBACK */
 
             setCachedData(
-              CACHE_KEY,
+              `${CACHE_KEY}_${lifecycle}`,
               previous
             )
 
@@ -165,11 +176,12 @@ export const useResolvedChats =
         [
           items,
           refresh,
+          lifecycle,
         ]
       )
 
     /* ========================================
-       DELETE CHAT
+       ARCHIVE CHAT
     ======================================== */
 
     const deleteChat =
@@ -201,6 +213,10 @@ export const useResolvedChats =
               endpoint
             )
 
+            /*
+              OPTIMISTIC REMOVE
+            */
+
             const optimistic =
               items.filter(
                 (item) =>
@@ -208,10 +224,8 @@ export const useResolvedChats =
                   sessionId
               )
 
-            /* OPTIMISTIC CACHE */
-
             setCachedData(
-              CACHE_KEY,
+              `${CACHE_KEY}_${lifecycle}`,
               optimistic
             )
 
@@ -220,7 +234,15 @@ export const useResolvedChats =
             )
 
             invalidateCache(
-              CACHE_KEY
+              `${CACHE_KEY}_${lifecycle}`
+            )
+
+            invalidateCache(
+              `${CACHE_KEY}_active`
+            )
+
+            invalidateCache(
+              `${CACHE_KEY}_inactive`
             )
 
             await refresh()
@@ -235,7 +257,7 @@ export const useResolvedChats =
             /* ROLLBACK */
 
             setCachedData(
-              CACHE_KEY,
+              `${CACHE_KEY}_${lifecycle}`,
               previous
             )
 
@@ -245,6 +267,99 @@ export const useResolvedChats =
         [
           items,
           refresh,
+          lifecycle,
+        ]
+      )
+
+    /* ========================================
+       RESTORE CHAT
+    ======================================== */
+
+    const restoreChat =
+      useCallback(
+        async (
+          sessionId
+        ) => {
+
+          const previous =
+            [...items]
+
+          try {
+
+            console.log(
+              "RESTORE_SESSION_ID:",
+              sessionId
+            )
+
+            const endpoint =
+              buildApiUrl(
+                API_ENDPOINTS.SELF_KNOWLEDGE_RESTORE,
+                {
+                  sessionId,
+                }
+              )
+
+            console.log(
+              "RESTORE_ENDPOINT:",
+              endpoint
+            )
+
+            /*
+              OPTIMISTIC REMOVE
+              FROM INACTIVE LIST
+            */
+
+            const optimistic =
+              items.filter(
+                (item) =>
+                  item.id !==
+                  sessionId
+              )
+
+            setCachedData(
+              `${CACHE_KEY}_${lifecycle}`,
+              optimistic
+            )
+
+            await apiClient.post(
+              endpoint
+            )
+
+            invalidateCache(
+              `${CACHE_KEY}_${lifecycle}`
+            )
+
+            invalidateCache(
+              `${CACHE_KEY}_active`
+            )
+
+            invalidateCache(
+              `${CACHE_KEY}_inactive`
+            )
+
+            await refresh()
+
+          } catch (error) {
+
+            console.error(
+              "RESTORE_RESOLVED_CHAT_ERROR",
+              error
+            )
+
+            /* ROLLBACK */
+
+            setCachedData(
+              `${CACHE_KEY}_${lifecycle}`,
+              previous
+            )
+
+            throw error
+          }
+        },
+        [
+          items,
+          refresh,
+          lifecycle,
         ]
       )
 
@@ -253,10 +368,13 @@ export const useResolvedChats =
       loading,
       error,
 
+      lifecycle,
+
       loadChats:
         refresh,
 
       updateChat,
       deleteChat,
+      restoreChat,
     }
   }

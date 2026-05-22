@@ -147,93 +147,101 @@ const KnowledgeFilesSection = () => {
       "
     >
       {/* ========================================
-              STATUS TABS
+                  STATUS TABS
           ======================================== */}
 
           <div
             className="
-              grid
-              grid-cols-2
-              gap-3
+              rounded-[30px]
+
+              border
+              border-[#24312b]
+
+              bg-[#101715]
+
+              p-2
+
+              shadow-[0_10px_30px_rgba(0,0,0,0.22)]
             "
           >
-            {STATUS_TABS.map((tab) => {
+            <div
+              className="
+                grid
+                grid-cols-2
+                gap-2
+              "
+            >
+              {STATUS_TABS.map((tab) => {
 
-              const active =
-                selectedStatus ===
-                tab.id
+                const active =
+                  selectedStatus ===
+                  tab.id
 
-              return (
-                <button
-                  key={tab.id}
+                return (
+                  <button
+                    key={tab.id}
 
-                  onClick={() =>
-                    setSelectedStatus(
-                      tab.id
-                    )
-                  }
-
-                  className={`
-                    relative
-
-                    flex
-                    items-center
-                    justify-center
-                    gap-2
-
-                    rounded-2xl
-
-                    border
-
-                    px-5
-                    py-4
-
-                    text-[13px]
-                    font-semibold
-
-                    transition-all
-                    duration-200
-
-                    ${
-                      active
-
-                        ? `
-                          border-[#3a4a43]
-
-                          bg-[#1b2522]
-
-                          text-white
-
-                          shadow-[0_8px_24px_rgba(0,0,0,0.28)]
-                        `
-
-                        : `
-                          border-[#26332d]
-
-                          bg-[#121a18]
-
-                          text-[#7f948b]
-
-                          hover:border-[#2d3b35]
-                          hover:bg-[#18211f]
-                          hover:text-white
-                        `
+                    onClick={() =>
+                      setSelectedStatus(
+                        tab.id
+                      )
                     }
-                  `}
-                >
-                  <Database
-                    className="
-                      h-4
-                      w-4
-                    "
-                  />
 
-                  {tab.label}
+                    className={`
+                      group
 
-                  {active && (
+                      relative
+
+                      overflow-hidden
+
+                      rounded-[22px]
+
+                      border
+
+                      px-5
+                      py-5
+
+                      transition-all
+                      duration-300
+
+                      ${
+                        active
+
+                          ? `
+                            border-[#314136]
+
+                            bg-[#16211d]
+
+                            shadow-[0_10px_30px_rgba(0,0,0,0.28)]
+                          `
+
+                          : `
+                            border-transparent
+
+                            bg-transparent
+
+                            hover:bg-[#141c19]
+                          `
+                      }
+                    `}
+                  >
+                    {/* ACTIVE GLOW */}
+                    {active && (
+                      <div
+                        className="
+                          absolute
+                          inset-0
+
+                          bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
+                        "
+                      />
+                    )}
+
+                    {/* ACTIVE INDICATOR */}
                     <div
-                      className="
+                      className={`
                         absolute
+
                         bottom-0
                         left-1/2
 
@@ -245,12 +253,123 @@ const KnowledgeFilesSection = () => {
                         rounded-full
 
                         bg-[#f5d547]
-                      "
+
+                        transition-all
+                        duration-300
+
+                        ${
+                          active
+                            ? "opacity-100"
+                            : "opacity-0"
+                        }
+                      `}
                     />
-                  )}
-                </button>
-              )
-            })}
+
+                    {/* CONTENT */}
+                    <div
+                      className="
+                        relative
+                        z-10
+
+                        flex
+                        items-center
+                        justify-center
+                        gap-2.5
+                      "
+                    >
+                      <div
+                        className={`
+                          flex
+                          h-9
+                          w-9
+                          items-center
+                          justify-center
+
+                          rounded-xl
+
+                          border
+
+                          transition-all
+                          duration-300
+
+                          ${
+                            active
+
+                              ? `
+                                border-[#95c11f]/20
+
+                                bg-[#95c11f]/10
+
+                                text-[#dff7a3]
+                              `
+
+                              : `
+                                border-[#26332d]
+
+                                bg-[#141c19]
+
+                                text-[#7f948b]
+
+                                group-hover:text-white
+                              `
+                          }
+                        `}
+                      >
+                        <Database
+                          className="
+                            h-4
+                            w-4
+                          "
+                        />
+                      </div>
+
+                      <div
+                        className="
+                          flex
+                          flex-col
+                          items-start
+                        "
+                      >
+                        <span
+                          className={`
+                            text-sm
+                            font-semibold
+
+                            transition-colors
+                            duration-300
+
+                            ${
+                              active
+                                ? "text-white"
+                                : "text-[#8ca29a] group-hover:text-white"
+                            }
+                          `}
+                        >
+                          {tab.label}
+                        </span>
+
+                        <span
+                          className={`
+                            text-[11px]
+
+                            transition-colors
+                            duration-300
+
+                            ${
+                              active
+                                ? "text-[#c8d6d0]"
+                                : "text-[#5f746c]"
+                            }
+                          `}
+                        >
+                         
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
           </div>
       {/* ========================================
           CATEGORY TABS
