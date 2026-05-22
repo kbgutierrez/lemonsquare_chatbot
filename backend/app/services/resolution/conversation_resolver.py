@@ -43,11 +43,43 @@ class ConversationResolutionService:
             if not parsed:
                 return self._fallback_response()
 
+            resolution_action = str(parsed.get("resolution_action", "") or "").strip().lower()
+            conversation_status = str(parsed.get("conversation_status", "") or "").strip().lower()
+
+            if resolution_action not in {"need_ticket", "resolved_chat", "active"}:
+                if conversation_status == "need_ticket":
+                    resolution_action = "need_ticket"
+                elif conversation_status == "resolved_candidate":
+                    resolution_action = "resolved_chat"
+                else:
+                    resolution_action = "active"
+
+            confidence = float(parsed.get("resolution_confidence", 0.0))
+
+            if resolution_action == "need_ticket":
+                return {
+                    "resolution_action": "need_ticket",
+                    "show_resolution_prompt": False,
+                    "allow_ticket_submission": True,
+                    "conversation_status": "need_ticket",
+                    "resolution_confidence": confidence,
+                }
+
+            if resolution_action == "resolved_chat":
+                return {
+                    "resolution_action": "resolved_chat",
+                    "show_resolution_prompt": True,
+                    "allow_ticket_submission": False,
+                    "conversation_status": "resolved_candidate",
+                    "resolution_confidence": confidence,
+                }
+
             return {
-                "show_resolution_prompt": bool(parsed.get("show_resolution_prompt", False)),
-                "allow_ticket_submission": bool(parsed.get("allow_ticket_submission", True)),
-                "conversation_status": parsed.get("conversation_status", "active"),
-                "resolution_confidence": float(parsed.get("resolution_confidence", 0.0)),
+                "resolution_action": "active",
+                "show_resolution_prompt": False,
+                "allow_ticket_submission": True,
+                "conversation_status": "active",
+                "resolution_confidence": confidence,
             }
         except Exception as exc:
             logger.error("Conversation resolution analysis failed: %s", exc, exc_info=True)
@@ -56,6 +88,7 @@ class ConversationResolutionService:
     @staticmethod
     def _fallback_response() -> dict:
         return {
+            "resolution_action": "active",
             "show_resolution_prompt": False,
             "allow_ticket_submission": True,
             "conversation_status": "active",

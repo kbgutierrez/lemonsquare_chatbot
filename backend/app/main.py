@@ -59,25 +59,33 @@ async def lifespan(app: FastAPI):
 
     # Qdrant check
     try:
+        logger.info("Starting Qdrant client and collection check...")
         qdrant_client = QdrantClient(
             url=app_settings.QDRANT_URL,
             api_key=app_settings.QDRANT_API_KEY,
             timeout=app_settings.QDRANT_TIMEOUT,
         )
+        logger.info("Qdrant client created, checking collection %s", app_settings.QDRANT_COLLECTION)
         if not qdrant_client.collection_exists(app_settings.QDRANT_COLLECTION):
             logger.error("Qdrant collection missing: %s", app_settings.QDRANT_COLLECTION)
         else:
-            logger.info("Qdrant OK")
+            logger.info("Qdrant OK - collection exists")
+            logger.info("Preparing shared Qdrant vector store...")
             get_shared_vector_store().prepare_collection()
+            logger.info("Shared Qdrant vector store ready")
     except Exception as exc:
         logger.error("Qdrant connection failed: %s", exc, exc_info=True)
 
     # AI Service Initialization
     db = SessionChatbot()
     try:
-        logger.info("Loading AI services...")
+        logger.info("Starting AI service initialization...")
+        logger.info("Creating SupportOrchestrator...")
         app.state.orchestrator = SupportOrchestrator(db=db)
+        logger.info("SupportOrchestrator initialized")
+        logger.info("Creating DocumentIngestionService...")
         app.state.ingestion_service = DocumentIngestionService(db=db)
+        logger.info("DocumentIngestionService initialized")
         app.state.ai_available = True
         logger.info("AI services loaded successfully")
     except Exception as exc:

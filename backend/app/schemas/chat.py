@@ -16,6 +16,9 @@ class ChatResponse(BaseModel):
     ticket_ids_used: list[int] = Field(default_factory=list)
     show_resolution_prompt: bool = False 
     allow_ticket_submission: bool = True
+    conversation_status: str = "active"
+    resolution_action: str = "active"
+    resolution_confidence: float = 0.0
 
 
 class MessageRecord(BaseModel):
@@ -52,4 +55,5 @@ class ResolutionCheckResponse(BaseModel):
     show_resolution_prompt: bool
     allow_ticket_submission: bool
     conversation_status: str       
+    resolution_action: str
     resolution_confidence: float   
