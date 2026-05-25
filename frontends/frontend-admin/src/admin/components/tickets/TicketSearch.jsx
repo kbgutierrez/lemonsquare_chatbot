@@ -2,14 +2,16 @@ import {
   Search,
   Ticket,
   ShieldAlert,
+  RefreshCw,
 } from "lucide-react"
 
 const TicketSearch = ({
   search,
   setSearch,
   totalTickets = 0,
+  onRefresh,
+  refreshing = false,
 }) => {
-
   return (
     <div
       className="
@@ -24,7 +26,6 @@ const TicketSearch = ({
     >
       {/* LEFT */}
       <div className="min-w-0">
-
         <p
           className="
             text-xs
@@ -33,7 +34,7 @@ const TicketSearch = ({
 
             tracking-[0.22em]
 
-            text-[#74877f]
+            text-[var(--text-secondary)]
           "
         >
           Support Workspace
@@ -48,7 +49,7 @@ const TicketSearch = ({
 
             tracking-tight
 
-            text-white
+            text-[var(--text-primary)]
           "
         >
           Tickets
@@ -60,7 +61,7 @@ const TicketSearch = ({
 
             text-sm
 
-            text-[#8ea59b]
+            text-[var(--text-secondary)]
           "
         >
           Manage support requests,
@@ -79,68 +80,138 @@ const TicketSearch = ({
           lg:items-end
         "
       >
-        {/* SEARCH */}
+        {/* SEARCH + ACTIONS */}
         <div
           className="
             flex
             w-full
-            items-center
+            flex-col
             gap-3
 
-            rounded-2xl
+            sm:flex-row
+            sm:items-center
 
-            border
-            border-[#2b3933]
-
-            bg-[#141d1a]
-
-            px-4
-            py-3
-
-            transition-all
-            duration-200
-
-            focus-within:border-[#f5d547]/30
-            focus-within:bg-[#18211f]
-
-            lg:w-[340px]
+            lg:w-auto
           "
         >
-          <Search
+          {/* SEARCH */}
+          <div
             className="
-              h-4
-              w-4
-              shrink-0
-
-              text-[#74877f]
-            "
-          />
-
-          <input
-            value={search}
-
-            onChange={(event) =>
-              setSearch(
-                event.target.value
-              )
-            }
-
-            placeholder="Search tickets..."
-
-            className="
+              flex
               w-full
+              items-center
+              gap-3
 
-              bg-transparent
+              rounded-2xl
+
+              border
+              border-[var(--border)]
+
+              bg-[var(--panel)]
+
+              px-4
+              py-3
+
+              transition-all
+              duration-200
+
+              focus-within:border-[var(--accent)]/30
+              focus-within:bg-[var(--panel-light)]
+              focus-within:shadow-[0_0_0_4px_rgba(245,213,71,0.05)]
+
+              lg:w-[340px]
+            "
+          >
+            <Search
+              className="
+                h-4
+                w-4
+                shrink-0
+
+                text-[var(--text-secondary)]
+              "
+            />
+
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(
+                  event.target.value
+                )
+              }
+              placeholder="Search tickets..."
+              className="
+                w-full
+
+                bg-transparent
+
+                text-sm
+
+                text-[var(--text-primary)]
+
+                outline-none
+
+                placeholder:text-[var(--text-secondary)]
+              "
+            />
+          </div>
+
+          {/* REFRESH BUTTON */}
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="
+              flex
+              h-[52px]
+              shrink-0
+              items-center
+              justify-center
+              gap-2
+
+              rounded-2xl
+
+              border
+              border-[var(--border)]
+
+              bg-[var(--panel)]
+
+              px-5
 
               text-sm
+              font-semibold
 
-              text-white
+              text-[var(--text-primary)]
 
-              outline-none
+              transition-all
+              duration-200
 
-              placeholder:text-[#74877f]
+              hover:border-[var(--accent)]/30
+              hover:bg-[var(--panel-light)]
+
+              disabled:cursor-not-allowed
+              disabled:opacity-70
             "
-          />
+          >
+            <RefreshCw
+              className={`
+                h-4
+                w-4
+
+                ${
+                  refreshing
+                    ? "animate-spin"
+                    : ""
+                }
+              `}
+            />
+
+            <span>
+              {refreshing
+                ? "Refreshing..."
+                : "Refresh"}
+            </span>
+          </button>
         </div>
 
         {/* METRICS */}
@@ -155,16 +226,13 @@ const TicketSearch = ({
           {/* TOTAL */}
           <div
             className="
+              muted-card
+
               flex
               items-center
               gap-3
 
               rounded-2xl
-
-              border
-              border-[#2b3933]
-
-              bg-[#141d1a]
 
               px-4
               py-3
@@ -180,7 +248,7 @@ const TicketSearch = ({
 
                 rounded-2xl
 
-                bg-[#f5d547]/10
+                bg-[var(--accent)]/10
               "
             >
               <Ticket
@@ -188,7 +256,7 @@ const TicketSearch = ({
                   h-5
                   w-5
 
-                  text-[#f5d547]
+                  text-[var(--accent)]
                 "
               />
             </div>
@@ -202,7 +270,7 @@ const TicketSearch = ({
 
                   tracking-[0.18em]
 
-                  text-[#74877f]
+                  text-[var(--text-secondary)]
                 "
               >
                 Total
@@ -215,7 +283,7 @@ const TicketSearch = ({
                   text-lg
                   font-bold
 
-                  text-white
+                  text-[var(--text-primary)]
                 "
               >
                 {totalTickets}
@@ -226,16 +294,13 @@ const TicketSearch = ({
           {/* STATUS */}
           <div
             className="
+              muted-card
+
               flex
               items-center
               gap-3
 
               rounded-2xl
-
-              border
-              border-[#2b3933]
-
-              bg-[#141d1a]
 
               px-4
               py-3
@@ -259,7 +324,9 @@ const TicketSearch = ({
                   h-5
                   w-5
 
-                  text-red-400
+                  text-red-600
+
+                  dark:text-red-400
                 "
               />
             </div>
@@ -273,7 +340,7 @@ const TicketSearch = ({
 
                   tracking-[0.18em]
 
-                  text-[#74877f]
+                  text-[var(--text-secondary)]
                 "
               >
                 Moderation
@@ -286,7 +353,7 @@ const TicketSearch = ({
                   text-sm
                   font-semibold
 
-                  text-white
+                  text-[var(--text-primary)]
                 "
               >
                 Active

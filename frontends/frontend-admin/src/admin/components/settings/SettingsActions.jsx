@@ -15,20 +15,15 @@ const SettingsActions = ({
   return (
     <div
       className="
+        panel-base
+
         flex
         flex-col
         gap-5
 
         rounded-[32px]
 
-        border
-        border-[#26342f]
-
-        bg-[#101715]
-
         p-7
-
-        shadow-[0_20px_60px_rgba(0,0,0,0.35)]
 
         lg:flex-row
         lg:items-center
@@ -44,7 +39,7 @@ const SettingsActions = ({
               text-lg
               font-semibold
 
-              text-white
+              text-[var(--text-primary)]
             "
           >
             Apply Configuration
@@ -55,8 +50,9 @@ const SettingsActions = ({
               mt-1
 
               text-sm
+              leading-relaxed
 
-              text-[#8ea59b]
+              text-[var(--text-secondary)]
             "
           >
             Save and activate the current
@@ -85,7 +81,9 @@ const SettingsActions = ({
               text-sm
               font-medium
 
-              text-emerald-400
+              text-emerald-600
+
+              dark:text-emerald-400
             "
           >
             <CheckCircle2 className="h-4 w-4" />
@@ -115,7 +113,9 @@ const SettingsActions = ({
               text-sm
               font-medium
 
-              text-red-400
+              text-red-600
+
+              dark:text-red-400
             "
           >
             <AlertTriangle className="h-4 w-4" />
@@ -143,9 +143,9 @@ const SettingsActions = ({
           rounded-3xl
 
           border
-          border-[#f5d547]/20
+          border-[var(--accent)]/20
 
-          bg-[#f5d547]
+          bg-[var(--accent)]
 
           px-8
           py-5
@@ -153,7 +153,7 @@ const SettingsActions = ({
           text-base
           font-semibold
 
-          text-[#111917]
+          text-[#1b211e]
 
           shadow-[0_10px_40px_rgba(245,213,71,0.18)]
 
@@ -161,7 +161,7 @@ const SettingsActions = ({
           duration-300
 
           hover:scale-[1.02]
-          hover:bg-[#f8de67]
+          hover:brightness-105
 
           active:scale-[0.99]
 

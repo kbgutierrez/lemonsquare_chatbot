@@ -1,5 +1,6 @@
 const SettingsInput = ({
   label,
+  className = "",
   ...props
 }) => {
 
@@ -16,7 +17,7 @@ const SettingsInput = ({
 
             tracking-[0.18em]
 
-            text-[#74877f]
+            text-[var(--text-secondary)]
           "
         >
           {label}
@@ -26,38 +27,14 @@ const SettingsInput = ({
       {/* INPUT */}
       <input
         {...props}
-        className="
-          w-full
-
-          rounded-2xl
-
-          border
-          border-[#2a3732]
-
-          bg-[#141d1a]
-
-          px-4
-          py-3.5
+        className={`
+          input-base
 
           text-sm
           font-medium
 
-          text-white
-
-          outline-none
-
-          transition-all
-          duration-200
-
-          placeholder:text-[#667870]
-
-          focus:border-[#f5d547]/30
-          focus:bg-[#18211f]
-          focus:shadow-[0_0_0_4px_rgba(245,213,71,0.06)]
-
-          disabled:cursor-not-allowed
-          disabled:opacity-50
-        "
+          ${className}
+        `}
       />
     </div>
   )

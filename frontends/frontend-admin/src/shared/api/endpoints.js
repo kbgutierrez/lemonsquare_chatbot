@@ -44,6 +44,9 @@ export const API_ENDPOINTS = {
   DOCUMENT_MANUAL_ENTRY_DELETE:
     "/api/documents/manual/:entryId",
 
+  DOCUMENT_MANUAL_ENTRY_RESTORE:
+    "/api/documents/manual/:entryId/restore",
+
   /* ====================================
      KNOWLEDGE EXPLORER
   ==================================== */
@@ -72,10 +75,13 @@ export const API_ENDPOINTS = {
   ==================================== */
 
   SELF_KNOWLEDGE_UPDATE:
-    "/self_knowledge/chats/:sessionId",
+    "/api/self_knowledge/chats/:sessionId",
 
   SELF_KNOWLEDGE_DELETE:
-    "/self_knowledge/chats/:sessionId",
+    "/api/self_knowledge/chats/:sessionId",
+
+  SELF_KNOWLEDGE_RESTORE:
+    "/api/self_knowledge/chats/:sessionId/restore",
 
   /* ====================================
      TICKETS

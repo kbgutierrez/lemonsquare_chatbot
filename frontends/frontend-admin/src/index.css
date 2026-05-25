@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* =========================================
-   ROOT
+   ROOT THEME TOKENS
 ========================================= */
 
 :root {
@@ -15,21 +15,150 @@
   --panel-light: #15211d;
 
   --border: #25332d;
+  --border-soft: rgba(255, 255, 255, 0.05);
+
+  --hover: #1a2420;
+  --hover-light: rgba(255,255,255,0.04);
 
   --text-primary: #ffffff;
   --text-secondary: #8ea59b;
+  --text-muted: #6f837b;
+
+  --placeholder: #6f837b;
 
   --accent: #f5d547;
   --accent-green: #95c11f;
 
+  --input-bg:
+    rgba(21, 33, 29, 0.82);
+
+  --input-bg-focus:
+    rgba(24, 38, 33, 0.92);
+
+  --modal-overlay:
+    rgba(0, 0, 0, 0.58);
+
   --shadow-lg:
     0 20px 80px rgba(0, 0, 0, 0.45);
+
+  --shadow-soft:
+    0 10px 40px rgba(0,0,0,0.22);
 
   --glass-bg:
     rgba(16, 24, 22, 0.78);
 
   --glass-border:
     rgba(255, 255, 255, 0.05);
+
+  --bg-glow-primary:
+    rgba(245, 213, 71, 0.08);
+
+  --bg-glow-secondary:
+    rgba(149, 193, 31, 0.08);
+
+  --grid-line:
+    rgba(255,255,255,0.02);
+
+  --scroll-track:
+    rgba(255,255,255,0.03);
+
+  --scroll-thumb-start:
+    rgba(245, 213, 71, 0.5);
+
+  --scroll-thumb-end:
+    rgba(149, 193, 31, 0.5);
+
+  --scroll-thumb-hover-start:
+    rgba(245, 213, 71, 0.8);
+
+  --scroll-thumb-hover-end:
+    rgba(149, 193, 31, 0.8);
+}
+
+/* =========================================
+   LIGHT THEME
+========================================= */
+
+:root[data-theme="light"] {
+  color-scheme: light;
+
+  /* MAIN FOUNDATION */
+  --background: #dfe7e2;
+
+  /* PANELS */
+  --panel: #e7ede9;
+  --panel-light: #dde5e0;
+
+  /* BORDERS */
+  --border: #bcc9c1;
+  --border-soft: rgba(15, 23, 42, 0.06);
+
+  /* HOVERS */
+  --hover: #d7e0da;
+  --hover-light: rgba(15,23,42,0.05);
+
+  /* TEXT */
+  --text-primary: #202824;
+  --text-secondary: #5f6d66;
+  --text-muted: #7b8781;
+
+  --placeholder: #86928c;
+
+  /* ACCENTS */
+  --accent: #caa114;
+  --accent-green: #739f16;
+
+  /* INPUTS */
+  --input-bg:
+    rgba(221, 229, 224, 0.92);
+
+  --input-bg-focus:
+    rgba(229, 236, 232, 0.98);
+
+  /* MODAL */
+  --modal-overlay:
+    rgba(15, 23, 42, 0.22);
+
+  /* SHADOWS */
+  --shadow-lg:
+    0 18px 60px rgba(15, 23, 42, 0.10);
+
+  --shadow-soft:
+    0 8px 30px rgba(15, 23, 42, 0.08);
+
+  /* GLASS */
+  --glass-bg:
+    rgba(231, 237, 233, 0.82);
+
+  --glass-border:
+    rgba(15, 23, 42, 0.06);
+
+  /* GLOWS */
+  --bg-glow-primary:
+    rgba(245, 213, 71, 0.07);
+
+  --bg-glow-secondary:
+    rgba(149, 193, 31, 0.05);
+
+  /* GRID */
+  --grid-line:
+    rgba(15,23,42,0.03);
+
+  /* SCROLL */
+  --scroll-track:
+    rgba(15,23,42,0.04);
+
+  --scroll-thumb-start:
+    rgba(202, 161, 20, 0.45);
+
+  --scroll-thumb-end:
+    rgba(115, 159, 22, 0.45);
+
+  --scroll-thumb-hover-start:
+    rgba(202, 161, 20, 0.7);
+
+  --scroll-thumb-hover-end:
+    rgba(115, 159, 22, 0.7);
 }
 
 /* =========================================
@@ -58,12 +187,12 @@ body {
   background:
     radial-gradient(
       circle at top left,
-      rgba(245, 213, 71, 0.08),
+      var(--bg-glow-primary),
       transparent 28%
     ),
     radial-gradient(
       circle at bottom right,
-      rgba(149, 193, 31, 0.08),
+      var(--bg-glow-secondary),
       transparent 30%
     ),
     var(--background);
@@ -79,8 +208,16 @@ body {
     sans-serif;
 
   text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+
+  -webkit-font-smoothing:
+    antialiased;
+
+  -moz-osx-font-smoothing:
+    grayscale;
+
+  transition:
+    background 0.25s ease,
+    color 0.25s ease;
 }
 
 #root {
@@ -121,12 +258,12 @@ body {
 
   background-image:
     linear-gradient(
-      rgba(255,255,255,0.02) 1px,
+      var(--grid-line) 1px,
       transparent 1px
     ),
     linear-gradient(
       90deg,
-      rgba(255,255,255,0.02) 1px,
+      var(--grid-line) 1px,
       transparent 1px
     );
 
@@ -152,15 +289,15 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255,255,255,0.03);
+  background: var(--scroll-track);
 }
 
 ::-webkit-scrollbar-thumb {
   background:
     linear-gradient(
       180deg,
-      rgba(245, 213, 71, 0.5),
-      rgba(149, 193, 31, 0.5)
+      var(--scroll-thumb-start),
+      var(--scroll-thumb-end)
     );
 
   border-radius: 999px;
@@ -170,9 +307,26 @@ body {
   background:
     linear-gradient(
       180deg,
-      rgba(245, 213, 71, 0.8),
-      rgba(149, 193, 31, 0.8)
+      var(--scroll-thumb-hover-start),
+      var(--scroll-thumb-hover-end)
     );
+}
+
+/* =========================================
+   GLOBAL FORM ELEMENTS
+========================================= */
+
+input,
+textarea,
+select {
+  color:
+    var(--text-primary);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color:
+    var(--placeholder);
 }
 
 /* =========================================
@@ -182,14 +336,151 @@ body {
 @layer utilities {
 
   .glass-panel {
-    background: var(--glass-bg);
+    background:
+      var(--glass-bg);
 
-    backdrop-filter: blur(24px);
+    backdrop-filter:
+      blur(24px);
 
     border:
-      1px solid var(--glass-border);
+      1px solid
+      var(--glass-border);
 
-    box-shadow: var(--shadow-lg);
+    box-shadow:
+      var(--shadow-lg);
+  }
+
+  .panel-base {
+    background:
+      var(--panel);
+
+    border:
+      1px solid
+      var(--border);
+
+    box-shadow:
+      var(--shadow-soft);
+
+    backdrop-filter:
+      blur(16px);
+  }
+
+  .modal-surface {
+    background:
+      var(--glass-bg);
+
+    border:
+      1px solid
+      var(--glass-border);
+
+    backdrop-filter:
+      blur(28px);
+
+    box-shadow:
+      var(--shadow-lg);
+  }
+
+  .muted-card {
+    background:
+      var(--panel-light);
+
+    border:
+      1px solid
+      var(--border);
+  }
+
+  .hover-surface {
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
+  }
+
+  .hover-surface:hover {
+    background:
+      var(--hover);
+
+    border-color:
+      var(--border);
+
+    transform:
+      translateY(-1px);
+  }
+
+  .input-base {
+    width: 100%;
+
+    border:
+      1px solid
+      var(--border);
+
+    background:
+      var(--input-bg);
+
+    color:
+      var(--text-primary);
+
+    border-radius:
+      1rem;
+
+    padding:
+      0.85rem 1rem;
+
+    font-size:
+      0.95rem;
+
+    line-height:
+      1.4;
+
+    outline:
+      none;
+
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,0.02);
+
+    backdrop-filter:
+      blur(14px);
+
+    transition:
+      background-color 0.2s ease,
+      border-color 0.2s ease,
+      box-shadow 0.2s ease,
+      transform 0.2s ease;
+  }
+
+  .input-base:hover {
+    background:
+      var(--input-bg-focus);
+
+    border-color:
+      var(--border);
+  }
+
+  .input-base:focus {
+    background:
+      var(--input-bg-focus);
+
+    border-color:
+      rgba(245, 213, 71, 0.45);
+
+    box-shadow:
+      0 0 0 4px rgba(245, 213, 71, 0.10);
+  }
+
+  :root[data-theme="light"] .input-base:focus {
+    box-shadow:
+      0 0 0 4px rgba(202, 161, 20, 0.10);
+  }
+
+  .theme-border {
+    border-color:
+      var(--border);
+  }
+
+  .theme-placeholder::placeholder {
+    color:
+      var(--placeholder);
   }
 
   .section-padding {
@@ -213,7 +504,8 @@ body {
   }
 
   .subtle-text {
-    color: var(--text-secondary);
+    color:
+      var(--text-secondary);
   }
 
   .animated-hover {
@@ -249,24 +541,57 @@ body {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation-duration:
+      0.01ms !important;
 
-    transition-duration: 0.01ms !important;
+    animation-iteration-count:
+      1 !important;
 
-    scroll-behavior: auto !important;
+    transition-duration:
+      0.01ms !important;
+
+    scroll-behavior:
+      auto !important;
   }
 }
 
+/* =========================================
+   GLOBAL THEME TRANSITIONS
+========================================= */
+
+body,
+aside,
+main,
+section,
+div,
+button,
+input,
+textarea,
+select {
+  transition:
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+
+/* =========================================
+   ANIMATIONS
+========================================= */
 
 @keyframes fadeIn {
+
   from {
     opacity: 0;
-    transform: translateY(8px);
+
+    transform:
+      translateY(8px);
   }
 
   to {
     opacity: 1;
-    transform: translateY(0);
+
+    transform:
+      translateY(0);
   }
 }

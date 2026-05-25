@@ -88,9 +88,12 @@ const ManualEntriesPagination =
               className={`
                 h-10
                 w-10
+
                 rounded-xl
+
                 text-sm
                 font-semibold
+
                 transition-all
                 duration-200
 
@@ -98,14 +101,23 @@ const ManualEntriesPagination =
                   isActive
                     ? `
                       cursor-default
-                      bg-[#f5d547]
-                      text-[#111917]
+
+                      bg-[color:var(--accent)]
+
+                      text-[color:var(--background)]
+
+                      shadow-[0_4px_18px_rgba(0,0,0,0.12)]
                     `
                     : `
-                      bg-[#18211f]
-                      text-white
+                      border
+                      theme-border
+
+                      bg-[color:var(--panel)]
+
+                      text-[color:var(--text-primary)]
+
                       hover:scale-105
-                      hover:bg-[#202b27]
+                      hover:bg-[color:var(--hover)]
                     `
                 }
               `}

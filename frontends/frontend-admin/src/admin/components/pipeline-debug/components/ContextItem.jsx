@@ -7,12 +7,9 @@ const ContextItem = ({
   return (
     <div
       className="
+        muted-card
+
         rounded-2xl
-
-        border
-        border-[#25332d]
-
-        bg-[#101816]
 
         p-4
       "
@@ -24,6 +21,7 @@ const ContextItem = ({
           flex
           items-center
           justify-between
+          gap-3
         "
       >
         <span
@@ -31,7 +29,7 @@ const ContextItem = ({
             text-sm
             font-semibold
 
-            text-white
+            text-[var(--text-primary)]
           "
         >
           {title}
@@ -42,14 +40,18 @@ const ContextItem = ({
             className="
               rounded-xl
 
-              bg-[#1d2925]
+              border
+              border-[var(--border)]
 
-              px-2
+              bg-[var(--hover)]
+
+              px-2.5
               py-1
 
               text-xs
+              font-medium
 
-              text-[#8ea59b]
+              text-[var(--text-secondary)]
             "
           >
             Score:
@@ -66,9 +68,11 @@ const ContextItem = ({
           whitespace-pre-wrap
           break-words
 
+          font-mono
           text-xs
+          leading-relaxed
 
-          text-[#b6c3bd]
+          text-[var(--text-secondary)]
         "
       >
         {content}

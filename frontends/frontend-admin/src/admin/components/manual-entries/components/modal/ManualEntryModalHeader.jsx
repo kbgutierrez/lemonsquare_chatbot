@@ -1,12 +1,10 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/ManualEntryModalHeader.jsx
-
 import { X } from "lucide-react"
 
 const ManualEntryModalHeader = ({
   isEditMode,
   onClose,
 }) => {
+
   return (
     <div
       className="
@@ -16,18 +14,22 @@ const ManualEntryModalHeader = ({
         gap-4
 
         border-b
-        border-[#24312b]
+        theme-border
 
         px-5
         py-5
       "
     >
+
+      {/* LEFT */}
       <div>
+
         <h3
           className="
             text-lg
             font-bold
-            text-white
+
+            text-[color:var(--text-primary)]
           "
         >
           {isEditMode
@@ -39,16 +41,20 @@ const ManualEntryModalHeader = ({
           className="
             mt-1
             text-sm
-            text-[#8ea59b]
+
+            text-[color:var(--text-secondary)]
           "
         >
           Manage manual knowledge entry information.
         </p>
+
       </div>
 
+      {/* CLOSE BUTTON */}
       <button
         type="button"
         onClick={onClose}
+
         className="
           flex
           h-10
@@ -60,21 +66,24 @@ const ManualEntryModalHeader = ({
           rounded-xl
 
           border
-          border-[#2d3b35]
+          theme-border
 
-          bg-[#18211f]
+          bg-[color:var(--panel)]
 
-          text-[#8ea59b]
+          text-[color:var(--text-secondary)]
 
           transition-all
           duration-200
 
-          hover:border-[#46544e]
-          hover:text-white
+          hover:bg-[color:var(--hover)]
+          hover:text-[color:var(--text-primary)]
         "
       >
+
         <X className="h-4 w-4" />
+
       </button>
+
     </div>
   )
 }

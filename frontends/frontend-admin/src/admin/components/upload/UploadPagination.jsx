@@ -1,9 +1,22 @@
+const paginationButtonClassName = `
+  hover-surface
+  rounded-xl
+  border
+  px-4
+  py-2
+  text-sm
+  font-medium
+  transition-all
+  duration-200
+  disabled:cursor-not-allowed
+  disabled:opacity-40
+`
+
 const UploadPagination = ({
   currentPage,
   totalPages,
   setCurrentPage,
 }) => {
-
   if (
     totalPages <= 1
   ) {
@@ -17,7 +30,6 @@ const UploadPagination = ({
         shrink-0
         items-center
         justify-between
-
         px-5
         py-4
       "
@@ -26,11 +38,11 @@ const UploadPagination = ({
       <p
         className="
           text-xs
-
           tracking-wide
-
-          text-[#74877e]
         "
+        style={{
+          color: "var(--text-secondary)",
+        }}
       >
         Page {currentPage} of{" "}
         {totalPages}
@@ -38,7 +50,6 @@ const UploadPagination = ({
 
       {/* RIGHT */}
       <div className="flex items-center gap-2">
-
         {/* PREV */}
         <button
           disabled={
@@ -50,30 +61,19 @@ const UploadPagination = ({
                 prev - 1
             )
           }
-          className="
-            rounded-xl
+          className={
+            paginationButtonClassName
+          }
+          style={{
+            borderColor:
+              "var(--border)",
 
-            border
-            border-[#2d3b35]
+            background:
+              "var(--panel-light)",
 
-            bg-[#18211f]
-
-            px-4
-            py-2
-
-            text-sm
-            font-medium
-
-            text-[#d5dfdb]
-
-            transition-all
-            duration-200
-
-            hover:bg-[#1f2a27]
-
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-          "
+            color:
+              "var(--text-primary)",
+          }}
         >
           Prev
         </button>
@@ -90,30 +90,19 @@ const UploadPagination = ({
                 prev + 1
             )
           }
-          className="
-            rounded-xl
+          className={
+            paginationButtonClassName
+          }
+          style={{
+            borderColor:
+              "var(--border)",
 
-            border
-            border-[#2d3b35]
+            background:
+              "var(--panel-light)",
 
-            bg-[#18211f]
-
-            px-4
-            py-2
-
-            text-sm
-            font-medium
-
-            text-[#d5dfdb]
-
-            transition-all
-            duration-200
-
-            hover:bg-[#1f2a27]
-
-            disabled:cursor-not-allowed
-            disabled:opacity-40
-          "
+            color:
+              "var(--text-primary)",
+          }}
         >
           Next
         </button>

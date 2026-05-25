@@ -23,6 +23,7 @@ import {
   createManualEntry,
   updateManualEntry,
   deleteManualEntry,
+  restoreManualEntry,
 } from "../services/manualEntriesService"
 
 import aiSettingsService
@@ -43,6 +44,18 @@ const useManualEntries = () => {
 
   const successTimeoutRef =
     useRef(null)
+
+  /*
+    CRITICAL FIX:
+    Prevent automatic polling refreshes
+    while user is actively editing.
+
+    This prevents modal text fields from
+    resetting during background refreshes.
+  */
+
+  const isEditingRef =
+    useRef(false)
 
   /* ========================================
      UI STATE
@@ -78,6 +91,18 @@ const useManualEntries = () => {
     setActiveCategory,
   ] = useState("All")
 
+  /*
+    IMPORTANT:
+    Default to ACTIVE because
+    your backend initially returns
+    active entries only.
+  */
+
+  const [
+    activityFilter,
+    setActivityFilter,
+  ] = useState("active")
+
   /* ========================================
      CLEANUP
   ======================================== */
@@ -108,11 +133,40 @@ const useManualEntries = () => {
   const safeFetchManualEntries =
     useCallback(async () => {
 
+      /*
+        CRITICAL FIX:
+        Block automatic polling refreshes
+        while editing modal is open.
+
+        This preserves local form state
+        and prevents field resets caused
+        by live query revalidation.
+      */
+
+      if (
+        isEditingRef.current
+      ) {
+
+        return null
+      }
+
+      /*
+        CRITICAL FIX:
+        We now fetch a large limit
+        to ensure inactive entries
+        are included.
+
+        Your backend appears to use
+        soft delete visibility logic.
+      */
+
       const [
         entriesResponse,
         settings,
       ] = await Promise.all([
-        fetchManualEntries(),
+        fetchManualEntries({
+          limit: 9999,
+        }),
 
         aiSettingsService.getSettings(),
       ])
@@ -175,11 +229,20 @@ const useManualEntries = () => {
       allowedCategories: [],
     },
 
+    /*
+      CRITICAL FIX:
+      Disable automatic polling.
+
+      User explicitly requested:
+      refresh ONLY when pressing
+      refresh button.
+    */
+
     refetchInterval:
-      API_CONFIG.POLLING_INTERVAL,
+      false,
 
     staleWhileRevalidate:
-      true,
+      false,
   })
 
   const safeItems =
@@ -243,10 +306,13 @@ const useManualEntries = () => {
   ======================================== */
 
   useEffect(() => {
+
     setPage(1)
+
   }, [
     search,
     activeCategory,
+    activityFilter,
   ])
 
   /* ========================================
@@ -337,9 +403,29 @@ const useManualEntries = () => {
             item.category ===
               activeCategory
 
+          /*
+            CRITICAL FIX:
+            Explicit activity filtering
+          */
+
+          const matchesActivity =
+
+            activityFilter ===
+            "all"
+
+              ? true
+
+              : activityFilter ===
+                "active"
+
+                ? item.is_active === true
+
+                : item.is_active === false
+
           return (
             matchesSearch &&
-            matchesCategory
+            matchesCategory &&
+            matchesActivity
           )
         }
       )
@@ -348,6 +434,7 @@ const useManualEntries = () => {
       safeItems,
       search,
       activeCategory,
+      activityFilter,
     ])
 
   /* ========================================
@@ -384,7 +471,40 @@ const useManualEntries = () => {
     ])
 
   /* ========================================
-     CREATE (OPTIMISTIC)
+     MANUAL REFRESH
+  ======================================== */
+
+  const reloadEntries =
+    useCallback(async () => {
+
+      if (
+        isEditingRef.current
+      ) {
+        return
+      }
+
+      invalidateCache(
+        CACHE_KEY
+      )
+
+      await refresh()
+
+    }, [refresh])
+
+  /* ========================================
+     EDITING STATE
+  ======================================== */
+
+  const setEditingState =
+    useCallback((value) => {
+
+      isEditingRef.current =
+        value
+
+    }, [])
+
+  /* ========================================
+     CREATE
   ======================================== */
 
   const handleCreateEntry =
@@ -424,6 +544,8 @@ const useManualEntries = () => {
           category:
             form.category ||
             "General",
+
+          is_active: true,
         }
 
         setCachedData(
@@ -443,11 +565,7 @@ const useManualEntries = () => {
             form
           )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -468,11 +586,7 @@ const useManualEntries = () => {
 
       } catch (error) {
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -495,7 +609,7 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -545,11 +659,7 @@ const useManualEntries = () => {
           form
         )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -590,11 +700,11 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
-     DELETE
+     DELETE / DEACTIVATE
   ======================================== */
 
   const handleDeleteEntry =
@@ -610,11 +720,25 @@ const useManualEntries = () => {
 
         setSubmitting(true)
 
+        /*
+          IMPORTANT:
+          Do NOT remove from array.
+          Mark inactive instead.
+        */
+
         const optimistic =
-          safeItems.filter(
+          safeItems.map(
             (item) =>
-              item.id !==
+
+              item.id ===
               entryId
+
+                ? {
+                    ...item,
+                    is_active: false,
+                  }
+
+                : item
           )
 
         setCachedData(
@@ -629,18 +753,14 @@ const useManualEntries = () => {
           entryId
         )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
         ) {
 
           setSuccessMessage(
-            "🗑️ Entry deleted successfully"
+            "Entry moved to inactive"
           )
         }
 
@@ -656,7 +776,7 @@ const useManualEntries = () => {
         ) {
           setError(
             error.message ||
-              "Failed to delete entry."
+              "Failed to deactivate entry."
           )
         }
 
@@ -672,7 +792,93 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
+    ])
+
+  /* ========================================
+     RESTORE
+  ======================================== */
+
+  const handleRestoreEntry =
+    useCallback(async (
+      entryId
+    ) => {
+
+      setError("")
+
+      const previous = data
+
+      try {
+
+        setSubmitting(true)
+
+        const optimistic =
+          safeItems.map(
+            (item) =>
+
+              item.id ===
+              entryId
+
+                ? {
+                    ...item,
+                    is_active: true,
+                  }
+
+                : item
+          )
+
+        setCachedData(
+          CACHE_KEY,
+          {
+            ...data,
+            items: optimistic,
+          }
+        )
+
+        await restoreManualEntry(
+          entryId
+        )
+
+        await reloadEntries()
+
+        if (
+          mountedRef.current
+        ) {
+
+          setSuccessMessage(
+            "Entry restored successfully"
+          )
+        }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (
+          mountedRef.current
+        ) {
+          setError(
+            error.message ||
+              "Failed to restore entry."
+          )
+        }
+
+      } finally {
+
+        if (
+          mountedRef.current
+        ) {
+          setSubmitting(false)
+        }
+      }
+
+    }, [
+      data,
+      safeItems,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -703,17 +909,22 @@ const useManualEntries = () => {
     activeCategory,
     setActiveCategory,
 
+    activityFilter,
+    setActivityFilter,
+
     paginatedItems,
     totalPages,
 
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleRestoreEntry,
 
     setError,
 
-    reloadEntries:
-      refresh,
+    reloadEntries,
+
+    setEditingState,
   }
 }
 

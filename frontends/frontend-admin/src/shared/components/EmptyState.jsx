@@ -29,9 +29,12 @@ const EmptyState = ({
           text-center
         "
       >
+
         {/* ICON */}
         <div
           className="
+            muted-card
+
             mb-4
 
             flex
@@ -42,10 +45,7 @@ const EmptyState = ({
 
             rounded-3xl
 
-            border
-            border-[#2b3933]
-
-            bg-[#18211f]
+            shadow-[var(--shadow-soft)]
           "
         >
           {icon || (
@@ -55,9 +55,11 @@ const EmptyState = ({
                 w-3
 
                 rounded-full
-
-                bg-[#f5d547]
               "
+              style={{
+                background:
+                  "var(--accent)",
+              }}
             />
           )}
         </div>
@@ -67,9 +69,11 @@ const EmptyState = ({
           className="
             text-sm
             font-semibold
-
-            text-white
           "
+          style={{
+            color:
+              "var(--text-primary)",
+          }}
         >
           {title}
         </h3>
@@ -82,9 +86,12 @@ const EmptyState = ({
             max-w-sm
 
             text-sm
-
-            text-[#81958c]
+            leading-relaxed
           "
+          style={{
+            color:
+              "var(--text-secondary)",
+          }}
         >
           {message}
         </p>
@@ -95,6 +102,7 @@ const EmptyState = ({
             {action}
           </div>
         )}
+
       </div>
     </div>
   )

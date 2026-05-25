@@ -19,14 +19,11 @@ const DropdownCard = ({
   return (
     <div
       className="
+        panel-base
+
         overflow-hidden
 
         rounded-3xl
-
-        border
-        border-[#25332d]
-
-        bg-[#151d1b]
       "
     >
       <button
@@ -34,6 +31,8 @@ const DropdownCard = ({
           setOpen(!open)
         }
         className="
+          hover-surface
+
           flex
           w-full
           items-center
@@ -62,7 +61,7 @@ const DropdownCard = ({
               text-sm
               font-semibold
 
-              text-white
+              text-[var(--text-primary)]
             "
           >
             {title}
@@ -74,7 +73,7 @@ const DropdownCard = ({
             h-4
             w-4
 
-            text-[#8ea59b]
+            text-[var(--text-secondary)]
 
             transition-transform
 

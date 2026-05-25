@@ -9,16 +9,11 @@ const SettingsHeader = ({
   return (
     <div
       className="
+        glass-panel
+
         rounded-3xl
 
-        border
-        border-violet-100
-
-        bg-white
-
         p-5
-
-        shadow-sm
       "
     >
       <div className="flex items-center gap-4">
@@ -34,14 +29,18 @@ const SettingsHeader = ({
 
             rounded-2xl
 
-            bg-violet-100
+            border
+            border-[var(--accent)]/15
+
+            bg-[var(--accent)]/10
           "
         >
           <SlidersHorizontal
             className="
               h-6
               w-6
-              text-violet-700
+
+              text-[var(--accent)]
             "
           />
         </div>
@@ -50,12 +49,13 @@ const SettingsHeader = ({
         <div>
           <p
             className="
-              text-xs
+              text-[11px]
               font-semibold
               uppercase
-              tracking-[0.2em]
 
-              text-violet-500
+              tracking-[0.22em]
+
+              text-[var(--accent)]
             "
           >
             AI Configuration
@@ -68,7 +68,7 @@ const SettingsHeader = ({
               text-xl
               font-bold
 
-              text-slate-900
+              text-[var(--text-primary)]
             "
           >
             Enterprise AI Settings
@@ -80,13 +80,19 @@ const SettingsHeader = ({
 
               text-sm
 
-              text-violet-600
+              text-[var(--text-secondary)]
             "
           >
             Active Model:
             {" "}
 
-            <span className="font-semibold">
+            <span
+              className="
+                font-semibold
+
+                text-[var(--text-primary)]
+              "
+            >
               {activeModel}
             </span>
           </p>

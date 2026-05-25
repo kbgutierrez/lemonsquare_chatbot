@@ -32,6 +32,7 @@ const ErrorState = ({
           text-center
         "
       >
+
         {/* ICON */}
         <div
           className="
@@ -46,18 +47,26 @@ const ErrorState = ({
             rounded-3xl
 
             border
-            border-red-500/20
 
-            bg-red-500/10
+            shadow-[var(--shadow-soft)]
           "
+          style={{
+            borderColor:
+              "rgba(239,68,68,0.18)",
+
+            background:
+              "rgba(239,68,68,0.10)",
+          }}
         >
           <AlertTriangle
             className="
               h-6
               w-6
-
-              text-red-300
             "
+            style={{
+              color:
+                "#ef4444",
+            }}
           />
         </div>
 
@@ -66,9 +75,11 @@ const ErrorState = ({
           className="
             text-sm
             font-semibold
-
-            text-white
           "
+          style={{
+            color:
+              "var(--text-primary)",
+          }}
         >
           {title}
         </h3>
@@ -79,9 +90,12 @@ const ErrorState = ({
             mt-2
 
             text-sm
-
-            text-[#81958c]
+            leading-relaxed
           "
+          style={{
+            color:
+              "var(--text-secondary)",
+          }}
         >
           {message}
         </p>
@@ -92,6 +106,7 @@ const ErrorState = ({
             {action}
           </div>
         )}
+
       </div>
     </div>
   )

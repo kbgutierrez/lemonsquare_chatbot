@@ -43,6 +43,11 @@ const normalizeManualEntry = (
       item.UpdatedAt ??
       item.updated_at ??
       null,
+
+    is_active:
+      item.IsActive ??
+      item.is_active ??
+      true,
   }
 }
 

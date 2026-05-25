@@ -1,7 +1,18 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/category-selector/ManualEntryCategoryModal.jsx
+import {
+  useEffect,
+  useRef,
+} from "react"
 
 import { X } from "lucide-react"
+
+import {
+  motion,
+  AnimatePresence,
+} from "framer-motion"
+
+import {
+  createPortal,
+} from "react-dom"
 
 import ManualEntryCategoryOption
   from "./ManualEntryCategoryOption"
@@ -15,179 +26,385 @@ const ManualEntryCategoryModal = ({
   onSelect,
 }) => {
 
+  const modalRef =
+    useRef(null)
+
+  /* ========================================
+     BODY LOCK
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!open) {
+      return
+    }
+
+    const originalOverflow =
+      document.body.style.overflow
+
+    document.body.style.overflow =
+      "hidden"
+
+    return () => {
+
+      document.body.style.overflow =
+        originalOverflow
+    }
+
+  }, [open])
+
+  /* ========================================
+     ESC CLOSE
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!open) {
+      return
+    }
+
+    const handleEscape =
+      (event) => {
+
+        if (
+          event.key ===
+          "Escape"
+        ) {
+
+          onClose?.()
+        }
+      }
+
+    document.addEventListener(
+      "keydown",
+      handleEscape
+    )
+
+    return () => {
+
+      document.removeEventListener(
+        "keydown",
+        handleEscape
+      )
+    }
+
+  }, [
+    open,
+    onClose,
+  ])
+
+  /* ========================================
+     OUTSIDE CLICK
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!open) {
+      return
+    }
+
+    const handleClickOutside =
+      (event) => {
+
+        if (
+          modalRef.current &&
+          !modalRef.current.contains(
+            event.target
+          )
+        ) {
+
+          onClose?.()
+        }
+      }
+
+    document.addEventListener(
+      "mousedown",
+      handleClickOutside
+    )
+
+    return () => {
+
+      document.removeEventListener(
+        "mousedown",
+        handleClickOutside
+      )
+    }
+
+  }, [
+    open,
+    onClose,
+  ])
+
   if (!open) {
     return null
   }
 
-  return (
-    <div
-      className="
-        fixed
-        inset-0
-        z-[120]
+  return createPortal(
+    <AnimatePresence>
 
-        flex
-        items-center
-        justify-center
+      <motion.div
+        initial={{
+          opacity: 0,
+        }}
 
-        px-4
-      "
-    >
-      {/* BACKDROP */}
-      <div
-        onClick={onClose}
+        animate={{
+          opacity: 1,
+        }}
+
+        exit={{
+          opacity: 0,
+        }}
+
         className="
-          absolute
+          fixed
           inset-0
 
-          bg-black/70
-        "
-      />
-
-      {/* CARD */}
-      <div
-        className="
-          relative
-          z-10
+          z-[99999]
 
           flex
-          w-full
-          max-w-[520px]
-          flex-col
+          items-center
+          justify-center
 
-          overflow-hidden
+          overflow-y-auto
 
-          rounded-[28px]
-
-          border
-          border-[#2f3c36]
-
-          bg-[#141c1a]
-
-          shadow-[0_30px_80px_rgba(0,0,0,0.55)]
+          p-3
+          sm:p-5
         "
       >
-        {/* HEADER */}
-        <div
+
+        {/* BACKDROP */}
+        <motion.div
+          initial={{
+            opacity: 0,
+          }}
+
+          animate={{
+            opacity: 1,
+          }}
+
+          exit={{
+            opacity: 0,
+          }}
+
           className="
+            absolute
+            inset-0
+          "
+          style={{
+            background:
+              "var(--modal-overlay)",
+
+            backdropFilter:
+              "blur(10px)",
+          }}
+        />
+
+        {/* MODAL */}
+        <motion.div
+          ref={modalRef}
+
+          initial={{
+            opacity: 0,
+            scale: 0.96,
+            y: 12,
+          }}
+
+          animate={{
+            opacity: 1,
+            scale: 1,
+            y: 0,
+          }}
+
+          exit={{
+            opacity: 0,
+            scale: 0.96,
+            y: 12,
+          }}
+
+          transition={{
+            duration: 0.18,
+          }}
+
+          className="
+            modal-surface
+            relative
+
+            z-[100000]
+
             flex
-            items-start
-            justify-between
-            gap-4
+            w-full
 
-            border-b
-            border-[#24312b]
+            max-w-[95vw]
+            sm:max-w-[560px]
 
-            px-5
-            py-5
+            max-h-[90vh]
+
+            flex-col
+
+            overflow-hidden
+
+            rounded-[28px]
           "
         >
-          <div>
-            <h3
-              className="
-                text-lg
-                font-bold
-                text-white
-              "
-            >
-              Select Category
-            </h3>
 
-            <p
-              className="
-                mt-1
-
-                text-sm
-                text-[#8ea59b]
-              "
-            >
-              Choose a category or use automatic AI detection.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onClose}
+          {/* HEADER */}
+          <div
             className="
               flex
-              h-10
-              w-10
+              items-start
+              justify-between
+              gap-4
 
-              shrink-0
-              items-center
-              justify-center
+              px-5
+              py-5
+            "
+            style={{
+              borderBottom:
+                "1px solid var(--border)",
+            }}
+          >
 
-              rounded-xl
+            <div className="min-w-0 flex-1">
 
-              border
-              border-[#2d3b35]
+              <h3
+                className="
+                  truncate
 
-              bg-[#18211f]
+                  text-lg
+                  font-bold
+                "
+                style={{
+                  color:
+                    "var(--text-primary)",
+                }}
+              >
+                Select Category
+              </h3>
 
-              text-[#8ea59b]
+              <p
+                className="
+                  mt-1
+                  text-sm
+                "
+                style={{
+                  color:
+                    "var(--text-secondary)",
+                }}
+              >
+                Choose a category or use automatic AI detection.
+              </p>
 
-              transition-all
-              duration-200
+            </div>
 
-              hover:border-[#46544e]
-              hover:text-white
+            <button
+              type="button"
+
+              onClick={onClose}
+
+              className="
+                hover-surface
+
+                flex
+                h-10
+                w-10
+
+                shrink-0
+                items-center
+                justify-center
+
+                rounded-xl
+                border
+              "
+              style={{
+                borderColor:
+                  "var(--border)",
+
+                background:
+                  "var(--panel-light)",
+
+                color:
+                  "var(--text-primary)",
+              }}
+            >
+
+              <X
+                className="
+                  h-4
+                  w-4
+                "
+              />
+
+            </button>
+
+          </div>
+
+          {/* OPTIONS */}
+          <div
+            className="
+              flex-1
+
+              overflow-y-auto
+
+              p-3
+
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
             "
           >
-            <X
-              className="
-                h-4
-                w-4
-              "
-            />
-          </button>
-        </div>
 
-        {/* OPTIONS */}
-        <div
-          className="
-            max-h-[420px]
-            overflow-y-auto
+            {/* AUTO DETECT */}
+            <div className="mb-2">
 
-            p-3
-          "
-        >
-          {/* AUTO DETECT */}
-          <div className="mb-2">
-            <ManualEntryCategoryOption
-              active={!selectedCategory}
-              label="Auto Detect Category"
-              description="Let the AI automatically determine the best category."
-              onClick={() =>
-                onSelect("")
-              }
-            />
+              <ManualEntryCategoryOption
+                active={!selectedCategory}
+
+                label="Auto Detect Category"
+
+                description="Let the AI automatically determine the best category."
+
+                onClick={() =>
+                  onSelect("")
+                }
+              />
+
+            </div>
+
+            {/* CATEGORY LIST */}
+            <div className="space-y-2">
+
+              {categories.map(
+                (category) => {
+
+                  const active =
+                    selectedCategory ===
+                    category
+
+                  return (
+                    <ManualEntryCategoryOption
+                      key={category}
+
+                      active={active}
+
+                      label={category}
+
+                      onClick={() =>
+                        onSelect(category)
+                      }
+                    />
+                  )
+                }
+              )}
+
+            </div>
+
           </div>
 
-          {/* CATEGORY LIST */}
-          <div className="space-y-2">
-            {categories.map(
-              (category) => {
+        </motion.div>
 
-                const active =
-                  selectedCategory ===
-                  category
+      </motion.div>
 
-                return (
-                  <ManualEntryCategoryOption
-                    key={category}
-                    active={active}
-                    label={category}
-                    onClick={() =>
-                      onSelect(category)
-                    }
-                  />
-                )
-              }
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    </AnimatePresence>,
+    document.body
   )
 }
 

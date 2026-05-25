@@ -1,4 +1,14 @@
-import { useState, useCallback, memo } from "react"
+import {
+  useState,
+  useCallback,
+  memo,
+} from "react"
+
+import {
+  Database,
+  DatabaseBackup,
+  RefreshCw,
+} from "lucide-react"
 
 import useManualEntries from "./hooks/useManualEntries"
 
@@ -29,7 +39,10 @@ const ManualEntriesSection = () => {
   ] = useState(null)
 
   const {
+    items,
+
     loading,
+    refreshing,
     submitting,
     error,
     successMessage,
@@ -46,13 +59,37 @@ const ManualEntriesSection = () => {
     activeCategory,
     setActiveCategory,
 
+    activityFilter,
+    setActivityFilter,
+
     paginatedItems,
     totalPages,
 
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleRestoreEntry,
+
+    reloadEntries,
+    setEditingState,
   } = useManualEntries()
+
+  /* ========================================
+     STATUS TABS
+  ======================================== */
+
+  const STATUS_TABS = [
+    {
+      id: "active",
+      label: "Active",
+      icon: Database,
+    },
+    {
+      id: "inactive",
+      label: "Inactive",
+      icon: DatabaseBackup,
+    },
+  ]
 
   /* ========================================
      MODAL HANDLERS
@@ -61,32 +98,405 @@ const ManualEntriesSection = () => {
   const openCreateModal =
     useCallback(() => {
 
+      setEditingState(true)
+
       setEditingEntry(null)
 
       setShowModal(true)
 
-    }, [])
+    }, [setEditingState])
 
   const openEditModal =
     useCallback((item) => {
+
+      setEditingState(true)
 
       setEditingEntry(item)
 
       setShowModal(true)
 
-    }, [])
+    }, [setEditingState])
+
+  const closeModal =
+    useCallback(() => {
+
+      setEditingState(false)
+
+      setShowModal(false)
+
+    }, [setEditingState])
+
+  /* ========================================
+     REFRESH
+  ======================================== */
+
+  const handleRefresh =
+    useCallback(async () => {
+
+      await reloadEntries()
+
+    }, [reloadEntries])
 
   return (
-    <div className="flex h-full flex-col gap-5">
+    <div className="flex h-full flex-col gap-3">
 
-      {/* HEADER */}
-      <ManualEntriesHeader
-        search={search}
-        setSearch={setSearch}
-        setShowModal={openCreateModal}
-      />
+      {/* ========================================
+          HEADER + REFRESH
+      ======================================== */}
 
-      {/* TABS */}
+      <div
+        className="
+          flex
+          flex-col
+          gap-3
+
+          lg:flex-row
+          lg:items-center
+          lg:justify-between
+        "
+      >
+
+        <div className="min-w-0 flex-1">
+          <ManualEntriesHeader
+            search={search}
+            setSearch={setSearch}
+            setShowModal={openCreateModal}
+          />
+        </div>
+
+        {/* ========================================
+            MANUAL REFRESH BUTTON
+        ======================================== */}
+
+        <button
+          onClick={handleRefresh}
+
+          disabled={
+            refreshing ||
+            loading
+          }
+
+          className="
+            group
+
+            flex
+            w-full
+            items-center
+            justify-center
+            gap-2
+
+            rounded-2xl
+
+            border
+            theme-border
+
+            bg-[color:var(--panel)]
+
+            px-4
+            py-3
+
+            text-sm
+            font-semibold
+
+            text-[color:var(--text-primary)]
+
+            shadow-[var(--shadow-soft)]
+
+            transition-all
+            duration-300
+
+            hover:bg-[color:var(--hover)]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+
+            lg:w-auto
+            lg:min-w-[170px]
+          "
+        >
+
+          <RefreshCw
+            className={`
+              h-4
+              w-4
+
+              transition-transform
+              duration-500
+
+              ${
+                refreshing || loading
+                  ? "animate-spin"
+                  : "group-hover:rotate-180"
+              }
+            `}
+          />
+
+          <span>
+            {
+              refreshing || loading
+
+                ? "Refreshing..."
+
+                : "Refresh Entries"
+            }
+          </span>
+        </button>
+      </div>
+
+      {/* ========================================
+          STATUS TABS
+      ======================================== */}
+
+      <div
+        className="
+          rounded-[30px]
+
+          border
+          theme-border
+
+          bg-[color:var(--panel)]
+
+          p-2
+
+          shadow-[var(--shadow-soft)]
+        "
+      >
+        <div
+          className="
+            grid
+            grid-cols-2
+            gap-2
+          "
+        >
+          {STATUS_TABS.map((tab) => {
+
+            const active =
+              activityFilter ===
+              tab.id
+
+            const Icon =
+              tab.icon
+
+            return (
+              <button
+                key={tab.id}
+
+                onClick={() =>
+                  setActivityFilter(
+                    tab.id
+                  )
+                }
+
+                className={`
+                  group
+
+                  relative
+
+                  overflow-hidden
+
+                  rounded-[22px]
+
+                  border
+
+                  px-5
+                  py-3
+
+                  transition-all
+                  duration-300
+
+                  ${
+                    active
+
+                      ? tab.id ===
+                        "active"
+
+                        ? `
+                          theme-border
+
+                          bg-[color:var(--panel-light)]
+
+                          shadow-[var(--shadow-soft)]
+                        `
+
+                        : `
+                          border-red-500/20
+
+                          bg-red-500/5
+
+                          shadow-[var(--shadow-soft)]
+                        `
+
+                      : `
+                        border-transparent
+
+                        bg-transparent
+
+                        hover:bg-[color:var(--hover)]
+                      `
+                  }
+                `}
+              >
+
+                {/* ACTIVE GLOW */}
+                {active && (
+                  <div
+                    className={`
+                      absolute
+                      inset-0
+
+                      ${
+                        tab.id ===
+                        "active"
+
+                          ? `
+                            bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
+                          `
+
+                          : `
+                            bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.08),transparent_70%)]
+                          `
+                      }
+                    `}
+                  />
+                )}
+
+                {/* ACTIVE INDICATOR */}
+                <div
+                  className={`
+                    absolute
+
+                    bottom-0
+                    left-1/2
+
+                    h-[3px]
+                    w-[55%]
+
+                    -translate-x-1/2
+
+                    rounded-full
+
+                    transition-all
+                    duration-300
+
+                    ${
+                      tab.id ===
+                      "active"
+
+                        ? "bg-[color:var(--accent)]"
+
+                        : "bg-red-400"
+                    }
+
+                    ${
+                      active
+                        ? "opacity-100"
+                        : "opacity-0"
+                    }
+                  `}
+                />
+
+                {/* CONTENT */}
+                <div
+                  className="
+                    relative
+                    z-10
+
+                    flex
+                    items-center
+                    justify-center
+                    gap-2.5
+                  "
+                >
+                  <div
+                    className={`
+                      flex
+                      h-6
+                      w-6
+                      items-center
+                      justify-center
+
+                      rounded-xl
+
+                      border
+
+                      transition-all
+                      duration-300
+
+                      ${
+                        active
+
+                          ? tab.id ===
+                            "active"
+
+                            ? `
+                              border-[color:var(--accent-green)]/20
+
+                              bg-[color:var(--accent-green)]/10
+
+                              text-[color:var(--accent-green)]
+                            `
+
+                            : `
+                              border-red-500/20
+
+                              bg-red-500/10
+
+                              text-red-300
+                            `
+
+                          : `
+                            theme-border
+
+                            bg-[color:var(--panel-light)]
+
+                            text-[color:var(--text-muted)]
+
+                            group-hover:text-[color:var(--text-primary)]
+                          `
+                      }
+                    `}
+                  >
+                    <Icon
+                      className="
+                        h-4
+                        w-4
+                      "
+                    />
+                  </div>
+
+                  <div
+                    className="
+                      flex
+                      flex-col
+                      items-start
+                    "
+                  >
+                    <span
+                      className={`
+                        text-sm
+                        font-semibold
+
+                        transition-colors
+                        duration-300
+
+                        ${
+                          active
+                            ? "text-[color:var(--text-primary)]"
+                            : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
+                        }
+                      `}
+                    >
+                      {tab.label}
+                    </span>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* CATEGORY TABS */}
       <ManualEntryTabs
         categories={categories}
         activeCategory={activeCategory}
@@ -96,7 +506,22 @@ const ManualEntriesSection = () => {
 
       {/* SUCCESS */}
       {successMessage && (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div
+          className="
+            rounded-2xl
+
+            border
+            border-emerald-500/20
+
+            bg-emerald-500/10
+
+            px-4
+            py-3
+
+            text-sm
+            text-emerald-300
+          "
+        >
           {successMessage}
         </div>
       )}
@@ -110,7 +535,23 @@ const ManualEntriesSection = () => {
       )}
 
       {/* CONTENT */}
-      <div className="flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
+      <div
+        className="
+          flex-1
+          overflow-auto
+
+          rounded-[28px]
+
+          border
+          theme-border
+
+          bg-[color:var(--panel)]
+
+          p-5
+
+          shadow-[var(--shadow-soft)]
+        "
+      >
 
         {loading ? (
           <LoadingSpinner label="Loading manual entries..." />
@@ -130,6 +571,7 @@ const ManualEntriesSection = () => {
                 allowedCategories={allowedCategories}
                 handleUpdateEntry={handleUpdateEntry}
                 handleDeleteEntry={handleDeleteEntry}
+                handleRestoreEntry={handleRestoreEntry}
                 openEditModal={openEditModal}
               />
             ))}
@@ -148,7 +590,7 @@ const ManualEntriesSection = () => {
       {/* MODAL */}
       <ManualEntryModal
         showModal={showModal}
-        setShowModal={setShowModal}
+        setShowModal={closeModal}
         categories={categories}
         submitting={submitting}
         error={error}

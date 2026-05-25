@@ -1,6 +1,3 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/ManualEntryModalActions.jsx
-
 import { Trash2 } from "lucide-react"
 
 const ManualEntryModalActions = ({
@@ -9,12 +6,17 @@ const ManualEntryModalActions = ({
   onDelete,
   onSubmit,
 }) => {
+
   return (
     <div className="flex gap-3">
+
+      {/* DELETE BUTTON */}
       {isEditMode && (
         <button
           onClick={onDelete}
+
           disabled={submitting}
+
           className="
             flex
             items-center
@@ -30,33 +32,58 @@ const ManualEntryModalActions = ({
             px-5
 
             text-red-300
+
+            transition-all
+            duration-200
+
+            hover:bg-red-500/20
+            hover:text-red-200
+
+            disabled:cursor-not-allowed
+            disabled:opacity-60
           "
         >
+
           <Trash2
             className="
               h-5
               w-5
             "
           />
+
         </button>
       )}
 
+      {/* SUBMIT BUTTON */}
       <button
         onClick={onSubmit}
+
         disabled={submitting}
+
         className="
           w-full
 
           rounded-2xl
 
-          bg-[#f5d547]
+          bg-[color:var(--accent)]
 
           py-3
 
           font-semibold
-          text-[#111917]
+
+          text-[color:var(--background)]
+
+          transition-all
+          duration-200
+
+          hover:brightness-105
+          hover:scale-[1.01]
+
+          disabled:cursor-not-allowed
+          disabled:opacity-60
         "
       >
+
         {submitting
           ? isEditMode
             ? "Updating..."
@@ -64,7 +91,9 @@ const ManualEntryModalActions = ({
           : isEditMode
           ? "Update Entry"
           : "Create Entry"}
+
       </button>
+
     </div>
   )
 }

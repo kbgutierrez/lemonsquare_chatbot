@@ -227,6 +227,50 @@ export const deleteManualEntry =
   }
 
 /* ========================================
+   RESTORE ENTRY
+======================================== */
+
+export const restoreManualEntry =
+  async (entryId) => {
+
+    console.log(
+      "RESTORE_MANUAL_ENTRY_ID",
+      entryId
+    )
+
+    if (
+      entryId === undefined ||
+      entryId === null ||
+      entryId === ""
+    ) {
+
+      throw new Error(
+        "Missing manual entry ID."
+      )
+    }
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.DOCUMENT_MANUAL_ENTRY_RESTORE,
+        {
+          entryId,
+        }
+      )
+
+    const response =
+      await apiClient.post(
+        endpoint
+      )
+
+    console.log(
+      "RESTORE_MANUAL_ENTRY_RESPONSE",
+      response
+    )
+
+    return response
+  }
+
+/* ========================================
    EXPORT
 ======================================== */
 
@@ -236,6 +280,7 @@ const manualEntriesService =
     createManualEntry,
     updateManualEntry,
     deleteManualEntry,
+    restoreManualEntry,
   }
 
 export default manualEntriesService

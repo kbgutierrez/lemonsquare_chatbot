@@ -11,9 +11,6 @@ const CategoryBadge = ({
         rounded-xl
 
         border
-        border-[#2d3b35]
-
-        bg-[#18211f]
 
         px-2.5
         py-1
@@ -22,9 +19,17 @@ const CategoryBadge = ({
         font-medium
 
         leading-none
-
-        text-[#d4dfdb]
       "
+      style={{
+        borderColor:
+          "var(--border)",
+
+        background:
+          "var(--panel-light)",
+
+        color:
+          "var(--text-primary)",
+      }}
     >
       {category}
     </span>

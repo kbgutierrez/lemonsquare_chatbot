@@ -19,10 +19,14 @@ const TicketPagination = ({
         justify-between
 
         border-t
-        border-[#24312b]
+        border-[var(--border)]
+
+        bg-black/[0.02]
 
         px-5
         py-4
+
+        dark:bg-white/[0.02]
       "
     >
       {/* LEFT */}
@@ -32,7 +36,7 @@ const TicketPagination = ({
 
           tracking-wide
 
-          text-[#74877f]
+          text-[var(--text-secondary)]
         "
       >
         Page {currentPage} of{" "}
@@ -40,26 +44,35 @@ const TicketPagination = ({
       </p>
 
       {/* RIGHT */}
-      <div className="flex items-center gap-2">
-
+      <div
+        className="
+          flex
+          items-center
+          gap-2
+        "
+      >
         {/* PREV */}
         <button
           disabled={
             currentPage === 1
           }
+
           onClick={() =>
             setCurrentPage(
               (prev) =>
                 prev - 1
             )
           }
+
           className="
+            hover-surface
+
             rounded-xl
 
             border
-            border-[#2d3b35]
+            border-[var(--border)]
 
-            bg-[#18211f]
+            bg-[var(--panel-light)]
 
             px-4
             py-2
@@ -67,12 +80,12 @@ const TicketPagination = ({
             text-sm
             font-medium
 
-            text-[#d5dfdb]
+            text-[var(--text-primary)]
 
             transition-all
             duration-200
 
-            hover:bg-[#1f2a27]
+            hover:scale-[1.01]
 
             disabled:cursor-not-allowed
             disabled:opacity-40
@@ -87,19 +100,23 @@ const TicketPagination = ({
             currentPage ===
             totalPages
           }
+
           onClick={() =>
             setCurrentPage(
               (prev) =>
                 prev + 1
             )
           }
+
           className="
+            hover-surface
+
             rounded-xl
 
             border
-            border-[#2d3b35]
+            border-[var(--border)]
 
-            bg-[#18211f]
+            bg-[var(--panel-light)]
 
             px-4
             py-2
@@ -107,12 +124,12 @@ const TicketPagination = ({
             text-sm
             font-medium
 
-            text-[#d5dfdb]
+            text-[var(--text-primary)]
 
             transition-all
             duration-200
 
-            hover:bg-[#1f2a27]
+            hover:scale-[1.01]
 
             disabled:cursor-not-allowed
             disabled:opacity-40

@@ -16,7 +16,7 @@ const DASHBOARD_UI_CACHE_KEY = "admin_dashboard_ui"
 
 const AdminDashboard = () => {
   /* ========================================
-     CACHE HYDRATION (SAFE DEFAULTS)
+     CACHE HYDRATION
   ======================================== */
   const cachedUI = getCachedData(DASHBOARD_UI_CACHE_KEY) ?? {}
 
@@ -24,6 +24,7 @@ const AdminDashboard = () => {
      AUTH STATE
   ======================================== */
   const [isAuthenticated, setIsAuthenticated] = useState(false)
+
   const [adminUser, setAdminUser] = useState(null)
 
   /* ========================================
@@ -55,7 +56,7 @@ const AdminDashboard = () => {
   }, [activeView, sidebarWidth, mobileSidebarOpen])
 
   /* ========================================
-     AUTH CHECK (SIMPLIFIED)
+     AUTH CHECK
   ======================================== */
   useEffect(() => {
     const auth = localStorage.getItem("admin_auth")
@@ -92,7 +93,7 @@ const AdminDashboard = () => {
   }
 
   /* ========================================
-     SIDEBAR RESIZE LOGIC
+     SIDEBAR RESIZE
   ======================================== */
   useEffect(() => {
     if (!isResizing) return
@@ -155,7 +156,12 @@ const AdminDashboard = () => {
         {/* DESKTOP SIDEBAR */}
         <aside
           style={{ width: `${sidebarWidth}px` }}
-          className="hidden shrink-0 overflow-hidden lg:flex"
+          className="
+            hidden
+            shrink-0
+            overflow-hidden
+            lg:flex
+          "
         >
           <SidebarMenu
             activeView={activeView}
@@ -174,14 +180,26 @@ const AdminDashboard = () => {
             w-1
             cursor-col-resize
             rounded-full
-            bg-transparent
             transition-all
             duration-200
-            hover:bg-[#f5d547]/30
             lg:block
           "
+          style={{
+            background: "transparent",
+          }}
         >
-          <div className="h-full w-full rounded-full group-hover:bg-[#f5d547]/40" />
+          <div
+            className="
+              h-full
+              w-full
+              rounded-full
+              transition-all
+              duration-200
+            "
+            style={{
+              background: "rgba(245, 213, 71, 0.15)",
+            }}
+          />
         </div>
 
         {/* CONTENT */}
@@ -195,22 +213,54 @@ const AdminDashboard = () => {
             overflow-hidden
             rounded-[24px]
             md:rounded-[32px]
-            border
-            border-[#25332d]
-            bg-[#101816]/95
-            shadow-[0_20px_80px_rgba(0,0,0,0.45)]
             backdrop-blur-xl
           "
+          style={{
+            border: "1px solid var(--border)",
+            background: "var(--glass-bg)",
+            boxShadow: "var(--shadow-lg)",
+          }}
         >
           {/* INNER EFFECTS */}
           <div className="pointer-events-none absolute inset-0">
-            <div className="absolute inset-x-0 top-0 h-px bg-white/5" />
+            <div
+              className="absolute inset-x-0 top-0 h-px"
+              style={{
+                background: "var(--glass-border)",
+              }}
+            />
 
-            <div className="absolute right-0 top-0 h-72 w-72 rounded-full bg-[#f5d547]/[0.03] blur-3xl" />
+            <div
+              className="
+                absolute
+                right-0
+                top-0
+                h-72
+                w-72
+                rounded-full
+                blur-3xl
+              "
+              style={{
+                background: "var(--bg-glow-primary)",
+              }}
+            />
           </div>
 
           {/* CONTENT WRAPPER */}
-          <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-hidden p-3 sm:p-4 md:p-5">
+          <div
+            className="
+              relative
+              z-10
+              flex
+              min-h-0
+              flex-1
+              flex-col
+              overflow-hidden
+              p-3
+              sm:p-4
+              md:p-5
+            "
+          >
             {/* MOBILE HEADER SPACING */}
             <div className="h-14 shrink-0 lg:hidden" />
 

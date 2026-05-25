@@ -340,20 +340,44 @@ async def update_document_metadata(
 from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
 
 
-@router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
+@router.get(
+    "/manual",
+    response_model=list[ManualEntryResponse],
+    summary="List all manual rules",
+)
 def get_manual_entries(
     skip: int = 0,
     limit: int = 50,
-    db: Session = Depends(get_chatbot_db)
+    status: str = "all",
+    db: Session = Depends(get_chatbot_db),
 ):
 
     from app.models.chatbot import ManualKnowledgeEntry
 
-    entries = (
-        db.query(ManualKnowledgeEntry)
-        .filter(
+    query = db.query(
+        ManualKnowledgeEntry
+    )
+
+    normalized_status = (
+        status
+        .lower()
+        .strip()
+    )
+
+    if normalized_status == "active":
+
+        query = query.filter(
             ManualKnowledgeEntry.IsActive == True
         )
+
+    elif normalized_status == "inactive":
+
+        query = query.filter(
+            ManualKnowledgeEntry.IsActive == False
+        )
+
+    entries = (
+        query
         .order_by(
             ManualKnowledgeEntry.CreatedAt.desc()
         )
@@ -365,6 +389,7 @@ def get_manual_entries(
     mapped_results = []
 
     for entry in entries:
+
         mapped_results.append(
             ManualEntryResponse(
                 entry_id=entry.EntryID,
@@ -373,7 +398,9 @@ def get_manual_entries(
                 category=entry.Category,
                 created_at=entry.CreatedAt,
                 updated_at=entry.UpdatedAt,
-                is_active=bool(entry.IsActive),
+                is_active=bool(
+                    entry.IsActive
+                ),
             )
         )
 

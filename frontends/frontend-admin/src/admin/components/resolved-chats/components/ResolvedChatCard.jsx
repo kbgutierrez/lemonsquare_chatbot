@@ -9,170 +9,861 @@ import {
 } from "framer-motion"
 
 import {
-  Trash2,
   AlertTriangle,
   X,
+  RotateCcw,
+  Archive,
+  ChevronRight,
+  Minimize2,
 } from "lucide-react"
 
-import { parseResolvedChat } from "../utils/parseResolvedChat"
+import {
+  parseResolvedChat,
+} from "../utils/parseResolvedChat"
 
 /* ========================================
-   PARSED FIELD BLOCK
+   FIELD BLOCK
 ======================================== */
 
-const FieldBlock = ({ title, value, color }) => {
-  if (!value) return null
+const FieldBlock = ({
+  title,
+  value,
+  color,
+}) => {
+
+  if (!value) {
+    return null
+  }
 
   return (
-    <div>
-      <h3 className={`mb-2 text-sm font-semibold ${color}`}>
+    <div
+      className="
+        rounded-2xl
+        border
+        theme-border
+
+        bg-[color:var(--panel-light)]
+
+        p-4
+      "
+    >
+
+      <h3
+        className={`mb-2 text-sm font-semibold ${color}`}
+      >
         {title}
       </h3>
-      <p className="text-sm leading-relaxed text-[#d7e0dc]">
+
+      <p
+        className="
+          whitespace-pre-wrap
+          text-sm
+          leading-relaxed
+
+          text-[color:var(--text-primary)]
+        "
+      >
         {value}
       </p>
+
     </div>
   )
 }
 
 /* ========================================
-   CARD
+   COMPONENT
 ======================================== */
 
-const ResolvedChatCard = ({ item, index, onDelete }) => {
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
+const ResolvedChatCard = ({
+  item,
+  lifecycle = "active",
+  onDelete,
+  onRestore,
+}) => {
 
-  const parsed = parseResolvedChat(item.content)
+  const [
+    expanded,
+    setExpanded,
+  ] = useState(false)
 
-  const handleDelete = async () => {
-    await onDelete(item.id)
-    setShowDeleteModal(false)
-  }
+  const [
+    showDeleteModal,
+    setShowDeleteModal,
+  ] = useState(false)
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(false)
+
+  const parsed =
+    parseResolvedChat(
+      item.content
+    )
+
+  const isInactive =
+    lifecycle ===
+    "inactive"
+
+  /* ========================================
+     DELETE
+  ======================================== */
+
+  const handleDelete =
+    async () => {
+
+      try {
+
+        setLoading(true)
+
+        await onDelete(
+          item.id
+        )
+
+        setShowDeleteModal(
+          false
+        )
+
+        setExpanded(false)
+
+      } finally {
+
+        setLoading(false)
+      }
+    }
+
+  /* ========================================
+     RESTORE
+  ======================================== */
+
+  const handleRestore =
+    async () => {
+
+      try {
+
+        setLoading(true)
+
+        await onRestore?.(
+          item.id
+        )
+
+        setExpanded(false)
+
+      } finally {
+
+        setLoading(false)
+      }
+    }
 
   return (
     <>
-      {/* CARD */}
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.94 }}
-        whileHover={{ y: -4 }}
-        transition={{ delay: index * 0.05, duration: 0.35 }}
-        className="group rounded-[28px] border border-[#26332d] bg-[#18211f] p-5 transition-all duration-300 hover:border-[#f5d547]/30 hover:shadow-[0_12px_50px_rgba(0,0,0,0.35)]"
+
+      {/* ========================================
+         LIST ITEM
+      ======================================== */}
+
+      <motion.button
+        type="button"
+        onClick={() =>
+          setExpanded(true)
+        }
+        whileHover={{
+          scale: 1.005,
+        }}
+        whileTap={{
+          scale: 0.995,
+        }}
+        className={`
+          group
+          flex
+          w-full
+          items-center
+          justify-between
+
+          rounded-[24px]
+          border
+
+          px-5
+          py-4
+
+          text-left
+
+          transition-all
+          duration-200
+
+          ${
+            isInactive
+              ? `
+                theme-border
+                bg-[color:var(--panel-light)]
+
+                hover:border-[color:var(--text-muted)]
+              `
+              : `
+                theme-border
+                bg-[color:var(--panel)]
+
+                hover:border-[color:var(--accent)]/30
+                hover:bg-[color:var(--hover)]
+              `
+          }
+        `}
       >
-        {/* HEADER */}
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+
+        {/* LEFT */}
+        <div className="min-w-0 flex-1">
+
           <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-2xl border border-[#f5d547]/10 bg-[#f5d547]/10 px-3 py-1 text-xs font-semibold text-[#f5d547]">
-              Resolved Chat
+
+            <span
+              className={`
+                rounded-xl
+                border
+
+                px-2.5
+                py-1
+
+                text-[11px]
+                font-semibold
+
+                ${
+                  isInactive
+                    ? `
+                      border-[color:var(--text-muted)]/20
+                      bg-[color:var(--text-muted)]/10
+
+                      text-[color:var(--text-secondary)]
+                    `
+                    : `
+                      border-[color:var(--accent)]/10
+                      bg-[color:var(--accent)]/10
+
+                      text-[color:var(--accent)]
+                    `
+                }
+              `}
+            >
+
+              {isInactive
+                ? "Inactive"
+                : "Active"}
+
             </span>
 
-            <span className="text-xs text-[#8ea59b]">
+            <span
+              className="
+                truncate
+                text-sm
+                font-semibold
+
+                text-[color:var(--text-primary)]
+              "
+            >
               {item.source}
             </span>
+
           </div>
 
-          {/* DELETE */}
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowDeleteModal(true)}
-            className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300 transition-all hover:bg-red-500/20 hover:shadow-[0_0_25px_rgba(239,68,68,0.15)]"
+          <p
+            className="
+              mt-2
+              line-clamp-1
+              text-sm
+
+              text-[color:var(--text-secondary)]
+            "
           >
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </motion.button>
+
+            {parsed["Issue Reported"] ||
+              "No issue summary available."}
+
+          </p>
+
         </div>
 
-        {/* CONTENT */}
-        <div className="space-y-5">
-          <FieldBlock
-            title="Issue Reported"
-            value={parsed["Issue Reported"]}
-            color="text-[#f5d547]"
+        {/* RIGHT */}
+        <div className="ml-4 flex items-center gap-3">
+
+          <ChevronRight
+            className="
+              h-5
+              w-5
+
+              text-[color:var(--text-muted)]
+
+              transition-transform
+              duration-200
+
+              group-hover:translate-x-1
+            "
           />
 
-          <FieldBlock
-            title="Issue Found"
-            value={parsed["Issue Found"]}
-            color="text-[#95c11f]"
-          />
-
-          <FieldBlock
-            title="Root Cause"
-            value={parsed["Root Cause"]}
-            color="text-[#ffb347]"
-          />
-
-          <FieldBlock
-            title="Work Done"
-            value={parsed["Work Done"]}
-            color="text-[#7dd3fc]"
-          />
         </div>
-      </motion.div>
 
-      {/* DELETE MODAL */}
+      </motion.button>
+
+      {/* ========================================
+         EXPANDED MODAL
+      ======================================== */}
+
       <AnimatePresence>
+
+        {expanded && (
+          <motion.div
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            className="
+              fixed
+              inset-0
+              z-[120]
+
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--modal-overlay)]
+
+              p-5
+
+              backdrop-blur-md
+            "
+          >
+
+            <motion.div
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+                y: 0,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+                y: 10,
+              }}
+              transition={{
+                duration: 0.18,
+              }}
+              className="
+                relative
+                flex
+                max-h-[90vh]
+                w-full
+                max-w-4xl
+                flex-col
+                overflow-hidden
+
+                rounded-[34px]
+                border
+
+                theme-border
+
+                bg-[color:var(--panel)]
+
+                shadow-[var(--shadow-lg)]
+              "
+            >
+
+              {/* HEADER */}
+              <div
+                className="
+                  flex
+                  items-center
+                  justify-between
+
+                  border-b
+                  theme-border
+
+                  px-7
+                  py-5
+                "
+              >
+
+                <div>
+
+                  <div className="flex items-center gap-3">
+
+                    <span
+                      className={`
+                        rounded-xl
+                        border
+
+                        px-3
+                        py-1
+
+                        text-xs
+                        font-semibold
+
+                        ${
+                          isInactive
+                            ? `
+                              border-[color:var(--text-muted)]/20
+                              bg-[color:var(--text-muted)]/10
+
+                              text-[color:var(--text-secondary)]
+                            `
+                            : `
+                              border-[color:var(--accent)]/10
+                              bg-[color:var(--accent)]/10
+
+                              text-[color:var(--accent)]
+                            `
+                        }
+                      `}
+                    >
+
+                      {isInactive
+                        ? "Inactive Chat"
+                        : "Resolved Chat"}
+
+                    </span>
+
+                    <span
+                      className="
+                        text-sm
+
+                        text-[color:var(--text-secondary)]
+                      "
+                    >
+                      {item.source}
+                    </span>
+
+                  </div>
+
+                  <h2
+                    className="
+                      mt-3
+                      text-2xl
+                      font-bold
+
+                      text-[color:var(--text-primary)]
+                    "
+                  >
+                    AI Learned Conversation
+                  </h2>
+
+                </div>
+
+                {/* MINIMIZE */}
+                <button
+                  onClick={() =>
+                    setExpanded(false)
+                  }
+                  className="
+                    rounded-2xl
+                    border
+
+                    theme-border
+
+                    bg-[color:var(--panel-light)]
+
+                    p-3
+
+                    text-[color:var(--text-secondary)]
+
+                    transition-all
+
+                    hover:bg-[color:var(--hover)]
+                    hover:text-[color:var(--text-primary)]
+                  "
+                >
+
+                  <Minimize2 className="h-5 w-5" />
+
+                </button>
+
+              </div>
+
+              {/* CONTENT */}
+              <div className="flex-1 overflow-y-auto px-7 py-6">
+
+                <div className="space-y-5">
+
+                  <FieldBlock
+                    title="Issue Reported"
+                    value={
+                      parsed[
+                        "Issue Reported"
+                      ]
+                    }
+                    color="text-[color:var(--accent)]"
+                  />
+
+                  <FieldBlock
+                    title="Issue Found"
+                    value={
+                      parsed[
+                        "Issue Found"
+                      ]
+                    }
+                    color="text-[color:var(--accent-green)]"
+                  />
+
+                  <FieldBlock
+                    title="Root Cause"
+                    value={
+                      parsed[
+                        "Root Cause"
+                      ]
+                    }
+                    color="text-orange-400"
+                  />
+
+                  <FieldBlock
+                    title="Work Done"
+                    value={
+                      parsed[
+                        "Work Done"
+                      ]
+                    }
+                    color="text-sky-400"
+                  />
+
+                </div>
+
+              </div>
+
+              {/* FOOTER */}
+              <div
+                className="
+                  border-t
+                  theme-border
+
+                  px-7
+                  py-5
+                "
+              >
+
+                {isInactive ? (
+                  <button
+                    disabled={loading}
+                    onClick={
+                      handleRestore
+                    }
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      justify-center
+                      gap-2
+
+                      rounded-2xl
+                      border
+
+                      border-emerald-500/20
+                      bg-emerald-500/10
+
+                      py-4
+
+                      text-sm
+                      font-semibold
+                      text-emerald-300
+
+                      transition-all
+
+                      hover:bg-emerald-500/20
+                      hover:shadow-[0_0_25px_rgba(16,185,129,0.15)]
+
+                      disabled:cursor-not-allowed
+                      disabled:opacity-60
+                    "
+                  >
+
+                    <RotateCcw className="h-4 w-4" />
+
+                    {loading
+                      ? "Restoring..."
+                      : "Restore Chat"}
+
+                  </button>
+                ) : (
+                  <button
+                    disabled={loading}
+                    onClick={() =>
+                      setShowDeleteModal(
+                        true
+                      )
+                    }
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      justify-center
+                      gap-2
+
+                      rounded-2xl
+                      border
+
+                      border-red-500/20
+                      bg-red-500/10
+
+                      py-4
+
+                      text-sm
+                      font-semibold
+                      text-red-300
+
+                      transition-all
+
+                      hover:bg-red-500/20
+                      hover:shadow-[0_0_25px_rgba(239,68,68,0.18)]
+
+                      disabled:cursor-not-allowed
+                      disabled:opacity-60
+                    "
+                  >
+
+                    <Archive className="h-4 w-4" />
+
+                    Archive Chat
+
+                  </button>
+                )}
+
+              </div>
+
+            </motion.div>
+          </motion.div>
+        )}
+
+      </AnimatePresence>
+
+      {/* ========================================
+         DELETE MODAL
+      ======================================== */}
+
+      <AnimatePresence>
+
         {showDeleteModal && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            initial={{
+              opacity: 0,
+            }}
+            animate={{
+              opacity: 1,
+            }}
+            exit={{
+              opacity: 0,
+            }}
+            className="
+              fixed
+              inset-0
+              z-[140]
+
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--modal-overlay)]
+
+              p-4
+
+              backdrop-blur-sm
+            "
           >
+
             <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.92, y: 10 }}
-              transition={{ type: "spring", damping: 20, stiffness: 250 }}
-              className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-red-500/20 bg-[#161f1c] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.45)]"
+              initial={{
+                opacity: 0,
+                scale: 0.96,
+              }}
+              animate={{
+                opacity: 1,
+                scale: 1,
+              }}
+              exit={{
+                opacity: 0,
+                scale: 0.96,
+              }}
+              transition={{
+                duration: 0.18,
+              }}
+              className="
+                relative
+                w-full
+                max-w-md
+                overflow-hidden
+
+                rounded-[32px]
+                border
+
+                border-red-500/20
+
+                bg-[color:var(--panel)]
+
+                p-6
+
+                shadow-[var(--shadow-lg)]
+              "
             >
+
               {/* CLOSE */}
               <button
-                onClick={() => setShowDeleteModal(false)}
-                className="absolute right-4 top-4 rounded-xl p-2 text-[#8ea59b] hover:bg-white/5 hover:text-white"
+                onClick={() =>
+                  setShowDeleteModal(
+                    false
+                  )
+                }
+                className="
+                  absolute
+                  right-4
+                  top-4
+
+                  rounded-xl
+                  p-2
+
+                  text-[color:var(--text-secondary)]
+
+                  transition-all
+
+                  hover:bg-[color:var(--hover-light)]
+                  hover:text-[color:var(--text-primary)]
+                "
               >
+
                 <X className="h-4 w-4" />
+
               </button>
 
               {/* ICON */}
-              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-red-500/20 bg-red-500/10">
+              <div
+                className="
+                  mb-5
+                  flex
+                  h-16
+                  w-16
+                  items-center
+                  justify-center
+
+                  rounded-3xl
+                  border
+
+                  border-red-500/20
+                  bg-red-500/10
+                "
+              >
+
                 <AlertTriangle className="h-8 w-8 text-red-400" />
+
               </div>
 
               {/* TITLE */}
-              <h2 className="text-2xl font-bold text-white">
-                Delete Resolved Chat?
+              <h2
+                className="
+                  text-2xl
+                  font-bold
+
+                  text-[color:var(--text-primary)]
+                "
+              >
+                Archive Resolved Chat?
               </h2>
 
-              <p className="mt-3 text-sm leading-relaxed text-[#9cb0a8]">
-                This action permanently removes this AI training memory and cannot be undone.
+              <p
+                className="
+                  mt-3
+                  text-sm
+                  leading-relaxed
+
+                  text-[color:var(--text-secondary)]
+                "
+              >
+
+                This removes the AI memory from active retrieval
+                while preserving the data for future restoration.
+
               </p>
 
               {/* ACTIONS */}
               <div className="mt-6 flex gap-3">
+
                 <button
-                  onClick={() => setShowDeleteModal(false)}
-                  className="flex-1 rounded-2xl border border-[#2d3b35] bg-[#1b2421] py-3 font-medium text-white hover:bg-[#222d29]"
+                  onClick={() =>
+                    setShowDeleteModal(
+                      false
+                    )
+                  }
+                  className="
+                    flex-1
+                    rounded-2xl
+                    border
+
+                    theme-border
+
+                    bg-[color:var(--panel-light)]
+
+                    py-3
+
+                    font-medium
+
+                    text-[color:var(--text-primary)]
+
+                    transition-all
+
+                    hover:bg-[color:var(--hover)]
+                  "
                 >
+
                   Cancel
+
                 </button>
 
                 <button
-                  onClick={handleDelete}
-                  className="flex-1 rounded-2xl bg-red-500 py-3 font-semibold text-white hover:bg-red-400 hover:shadow-[0_0_30px_rgba(239,68,68,0.35)]"
+                  disabled={loading}
+                  onClick={
+                    handleDelete
+                  }
+                  className="
+                    flex-1
+                    rounded-2xl
+
+                    bg-red-500
+
+                    py-3
+
+                    font-semibold
+                    text-white
+
+                    transition-all
+
+                    hover:bg-red-400
+                    hover:shadow-[0_0_30px_rgba(239,68,68,0.35)]
+
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
+                  "
                 >
-                  Delete
+
+                  {loading
+                    ? "Archiving..."
+                    : "Archive"}
+
                 </button>
+
               </div>
+
             </motion.div>
+
           </motion.div>
         )}
+
       </AnimatePresence>
+
     </>
   )
 }
 
-export default memo(ResolvedChatCard)
+export default memo(
+  ResolvedChatCard
+)

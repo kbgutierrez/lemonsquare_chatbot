@@ -32,7 +32,7 @@ const FileTableRow = ({
   const cellClass =
     `
       border-b
-      border-[#202b27]
+      theme-border
 
       px-5
       py-3.5
@@ -43,10 +43,10 @@ const FileTableRow = ({
       className="
         group
 
+        hover-surface
+
         transition-all
         duration-200
-
-        hover:bg-[#18211f]/70
       "
     >
       {/* FILE */}
@@ -59,6 +59,8 @@ const FileTableRow = ({
 
           <div
             className="
+              muted-card
+
               flex
               h-10
               w-10
@@ -67,11 +69,6 @@ const FileTableRow = ({
               justify-center
 
               rounded-xl
-
-              border
-              border-[#2a3732]
-
-              bg-[#18211f]
             "
           >
             <FileText
@@ -79,7 +76,7 @@ const FileTableRow = ({
                 h-4.5
                 w-4.5
 
-                text-[#f5d547]
+                text-[var(--accent)]
               "
             />
           </div>
@@ -93,7 +90,7 @@ const FileTableRow = ({
                 text-[13px]
                 font-medium
 
-                text-white
+                text-[var(--text-primary)]
               "
             >
               {file.file_name}
@@ -105,7 +102,7 @@ const FileTableRow = ({
 
                 text-[11px]
 
-                text-[#70847b]
+                text-[var(--text-secondary)]
               "
             >
               PDF Document
@@ -135,7 +132,7 @@ const FileTableRow = ({
           text-[13px]
           font-medium
 
-          text-white
+          text-[var(--text-primary)]
         `}
       >
         {file.chunk_count}
@@ -148,7 +145,7 @@ const FileTableRow = ({
 
           text-[13px]
 
-          text-[#8ca097]
+          text-[var(--text-secondary)]
         `}
       >
         {formatDate(

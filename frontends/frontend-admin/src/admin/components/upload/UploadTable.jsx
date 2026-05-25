@@ -1,6 +1,7 @@
 import UploadTableRow from "./UploadTableRow"
 import UploadPagination from "./UploadPagination"
 import UploadMobileCard from "./UploadMobileCard"
+
 import EmptyState from "../../../shared/components/EmptyState"
 
 const UploadTable = ({
@@ -42,7 +43,18 @@ const UploadTable = ({
         <div className="hidden h-full overflow-auto md:block">
           <table className="w-full min-w-[900px] border-collapse">
             {/* TABLE HEAD */}
-            <thead className="sticky top-0 z-10 border-b border-[#24312b] bg-[#161f1d]/95 backdrop-blur-xl">
+            <thead
+              className="
+                sticky
+                top-0
+                z-10
+                backdrop-blur-xl
+              "
+              style={{
+                borderBottom: "1px solid var(--border)",
+                background: "color-mix(in srgb, var(--panel) 92%, transparent)",
+              }}
+            >
               <tr>
                 {[
                   { label: "File", width: "w-[40%]" },
@@ -58,15 +70,15 @@ const UploadTable = ({
                       ${width}
                       px-4
                       py-3
-
                       text-left
                       text-[10px]
                       font-semibold
                       uppercase
                       tracking-[0.16em]
-
-                      text-[#70837a]
                     `}
+                    style={{
+                      color: "var(--text-secondary)",
+                    }}
                   >
                     {label}
                   </th>
@@ -93,20 +105,14 @@ const UploadTable = ({
   return (
     <div
       className="
+        panel-base
         flex
         h-full
         min-h-0
         flex-1
         flex-col
-
         overflow-hidden
-
         rounded-[24px]
-
-        border
-        border-[#26332d]
-
-        bg-[#121a18]
       "
     >
       {/* CONTENT */}
@@ -116,7 +122,13 @@ const UploadTable = ({
 
       {/* PAGINATION */}
       {uploadedFiles.length > 0 && (
-        <div className="shrink-0 border-t border-[#24312b] bg-[#141c1a]">
+        <div
+          className="shrink-0"
+          style={{
+            borderTop: "1px solid var(--border)",
+            background: "var(--panel-light)",
+          }}
+        >
           <UploadPagination
             currentPage={currentPage}
             totalPages={totalPages}
