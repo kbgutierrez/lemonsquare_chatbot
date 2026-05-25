@@ -7,6 +7,7 @@ import {
 import {
   Database,
   DatabaseBackup,
+  RefreshCw,
 } from "lucide-react"
 
 import useManualEntries from "./hooks/useManualEntries"
@@ -41,6 +42,7 @@ const ManualEntriesSection = () => {
     items,
 
     loading,
+    refreshing,
     submitting,
     error,
     successMessage,
@@ -67,6 +69,9 @@ const ManualEntriesSection = () => {
     handleUpdateEntry,
     handleDeleteEntry,
     handleRestoreEntry,
+
+    reloadEntries,
+    setEditingState,
   } = useManualEntries()
 
   /* ========================================
@@ -93,30 +98,148 @@ const ManualEntriesSection = () => {
   const openCreateModal =
     useCallback(() => {
 
+      setEditingState(true)
+
       setEditingEntry(null)
 
       setShowModal(true)
 
-    }, [])
+    }, [setEditingState])
 
   const openEditModal =
     useCallback((item) => {
+
+      setEditingState(true)
 
       setEditingEntry(item)
 
       setShowModal(true)
 
-    }, [])
+    }, [setEditingState])
+
+  const closeModal =
+    useCallback(() => {
+
+      setEditingState(false)
+
+      setShowModal(false)
+
+    }, [setEditingState])
+
+  /* ========================================
+     REFRESH
+  ======================================== */
+
+  const handleRefresh =
+    useCallback(async () => {
+
+      await reloadEntries()
+
+    }, [reloadEntries])
 
   return (
     <div className="flex h-full flex-col gap-3">
 
-      {/* HEADER */}
-      <ManualEntriesHeader
-        search={search}
-        setSearch={setSearch}
-        setShowModal={openCreateModal}
-      />
+      {/* ========================================
+          HEADER + REFRESH
+      ======================================== */}
+
+      <div
+        className="
+          flex
+          flex-col
+          gap-3
+
+          lg:flex-row
+          lg:items-center
+          lg:justify-between
+        "
+      >
+
+        <div className="min-w-0 flex-1">
+          <ManualEntriesHeader
+            search={search}
+            setSearch={setSearch}
+            setShowModal={openCreateModal}
+          />
+        </div>
+
+        {/* ========================================
+            MANUAL REFRESH BUTTON
+        ======================================== */}
+
+        <button
+          onClick={handleRefresh}
+
+          disabled={
+            refreshing ||
+            loading
+          }
+
+          className="
+            group
+
+            flex
+            w-full
+            items-center
+            justify-center
+            gap-2
+
+            rounded-2xl
+
+            border
+            border-[#2b3a33]
+
+            bg-[#131b18]
+
+            px-4
+            py-3
+
+            text-sm
+            font-semibold
+            text-[#d7e0db]
+
+            transition-all
+            duration-300
+
+            hover:border-[#3b4d44]
+            hover:bg-[#18211d]
+
+            disabled:cursor-not-allowed
+            disabled:opacity-60
+
+            lg:w-auto
+            lg:min-w-[170px]
+          "
+        >
+
+          <RefreshCw
+            className={`
+              h-4
+              w-4
+
+              transition-transform
+              duration-500
+
+              ${
+                refreshing || loading
+                  ? "animate-spin"
+                  : "group-hover:rotate-180"
+              }
+            `}
+          />
+
+          <span>
+            {
+              refreshing || loading
+
+                ? "Refreshing..."
+
+                : "Refresh Entries"
+            }
+          </span>
+        </button>
+      </div>
 
       {/* ========================================
           STATUS TABS
@@ -434,7 +557,7 @@ const ManualEntriesSection = () => {
       {/* MODAL */}
       <ManualEntryModal
         showModal={showModal}
-        setShowModal={setShowModal}
+        setShowModal={closeModal}
         categories={categories}
         submitting={submitting}
         error={error}

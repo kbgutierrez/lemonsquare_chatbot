@@ -45,6 +45,18 @@ const useManualEntries = () => {
   const successTimeoutRef =
     useRef(null)
 
+  /*
+    CRITICAL FIX:
+    Prevent automatic polling refreshes
+    while user is actively editing.
+
+    This prevents modal text fields from
+    resetting during background refreshes.
+  */
+
+  const isEditingRef =
+    useRef(false)
+
   /* ========================================
      UI STATE
   ======================================== */
@@ -120,6 +132,23 @@ const useManualEntries = () => {
 
   const safeFetchManualEntries =
     useCallback(async () => {
+
+      /*
+        CRITICAL FIX:
+        Block automatic polling refreshes
+        while editing modal is open.
+
+        This preserves local form state
+        and prevents field resets caused
+        by live query revalidation.
+      */
+
+      if (
+        isEditingRef.current
+      ) {
+
+        return null
+      }
 
       /*
         CRITICAL FIX:
@@ -200,11 +229,20 @@ const useManualEntries = () => {
       allowedCategories: [],
     },
 
+    /*
+      CRITICAL FIX:
+      Disable automatic polling.
+
+      User explicitly requested:
+      refresh ONLY when pressing
+      refresh button.
+    */
+
     refetchInterval:
-      API_CONFIG.POLLING_INTERVAL,
+      false,
 
     staleWhileRevalidate:
-      true,
+      false,
   })
 
   const safeItems =
@@ -433,6 +471,39 @@ const useManualEntries = () => {
     ])
 
   /* ========================================
+     MANUAL REFRESH
+  ======================================== */
+
+  const reloadEntries =
+    useCallback(async () => {
+
+      if (
+        isEditingRef.current
+      ) {
+        return
+      }
+
+      invalidateCache(
+        CACHE_KEY
+      )
+
+      await refresh()
+
+    }, [refresh])
+
+  /* ========================================
+     EDITING STATE
+  ======================================== */
+
+  const setEditingState =
+    useCallback((value) => {
+
+      isEditingRef.current =
+        value
+
+    }, [])
+
+  /* ========================================
      CREATE
   ======================================== */
 
@@ -494,11 +565,7 @@ const useManualEntries = () => {
             form
           )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -519,11 +586,7 @@ const useManualEntries = () => {
 
       } catch (error) {
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -546,7 +609,7 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -596,11 +659,7 @@ const useManualEntries = () => {
           form
         )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -641,7 +700,7 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -694,11 +753,7 @@ const useManualEntries = () => {
           entryId
         )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -737,7 +792,7 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -784,11 +839,7 @@ const useManualEntries = () => {
           entryId
         )
 
-        invalidateCache(
-          CACHE_KEY
-        )
-
-        await refresh()
+        await reloadEntries()
 
         if (
           mountedRef.current
@@ -827,7 +878,7 @@ const useManualEntries = () => {
     }, [
       data,
       safeItems,
-      refresh,
+      reloadEntries,
     ])
 
   /* ========================================
@@ -871,8 +922,9 @@ const useManualEntries = () => {
 
     setError,
 
-    reloadEntries:
-      refresh,
+    reloadEntries,
+
+    setEditingState,
   }
 }
 
