@@ -6,29 +6,111 @@ import {
   API_ENDPOINTS,
 } from "../../shared/api/endpoints"
 
+import {
+  appendCachedData,
+  createAbortController,
+  createRequestVersion,
+  isLatestRequestVersion,
+  setCachedData,
+  abortActiveRequest,
+} from "../../shared/cache/liveQueryCache"
+
 /* ========================================
-   GET ALL TICKETS (AUTO PAGINATED)
+   CONFIG
 ======================================== */
 
 const PAGE_SIZE = 50
 
-const getTickets =
-  async ({
-    search = "",
-  } = {}) => {
+const STREAM_DELAY = 0
 
-    const endpoint =
-      buildApiUrl(
-        API_ENDPOINTS.TICKETS
-      )
+/* ========================================
+   SMALL YIELD
+======================================== */
 
-    let skip = 0
+const yieldToMainThread = () =>
+  new Promise((resolve) =>
+    setTimeout(resolve, STREAM_DELAY)
+  )
 
-    let hasMore = true
+/* ========================================
+   GET ALL TICKETS
+   (PROGRESSIVE STREAMING)
+======================================== */
 
-    let allTickets = []
+const getTickets = async ({
+  search = "",
+  cacheKey = null,
+  progressive = false,
+} = {}) => {
+  const endpoint =
+    buildApiUrl(
+      API_ENDPOINTS.TICKETS
+    )
 
-    while (hasMore) {
+  const requestKey =
+    cacheKey ||
+    `tickets_${search}`
+
+  /*
+    IMPORTANT:
+    Abort old request before
+    creating a new one.
+  */
+
+  abortActiveRequest(requestKey)
+
+  const controller =
+    createAbortController(
+      requestKey
+    )
+
+  const requestVersion =
+    createRequestVersion(
+      requestKey
+    )
+
+  let skip = 0
+
+  let hasMore = true
+
+  let allTickets = []
+
+  /*
+    IMPORTANT:
+    Reset cache only for
+    progressive mode.
+  */
+
+  if (progressive) {
+    setCachedData(
+      requestKey,
+      []
+    )
+  }
+
+  try {
+    while (
+      hasMore &&
+      !controller.signal.aborted
+    ) {
+      /*
+        IMPORTANT:
+        Prevent stale requests
+        from mutating cache.
+      */
+
+      if (
+        !isLatestRequestVersion(
+          requestKey,
+          requestVersion
+        )
+      ) {
+        console.warn(
+          "STALE_TICKET_REQUEST_DROPPED"
+        )
+
+        break
+      }
 
       const params =
         new URLSearchParams()
@@ -36,7 +118,6 @@ const getTickets =
       if (
         search?.trim()
       ) {
-
         params.append(
           "search",
           search.trim()
@@ -63,7 +144,11 @@ const getTickets =
 
       const batch =
         await apiClient.get(
-          finalUrl
+          finalUrl,
+          {
+            signal:
+              controller.signal,
+          }
         )
 
       const safeBatch =
@@ -71,26 +156,53 @@ const getTickets =
           ? batch
           : []
 
+      /*
+        IMPORTANT:
+        Progressive cache append
+        for instant rendering.
+      */
+
+      if (
+        progressive &&
+        safeBatch.length > 0
+      ) {
+        appendCachedData({
+          key: requestKey,
+          incoming: safeBatch,
+          uniqueKey:
+            "ticket_number",
+        })
+      }
+
+      /*
+        IMPORTANT:
+        Keep local aggregate
+        for final return.
+      */
+
       allTickets = [
         ...allTickets,
         ...safeBatch,
       ]
 
       /*
-        If returned rows are smaller
-        than requested limit,
-        we reached the end.
+        IMPORTANT:
+        Yield to browser so UI
+        can rerender between batches.
+      */
+
+      await yieldToMainThread()
+
+      /*
+        End pagination.
       */
 
       if (
         safeBatch.length <
         PAGE_SIZE
       ) {
-
         hasMore = false
-
       } else {
-
         skip += PAGE_SIZE
       }
     }
@@ -101,7 +213,26 @@ const getTickets =
     )
 
     return allTickets
+  } catch (error) {
+    if (
+      error?.message ===
+      "Request aborted"
+    ) {
+      console.log(
+        "TICKET_FETCH_ABORTED"
+      )
+
+      return allTickets
+    }
+
+    console.error(
+      "GET_TICKETS_ERROR",
+      error
+    )
+
+    throw error
   }
+}
 
 /* ========================================
    DELETE TICKET
@@ -111,11 +242,9 @@ const deleteTicket =
   async (
     ticketNumber
   ) => {
-
     if (
       !ticketNumber
     ) {
-
       throw new Error(
         "Ticket number is required."
       )
@@ -147,11 +276,9 @@ const toggleTicketWhitelist =
   async (
     ticketNumber
   ) => {
-
     if (
       !ticketNumber
     ) {
-
       throw new Error(
         "Ticket number is required."
       )

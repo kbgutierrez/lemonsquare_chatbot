@@ -2,6 +2,8 @@ const cacheStore = new Map()
 const listenersStore = new Map()
 const inflightStore = new Map()
 const refreshLocks = new Map()
+const abortControllers = new Map()
+const requestVersionStore = new Map()
 const CACHE_METADATA = new Map()
 
 const DEFAULT_TTL = 1000 * 60 * 5
@@ -10,6 +12,7 @@ const STALE_TIME = 1000 * 15
 /* ========================================
    SAFE CLONE
 ======================================== */
+
 const safeClone = (value) => {
   try {
     return structuredClone(value)
@@ -25,6 +28,7 @@ const safeClone = (value) => {
 /* ========================================
    VALIDATION
 ======================================== */
+
 const isValidCacheEntry = (cache) => {
   return Boolean(
     cache &&
@@ -38,6 +42,7 @@ const isValidCacheEntry = (cache) => {
 /* ========================================
    HELPERS
 ======================================== */
+
 const isExpired = (cache) => {
   if (!isValidCacheEntry(cache)) return true
   return Date.now() > cache.expiry
@@ -49,8 +54,81 @@ const isStale = (cache) => {
 }
 
 /* ========================================
+   DEDUPE ARRAY
+======================================== */
+
+const dedupeArray = (items = [], uniqueKey = "id") => {
+  const map = new Map()
+
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue
+
+    const key =
+      item?.[uniqueKey] ??
+      item?.ticket_number ??
+      item?.id
+
+    if (key === undefined || key === null) continue
+
+    map.set(key, item)
+  }
+
+  return Array.from(map.values())
+}
+
+/* ========================================
+   REQUEST VERSIONING
+======================================== */
+
+export const createRequestVersion = (key) => {
+  const version = Date.now() + Math.random()
+
+  requestVersionStore.set(key, version)
+
+  return version
+}
+
+export const isLatestRequestVersion = (key, version) => {
+  return requestVersionStore.get(key) === version
+}
+
+/* ========================================
+   ABORT MANAGEMENT
+======================================== */
+
+export const createAbortController = (key) => {
+  abortActiveRequest(key)
+
+  const controller = new AbortController()
+
+  abortControllers.set(key, controller)
+
+  return controller
+}
+
+export const getAbortSignal = (key) => {
+  return abortControllers.get(key)?.signal
+}
+
+export const abortActiveRequest = (key) => {
+  const controller = abortControllers.get(key)
+
+  if (controller) {
+    try {
+      controller.abort()
+    } catch (error) {
+      console.error("ABORT_REQUEST_ERROR", error)
+    }
+  }
+
+  abortControllers.delete(key)
+  inflightStore.delete(key)
+}
+
+/* ========================================
    GET CACHE
 ======================================== */
+
 export const getCachedData = (key) => {
   const cached = cacheStore.get(key)
 
@@ -67,6 +145,7 @@ export const getCachedData = (key) => {
 /* ========================================
    GET FULL ENTRY
 ======================================== */
+
 export const getCacheEntry = (key) => {
   const cache = cacheStore.get(key)
 
@@ -84,40 +163,105 @@ export const getCacheEntry = (key) => {
 }
 
 /* ========================================
+   INTERNAL WRITE
+======================================== */
+
+const writeCacheEntry = ({
+  key,
+  data,
+  ttl = DEFAULT_TTL,
+}) => {
+  const payload = {
+    data: safeClone(data),
+    timestamp: Date.now(),
+    expiry: Date.now() + ttl,
+  }
+
+  cacheStore.set(key, payload)
+
+  CACHE_METADATA.set(key, {
+    updatedAt: Date.now(),
+  })
+
+  notifySubscribers(key, payload.data)
+
+  try {
+    localStorage.setItem(
+      `cache_${key}`,
+      JSON.stringify(payload)
+    )
+  } catch (error) {
+    console.error("CACHE_PERSIST_ERROR", error)
+  }
+}
+
+/* ========================================
    SET CACHE
 ======================================== */
-export const setCachedData = (key, data, ttl = DEFAULT_TTL) => {
+
+export const setCachedData = (
+  key,
+  data,
+  ttl = DEFAULT_TTL
+) => {
   try {
-    const payload = {
-      data: safeClone(data),
-      timestamp: Date.now(),
-      expiry: Date.now() + ttl,
-    }
-
-    cacheStore.set(key, payload)
-
-    CACHE_METADATA.set(key, {
-      updatedAt: Date.now(),
+    writeCacheEntry({
+      key,
+      data,
+      ttl,
     })
-
-    notifySubscribers(key, payload.data)
-
-    try {
-      localStorage.setItem(`cache_${key}`, JSON.stringify(payload))
-    } catch (error) {
-      console.error("CACHE_PERSIST_ERROR", error)
-    }
   } catch (error) {
     console.error("SET_CACHE_ERROR", error)
   }
 }
 
 /* ========================================
+   APPEND CACHE
+======================================== */
+
+export const appendCachedData = ({
+  key,
+  incoming,
+  uniqueKey = "ticket_number",
+  ttl = DEFAULT_TTL,
+}) => {
+  try {
+    const existing = getCachedData(key)
+
+    const existingArray = Array.isArray(existing)
+      ? existing
+      : []
+
+    const incomingArray = Array.isArray(incoming)
+      ? incoming
+      : []
+
+    const merged = dedupeArray(
+      [...existingArray, ...incomingArray],
+      uniqueKey
+    )
+
+    writeCacheEntry({
+      key,
+      data: merged,
+      ttl,
+    })
+
+    return safeClone(merged)
+  } catch (error) {
+    console.error("APPEND_CACHE_ERROR", error)
+    return []
+  }
+}
+
+/* ========================================
    HYDRATE CACHE
 ======================================== */
+
 export const hydrateCache = (key) => {
   try {
     const raw = localStorage.getItem(`cache_${key}`)
+
     if (!raw) return null
 
     const parsed = JSON.parse(raw)
@@ -137,7 +281,9 @@ export const hydrateCache = (key) => {
     return safeClone(parsed.data)
   } catch (error) {
     console.error("CACHE_HYDRATE_ERROR", error)
+
     invalidateCache(key)
+
     return null
   }
 }
@@ -145,7 +291,11 @@ export const hydrateCache = (key) => {
 /* ========================================
    SUBSCRIBE
 ======================================== */
-export const subscribeCache = (key, callback) => {
+
+export const subscribeCache = (
+  key,
+  callback
+) => {
   if (!listenersStore.has(key)) {
     listenersStore.set(key, new Set())
   }
@@ -160,8 +310,14 @@ export const subscribeCache = (key, callback) => {
 /* ========================================
    NOTIFY
 ======================================== */
-const notifySubscribers = (key, data) => {
-  const listeners = listenersStore.get(key)
+
+const notifySubscribers = (
+  key,
+  data
+) => {
+  const listeners =
+    listenersStore.get(key)
+
   if (!listeners) return
 
   requestAnimationFrame(() => {
@@ -169,7 +325,10 @@ const notifySubscribers = (key, data) => {
       try {
         listener(safeClone(data))
       } catch (error) {
-        console.error("CACHE_SUBSCRIBER_ERROR", error)
+        console.error(
+          "CACHE_SUBSCRIBER_ERROR",
+          error
+        )
       }
     })
   })
@@ -178,46 +337,59 @@ const notifySubscribers = (key, data) => {
 /* ========================================
    INVALIDATE
 ======================================== */
-export const invalidateCache = (key) => {
+
+export const invalidateCache = (
+  key
+) => {
   cacheStore.delete(key)
   inflightStore.delete(key)
   refreshLocks.delete(key)
+  requestVersionStore.delete(key)
+
+  abortActiveRequest(key)
+
   CACHE_METADATA.delete(key)
 
-  localStorage.removeItem(`cache_${key}`)
+  localStorage.removeItem(
+    `cache_${key}`
+  )
 }
 
 /* ========================================
    CLEAR ALL
 ======================================== */
+
 export const clearAllCache = () => {
   cacheStore.clear()
   inflightStore.clear()
   refreshLocks.clear()
   listenersStore.clear()
   CACHE_METADATA.clear()
+  requestVersionStore.clear()
 
-  Object.keys(localStorage).forEach((key) => {
-    if (key.startsWith("cache_")) {
-      localStorage.removeItem(key)
+  abortControllers.forEach(
+    (controller) => {
+      try {
+        controller.abort()
+      } catch {}
     }
-  })
+  )
+
+  abortControllers.clear()
+
+  Object.keys(localStorage).forEach(
+    (key) => {
+      if (key.startsWith("cache_")) {
+        localStorage.removeItem(key)
+      }
+    }
+  )
 }
 
 /* ========================================
-   PREFETCH
+   FETCH WITH CACHE
 ======================================== */
-export const prefetchCache = async ({ key, fetcher, ttl = DEFAULT_TTL }) => {
-  try {
-    await fetchWithCache({ key, fetcher, ttl })
-  } catch (error) {
-    console.error("PREFETCH_ERROR", error)
-  }
-}
 
-/* ========================================
-   FETCH WITH CACHE (CORE ENGINE)
-======================================== */
 export const fetchWithCache = async ({
   key,
   fetcher,
@@ -231,10 +403,15 @@ export const fetchWithCache = async ({
   }
 
   if (cached && !force) {
-    const fullCache = cacheStore.get(key)
+    const fullCache =
+      cacheStore.get(key)
 
     if (isStale(fullCache)) {
-      backgroundRefresh({ key, fetcher, ttl })
+      backgroundRefresh({
+        key,
+        fetcher,
+        ttl,
+      })
     }
 
     return safeClone(cached)
@@ -246,13 +423,22 @@ export const fetchWithCache = async ({
 
   const promise = (async () => {
     try {
-      const data = await fetcher()
+      const data =
+        await fetcher()
 
-      setCachedData(key, data, ttl)
+      setCachedData(
+        key,
+        data,
+        ttl
+      )
 
       return safeClone(data)
     } catch (error) {
-      console.error("FETCH_WITH_CACHE_ERROR", error)
+      console.error(
+        "FETCH_WITH_CACHE_ERROR",
+        error
+      )
+
       throw error
     } finally {
       inflightStore.delete(key)
@@ -265,18 +451,34 @@ export const fetchWithCache = async ({
 }
 
 /* ========================================
-   BACKGROUND REFRESH (LOCKED)
+   BACKGROUND REFRESH
 ======================================== */
-const backgroundRefresh = async ({ key, fetcher, ttl }) => {
-  if (refreshLocks.has(key)) return
+
+const backgroundRefresh = async ({
+  key,
+  fetcher,
+  ttl,
+}) => {
+  if (refreshLocks.has(key)) {
+    return
+  }
 
   refreshLocks.set(key, true)
 
   try {
-    const data = await fetcher()
-    setCachedData(key, data, ttl)
+    const data =
+      await fetcher()
+
+    setCachedData(
+      key,
+      data,
+      ttl
+    )
   } catch (error) {
-    console.error("BACKGROUND_REFRESH_ERROR", error)
+    console.error(
+      "BACKGROUND_REFRESH_ERROR",
+      error
+    )
   } finally {
     refreshLocks.delete(key)
   }
@@ -285,11 +487,23 @@ const backgroundRefresh = async ({ key, fetcher, ttl }) => {
 /* ========================================
    DEBUG
 ======================================== */
-export const getCacheDebugSnapshot = () => {
-  return {
-    cacheKeys: Array.from(cacheStore.keys()),
-    inflightKeys: Array.from(inflightStore.keys()),
-    listenerKeys: Array.from(listenersStore.keys()),
-    refreshKeys: Array.from(refreshLocks.keys()),
+
+export const getCacheDebugSnapshot =
+  () => {
+    return {
+      cacheKeys:
+        Array.from(cacheStore.keys()),
+
+      inflightKeys:
+        Array.from(inflightStore.keys()),
+
+      listenerKeys:
+        Array.from(listenersStore.keys()),
+
+      refreshKeys:
+        Array.from(refreshLocks.keys()),
+
+      abortKeys:
+        Array.from(abortControllers.keys()),
+    }
   }
-}

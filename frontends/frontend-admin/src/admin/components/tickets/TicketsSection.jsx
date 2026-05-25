@@ -8,17 +8,24 @@ import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 import EmptyState from "../../../shared/components/EmptyState"
 
 const TicketsSection = () => {
-
   const {
     loading,
+    refreshing,
+
     search,
     setSearch,
+
     tickets,
     paginatedTickets,
+
     currentPage,
     setCurrentPage,
+
     totalPages,
+
     blockTicket,
+
+    refreshTickets,
   } = useTickets()
 
   /* ========================================
@@ -27,6 +34,16 @@ const TicketsSection = () => {
 
   const hasTickets =
     paginatedTickets.length > 0
+
+  /*
+    IMPORTANT:
+    Only show fullscreen loading
+    if absolutely no cached data exists.
+  */
+
+  const showInitialLoading =
+    loading &&
+    tickets.length === 0
 
   return (
     <div
@@ -46,6 +63,8 @@ const TicketsSection = () => {
         search={search}
         setSearch={setSearch}
         totalTickets={tickets.length}
+        onRefresh={refreshTickets}
+        refreshing={refreshing}
       />
 
       {/* TABLE CARD */}
@@ -80,7 +99,7 @@ const TicketsSection = () => {
         />
 
         {/* LOADING */}
-        {loading && (
+        {showInitialLoading && (
           <div
             className="
               flex
@@ -96,46 +115,58 @@ const TicketsSection = () => {
         )}
 
         {/* EMPTY */}
-        {!loading && !hasTickets && (
-          <div
-            className="
-              flex
-              flex-1
-              items-center
-              justify-center
-            "
-          >
-            <EmptyState
-              title="No tickets found"
-              message="No tickets matched your current search."
-            />
-          </div>
-        )}
-
-        {/* TABLE */}
-        {!loading && hasTickets && (
-          <>
+        {!showInitialLoading &&
+          !hasTickets && (
             <div
               className="
+                flex
                 flex-1
-                min-h-0
-
-                overflow-hidden
+                items-center
+                justify-center
               "
             >
-              <TicketTable
-                tickets={paginatedTickets}
-                blockTicket={blockTicket}
+              <EmptyState
+                title="No tickets found"
+                message="No tickets matched your current search."
               />
             </div>
+          )}
 
-            <TicketPagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              setCurrentPage={setCurrentPage}
-            />
-          </>
-        )}
+        {/* TABLE */}
+        {!showInitialLoading &&
+          hasTickets && (
+            <>
+              <div
+                className="
+                  flex-1
+                  min-h-0
+
+                  overflow-hidden
+                "
+              >
+                <TicketTable
+                  tickets={
+                    paginatedTickets
+                  }
+                  blockTicket={
+                    blockTicket
+                  }
+                />
+              </div>
+
+              <TicketPagination
+                currentPage={
+                  currentPage
+                }
+                totalPages={
+                  totalPages
+                }
+                setCurrentPage={
+                  setCurrentPage
+                }
+              />
+            </>
+          )}
       </div>
     </div>
   )
