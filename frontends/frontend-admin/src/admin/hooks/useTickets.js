@@ -11,7 +11,6 @@ import ticketAdminService from "../services/ticketAdminService"
 import useLiveQuery from "../../shared/hooks/useLiveQuery"
 
 import {
-  invalidateCache,
   setCachedData,
   abortActiveRequest,
 } from "../../shared/cache/liveQueryCache"
@@ -20,24 +19,6 @@ const ITEMS_PER_PAGE = 10
 const SEARCH_DEBOUNCE = 400
 const CACHE_KEY = "tickets_cache"
 
-/*
-  IMPORTANT:
-
-  Polling removed intentionally.
-
-  Tickets now refresh ONLY via:
-  - manual refresh button
-  - explicit refresh()
-  - search changes
-
-  This prevents:
-  - continuous background refetches
-  - unnecessary pagination refetch loops
-  - bandwidth waste
-  - hidden tab refresh churn
-  - remount fetches
-*/
-
 export const useTickets = () => {
   const mountedRef =
     useRef(true)
@@ -45,14 +26,29 @@ export const useTickets = () => {
   const debounceRef =
     useRef(null)
 
+  /*
+    IMPORTANT:
+    Prevent overlapping mutations.
+  */
+
+  const mutationRef =
+    useRef(false)
+
+  /*
+    IMPORTANT:
+    Master local dataset.
+
+    Search/filtering now happens
+    entirely client-side without
+    refetching.
+  */
+
+  const allTicketsRef =
+    useRef([])
+
   const [
     search,
     setSearch,
-  ] = useState("")
-
-  const [
-    debouncedSearch,
-    setDebouncedSearch,
   ] = useState("")
 
   const [
@@ -65,7 +61,7 @@ export const useTickets = () => {
   ======================================== */
 
   const queryKey =
-    `${CACHE_KEY}_${debouncedSearch}`
+    CACHE_KEY
 
   /* ========================================
      CLEANUP
@@ -81,12 +77,6 @@ export const useTickets = () => {
         debounceRef.current
       )
 
-      /*
-        IMPORTANT:
-        Abort inflight fetches
-        on navigation/unmount.
-      */
-
       abortActiveRequest(
         queryKey
       )
@@ -96,6 +86,11 @@ export const useTickets = () => {
   /* ========================================
      SEARCH DEBOUNCE
   ======================================== */
+
+  const [
+    debouncedSearch,
+    setDebouncedSearch,
+  ] = useState("")
 
   useEffect(() => {
     setCurrentPage(1)
@@ -122,12 +117,22 @@ export const useTickets = () => {
 
   const fetchTickets =
     useCallback(async () => {
+      /*
+        IMPORTANT:
+        Never refetch during mutations.
+      */
+
+      if (
+        mutationRef.current
+      ) {
+        return (
+          allTicketsRef.current
+        )
+      }
+
       const response =
         await ticketAdminService.getTickets(
           {
-            search:
-              debouncedSearch,
-
             cacheKey:
               queryKey,
 
@@ -135,30 +140,31 @@ export const useTickets = () => {
           }
         )
 
+      let normalized = []
+
       if (
         Array.isArray(response)
       ) {
-        return response
-      }
-
-      if (
+        normalized = response
+      } else if (
         Array.isArray(
           response?.data
         )
       ) {
-        return response.data
+        normalized =
+          response.data
       }
 
-      console.warn(
-        "INVALID_TICKETS_RESPONSE",
-        response
-      )
+      /*
+        IMPORTANT:
+        Persist full dataset locally.
+      */
 
-      return []
-    }, [
-      debouncedSearch,
-      queryKey,
-    ])
+      allTicketsRef.current =
+        normalized
+
+      return normalized
+    }, [queryKey])
 
   /* ========================================
      LIVE QUERY
@@ -168,7 +174,6 @@ export const useTickets = () => {
     data: tickets,
     loading,
     refreshing,
-    refresh,
   } = useLiveQuery({
     queryKey,
 
@@ -177,41 +182,14 @@ export const useTickets = () => {
 
     initialData: [],
 
-    /*
-      IMPORTANT:
-      TRUE CACHE-FIRST MODE
-    */
-
     staleWhileRevalidate: false,
-
-    /*
-      IMPORTANT:
-      No polling.
-    */
 
     refetchInterval:
       null,
 
-    /*
-      IMPORTANT:
-      Preserve visible data.
-    */
-
     keepPreviousData: true,
 
-    /*
-      IMPORTANT:
-      Disable automatic
-      focus refreshes.
-    */
-
     refreshOnFocus: false,
-
-    /*
-      IMPORTANT:
-      Allow initial fetch ONLY
-      when cache doesn't exist.
-    */
 
     fetchOnMount: true,
   })
@@ -230,95 +208,207 @@ export const useTickets = () => {
     }, [tickets])
 
   /* ========================================
-     BLOCK / UNBLOCK
+     CLIENT-SIDE SEARCH
+     (NO REFETCH)
+  ======================================== */
+
+  const filteredTickets =
+    useMemo(() => {
+      /*
+        IMPORTANT:
+        Always filter from
+        master dataset.
+      */
+
+      const dataset =
+        allTicketsRef.current
+          .length > 0
+          ? allTicketsRef.current
+          : safeTickets
+
+      const trimmed =
+        debouncedSearch
+          .trim()
+          .toLowerCase()
+
+      if (!trimmed) {
+        return dataset
+      }
+
+      return dataset.filter(
+        (ticket) => {
+          return [
+            ticket.ticket_number,
+            ticket.issue_reported,
+            ticket.work_done,
+          ]
+            .filter(Boolean)
+            .some((value) =>
+              String(value)
+                .toLowerCase()
+                .includes(trimmed)
+            )
+        }
+      )
+    }, [
+      debouncedSearch,
+      safeTickets,
+    ])
+
+  /* ========================================
+     DELETE / UNBLOCK
      (OPTIMISTIC UPDATE)
   ======================================== */
 
   const blockTicket =
     useCallback(
       async (
-        ticketNumber
+        ticketNumber,
+        isBlocked = false
       ) => {
-        const previous =
-          [...safeTickets]
+        if (
+          mutationRef.current
+        ) {
+          return
+        }
+
+        mutationRef.current = true
+
+        const previous = [
+          ...allTicketsRef.current,
+        ]
 
         const target =
-          safeTickets.find(
+          allTicketsRef.current.find(
             (t) =>
               t.ticket_number ===
               ticketNumber
           )
 
         if (!target) {
+          mutationRef.current = false
           return
         }
 
-        const nextStatus =
-          !target.is_blacklisted
-
-        const optimistic =
-          safeTickets.map(
-            (t) => {
-              if (
-                t.ticket_number ===
-                ticketNumber
-              ) {
-                return {
-                  ...t,
-                  is_blacklisted:
-                    nextStatus,
-                }
-              }
-
-              return t
-            }
-          )
-
-        /*
-          IMPORTANT:
-          Instant UI update.
-        */
-
-        setCachedData(
-          queryKey,
-          optimistic
-        )
-
         try {
-          await ticketAdminService.toggleTicketWhitelist(
-            ticketNumber
-          )
-
           /*
-            IMPORTANT:
-            DO NOT invalidate cache.
-            Keep UI hot.
+            ====================================
+            UNBLOCK FLOW
+            ====================================
           */
 
-          await refresh()
+          if (isBlocked) {
+            const optimistic =
+              allTicketsRef.current.map(
+                (t) => {
+                  if (
+                    t.ticket_number ===
+                    ticketNumber
+                  ) {
+                    return {
+                      ...t,
+                      is_blacklisted:
+                        false,
+                    }
+                  }
+
+                  return t
+                }
+              )
+
+            allTicketsRef.current =
+              optimistic
+
+            setCachedData(
+              queryKey,
+              optimistic
+            )
+
+            await ticketAdminService.toggleTicketWhitelist(
+              ticketNumber
+            )
+          } else {
+            /*
+              ====================================
+              DELETE FLOW
+              ====================================
+            */
+
+            const optimistic =
+              allTicketsRef.current.filter(
+                (t) =>
+                  t.ticket_number !==
+                  ticketNumber
+              )
+
+            allTicketsRef.current =
+              optimistic
+
+            setCachedData(
+              queryKey,
+              optimistic
+            )
+
+            await ticketAdminService.deleteTicket(
+              ticketNumber
+            )
+          }
         } catch (error) {
           console.error(
-            "TOGGLE_TICKET_ERROR",
+            "TICKET_MUTATION_ERROR",
             error
           )
 
           /*
             IMPORTANT:
-            Rollback optimistic update.
+            Rollback safely.
           */
+
+          allTicketsRef.current =
+            previous
 
           setCachedData(
             queryKey,
             previous
           )
+
+          throw error
+        } finally {
+          setTimeout(() => {
+            mutationRef.current =
+              false
+          }, 250)
         }
       },
-      [
-        safeTickets,
-        queryKey,
-        refresh,
-      ]
+      [queryKey]
     )
+
+  /* ========================================
+     MANUAL REFRESH
+  ======================================== */
+
+  const refreshTickets =
+    useCallback(async () => {
+      if (
+        mutationRef.current
+      ) {
+        return
+      }
+
+      const fresh =
+        await fetchTickets()
+
+      allTicketsRef.current =
+        fresh
+
+      setCachedData(
+        queryKey,
+        fresh
+      )
+    }, [
+      fetchTickets,
+      queryKey,
+    ])
 
   /* ========================================
      PAGINATION
@@ -329,11 +419,11 @@ export const useTickets = () => {
       return Math.max(
         1,
         Math.ceil(
-          safeTickets.length /
+          filteredTickets.length /
             ITEMS_PER_PAGE
         )
       )
-    }, [safeTickets])
+    }, [filteredTickets])
 
   const paginatedTickets =
     useMemo(() => {
@@ -341,25 +431,27 @@ export const useTickets = () => {
         (currentPage - 1) *
         ITEMS_PER_PAGE
 
-      return safeTickets.slice(
+      return filteredTickets.slice(
         start,
         start +
           ITEMS_PER_PAGE
       )
     }, [
-      safeTickets,
+      filteredTickets,
       currentPage,
     ])
 
   return {
     loading,
-    refreshing,
+    refreshing:
+      refreshing &&
+      !mutationRef.current,
 
     search,
     setSearch,
 
     tickets:
-      safeTickets,
+      filteredTickets,
 
     paginatedTickets,
 
@@ -370,7 +462,6 @@ export const useTickets = () => {
 
     blockTicket,
 
-    refreshTickets:
-      refresh,
+    refreshTickets,
   }
 }
