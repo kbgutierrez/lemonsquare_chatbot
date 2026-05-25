@@ -1,0 +1,386 @@
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[AIChatbot_Settings]    Script Date: 5/25/2026 5:36:25 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[AIChatbot_Settings](
+	[SettingID] [int] IDENTITY(1,1) NOT NULL,
+	[ActiveModel] [nvarchar](100) NOT NULL,
+	[SystemPrompt] [nvarchar](max) NOT NULL,
+	[Temperature] [decimal](3, 2) NULL,
+	[IsActive] [bit] NULL,
+	[CreatedDate] [datetime] NULL,
+	[UpdatedBy] [bigint] NULL,
+	[EmbeddingModel] [nvarchar](100) NULL,
+	[TopK_Tickets] [int] NULL,
+	[ReformulatorModel] [nvarchar](100) NULL,
+	[ReformulatorPrompt] [nvarchar](max) NULL,
+	[ConfidenceThreshold] [decimal](4, 2) NULL,
+	[RerankerModel] [nvarchar](100) NULL,
+	[UseReformulator] [bit] NULL,
+	[UseReranker] [bit] NULL,
+	[AllowedCategories] [nvarchar](500) NULL,
+	[ChatExtractionPrompt] [nvarchar](max) NULL,
+	[EscalationDraftModel] [varchar](100) NULL,
+	[EscalationDraftPrompt] [text] NULL,
+	[RoutingModel] [varchar](100) NULL,
+	[RoutingPrompt] [text] NULL,
+	[DocumentClassifierModel] [varchar](100) NULL,
+	[DocumentClassifierPrompt] [text] NULL,
+	[ConversationResolutionModel] [varchar](100) NULL,
+	[ConversationResolutionPrompt] [text] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[SettingID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ('llama-3.3-70b-versatile') FOR [ActiveModel]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((0.3)) FOR [Temperature]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT (getdate()) FOR [CreatedDate]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ('intfloat/multilingual-e5-large') FOR [EmbeddingModel]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((8)) FOR [TopK_Tickets]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ('llama-3.1-8b-instant') FOR [ReformulatorModel]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((-2.00)) FOR [ConfidenceThreshold]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((1)) FOR [UseReformulator]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ((1)) FOR [UseReranker]
+GO
+
+ALTER TABLE [dbo].[AIChatbot_Settings] ADD  DEFAULT ('Network_Infrastructure,Hardware_Guide,Software_Documentation,HR_IT_Policy,Troubleshooting_Manual,General_IT') FOR [AllowedCategories]
+GO
+
+
+
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[ChatMessage]    Script Date: 5/25/2026 5:36:34 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[ChatMessage](
+	[MessageID] [bigint] IDENTITY(1,1) NOT NULL,
+	[SessionID] [uniqueidentifier] NOT NULL,
+	[SenderRole] [nvarchar](10) NOT NULL,
+	[MessageContent] [nvarchar](max) NOT NULL,
+	[CreatedAt] [datetime] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[MessageID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[ChatMessage] ADD  DEFAULT (getdate()) FOR [CreatedAt]
+GO
+
+ALTER TABLE [dbo].[ChatMessage]  WITH CHECK ADD  CONSTRAINT [FK_ChatMessage_Session] FOREIGN KEY([SessionID])
+REFERENCES [dbo].[ChatSession] ([SessionID])
+ON DELETE CASCADE
+GO
+
+ALTER TABLE [dbo].[ChatMessage] CHECK CONSTRAINT [FK_ChatMessage_Session]
+GO
+
+ALTER TABLE [dbo].[ChatMessage]  WITH CHECK ADD CHECK  (([SenderRole]='ai' OR [SenderRole]='user'))
+GO
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[ChatSession]    Script Date: 5/25/2026 5:36:49 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[ChatSession](
+	[SessionID] [uniqueidentifier] NOT NULL,
+	[RequesterUserID] [bigint] NOT NULL,
+	[ChatTitle] [nvarchar](255) NULL,
+	[StartTime] [datetime] NULL,
+	[LastActive] [datetime] NULL,
+	[IsActive] [bit] NULL,
+	[RelatedTicketID] [bigint] NULL,
+	[IssueSummary] [nvarchar](max) NULL,
+	[ResolutionSummary] [nvarchar](max) NULL,
+	[SessionStatus] [nvarchar](50) NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[SessionID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[ChatSession] ADD  DEFAULT (newid()) FOR [SessionID]
+GO
+
+ALTER TABLE [dbo].[ChatSession] ADD  DEFAULT (getdate()) FOR [StartTime]
+GO
+
+ALTER TABLE [dbo].[ChatSession] ADD  DEFAULT (getdate()) FOR [LastActive]
+GO
+
+ALTER TABLE [dbo].[ChatSession] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[ChatSession] ADD  DEFAULT ('Active') FOR [SessionStatus]
+GO
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_blacklisted_tickets]    Script Date: 5/25/2026 5:37:31 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_blacklisted_tickets](
+	[TicketNumber] [nvarchar](15) NOT NULL,
+	[BlacklistedAt] [datetime] NULL,
+	[BlacklistedBy] [bigint] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[TicketNumber] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_blacklisted_tickets] ADD  DEFAULT (getdate()) FOR [BlacklistedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_blacklisted_tickets] ADD  DEFAULT ((1)) FOR [BlacklistedBy]
+GO
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_knowledge_cluster_map]    Script Date: 5/25/2026 5:37:44 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_knowledge_cluster_map](
+	[SourceID] [nvarchar](64) NOT NULL,
+	[SourceType] [nvarchar](50) NOT NULL,
+	[ClusterID] [nvarchar](64) NOT NULL,
+	[ClusterKey] [nvarchar](128) NOT NULL,
+	[IsActive] [bit] NULL,
+	[CreatedAt] [datetime] NULL,
+	[UpdatedAt] [datetime] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[SourceID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_knowledge_cluster_map] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+ALTER TABLE [dbo].[tbl_knowledge_cluster_map] ADD  DEFAULT (getutcdate()) FOR [CreatedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_knowledge_cluster_map] ADD  DEFAULT (getutcdate()) FOR [UpdatedAt]
+GO
+
+
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_learned_chats]    Script Date: 5/25/2026 5:37:54 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_learned_chats](
+	[SessionID] [nvarchar](36) NOT NULL,
+	[IssueReported] [nvarchar](max) NULL,
+	[IssueFound] [nvarchar](max) NULL,
+	[RootCause] [nvarchar](max) NULL,
+	[WorkDone] [nvarchar](max) NULL,
+	[LearnedAt] [datetime] NULL,
+	[UpdatedAt] [datetime] NULL,
+	[IsActive] [bit] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[SessionID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_learned_chats] ADD  DEFAULT (getdate()) FOR [LearnedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_learned_chats] ADD  DEFAULT (getdate()) FOR [UpdatedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_learned_chats] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+
+
+
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_manual_knowledge]    Script Date: 5/25/2026 5:38:01 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_manual_knowledge](
+	[EntryID] [nvarchar](36) NOT NULL,
+	[Title] [nvarchar](255) NOT NULL,
+	[Content] [nvarchar](max) NOT NULL,
+	[Category] [nvarchar](100) NOT NULL,
+	[CreatedAt] [datetime] NULL,
+	[UpdatedAt] [datetime] NULL,
+	[CreatedBy] [bigint] NULL,
+	[IsActive] [bit] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[EntryID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_manual_knowledge] ADD  DEFAULT (getdate()) FOR [CreatedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_manual_knowledge] ADD  DEFAULT (getdate()) FOR [UpdatedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_manual_knowledge] ADD  DEFAULT ((1)) FOR [CreatedBy]
+GO
+
+ALTER TABLE [dbo].[tbl_manual_knowledge] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_ticket_routing_log]    Script Date: 5/25/2026 5:38:10 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_ticket_routing_log](
+	[LogID] [varchar](36) NOT NULL,
+	[InputSummary] [varchar](500) NOT NULL,
+	[InputDescription] [nvarchar](max) NOT NULL,
+	[PredictedDepartment] [varchar](100) NULL,
+	[PredictedSubcategory] [varchar](100) NULL,
+	[ConfidenceScore] [decimal](4, 3) NULL,
+	[LLMReasoning] [nvarchar](max) NULL,
+	[IsHumanOverridden] [bit] NULL,
+	[FinalDepartment] [varchar](100) NULL,
+	[FinalSubcategory] [varchar](100) NULL,
+	[CreatedAt] [datetime] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[LogID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_ticket_routing_log] ADD  DEFAULT ((0)) FOR [IsHumanOverridden]
+GO
+
+ALTER TABLE [dbo].[tbl_ticket_routing_log] ADD  DEFAULT (getutcdate()) FOR [CreatedAt]
+GO
+
+
+USE [BigEChatBot]
+GO
+
+/****** Object:  Table [dbo].[tbl_uploaded_documents]    Script Date: 5/25/2026 5:38:23 PM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE TABLE [dbo].[tbl_uploaded_documents](
+	[DocumentID] [nvarchar](36) NOT NULL,
+	[FileName] [nvarchar](255) NOT NULL,
+	[Category] [nvarchar](100) NOT NULL,
+	[ChunkCount] [int] NOT NULL,
+	[UploadedAt] [datetime] NULL,
+	[UploadedBy] [bigint] NULL,
+	[IsActive] [bit] NULL,
+PRIMARY KEY CLUSTERED 
+(
+	[DocumentID] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[tbl_uploaded_documents] ADD  DEFAULT (getdate()) FOR [UploadedAt]
+GO
+
+ALTER TABLE [dbo].[tbl_uploaded_documents] ADD  DEFAULT ((1)) FOR [UploadedBy]
+GO
+
+ALTER TABLE [dbo].[tbl_uploaded_documents] ADD  DEFAULT ((1)) FOR [IsActive]
+GO
+
+
+
+
+
+
+
+
+
