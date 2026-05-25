@@ -13,6 +13,7 @@ class RoutingSuggestion(BaseModel):
     subcategory_name: str | None = None
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     reasoning: str
+    analysis: str | None = None
 
 
 class RoutingResponse(BaseModel):

@@ -15,6 +15,11 @@ from app.services.llm_client import create_llm
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
 
+from app.services.routing.routing_engine import suggest_route
+from app.schemas.routing import RoutingRequest
+from app.services.retrieval.vector_store import get_shared_vector_store
+from app.services.retrieval.embedding_provider import get_embedding_model
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -40,9 +45,10 @@ class EscalationService:
         self.repo = ChatRepository(db)
         self.message_svc = MessageService(db)
 
+
     async def draft_escalation(self, session_id: str) -> dict:
         """
-        Generate a ticket escalation draft from chat transcript.
+        Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
         session = self.repo.validate_session_for_escalation(session_id)
@@ -51,12 +57,16 @@ class EscalationService:
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        llm = create_llm(model=runtime_config.escalation_draft_model,temperature=0.0,)
+        # --- 1. AI DRAFTS THE TICKET ---
+        llm = create_llm(model=runtime_config.escalation_draft_model, temperature=0.0)
         
-        prompt = runtime_config.escalation_draft_prompt.format(transcript=transcript,)
+        prompt = runtime_config.escalation_draft_prompt.replace(
+            "{transcript}", transcript
+        )
 
         result = await llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
+        logger.info("Escalation LLM raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
 
         if not extracted_data:
@@ -65,18 +75,69 @@ class EscalationService:
 
         summary = extracted_data.get("summary") or "AI Escalation Issue"
         description = extracted_data.get("description") or "Escalated from AI Chatbot"
-        routing = FALLBACK_ROUTING
+        logger.info("Escalation draft parsed summary='%s', description='%s'", summary, description)
 
+        # --- 2. AI PREDICTS THE ROUTING ---
+        try:
+            logger.info("Passing drafted ticket to Routing Engine...")
+            vector_store = get_shared_vector_store()
+            embeddings = get_embedding_model()
+            
+            routing_req = RoutingRequest(summary=summary, description=description)
+            
+            routing_response = await suggest_route(
+                request=routing_req,
+                db=self.db,
+                qdrant=vector_store.qdrant,
+                embeddings=embeddings,
+                collection_name=settings.QDRANT_ROUTING_COLLECTION,
+            )
+            
+            # Extract predictions from RoutingResponse
+            suggestion = routing_response.suggestion
+            predicted_dept_id = suggestion.department_id
+            predicted_subcat_id = suggestion.subcategory_id
+            predicted_dept_name = suggestion.department_name
+            predicted_subcat_name = suggestion.subcategory_name
+            routing_confidence = suggestion.confidence_score
+            routing_reasoning = suggestion.reasoning
+            routing_analysis = suggestion.analysis
+            routing_source = "ai_rac_pipeline"
+            logger.info(
+                "Escalation routing chosen department=%s (%s), subcategory=%s (%s), confidence=%s",
+                predicted_dept_name,
+                predicted_dept_id,
+                predicted_subcat_name,
+                predicted_subcat_id,
+                routing_confidence,
+            )
+            logger.info("Escalation routing analysis: %s", routing_analysis)
+            
+        except Exception as e:
+            logger.error("Routing engine failed during escalation draft: %s", e)
+            # Safe fallback if the routing engine crashes
+            predicted_dept_id = FALLBACK_ROUTING["department_id"]
+            predicted_subcat_id = FALLBACK_ROUTING["subcategory_id"]
+            predicted_dept_name = FALLBACK_ROUTING["department_name"]
+            predicted_subcat_name = FALLBACK_ROUTING["subcategory_name"]
+            routing_confidence = 0.0
+            routing_reasoning = "Routing engine failed."
+            routing_source = FALLBACK_ROUTING["routing_source"]
+            routing_analysis = "Routing engine failed."
+
+        # --- 3. RETURN COMBO TO FRONTEND ---
         return {
             "status": "success",
             "summary": summary,
             "description": description,
-            "department_id": routing["department_id"],
-            "department_name": routing["department_name"],
-            "subcategory_id": routing["subcategory_id"],
-            "subcategory_name": routing["subcategory_name"],
-            "routing_confidence": routing["confidence"],
-            "routing_source": routing["routing_source"],
+            "department_id": predicted_dept_id,
+            "department_name": predicted_dept_name,
+            "subcategory_id": predicted_subcat_id,
+            "subcategory_name": predicted_subcat_name,
+            "routing_confidence": routing_confidence,
+            "routing_reasoning": routing_reasoning,
+            "routing_analysis": routing_analysis,
+            "routing_source": "ai_rac_pipeline",
         }
 
     async def submit_escalation(self, payload: dict) -> dict:
