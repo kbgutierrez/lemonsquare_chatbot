@@ -568,25 +568,46 @@ async def handle_chat(
 
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
-    ai_response, ticket_ids = await orchestrator.orchestrate(
+    display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
         user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
         db=db,
     )
 
+    # Persist only the human-visible assistant text
     msg_svc.save_ai_message(
         session_id=session_id,
-        content=ai_response,
+        content=display_text,
     )
 
-    # We now let the GET /check-resolution endpoint handle the buttons!
+    # Map action to UI flags
+    show_resolution_prompt = False
+    allow_ticket_submission = False
+    conversation_status = "active"
+    resolution_action = "active"
+
+    if str(action).lower() == "show_ticket":
+        show_resolution_prompt = False
+        allow_ticket_submission = True
+        conversation_status = "need_ticket"
+        resolution_action = "need_ticket"
+    elif str(action).lower() == "show_resolve":
+        show_resolution_prompt = True
+        allow_ticket_submission = False
+        conversation_status = "resolved_candidate"
+        resolution_action = "resolved_chat"
+
     return ChatResponse(
         session_id=session_id,
-        response=ai_response,
+        response=display_text,
         ticket_ids_used=ticket_ids,
-        show_resolution_prompt=False, 
-        allow_ticket_submission=False 
+        show_resolution_prompt=show_resolution_prompt,
+        allow_ticket_submission=allow_ticket_submission,
+        conversation_status=conversation_status,
+        resolution_action=resolution_action,
+        resolution_confidence=1.0,
+        resolution_message=resolution_message,
     )
 
 
@@ -808,7 +829,7 @@ async def check_chat_resolution(
 
     return ResolutionCheckResponse(
         show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", True),
+        allow_ticket_submission=resolution_data.get("allow_ticket_submission", False),
         conversation_status=resolution_data.get("conversation_status", "active"),
         resolution_action=resolution_data.get("resolution_action", "active"),
         resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
@@ -2868,6 +2889,7 @@ class ChatResponse(BaseModel):
     conversation_status: str = "active"
     resolution_action: str = "active"
     resolution_confidence: float = 0.0
+    resolution_message: str | None = None
 
 
 class MessageRecord(BaseModel):
@@ -2999,6 +3021,7 @@ class RoutingSuggestion(BaseModel):
     subcategory_name: str | None = None
     confidence_score: float = Field(..., ge=0.0, le=1.0)
     reasoning: str
+    analysis: str | None = None
 
 
 class RoutingResponse(BaseModel):
@@ -3231,6 +3254,28 @@ You are Lemon Square's Helpdesk Advisor.
 
 Your job is to answer workplace, HR, maintenance, and IT concerns naturally and professionally using ONLY the provided Retrieved Context.
 
+You MUST return ONLY valid JSON.
+
+========================================
+OUTPUT FORMAT
+========================================
+
+Return EXACTLY this JSON schema:
+
+{
+  "response": string,
+  "action": "show_ticket" | "show_resolve" | "none",
+  "resolution_message": string | null
+}
+
+- "response" = the actual assistant reply shown to the user
+- "action" = determines UI behavior
+- "resolution_message" = optional UI message
+
+Do NOT return markdown.
+Do NOT wrap JSON in code blocks.
+Do NOT add explanations outside the JSON.
+
 ========================================
 1. STRICT CONTEXT RULES
 ========================================
@@ -3238,7 +3283,8 @@ Your job is to answer workplace, HR, maintenance, and IT concerns naturally and 
 - NEVER hallucinate.
 - NEVER invent troubleshooting steps, policies, approvals, or technical explanations.
 - ONLY answer using the Retrieved Context.
-- If the context does not clearly contain the answer, advise the user to contact the live Helpdesk staff.
+- If the context does not clearly contain the answer, say:
+  "Pa-check na lang sa Helpdesk staff for further assistance."
 - Do NOT guess.
 
 ========================================
@@ -3254,7 +3300,7 @@ You cannot:
 - access company systems
 - confirm actions were completed unless explicitly stated
 
-Only guide the user on what THEY should do.
+Do NOT automatically tell users to contact IT, create tickets, or escalate concerns unless the Retrieved Context explicitly says so.
 
 ========================================
 3. TONE & CONVERSATION STYLE
@@ -3316,8 +3362,8 @@ NOT:
 4. LANGUAGE MATCHING
 ========================================
 
-- English question [122;5u English response
-- Tagalog question [122;5u Tagalog/Taglish response
+- English question → English response
+- Tagalog question → Tagalog/Taglish response
 - Match the user's communication style naturally.
 
 ========================================
@@ -3361,33 +3407,73 @@ Treat it as contextual information related to the ongoing issue.
 Continue the troubleshooting flow naturally.
 
 ========================================
-6. RESPONSE FORMAT
+6. RESPONSE FORMAT RULES
 ========================================
 
 - Keep responses short and readable.
-- Use numbered steps only if needed.
-- Avoid walls of text.
 - Go straight to the point.
+- Give ONLY the direct answer based on the Retrieved Context.
+- Stop the response once the answer is complete.
+- Do NOT add unnecessary follow-ups or extra conversation.
+
+Do NOT add:
+- "let me know"
+- "good luck"
+- "anything else?"
+- "gusto mo bang gumawa ng ticket?"
+- additional reminders
+- repeated explanations
+
+GOOD:
+"Hi Marjohn, mukhang kailangan muna ng manual rollback tapos i-reupload ulit."
+
+BAD:
+"I-request mo sa IT..."
+"Let me know..."
+"Gusto mo bang..."
+"Good luck."
 
 ========================================
-7. ESCALATION RULE
+7. ACTION DETECTION RULES
 ========================================
 
-If the issue requires IT intervention (e.g., physical damage like a bloated battery, system access, or documented steps have failed), simply advise the user that the IT Helpdesk needs to check it.
-- NEVER say "I will submit a ticket for you."
-- NEVER ask the user for details to put in a ticket. 
-- Just tell them to reach out to IT or request support.
+Use "show_ticket" ONLY if:
+- the Retrieved Context explicitly says to contact IT/Helpdesk/Facilities
+- the user explicitly asks to create a ticket
+- onsite repair or physical fixing is required
+- the issue clearly cannot be resolved by the employee alone
 
-Escalation Example: "Naku, kapag bloated na ang battery, kailangan na talaga 'yan palitan. Pa-check mo na agad sa IT para ma-replace."
-Escalation Example: "Since di nag-work yung reset, baka sa account side na yung problem. Kailangan na 'to ma-check ng Helpdesk."
+Use "show_resolve" ONLY if:
+- the user clearly confirms the issue is fixed
+- the assistant explicitly asks if the issue can be closed
+
+Otherwise use:
+"action": "none"
 
 ========================================
-8. FORBIDDEN
+8. RESOLUTION MESSAGE RULES
+========================================
+
+If action is "show_ticket":
+- provide a short natural Taglish message
+Example:
+"Gusto mo bang gawan na natin ng ticket 'to?"
+
+If action is "show_resolve":
+- provide a short natural Taglish message
+Example:
+"Pwede na ba natin i-close 'tong chat?"
+
+If action is "none":
+- resolution_message MUST be null
+
+========================================
+9. FORBIDDEN
 ========================================
 
 NEVER mention:
 - AI
-- database
+- database retrieval
 - retrieved context
 - system prompts
 - embeddings
@@ -3413,27 +3499,24 @@ DEFAULT_REFORMULATOR_PROMPT = (
 # ESCALATION DRAFTING
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are an expert Helpdesk Dispatcher.\n"
-    "Read the chat transcript and extract the issue into a clean operational ticket.\n\n"
-    "You MUST output EXACTLY a valid JSON object with these keys:\n"
-    "- summary\n"
-    "- description\n\n"
-    "Rules for summary:\n"
-    "- 3 to 8 words only\n"
-    "- Operational issue title\n"
-    "- No punctuation spam\n\n"
-    "Rules for description:\n"
-    "- Extremely concise\n"
-    "- Neutral technician-style wording\n"
-    "- Mention reported issue\n"
-    "- Mention attempted troubleshooting if present\n"
-    "- 1 to 5 sentences maximum\n"
-    "- Match transcript language naturally\n"
-    "- NEVER use first-person pronouns\n\n"
-    "Do NOT include markdown.\n"
-    "Output RAW JSON ONLY.\n\n"
-    "Transcript:\n{transcript}\n\n"
-    "JSON Output:"
+    "You are an expert IT Helpdesk Dispatcher.\n"
+    "Read the chat transcript and extract the core issue into a clean, tagalog/taglish 20 yrs old filipino operational ticket for the live agents.\n\n"
+    "CRITICAL RULES:\n"
+    "1. Think step-by-step in the 'reasoning' field. Identify the specific device, location, error codes, and what troubleshooting steps the user already tried.\n"
+    "2. Keep the 'summary' between 3 to 8 words (e.g., 'Aircon not cooling in HR office').\n"
+    "3. Write a 'description' that is highly technical, neutral, and actionable. Explicitly list the details you inferred in step 1.\n"
+    "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "reasoning": "Analysis of the user\'s problem, extracting devices, errors, and failed steps",\n'
+    '  "summary": "Short operational title",\n'
+    '  "description": "Concise technician-style summary of the issue, including environment details and steps already taken."\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
 )
 
 # =========================================================
@@ -3456,10 +3539,16 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
         '  "department_name": "string",\n'
         '  "subcategory_name": "string",\n'
         '  "confidence": float (0.0 to 1.0),\n'
-        '  "reasoning": "string" (1-sentence technical explanation)\n'
+        '  "reasoning": "string" (1-sentence technical explanation),\n'
+        '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
         "}}\n\n"
         "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
         "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+        "INSTRUCTIONS:\n"
+        "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
+        "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
+        "- Choose the single best department and subcategory from the taxonomy.\n"
+        "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
         "JSON OUTPUT:"
     )
 
@@ -3469,40 +3558,21 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
 # CONVERSATION RESOLUTION
 # =========================================================
 CONVERSATION_RESOLUTION_PROMPT = """
-You are a conversation resolution analyzer for an IT Helpdesk AI assistant.
-Your job is to determine the current state of the troubleshooting session based on:
-- the latest user message
-- the AI response
-- recent conversation history
+You are a conversation analyzer for an IT Helpdesk AI.
+Determine what UI action should be taken based on the chat state.
 
 You MUST return ONLY valid JSON.
 
-CRITICAL RULES:
-1. MUTUAL EXCLUSIVITY: "show_resolution_prompt" and "allow_ticket_submission" CANNOT both be true.
-2. THE "RESOLVED" TRIGGER:
-Set "show_resolution_prompt" to true ONLY IF:
-- "conversation_status" is "resolved_candidate"
-- OR the AI proactively asks if the issue is resolved (e.g., "pwede na ba natin i-close 'tong chat?")
-* If this is true, "allow_ticket_submission" MUST be false.
+Choose ONLY ONE "action" based on these rules:
+- "show_ticket": The AI mentions, suggests, or advises contacting IT/Facilities/Helpdesk (even conditionally, like "pag di gumana, contact IT"), OR the user explicitly asks for a ticket, OR the issue involves physical office equipment (e.g., aircon, printer, hardware) that employees cannot fix themselves.
+- "show_resolve": The user confirms the issue is fixed, OR the AI proactively asked if the chat can be closed.
+- "none": The troubleshooting is still active and neither of the above apply.
 
-3. THE "TICKET" TRIGGER:
-Set "allow_ticket_submission" to true ONLY IF:
-- the issue is still ongoing and unsolved.
-- OR the AI proactively suggests submitting a ticket (e.g., "Gusto mo na bang mag-submit ng ticket?", "Pa-check mo na agad sa IT").
-* If this is true, "show_resolution_prompt" MUST be false.
-
-4. THE "UI TRICK" MESSAGE:
-If you set either trigger to true, you MUST provide a "resolution_message".
-- This is a natural Taglish follow-up question from the AI (e.g., "Pwede na ba nating i-close 'tong chat?", "Gusto mo bang gawan na natin ng ticket 'to para ma-check ng IT?").
-- If the AI already asked a similar question in its latest response, set "resolution_message" to null.
-- If neither trigger is active, set "resolution_message" to null.
+If action is "show_ticket" or "show_resolve", you MUST provide a natural Taglish "resolution_message" (e.g., "Gusto mo bang gawan na natin ng ticket 'to para ma-schedule na nila?", "Pwede na ba natin i-close 'tong chat?"). Otherwise, set it to null.
 
 Return EXACTLY this JSON schema:
 {{
-  "show_resolution_prompt": boolean,
-  "allow_ticket_submission": boolean,
-  "conversation_status": "active" | "resolved_candidate",
-  "resolution_confidence": float,
+  "action": "show_ticket" | "show_resolve" | "none",
   "resolution_message": string | null
 }}
 
@@ -3534,19 +3604,31 @@ def build_consolidation_prompt(cluster_payloads: list[str]) -> str:
     )
 
 
-def build_document_classifier_prompt(snippet: str,allowed_categories: str,) -> str:
-        return (
-            "You are an IT categorization AI. "
-            "Read this document snippet:\n\n"
-            "{snippet}\n\n"
-            "Categorize it into EXACTLY ONE of these categories:\n"
-            "{allowed_categories}\n\n"
-            "Reply with ONLY the exact category name. "
-            "Do not add punctuation or extra words."
-        ).format(
-            snippet=snippet,
-            allowed_categories=allowed_categories,
-        )
+def build_document_classifier_prompt(snippet: str, allowed_categories: str) -> str:
+    return (
+        "You are an expert IT Knowledge Base Categorizer.\n"
+        "Analyze the document snippet and determine the most appropriate category.\n\n"
+        "ALLOWED CATEGORIES:\n"
+        "{allowed_categories}\n\n"
+        "RULES:\n"
+        "1. You MUST choose EXACTLY ONE category from the list above.\n"
+        "2. If the document covers multiple topics, choose the primary one.\n"
+        "3. If no category fits perfectly, choose 'General_IT'.\n"
+        "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
+        "REQUIRED JSON SCHEMA:\n"
+        "{{\n"
+        '  "reasoning": "Brief 1-sentence technical explanation of why this category fits",\n'
+        '  "category": "Exact Category Name"\n'
+        "}}\n\n"
+        "DOCUMENT SNIPPET:\n"
+        "=================\n"
+        "{snippet}\n"
+        "=================\n\n"
+        "JSON OUTPUT:"
+    ).format(
+        snippet=snippet,
+        allowed_categories=allowed_categories,
+    )
 
 
 --- FILE: backend\app\services\analytics\__init__.py ---
@@ -3623,6 +3705,11 @@ from app.services.llm_client import create_llm
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
 
+from app.services.routing.routing_engine import suggest_route
+from app.schemas.routing import RoutingRequest
+from app.services.retrieval.vector_store import get_shared_vector_store
+from app.services.retrieval.embedding_provider import get_embedding_model
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -3648,9 +3735,10 @@ class EscalationService:
         self.repo = ChatRepository(db)
         self.message_svc = MessageService(db)
 
+
     async def draft_escalation(self, session_id: str) -> dict:
         """
-        Generate a ticket escalation draft from chat transcript.
+        Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
         session = self.repo.validate_session_for_escalation(session_id)
@@ -3659,12 +3747,16 @@ class EscalationService:
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        llm = create_llm(model=runtime_config.escalation_draft_model,temperature=0.0,)
+        # --- 1. AI DRAFTS THE TICKET ---
+        llm = create_llm(model=runtime_config.escalation_draft_model, temperature=0.0)
         
-        prompt = runtime_config.escalation_draft_prompt.format(transcript=transcript,)
+        prompt = runtime_config.escalation_draft_prompt.replace(
+            "{transcript}", transcript
+        )
 
         result = await llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
+        logger.info("Escalation LLM raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
 
         if not extracted_data:
@@ -3673,18 +3765,69 @@ class EscalationService:
 
         summary = extracted_data.get("summary") or "AI Escalation Issue"
         description = extracted_data.get("description") or "Escalated from AI Chatbot"
-        routing = FALLBACK_ROUTING
+        logger.info("Escalation draft parsed summary='%s', description='%s'", summary, description)
 
+        # --- 2. AI PREDICTS THE ROUTING ---
+        try:
+            logger.info("Passing drafted ticket to Routing Engine...")
+            vector_store = get_shared_vector_store()
+            embeddings = get_embedding_model()
+            
+            routing_req = RoutingRequest(summary=summary, description=description)
+            
+            routing_response = await suggest_route(
+                request=routing_req,
+                db=self.db,
+                qdrant=vector_store.qdrant,
+                embeddings=embeddings,
+                collection_name=settings.QDRANT_ROUTING_COLLECTION,
+            )
+            
+            # Extract predictions from RoutingResponse
+            suggestion = routing_response.suggestion
+            predicted_dept_id = suggestion.department_id
+            predicted_subcat_id = suggestion.subcategory_id
+            predicted_dept_name = suggestion.department_name
+            predicted_subcat_name = suggestion.subcategory_name
+            routing_confidence = suggestion.confidence_score
+            routing_reasoning = suggestion.reasoning
+            routing_analysis = suggestion.analysis
+            routing_source = "ai_rac_pipeline"
+            logger.info(
+                "Escalation routing chosen department=%s (%s), subcategory=%s (%s), confidence=%s",
+                predicted_dept_name,
+                predicted_dept_id,
+                predicted_subcat_name,
+                predicted_subcat_id,
+                routing_confidence,
+            )
+            logger.info("Escalation routing analysis: %s", routing_analysis)
+            
+        except Exception as e:
+            logger.error("Routing engine failed during escalation draft: %s", e)
+            # Safe fallback if the routing engine crashes
+            predicted_dept_id = FALLBACK_ROUTING["department_id"]
+            predicted_subcat_id = FALLBACK_ROUTING["subcategory_id"]
+            predicted_dept_name = FALLBACK_ROUTING["department_name"]
+            predicted_subcat_name = FALLBACK_ROUTING["subcategory_name"]
+            routing_confidence = 0.0
+            routing_reasoning = "Routing engine failed."
+            routing_source = FALLBACK_ROUTING["routing_source"]
+            routing_analysis = "Routing engine failed."
+
+        # --- 3. RETURN COMBO TO FRONTEND ---
         return {
             "status": "success",
             "summary": summary,
             "description": description,
-            "department_id": routing["department_id"],
-            "department_name": routing["department_name"],
-            "subcategory_id": routing["subcategory_id"],
-            "subcategory_name": routing["subcategory_name"],
-            "routing_confidence": routing["confidence"],
-            "routing_source": routing["routing_source"],
+            "department_id": predicted_dept_id,
+            "department_name": predicted_dept_name,
+            "subcategory_id": predicted_subcat_id,
+            "subcategory_name": predicted_subcat_name,
+            "routing_confidence": routing_confidence,
+            "routing_reasoning": routing_reasoning,
+            "routing_analysis": routing_analysis,
+            "routing_source": "ai_rac_pipeline",
         }
 
     async def submit_escalation(self, payload: dict) -> dict:
@@ -5754,16 +5897,32 @@ class PDFProcessor:
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"document_{key}"))
 
     async def _classify_document(self, text: str, allowed_categories: list[str]) -> str:
-        snippet = text[:3000]
+        snippet = text[:12000]
         try:
-            llm = create_llm(model=self.runtime_config.document_classifier_model,temperature=0.0,)
-            prompt = self.runtime_config.document_classifier_prompt.format(snippet=snippet,allowed_categories=allowed_categories,)
-            category = (await llm.ainvoke(prompt)).content.strip(" \"'\n")
+            llm = create_llm(model=self.runtime_config.document_classifier_model, temperature=0.0)
+            prompt = self.runtime_config.document_classifier_prompt.replace(
+                "{snippet}", snippet
+            ).replace(
+                "{allowed_categories}", str(allowed_categories)
+            )
+            
+            # --- NEW JSON PARSING LOGIC ---
+            from app.utils.json_utils import clean_llm_json_output, safe_json_loads
+            raw_response = (await llm.ainvoke(prompt)).content
+            cleaned_response = clean_llm_json_output(raw_response)
+            parsed_json = safe_json_loads(cleaned_response, context="document_classification")
+            
+            # Extract the category from the JSON
+            category = parsed_json.get("category", "").strip()
+            
             if category in allowed_categories:
+                logger.info("AI classified document as %s. Reasoning: %s", category, parsed_json.get("reasoning", "None"))
                 return category
+                
             logger.warning("AI returned invalid category '%s'; using General_IT.", category)
         except Exception as exc:
             logger.error("Document classification failed: %s", exc)
+            
         return "General_IT"
 
     @staticmethod
@@ -6044,6 +6203,19 @@ class AnswerGenerator:
             f"User Query: {user_query}"
         )
 
+        # Append strict JSON output instruction so the main AI replies using
+        # the agreed schema. The LLM should output RAW JSON only.
+        json_instruction = (
+            "\n\nAfter producing the assistant reply, RETURN EXACTLY this JSON schema (RAW JSON ONLY):\n"
+            "{ \"response\": string, \"action\": \"show_ticket\" | \"show_resolve\" | \"none\", \"resolution_message\": string | null }\n"
+            "- `response`: the assistant text shown to the user.\n"
+            "- `action`: determines UI behavior.\n"
+            "- `resolution_message`: optional short Taglish message for the UI, or null.\n"
+            "DO NOT output any extra text, explanation, or markdown fences."
+        )
+
+        final_prompt = f"{final_prompt}{json_instruction}"
+
         llm = create_llm(model=model, temperature=temperature)
         result = await llm.ainvoke(final_prompt)
         return result.content
@@ -6134,6 +6306,7 @@ from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.reranker_service import RerankerService
 from app.services.rag.answer_generator import AnswerGenerator
 from app.services.prompts import DEFAULT_SYSTEM_PROMPT
+from app.utils.json_utils import safe_json_loads
 
 logger = logging.getLogger(__name__)
 
@@ -6198,8 +6371,8 @@ class SupportOrchestrator:
         chat_history: str,
         user_name: str,
         db: Session,
-    ) -> tuple[str, list[int]]:
-        """Run the full RAG pipeline. Returns (answer, ticket_ids)."""
+    ) -> tuple[str, str, str | None, list[int]]:
+        """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids)."""
         try:
             return await self._run_pipeline(user_query, chat_history, user_name, db, debug=False)
         except Exception as exc:
@@ -6249,7 +6422,8 @@ class SupportOrchestrator:
                     "final_answer": greeting_response,
                     "ticket_ids_used": [],
                 }
-            return greeting_response, []
+            # Non-debug: return standardized 4-tuple
+            return greeting_response, "none", None, []
 
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
@@ -6310,7 +6484,8 @@ class SupportOrchestrator:
                     "final_answer": fallback_msg,
                     "ticket_ids_used": [],
                 }
-            return fallback_msg, []
+            # Non-debug: return standardized 4-tuple
+            return fallback_msg, "none", None, []
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
@@ -6348,7 +6523,8 @@ class SupportOrchestrator:
                     "final_answer": fallback_msg,
                     "ticket_ids_used": [],
                 }
-            return fallback_msg, []
+            # Non-debug: return standardized 4-tuple
+            return fallback_msg, "none", None, []
 
         doc_budget = max(2, int(top_k * 0.4))
         ticket_budget = top_k - doc_budget
@@ -6395,7 +6571,6 @@ class SupportOrchestrator:
             model=main_model,
             temperature=temperature,
         )
-
         if debug:
             debug_retrieval = []
             for hit in final_hits:
@@ -6413,7 +6588,22 @@ class SupportOrchestrator:
                 "ticket_ids_used": ticket_ids,
             }
 
-        return answer, ticket_ids
+        # Try to parse the final answer as the new JSON schema. If the LLM
+        # followed instructions, we'll get a dict with `response`, `action`,
+        # and `resolution_message`. Otherwise fall back to the plain text
+        # answer and use a 'none' action.
+        parsed = safe_json_loads(answer, context="final_answer")
+
+        if isinstance(parsed, dict) and parsed.get("response"):
+            display_text = str(parsed.get("response") or "")
+            action = str(parsed.get("action") or "none").strip().lower()
+            resolution_message = parsed.get("resolution_message")
+        else:
+            display_text = answer
+            action = "none"
+            resolution_message = None
+
+        return display_text, action, resolution_message, ticket_ids
 
 
 --- FILE: backend\app\services\resolution\__init__.py ---
@@ -6469,28 +6659,32 @@ class ConversationResolutionService:
                 logger.warning("⚠️ RESOLUTION PARSE FAILED - FALLBACK USED")
                 return self._fallback_response()
 
-            # We now trust the LLM's boolean decisions directly if provided,
-            # but we still maintain the resolution_action and conversation_status 
-            # for backward compatibility with the schema.
-            
-            show_resolution_prompt = bool(parsed.get("show_resolution_prompt", False))
-            allow_ticket_submission = bool(parsed.get("allow_ticket_submission", True))
+            # Using the new, clean categorical logic!
+            action = str(parsed.get("action", "none")).strip().lower()
             resolution_message = parsed.get("resolution_message")
-            conversation_status = str(parsed.get("conversation_status", "active")).strip().lower()
-            confidence = float(parsed.get("resolution_confidence", 0.0))
-
-            # --- MUTUAL EXCLUSIVITY SAFEGUARD ---
-            # If the AI wants to show the resolution prompt (Resolved button),
-            # we must NOT allow ticket submission in the same turn.
-            if show_resolution_prompt:
-                allow_ticket_submission = False
             
-            # Map conversation_status to resolution_action for the legacy response_model
-            if conversation_status == "resolved_candidate":
-                resolution_action = "resolved_chat"
-            elif conversation_status == "need_ticket":
+            # Default values
+            show_resolution_prompt = False
+            allow_ticket_submission = False
+            conversation_status = "active"
+            resolution_action = "active"
+            confidence = 1.0 # High confidence for categorical choice
+
+            if action == "show_ticket":
+                show_resolution_prompt = False # Hide resolve button
+                allow_ticket_submission = True # Show ticket button
+                conversation_status = "need_ticket"
                 resolution_action = "need_ticket"
+            elif action == "show_resolve":
+                show_resolution_prompt = True # Show resolve button
+                allow_ticket_submission = False # Hide ticket button
+                conversation_status = "resolved_candidate"
+                resolution_action = "resolved_chat"
             else:
+                # 'none' action
+                show_resolution_prompt = False
+                allow_ticket_submission = False
+                conversation_status = "active"
                 resolution_action = "active"
 
             response_data = {
@@ -6513,7 +6707,7 @@ class ConversationResolutionService:
         return {
             "resolution_action": "active",
             "show_resolution_prompt": False,
-            "allow_ticket_submission": True,
+            "allow_ticket_submission": False,
             "conversation_status": "active",
             "resolution_confidence": 0.0,
             "resolution_message": None,
@@ -6914,7 +7108,8 @@ async def suggest_route(
     search_text = f"ISSUE: {request.summary}\nDETAILS: {request.description}"
     query_vector = await asyncio.to_thread(embeddings.embed_query, search_text)
 
-    routing_collection = getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
+    routing_collection = collection_name or getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
+    logger.debug("Routing query collection: %s", routing_collection)
     search_results = qdrant.query_points(
         collection_name=routing_collection,
         query=query_vector,
@@ -6952,17 +7147,20 @@ async def suggest_route(
         predicted_subcat_name = parsed_routing.get("subcategory_name", parsed_routing.get("subcategory", "OTHERS"))
         confidence = float(parsed_routing.get("confidence", 0.0))
         reasoning = parsed_routing.get("reasoning", "Parsed successfully but reasoning missing.")
+        analysis = parsed_routing.get("analysis", "No analysis provided.")
 
     except json.JSONDecodeError as e:
         logger.error("Failed to parse LLM JSON: %s\nRaw: %s", e, raw_output)
         predicted_dept_id, predicted_subcat_id = FALLBACK_DEPT_ID, FALLBACK_SUBCAT_ID
         predicted_dept_name, predicted_subcat_name = "System_Error", "Parsing_Failed"
         confidence, reasoning = 0.0, "AI evaluation failed to produce valid JSON."
+        analysis = "AI evaluation failed to produce valid JSON."
     except Exception as e:
         logger.error("Unexpected routing error: %s", e)
         predicted_dept_id, predicted_subcat_id = FALLBACK_DEPT_ID, FALLBACK_SUBCAT_ID
         predicted_dept_name, predicted_subcat_name = "System_Error", "API_Failed"
         confidence, reasoning = 0.0, str(e)
+        analysis = str(e)
 
     (
         predicted_dept_id,
@@ -6996,6 +7194,7 @@ async def suggest_route(
 
     logger.info("Routing complete [LogID: %s] | Dept ID: %d -> Subcat ID: %d",
                 routing_log.LogID, predicted_dept_id, predicted_subcat_id)
+    logger.info("Routing analysis: %s", analysis)
 
     return RoutingResponse(
         status="success",
@@ -7007,6 +7206,7 @@ async def suggest_route(
             subcategory_name=predicted_subcat_name,
             confidence_score=confidence,
             reasoning=reasoning,
+            analysis=analysis,
         )
     )
 
@@ -7043,7 +7243,7 @@ from app.services.prompts import (
 )
 
 
-DEFAULT_ROUTING_MODEL = "llama-3.1-8b-instant"
+DEFAULT_ROUTING_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_DOCUMENT_CLASSIFIER_MODEL = "llama-3.1-8b-instant"
 DEFAULT_ESCALATION_MODEL = "llama-3.1-8b-instant"
 DEFAULT_CONVERSATION_RESOLUTION_MODEL = "llama-3.1-8b-instant"

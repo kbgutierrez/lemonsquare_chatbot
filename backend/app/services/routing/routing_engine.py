@@ -74,7 +74,8 @@ async def suggest_route(
     search_text = f"ISSUE: {request.summary}\nDETAILS: {request.description}"
     query_vector = await asyncio.to_thread(embeddings.embed_query, search_text)
 
-    routing_collection = getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
+    routing_collection = collection_name or getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
+    logger.debug("Routing query collection: %s", routing_collection)
     search_results = qdrant.query_points(
         collection_name=routing_collection,
         query=query_vector,
@@ -112,17 +113,20 @@ async def suggest_route(
         predicted_subcat_name = parsed_routing.get("subcategory_name", parsed_routing.get("subcategory", "OTHERS"))
         confidence = float(parsed_routing.get("confidence", 0.0))
         reasoning = parsed_routing.get("reasoning", "Parsed successfully but reasoning missing.")
+        analysis = parsed_routing.get("analysis", "No analysis provided.")
 
     except json.JSONDecodeError as e:
         logger.error("Failed to parse LLM JSON: %s\nRaw: %s", e, raw_output)
         predicted_dept_id, predicted_subcat_id = FALLBACK_DEPT_ID, FALLBACK_SUBCAT_ID
         predicted_dept_name, predicted_subcat_name = "System_Error", "Parsing_Failed"
         confidence, reasoning = 0.0, "AI evaluation failed to produce valid JSON."
+        analysis = "AI evaluation failed to produce valid JSON."
     except Exception as e:
         logger.error("Unexpected routing error: %s", e)
         predicted_dept_id, predicted_subcat_id = FALLBACK_DEPT_ID, FALLBACK_SUBCAT_ID
         predicted_dept_name, predicted_subcat_name = "System_Error", "API_Failed"
         confidence, reasoning = 0.0, str(e)
+        analysis = str(e)
 
     (
         predicted_dept_id,
@@ -156,6 +160,7 @@ async def suggest_route(
 
     logger.info("Routing complete [LogID: %s] | Dept ID: %d -> Subcat ID: %d",
                 routing_log.LogID, predicted_dept_id, predicted_subcat_id)
+    logger.info("Routing analysis: %s", analysis)
 
     return RoutingResponse(
         status="success",
@@ -167,5 +172,6 @@ async def suggest_route(
             subcategory_name=predicted_subcat_name,
             confidence_score=confidence,
             reasoning=reasoning,
+            analysis=analysis,
         )
     )

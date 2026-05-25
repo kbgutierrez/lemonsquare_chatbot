@@ -258,27 +258,24 @@ DEFAULT_REFORMULATOR_PROMPT = (
 # ESCALATION DRAFTING
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are an expert Helpdesk Dispatcher.\n"
-    "Read the chat transcript and extract the issue into a clean operational ticket.\n\n"
-    "You MUST output EXACTLY a valid JSON object with these keys:\n"
-    "- summary\n"
-    "- description\n\n"
-    "Rules for summary:\n"
-    "- 3 to 8 words only\n"
-    "- Operational issue title\n"
-    "- No punctuation spam\n\n"
-    "Rules for description:\n"
-    "- Extremely concise\n"
-    "- Neutral technician-style wording\n"
-    "- Mention reported issue\n"
-    "- Mention attempted troubleshooting if present\n"
-    "- 1 to 5 sentences maximum\n"
-    "- Match transcript language naturally\n"
-    "- NEVER use first-person pronouns\n\n"
-    "Do NOT include markdown.\n"
-    "Output RAW JSON ONLY.\n\n"
-    "Transcript:\n{transcript}\n\n"
-    "JSON Output:"
+    "You are an expert IT Helpdesk Dispatcher.\n"
+    "Read the chat transcript and extract the core issue into a clean, tagalog/taglish 20 yrs old filipino operational ticket for the live agents.\n\n"
+    "CRITICAL RULES:\n"
+    "1. Think step-by-step in the 'reasoning' field. Identify the specific device, location, error codes, and what troubleshooting steps the user already tried.\n"
+    "2. Keep the 'summary' between 3 to 8 words (e.g., 'Aircon not cooling in HR office').\n"
+    "3. Write a 'description' that is highly technical, neutral, and actionable. Explicitly list the details you inferred in step 1.\n"
+    "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "reasoning": "Analysis of the user\'s problem, extracting devices, errors, and failed steps",\n'
+    '  "summary": "Short operational title",\n'
+    '  "description": "Concise technician-style summary of the issue, including environment details and steps already taken."\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
 )
 
 # =========================================================
@@ -301,10 +298,16 @@ def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrie
         '  "department_name": "string",\n'
         '  "subcategory_name": "string",\n'
         '  "confidence": float (0.0 to 1.0),\n'
-        '  "reasoning": "string" (1-sentence technical explanation)\n'
+        '  "reasoning": "string" (1-sentence technical explanation),\n'
+        '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
         "}}\n\n"
         "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
         "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+        "INSTRUCTIONS:\n"
+        "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
+        "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
+        "- Choose the single best department and subcategory from the taxonomy.\n"
+        "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
         "JSON OUTPUT:"
     )
 
@@ -360,16 +363,28 @@ def build_consolidation_prompt(cluster_payloads: list[str]) -> str:
     )
 
 
-def build_document_classifier_prompt(snippet: str,allowed_categories: str,) -> str:
-        return (
-            "You are an IT categorization AI. "
-            "Read this document snippet:\n\n"
-            "{snippet}\n\n"
-            "Categorize it into EXACTLY ONE of these categories:\n"
-            "{allowed_categories}\n\n"
-            "Reply with ONLY the exact category name. "
-            "Do not add punctuation or extra words."
-        ).format(
-            snippet=snippet,
-            allowed_categories=allowed_categories,
-        )
+def build_document_classifier_prompt(snippet: str, allowed_categories: str) -> str:
+    return (
+        "You are an expert IT Knowledge Base Categorizer.\n"
+        "Analyze the document snippet and determine the most appropriate category.\n\n"
+        "ALLOWED CATEGORIES:\n"
+        "{allowed_categories}\n\n"
+        "RULES:\n"
+        "1. You MUST choose EXACTLY ONE category from the list above.\n"
+        "2. If the document covers multiple topics, choose the primary one.\n"
+        "3. If no category fits perfectly, choose 'General_IT'.\n"
+        "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
+        "REQUIRED JSON SCHEMA:\n"
+        "{{\n"
+        '  "reasoning": "Brief 1-sentence technical explanation of why this category fits",\n'
+        '  "category": "Exact Category Name"\n'
+        "}}\n\n"
+        "DOCUMENT SNIPPET:\n"
+        "=================\n"
+        "{snippet}\n"
+        "=================\n\n"
+        "JSON OUTPUT:"
+    ).format(
+        snippet=snippet,
+        allowed_categories=allowed_categories,
+    )

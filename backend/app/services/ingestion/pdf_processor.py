@@ -64,16 +64,32 @@ class PDFProcessor:
         return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"document_{key}"))
 
     async def _classify_document(self, text: str, allowed_categories: list[str]) -> str:
-        snippet = text[:3000]
+        snippet = text[:12000]
         try:
-            llm = create_llm(model=self.runtime_config.document_classifier_model,temperature=0.0,)
-            prompt = self.runtime_config.document_classifier_prompt.format(snippet=snippet,allowed_categories=allowed_categories,)
-            category = (await llm.ainvoke(prompt)).content.strip(" \"'\n")
+            llm = create_llm(model=self.runtime_config.document_classifier_model, temperature=0.0)
+            prompt = self.runtime_config.document_classifier_prompt.replace(
+                "{snippet}", snippet
+            ).replace(
+                "{allowed_categories}", str(allowed_categories)
+            )
+            
+            # --- NEW JSON PARSING LOGIC ---
+            from app.utils.json_utils import clean_llm_json_output, safe_json_loads
+            raw_response = (await llm.ainvoke(prompt)).content
+            cleaned_response = clean_llm_json_output(raw_response)
+            parsed_json = safe_json_loads(cleaned_response, context="document_classification")
+            
+            # Extract the category from the JSON
+            category = parsed_json.get("category", "").strip()
+            
             if category in allowed_categories:
+                logger.info("AI classified document as %s. Reasoning: %s", category, parsed_json.get("reasoning", "None"))
                 return category
+                
             logger.warning("AI returned invalid category '%s'; using General_IT.", category)
         except Exception as exc:
             logger.error("Document classification failed: %s", exc)
+            
         return "General_IT"
 
     @staticmethod
