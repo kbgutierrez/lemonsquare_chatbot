@@ -280,8 +280,8 @@ const KnowledgeFilesSection = () => {
                       <div
                         className={`
                           flex
-                          h-9
-                          w-9
+                          h-6
+                          w-6
                           items-center
                           justify-center
 
