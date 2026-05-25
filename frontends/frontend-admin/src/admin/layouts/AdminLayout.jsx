@@ -6,6 +6,7 @@ const AdminLayout = ({ children }) => {
         flex
         h-[100dvh]
         min-h-[100dvh]
+        w-full
         overflow-hidden
       "
       style={{
@@ -62,6 +63,7 @@ const AdminLayout = ({ children }) => {
           flex
           h-full
           w-full
+          min-w-0
         "
       >
         {children}

@@ -147,21 +147,24 @@ const AdminDashboard = () => {
           h-full
           min-h-0
           w-full
-          gap-4
-          p-2
-          sm:p-3
-          md:p-4
+          overflow-hidden
         "
       >
+        {/* LEFT SPACING */}
+        <div className="hidden lg:block w-0" />
+
         {/* DESKTOP SIDEBAR */}
         <aside
-          style={{ width: `${sidebarWidth}px` }}
           className="
             hidden
+            h-full
             shrink-0
             overflow-hidden
             lg:flex
           "
+          style={{
+            width: `${sidebarWidth}px`,
+          }}
         >
           <SidebarMenu
             activeView={activeView}
@@ -177,27 +180,26 @@ const AdminDashboard = () => {
           className="
             group
             hidden
-            w-1
+            h-full
+            w-[8px]
             cursor-col-resize
-            rounded-full
             transition-all
             duration-200
             lg:block
           "
-          style={{
-            background: "transparent",
-          }}
         >
           <div
             className="
+              mx-auto
               h-full
-              w-full
-              rounded-full
+              w-[2px]
               transition-all
               duration-200
+              group-hover:bg-yellow-400/40
             "
             style={{
-              background: "rgba(245, 213, 71, 0.15)",
+              background:
+                "rgba(255,255,255,0.05)",
             }}
           />
         </div>
@@ -211,41 +213,11 @@ const AdminDashboard = () => {
             flex-1
             flex-col
             overflow-hidden
-            rounded-[24px]
-            md:rounded-[32px]
-            backdrop-blur-xl
+            px-4
+            py-4
+            lg:pr-5
           "
-          style={{
-            border: "1px solid var(--border)",
-            background: "var(--glass-bg)",
-            boxShadow: "var(--shadow-lg)",
-          }}
         >
-          {/* INNER EFFECTS */}
-          <div className="pointer-events-none absolute inset-0">
-            <div
-              className="absolute inset-x-0 top-0 h-px"
-              style={{
-                background: "var(--glass-border)",
-              }}
-            />
-
-            <div
-              className="
-                absolute
-                right-0
-                top-0
-                h-72
-                w-72
-                rounded-full
-                blur-3xl
-              "
-              style={{
-                background: "var(--bg-glow-primary)",
-              }}
-            />
-          </div>
-
           {/* CONTENT WRAPPER */}
           <div
             className="
@@ -256,9 +228,6 @@ const AdminDashboard = () => {
               flex-1
               flex-col
               overflow-hidden
-              p-3
-              sm:p-4
-              md:p-5
             "
           >
             {/* MOBILE HEADER SPACING */}
@@ -270,6 +239,17 @@ const AdminDashboard = () => {
             </div>
           </div>
         </main>
+
+        {/* RIGHT SPACING */}
+        <div
+          className="
+            hidden
+            lg:block
+          "
+          style={{
+            width: "16px",
+          }}
+        />
       </div>
     </AdminLayout>
   )

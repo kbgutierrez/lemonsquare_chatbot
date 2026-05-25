@@ -24,6 +24,10 @@ const SidebarMenu = ({
     adminUser?.name ||
     "Authenticated User"
 
+  const displayRole =
+    adminUser?.role ||
+    "Administrator"
+
   /* ========================================
      CLASS HELPERS
   ======================================== */
@@ -41,18 +45,18 @@ const SidebarMenu = ({
         flex
         flex-col
         gap-4
-        px-4
+        px-5
         py-5
       `
 
   const logoutLayout =
     isMobile
-      ? "w-full px-4 py-3"
-      : "h-11 w-11"
+      ? "w-full px-4 py-3 rounded-xl"
+      : "h-11 w-11 rounded-xl"
 
   return (
     <aside
-      className="
+      className={`
         flex
         h-full
         min-h-0
@@ -60,17 +64,17 @@ const SidebarMenu = ({
         flex-col
         overflow-hidden
 
-        rounded-[28px]
+        border-r
 
-        p-3
+        shadow-[0_10px_40px_rgba(0,0,0,0.12)]
 
-        shadow-[0_10px_40px_rgba(0,0,0,0.18)]
+        select-none
 
-        sm:p-4
-      "
+        ${isMobile ? "rounded-r-3xl" : ""}
+      `}
       style={{
-        border:
-          "1px solid var(--border)",
+        borderColor:
+          "var(--border)",
 
         background:
           "var(--panel)",
@@ -80,16 +84,16 @@ const SidebarMenu = ({
       {/* HEADER */}
       <div
         className={`
-          mb-6
+          mb-5
           shrink-0
 
-          rounded-3xl
+          border-b
 
           ${headerLayout}
         `}
         style={{
-          border:
-            "1px solid var(--border)",
+          borderColor:
+            "var(--border)",
 
           background:
             "var(--panel-light)",
@@ -114,7 +118,7 @@ const SidebarMenu = ({
               h-auto
 
               w-full
-              max-w-[140px]
+              max-w-[150px]
 
               object-contain
             "
@@ -137,6 +141,16 @@ const SidebarMenu = ({
             className="
               min-w-0
               flex-1
+
+              rounded-xl
+
+              px-3
+              py-2
+
+              transition-all
+              duration-200
+
+              hover:bg-white/[0.04]
             "
           >
 
@@ -155,6 +169,22 @@ const SidebarMenu = ({
               {displayName}
             </h2>
 
+            <p
+              className="
+                mt-0.5
+
+                truncate
+
+                text-xs
+              "
+              style={{
+                color:
+                  "var(--text-secondary)",
+              }}
+            >
+              {displayRole}
+            </p>
+
           </div>
 
           {/* LOGOUT */}
@@ -169,8 +199,6 @@ const SidebarMenu = ({
               items-center
               justify-center
               gap-2
-
-              rounded-2xl
 
               transition-all
               duration-200
@@ -222,7 +250,7 @@ const SidebarMenu = ({
           mb-3
           shrink-0
 
-          px-2
+          px-4
         "
       >
 
@@ -253,7 +281,8 @@ const SidebarMenu = ({
           overflow-y-auto
           overflow-x-hidden
 
-          pr-1
+          px-3
+          pb-3
 
           [scrollbar-width:none]
 
@@ -265,7 +294,7 @@ const SidebarMenu = ({
           className="
             flex
             flex-col
-            gap-2
+            gap-1
           "
         >
 
@@ -298,7 +327,7 @@ const SidebarMenu = ({
                     items-center
                     gap-3
 
-                    rounded-2xl
+                    rounded-xl
 
                     px-3
                     py-3
@@ -307,6 +336,8 @@ const SidebarMenu = ({
 
                     transition-all
                     duration-200
+
+                    hover:bg-white/[0.03]
                   "
                   style={{
                     border:
@@ -340,7 +371,7 @@ const SidebarMenu = ({
                       items-center
                       justify-center
 
-                      rounded-xl
+                      rounded-lg
 
                       transition-all
                       duration-200

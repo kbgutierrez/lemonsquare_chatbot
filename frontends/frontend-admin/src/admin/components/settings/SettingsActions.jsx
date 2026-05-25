@@ -21,9 +21,9 @@ const SettingsActions = ({
         flex-col
         gap-5
 
-        rounded-[32px]
+        rounded-[24px]
 
-        p-7
+        p-5
 
         lg:flex-row
         lg:items-center
@@ -36,7 +36,7 @@ const SettingsActions = ({
         <div>
           <h3
             className="
-              text-lg
+              text-base
               font-semibold
 
               text-[var(--text-primary)]
@@ -68,15 +68,15 @@ const SettingsActions = ({
               items-center
               gap-2
 
-              rounded-2xl
+              rounded-xl
 
               border
               border-emerald-500/20
 
               bg-emerald-500/10
 
-              px-4
-              py-2.5
+              px-3
+              py-2
 
               text-sm
               font-medium
@@ -100,15 +100,15 @@ const SettingsActions = ({
               items-center
               gap-2
 
-              rounded-2xl
+              rounded-xl
 
               border
               border-red-500/20
 
               bg-red-500/10
 
-              px-4
-              py-2.5
+              px-3
+              py-2
 
               text-sm
               font-medium
@@ -135,32 +135,32 @@ const SettingsActions = ({
 
         className="
           inline-flex
-          min-w-[260px]
+          min-w-[210px]
           items-center
           justify-center
-          gap-3
+          gap-2.5
 
-          rounded-3xl
+          rounded-2xl
 
           border
           border-[var(--accent)]/20
 
           bg-[var(--accent)]
 
-          px-8
-          py-5
+          px-6
+          py-3.5
 
-          text-base
+          text-sm
           font-semibold
 
           text-[#1b211e]
 
-          shadow-[0_10px_40px_rgba(245,213,71,0.18)]
+          shadow-[0_8px_28px_rgba(245,213,71,0.16)]
 
           transition-all
           duration-300
 
-          hover:scale-[1.02]
+          hover:scale-[1.015]
           hover:brightness-105
 
           active:scale-[0.99]
@@ -172,19 +172,19 @@ const SettingsActions = ({
         {saving ? (
           <LoaderCircle
             className="
-              h-5
-              w-5
+              h-4.5
+              w-4.5
               animate-spin
             "
           />
         ) : (
-          <Save className="h-5 w-5" />
+          <Save className="h-4.5 w-4.5" />
         )}
 
         {
           saving
-            ? "Saving Configuration..."
-            : "Save AI Configuration"
+            ? "Saving..."
+            : "Save Configuration"
         }
       </button>
     </div>
