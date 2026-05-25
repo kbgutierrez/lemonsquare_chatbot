@@ -297,7 +297,7 @@ const ManualEntriesSection = () => {
                   border
 
                   px-5
-                  py-5
+                  py-3
 
                   transition-all
                   duration-300
