@@ -29,6 +29,8 @@ const EmptyState = ({
           text-center
         "
       >
+
+        {/* ICON */}
         <div
           className="
             muted-card
@@ -42,6 +44,8 @@ const EmptyState = ({
             justify-center
 
             rounded-3xl
+
+            shadow-[var(--shadow-soft)]
           "
         >
           {icon || (
@@ -51,24 +55,30 @@ const EmptyState = ({
                 w-3
 
                 rounded-full
-
-                bg-[var(--accent)]
               "
+              style={{
+                background:
+                  "var(--accent)",
+              }}
             />
           )}
         </div>
 
+        {/* TITLE */}
         <h3
           className="
             text-sm
             font-semibold
-
-            text-[var(--text-primary)]
           "
+          style={{
+            color:
+              "var(--text-primary)",
+          }}
         >
           {title}
         </h3>
 
+        {/* MESSAGE */}
         <p
           className="
             mt-2
@@ -77,18 +87,22 @@ const EmptyState = ({
 
             text-sm
             leading-relaxed
-
-            text-[var(--text-secondary)]
           "
+          style={{
+            color:
+              "var(--text-secondary)",
+          }}
         >
           {message}
         </p>
 
+        {/* ACTION */}
         {action && (
           <div className="mt-5">
             {action}
           </div>
         )}
+
       </div>
     </div>
   )

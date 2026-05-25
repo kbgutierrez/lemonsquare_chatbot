@@ -49,9 +49,12 @@ const LoadingSpinner = ({
           text-center
         "
       >
+
         {/* SPINNER */}
         <div
           className={`
+            muted-card
+
             mb-4
 
             flex
@@ -60,10 +63,7 @@ const LoadingSpinner = ({
 
             rounded-3xl
 
-            border
-            border-[#2b3933]
-
-            bg-[#18211f]
+            shadow-[var(--shadow-soft)]
 
             ${spinnerSize}
           `}
@@ -72,10 +72,12 @@ const LoadingSpinner = ({
             className={`
               animate-spin
 
-              text-[#f5d547]
-
               ${iconSize}
             `}
+            style={{
+              color:
+                "var(--accent)",
+            }}
           />
         </div>
 
@@ -84,12 +86,15 @@ const LoadingSpinner = ({
           className="
             text-sm
             font-medium
-
-            text-[#c7d3ce]
           "
+          style={{
+            color:
+              "var(--text-secondary)",
+          }}
         >
           {label}
         </p>
+
       </div>
     </div>
   )

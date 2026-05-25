@@ -1,38 +1,79 @@
-import { useState } from "react"
-import { ShieldCheck, Loader2 } from "lucide-react"
-import { apiClient } from "../../shared/api/client"
-import API_ENDPOINTS from "../../shared/api/endpoints"
+import { useState }
+  from "react"
 
-const LoginPage = ({ onLogin }) => {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState("")
+import {
+  Loader2,
+} from "lucide-react"
+
+import { apiClient }
+  from "../../shared/api/client"
+
+import API_ENDPOINTS
+  from "../../shared/api/endpoints"
+
+import LemonLogo
+  from "../../assets/Lemon_logo_With_CatchPhrase.jpg"
+
+const LoginPage = ({
+  onLogin,
+}) => {
+
+  const [username, setUsername] =
+    useState("")
+
+  const [password, setPassword] =
+    useState("")
+
+  const [loading, setLoading] =
+    useState(false)
+
+  const [error, setError] =
+    useState("")
 
   const handleLogin = async (e) => {
+
     e.preventDefault()
 
-    const trimmedUsername = username.trim()
-    const trimmedPassword = password.trim()
+    const trimmedUsername =
+      username.trim()
 
-    if (!trimmedUsername || !trimmedPassword) {
-      setError("Username and password are required.")
+    const trimmedPassword =
+      password.trim()
+
+    if (
+      !trimmedUsername ||
+      !trimmedPassword
+    ) {
+
+      setError(
+        "Username and password are required."
+      )
+
       return
     }
 
     try {
+
       setLoading(true)
       setError("")
 
-      const response = await apiClient.post(
-        API_ENDPOINTS.LSBIZPORTAL_LOGIN,
-        {
-          username: trimmedUsername,
-          password: trimmedPassword,
-        }
-      )
+      const response =
+        await apiClient.post(
+          API_ENDPOINTS.LSBIZPORTAL_LOGIN,
+          {
+            username:
+              trimmedUsername,
 
-      if (!response || response?.success === false) {
+            password:
+              trimmedPassword,
+          }
+        )
+
+      if (
+        !response ||
+        response?.success === false
+      ) {
+
         throw new Error(
           response?.message ||
           response?.error ||
@@ -40,9 +81,9 @@ const LoginPage = ({ onLogin }) => {
         )
       }
 
-      // ========================================
-      // NORMALIZE USER PAYLOAD
-      // ========================================
+      /* ========================================
+         NORMALIZE USER PAYLOAD
+      ======================================== */
 
       const rawUser =
         response?.data?.response ||
@@ -63,7 +104,8 @@ const LoginPage = ({ onLogin }) => {
         ]
           .filter(Boolean)
           .join(" ")
-          .trim() || "Authenticated User",
+          .trim() ||
+          "Authenticated User",
 
         firstname:
           rawUser?.firstname || "",
@@ -85,7 +127,8 @@ const LoginPage = ({ onLogin }) => {
         company:
           rawUser?.company || "",
 
-        raw_data: rawUser,
+        raw_data:
+          rawUser,
       }
 
       localStorage.setItem(
@@ -95,95 +138,379 @@ const LoginPage = ({ onLogin }) => {
 
       localStorage.setItem(
         "admin_user",
-        JSON.stringify(normalizedUser)
+        JSON.stringify(
+          normalizedUser
+        )
       )
 
-      onLogin(normalizedUser)
+      onLogin(
+        normalizedUser
+      )
 
     } catch (err) {
+
       setError(
-        err.message || "Login failed."
+        err.message ||
+        "Login failed."
       )
+
     } finally {
+
       setLoading(false)
     }
   }
 
   return (
-    <section className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#0b1311] p-4">
+    <section
+      className="
+        relative
 
-      <div className="absolute left-[-120px] top-[-120px] h-[420px] w-[420px] rounded-full bg-[#f5d547]/[0.05] blur-3xl" />
-      <div className="absolute bottom-[-180px] right-[-140px] h-[420px] w-[420px] rounded-full bg-[#95c11f]/[0.06] blur-3xl" />
+        flex
+        min-h-screen
+        items-center
+        justify-center
 
+        overflow-hidden
+
+        p-4
+      "
+      style={{
+        background:
+          `
+            radial-gradient(
+              circle at top left,
+              var(--bg-glow-primary),
+              transparent 28%
+            ),
+            radial-gradient(
+              circle at bottom right,
+              var(--bg-glow-secondary),
+              transparent 30%
+            ),
+            var(--background)
+          `,
+      }}
+    >
+
+      {/* BACKGROUND GLOW */}
+      <div
+        className="
+          absolute
+          left-[-120px]
+          top-[-120px]
+
+          h-[420px]
+          w-[420px]
+
+          rounded-full
+
+          blur-3xl
+        "
+        style={{
+          background:
+            "var(--bg-glow-primary)",
+        }}
+      />
+
+      <div
+        className="
+          absolute
+          bottom-[-180px]
+          right-[-140px]
+
+          h-[420px]
+          w-[420px]
+
+          rounded-full
+
+          blur-3xl
+        "
+        style={{
+          background:
+            "var(--bg-glow-secondary)",
+        }}
+      />
+
+      {/* GRID */}
+      <div
+        className="
+          absolute
+          inset-0
+
+          opacity-40
+        "
+        style={{
+          backgroundImage:
+            `
+              linear-gradient(
+                var(--grid-line) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                90deg,
+                var(--grid-line) 1px,
+                transparent 1px
+              )
+            `,
+
+          backgroundSize:
+            "40px 40px",
+
+          maskImage:
+            `
+              radial-gradient(
+                circle at center,
+                black,
+                transparent 90%
+              )
+            `,
+        }}
+      />
+
+      {/* LOGIN CARD */}
       <form
         onSubmit={handleLogin}
-        className="relative z-10 w-full max-w-md rounded-[32px] border border-[#25332d] bg-[#101816]/95 p-8 shadow-[0_20px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl"
-      >
-        <div className="mb-8 flex flex-col items-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-3xl bg-[#f5d547]">
-            <ShieldCheck className="h-8 w-8 text-[#111917]" />
-          </div>
+        className="
+          glass-panel
 
-          <h1 className="text-3xl font-bold text-white">
+          relative
+          z-10
+
+          w-full
+          max-w-md
+
+          overflow-hidden
+
+          rounded-[32px]
+
+          p-8
+        "
+      >
+
+        {/* TOP LIGHT */}
+        <div
+          className="
+            absolute
+            inset-x-0
+            top-0
+
+            h-px
+          "
+          style={{
+            background:
+              "var(--glass-border)",
+          }}
+        />
+
+        {/* HEADER */}
+        <div
+          className="
+            mb-8
+
+            flex
+            flex-col
+            items-center
+          "
+        >
+
+          {/* LOGO */}
+          <img
+            src={LemonLogo}
+
+            alt="Lemon Square"
+
+            className="
+              mb-6
+
+              h-auto
+              w-full
+              max-w-[220px]
+
+              object-contain
+            "
+          />
+
+          {/* TITLE */}
+          <h1
+            className="
+              text-3xl
+              font-bold
+            "
+            style={{
+              color:
+                "var(--text-primary)",
+            }}
+          >
             Admin Access
           </h1>
 
-          <p className="mt-2 text-sm text-[#8ea59b]">
+          {/* SUBTITLE */}
+          <p
+            className="
+              mt-2
+
+              text-sm
+            "
+            style={{
+              color:
+                "var(--text-secondary)",
+            }}
+          >
             Enter your credentials
           </p>
+
         </div>
 
+        {/* USERNAME */}
         <div className="mb-4">
-          <label className="mb-2 block text-sm font-medium text-[#d1d5db]">
+
+          <label
+            className="
+              mb-2
+              block
+
+              text-sm
+              font-medium
+            "
+            style={{
+              color:
+                "var(--text-primary)",
+            }}
+          >
             Username
           </label>
 
           <input
             type="text"
+
             value={username}
+
             onChange={(e) =>
-              setUsername(e.target.value)
+              setUsername(
+                e.target.value
+              )
             }
-            className="w-full rounded-2xl border border-[#2a3a33] bg-[#151d1b] px-4 py-3 text-sm text-white outline-none focus:border-[#f5d547]"
+
+            className="
+              input-base
+            "
           />
+
         </div>
 
+        {/* PASSWORD */}
         <div className="mb-6">
-          <label className="mb-2 block text-sm font-medium text-[#d1d5db]">
+
+          <label
+            className="
+              mb-2
+              block
+
+              text-sm
+              font-medium
+            "
+            style={{
+              color:
+                "var(--text-primary)",
+            }}
+          >
             Password
           </label>
 
           <input
             type="password"
+
             value={password}
+
             onChange={(e) =>
-              setPassword(e.target.value)
+              setPassword(
+                e.target.value
+              )
             }
-            className="w-full rounded-2xl border border-[#2a3a33] bg-[#151d1b] px-4 py-3 text-sm text-white outline-none focus:border-[#f5d547]"
+
+            className="
+              input-base
+            "
           />
 
           {error && (
-            <p className="mt-2 text-sm text-red-400">
+            <p
+              className="
+                mt-3
+
+                text-sm
+              "
+              style={{
+                color:
+                  "#ef4444",
+              }}
+            >
               {error}
             </p>
           )}
+
         </div>
 
+        {/* SUBMIT */}
         <button
           type="submit"
+
           disabled={loading}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#f5d547] px-4 py-3 text-sm font-semibold text-[#111917] hover:opacity-90 disabled:opacity-50"
+
+          className="
+            flex
+            w-full
+            items-center
+            justify-center
+            gap-2
+
+            rounded-2xl
+
+            px-4
+            py-3
+
+            text-sm
+            font-semibold
+
+            transition-all
+            duration-200
+
+            hover:opacity-90
+
+            disabled:opacity-50
+            disabled:cursor-not-allowed
+          "
+          style={{
+            background:
+              "var(--accent)",
+
+            color:
+              "var(--background)",
+          }}
         >
+
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
+
+              <Loader2
+                className="
+                  h-4
+                  w-4
+                  animate-spin
+                "
+              />
+
               Logging in...
+
             </>
           ) : (
             "Continue"
           )}
+
         </button>
+
       </form>
+
     </section>
   )
 }

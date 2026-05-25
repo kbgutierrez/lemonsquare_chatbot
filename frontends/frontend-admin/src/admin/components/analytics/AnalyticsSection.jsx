@@ -39,22 +39,19 @@ const StatCard = ({
   return (
     <div
       className="
+        panel-base
+
         relative
 
         overflow-hidden
 
         rounded-[28px]
 
-        border
-        border-[#26332d]
-
-        bg-[#121a18]
-
         p-6
-
-        shadow-[0_10px_40px_rgba(0,0,0,0.28)]
       "
     >
+
+      {/* GLOW */}
       <div
         className={`
           absolute
@@ -83,13 +80,18 @@ const StatCard = ({
           gap-4
         "
       >
+
+        {/* TEXT */}
         <div>
+
           <p
             className="
               text-sm
-
-              text-[#7f948b]
             "
+            style={{
+              color:
+                "var(--text-secondary)",
+            }}
           >
             {title}
           </p>
@@ -102,14 +104,18 @@ const StatCard = ({
               font-black
 
               tracking-tight
-
-              text-white
             "
+            style={{
+              color:
+                "var(--text-primary)",
+            }}
           >
             {value}
           </h3>
+
         </div>
 
+        {/* ICON */}
         <div
           className="
             flex
@@ -119,20 +125,28 @@ const StatCard = ({
             justify-center
 
             rounded-2xl
-
-            bg-[#1b2421]
           "
+          style={{
+            background:
+              "var(--panel-light)",
+          }}
         >
+
           <Icon
             className="
               h-7
               w-7
-
-              text-[#f5d547]
             "
+            style={{
+              color:
+                "var(--accent)",
+            }}
           />
+
         </div>
+
       </div>
+
     </div>
   )
 }
@@ -228,6 +242,7 @@ const AnalyticsSection =
           overflow-auto
         "
       >
+
         {/* HEADER */}
         <div
           className="
@@ -237,16 +252,20 @@ const AnalyticsSection =
             gap-4
           "
         >
+
           <div>
+
             <h1
               className="
                 text-3xl
                 font-black
 
                 tracking-tight
-
-                text-white
               "
+              style={{
+                color:
+                  "var(--text-primary)",
+              }}
             >
               Analytics Overview
             </h1>
@@ -256,13 +275,16 @@ const AnalyticsSection =
                 mt-2
 
                 text-sm
-
-                text-[#7f948b]
               "
+              style={{
+                color:
+                  "var(--text-secondary)",
+              }}
             >
               Real-time AI knowledge base
               and support system metrics.
             </p>
+
           </div>
 
           {refreshing && (
@@ -271,21 +293,27 @@ const AnalyticsSection =
                 rounded-xl
 
                 border
-                border-[#26332d]
-
-                bg-[#121a18]
 
                 px-3
                 py-2
 
                 text-xs
-
-                text-[#7f948b]
               "
+              style={{
+                borderColor:
+                  "var(--border)",
+
+                background:
+                  "var(--panel)",
+
+                color:
+                  "var(--text-secondary)",
+              }}
             >
               Updating...
             </div>
           )}
+
         </div>
 
         {/* GRID */}
@@ -300,13 +328,14 @@ const AnalyticsSection =
             xl:grid-cols-3
           "
         >
+
           <StatCard
             title="Active Chats"
             value={
               chats.total_active || 0
             }
             icon={MessageSquareMore}
-            accent="bg-[#f5d547]/10"
+            accent="bg-[var(--bg-glow-primary)]"
           />
 
           <StatCard
@@ -353,7 +382,9 @@ const AnalyticsSection =
             icon={Ticket}
             accent="bg-amber-500/10"
           />
+
         </div>
+
       </div>
     )
   }
