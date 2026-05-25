@@ -27,43 +27,57 @@ const ResolvedChatsPagination = ({
         },
         (_, i) =>
           i + 1
-      ).map((number) => (
-        <button
-          key={number}
-          onClick={() =>
-            setPage(
-              number
-            )
-          }
-          className={`
-            h-10
-            w-10
+      ).map((number) => {
 
-            rounded-xl
+        const isActive =
+          page === number
 
-            text-sm
-            font-semibold
-
-            transition-all
-
-            ${
-              page ===
-              number
-                ? `
-                  bg-[#f5d547]
-                  text-[#111917]
-                `
-                : `
-                  bg-[#18211f]
-                  text-white
-                  hover:bg-[#202b27]
-                `
+        return (
+          <button
+            key={number}
+            onClick={() =>
+              setPage(
+                number
+              )
             }
-          `}
-        >
-          {number}
-        </button>
-      ))}
+            className={`
+              h-10
+              w-10
+
+              rounded-xl
+              border
+
+              text-sm
+              font-semibold
+
+              transition-all
+              duration-200
+
+              ${
+                isActive
+                  ? `
+                    border-[color:var(--accent)]
+                    bg-[color:var(--accent)]
+
+                    text-[#111917]
+
+                    shadow-[0_10px_30px_rgba(245,213,71,0.16)]
+                  `
+                  : `
+                    theme-border
+
+                    bg-[color:var(--panel)]
+                    text-[color:var(--text-primary)]
+
+                    hover:bg-[color:var(--hover)]
+                  `
+              }
+            `}
+          >
+            {number}
+          </button>
+        )
+      })}
     </div>
   )
 }

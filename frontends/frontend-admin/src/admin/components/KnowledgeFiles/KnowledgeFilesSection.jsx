@@ -148,58 +148,141 @@ const KnowledgeFilesSection = () => {
     >
       {/* ========================================
                   STATUS TABS
-          ======================================== */}
+      ======================================== */}
 
-          <div
-            className="
-              rounded-[30px]
+      <div
+        className="
+          panel-base
 
-              border
-              border-[#24312b]
+          rounded-[30px]
 
-              bg-[#101715]
+          p-2
+        "
+      >
+        <div
+          className="
+            grid
+            grid-cols-2
+            gap-2
+          "
+        >
+          {STATUS_TABS.map((tab) => {
 
-              p-2
+            const active =
+              selectedStatus ===
+              tab.id
 
-              shadow-[0_10px_30px_rgba(0,0,0,0.22)]
-            "
-          >
-            <div
-              className="
-                grid
-                grid-cols-2
-                gap-2
-              "
-            >
-              {STATUS_TABS.map((tab) => {
+            return (
+              <button
+                key={tab.id}
 
-                const active =
-                  selectedStatus ===
-                  tab.id
+                onClick={() =>
+                  setSelectedStatus(
+                    tab.id
+                  )
+                }
 
-                return (
-                  <button
-                    key={tab.id}
+                className={`
+                  group
 
-                    onClick={() =>
-                      setSelectedStatus(
-                        tab.id
-                      )
+                  relative
+
+                  overflow-hidden
+
+                  rounded-[22px]
+
+                  border
+
+                  px-5
+                  py-3
+
+                  transition-all
+                  duration-300
+
+                  ${
+                    active
+
+                      ? `
+                        theme-border
+
+                        muted-card
+
+                        shadow-[0_10px_30px_rgba(0,0,0,0.18)]
+                      `
+
+                      : `
+                        border-transparent
+
+                        bg-transparent
+
+                        hover-surface
+                      `
+                  }
+                `}
+              >
+                {/* ACTIVE GLOW */}
+                {active && (
+                  <div
+                    className="
+                      absolute
+                      inset-0
+
+                      bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
+                    "
+                  />
+                )}
+
+                {/* ACTIVE INDICATOR */}
+                <div
+                  className={`
+                    absolute
+
+                    bottom-0
+                    left-1/2
+
+                    h-[3px]
+                    w-[55%]
+
+                    -translate-x-1/2
+
+                    rounded-full
+
+                    bg-[var(--accent)]
+
+                    transition-all
+                    duration-300
+
+                    ${
+                      active
+                        ? "opacity-100"
+                        : "opacity-0"
                     }
+                  `}
+                />
 
+                {/* CONTENT */}
+                <div
+                  className="
+                    relative
+                    z-10
+
+                    flex
+                    items-center
+                    justify-center
+                    gap-2.5
+                  "
+                >
+                  <div
                     className={`
-                      group
+                      flex
+                      h-6
+                      w-6
+                      items-center
+                      justify-center
 
-                      relative
-
-                      overflow-hidden
-
-                      rounded-[22px]
+                      rounded-xl
 
                       border
-
-                      px-5
-                      py-3
 
                       transition-all
                       duration-300
@@ -208,169 +291,82 @@ const KnowledgeFilesSection = () => {
                         active
 
                           ? `
-                            border-[#314136]
+                            border-[var(--accent-green)]
 
-                            bg-[#16211d]
+                            bg-[color:rgba(149,193,31,0.10)]
 
-                            shadow-[0_10px_30px_rgba(0,0,0,0.28)]
+                            text-[var(--text-primary)]
                           `
 
                           : `
-                            border-transparent
+                            theme-border
 
-                            bg-transparent
+                            theme-panel-light
 
-                            hover:bg-[#141c19]
+                            text-[var(--text-secondary)]
+
+                            group-hover:text-[var(--text-primary)]
                           `
                       }
                     `}
                   >
-                    {/* ACTIVE GLOW */}
-                    {active && (
-                      <div
-                        className="
-                          absolute
-                          inset-0
+                    <Database
+                      className="
+                        h-4
+                        w-4
+                      "
+                    />
+                  </div>
 
-                          bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
-                        "
-                      />
-                    )}
-
-                    {/* ACTIVE INDICATOR */}
-                    <div
+                  <div
+                    className="
+                      flex
+                      flex-col
+                      items-start
+                    "
+                  >
+                    <span
                       className={`
-                        absolute
+                        text-sm
+                        font-semibold
 
-                        bottom-0
-                        left-1/2
-
-                        h-[3px]
-                        w-[55%]
-
-                        -translate-x-1/2
-
-                        rounded-full
-
-                        bg-[#f5d547]
-
-                        transition-all
+                        transition-colors
                         duration-300
 
                         ${
                           active
-                            ? "opacity-100"
-                            : "opacity-0"
+                            ? "text-[var(--text-primary)]"
+                            : "text-[var(--text-secondary)] group-hover:text-[var(--text-primary)]"
                         }
                       `}
-                    />
-
-                    {/* CONTENT */}
-                    <div
-                      className="
-                        relative
-                        z-10
-
-                        flex
-                        items-center
-                        justify-center
-                        gap-2.5
-                      "
                     >
-                      <div
-                        className={`
-                          flex
-                          h-6
-                          w-6
-                          items-center
-                          justify-center
+                      {tab.label}
+                    </span>
 
-                          rounded-xl
+                    <span
+                      className={`
+                        text-[11px]
 
-                          border
+                        transition-colors
+                        duration-300
 
-                          transition-all
-                          duration-300
+                        ${
+                          active
+                            ? "text-[var(--text-secondary)]"
+                            : "text-[var(--text-muted)]"
+                        }
+                      `}
+                    >
 
-                          ${
-                            active
+                    </span>
+                  </div>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
 
-                              ? `
-                                border-[#95c11f]/20
-
-                                bg-[#95c11f]/10
-
-                                text-[#dff7a3]
-                              `
-
-                              : `
-                                border-[#26332d]
-
-                                bg-[#141c19]
-
-                                text-[#7f948b]
-
-                                group-hover:text-white
-                              `
-                          }
-                        `}
-                      >
-                        <Database
-                          className="
-                            h-4
-                            w-4
-                          "
-                        />
-                      </div>
-
-                      <div
-                        className="
-                          flex
-                          flex-col
-                          items-start
-                        "
-                      >
-                        <span
-                          className={`
-                            text-sm
-                            font-semibold
-
-                            transition-colors
-                            duration-300
-
-                            ${
-                              active
-                                ? "text-white"
-                                : "text-[#8ca29a] group-hover:text-white"
-                            }
-                          `}
-                        >
-                          {tab.label}
-                        </span>
-
-                        <span
-                          className={`
-                            text-[11px]
-
-                            transition-colors
-                            duration-300
-
-                            ${
-                              active
-                                ? "text-[#c8d6d0]"
-                                : "text-[#5f746c]"
-                            }
-                          `}
-                        >
-                         
-                        </span>
-                      </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
       {/* ========================================
           CATEGORY TABS
       ======================================== */}
@@ -391,8 +387,8 @@ const KnowledgeFilesSection = () => {
             w-12
 
             bg-gradient-to-r
-            from-[#0f1614]
-            via-[#0f1614]
+            from-[var(--background)]
+            via-[var(--background)]
             to-transparent
           "
         />
@@ -411,8 +407,8 @@ const KnowledgeFilesSection = () => {
             w-12
 
             bg-gradient-to-l
-            from-[#0f1614]
-            via-[#0f1614]
+            from-[var(--background)]
+            via-[var(--background)]
             to-transparent
           "
         />
@@ -439,19 +435,19 @@ const KnowledgeFilesSection = () => {
             rounded-full
 
             border
-            border-[#2d3b35]
+            theme-border
 
-            bg-[#18211f]/95
+            theme-panel-light
 
-            text-[#8ca097]
+            text-[var(--text-secondary)]
 
             backdrop-blur-sm
 
             transition-all
             duration-200
 
-            hover:text-white
-            hover:bg-[#202b27]
+            hover:bg-[var(--hover)]
+            hover:text-[var(--text-primary)]
           "
         >
           <ChevronLeft
@@ -481,26 +477,25 @@ const KnowledgeFilesSection = () => {
             rounded-full
 
             border
-            border-[#2d3b35]
+            theme-border
 
-            bg-[#18211f]/95
+            theme-panel-light
 
-            text-[#8ca097]
+            text-[var(--text-secondary)]
 
             backdrop-blur-sm
 
             transition-all
             duration-200
 
-            hover:text-white
-            hover:bg-[#202b27]
+            hover:bg-[var(--hover)]
+            hover:text-[var(--text-primary)]
           "
         >
           <ChevronRight
             className="h-4 w-4"
           />
         </button>
-
         {/* CATEGORY SCROLLER */}
         <div
           ref={tabsRef}
@@ -511,7 +506,7 @@ const KnowledgeFilesSection = () => {
             overflow-x-auto
 
             border-b
-            border-[#24312b]
+            theme-border
 
             px-12
             pb-2
@@ -574,17 +569,17 @@ const KnowledgeFilesSection = () => {
                           ? `
                             border
                             border-b-0
-                            border-[#2d3b35]
+                            theme-border
 
-                            bg-[#151d1b]
+                            theme-panel-light
 
-                            text-white
+                            text-[var(--text-primary)]
                           `
 
                           : `
-                            text-[#7f948b]
+                            text-[var(--text-secondary)]
 
-                            hover:text-white
+                            hover:text-[var(--text-primary)]
                           `
                       }
                     `}
@@ -601,7 +596,7 @@ const KnowledgeFilesSection = () => {
                           h-[2px]
                           w-full
 
-                          bg-[#f5d547]
+                          bg-[var(--accent)]
                         "
                       />
                     )}
@@ -619,6 +614,8 @@ const KnowledgeFilesSection = () => {
 
       <div
         className="
+          panel-base
+
           flex
           min-h-0
           flex-1
@@ -627,13 +624,6 @@ const KnowledgeFilesSection = () => {
           overflow-hidden
 
           rounded-[24px]
-
-          border
-          border-[#26332d]
-
-          bg-[#121a18]
-
-          shadow-[0_8px_32px_rgba(0,0,0,0.24)]
         "
       >
         {/* TOP BAR */}
@@ -647,7 +637,7 @@ const KnowledgeFilesSection = () => {
             gap-3
 
             border-b
-            border-[#24312b]
+            theme-border
 
             px-4
             py-3
@@ -659,7 +649,8 @@ const KnowledgeFilesSection = () => {
                 text-lg
                 font-semibold
                 tracking-tight
-                text-white
+
+                text-[var(--text-primary)]
               "
             >
               Knowledge Files
@@ -671,7 +662,7 @@ const KnowledgeFilesSection = () => {
 
                 text-xs
 
-                text-[#7f948b]
+                text-[var(--text-secondary)]
               "
             >
               {filteredFiles.length} document(s)
@@ -679,7 +670,8 @@ const KnowledgeFilesSection = () => {
               <span
                 className="
                   capitalize
-                  text-[#f5d547]
+
+                  text-[var(--accent)]
                 "
               >
                 {selectedStatus}
@@ -690,6 +682,8 @@ const KnowledgeFilesSection = () => {
           {/* SEARCH */}
           <div
             className="
+              theme-panel-light
+
               flex
               h-11
               w-full
@@ -699,9 +693,7 @@ const KnowledgeFilesSection = () => {
               rounded-xl
 
               border
-              border-[#2d3b35]
-
-              bg-[#18211f]
+              theme-border
 
               px-3.5
 
@@ -714,7 +706,7 @@ const KnowledgeFilesSection = () => {
                 w-4
                 shrink-0
 
-                text-[#70847b]
+                text-[var(--text-muted)]
               "
             />
 
@@ -737,11 +729,12 @@ Search ${selectedStatus} files...
                 bg-transparent
 
                 text-sm
-                text-white
+
+                text-[var(--text-primary)]
 
                 outline-none
 
-                placeholder:text-[#70847b]
+                placeholder:text-[var(--placeholder)]
               "
             />
           </div>

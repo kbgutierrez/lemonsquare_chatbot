@@ -42,15 +42,14 @@ const ManualEntryModalContainer = ({
         rounded-[32px]
 
         border
-        border-[#2a3a33]
+        theme-border
 
-        bg-[#111917]
+        glass-panel
 
         p-6
-
-        shadow-[0_20px_80px_rgba(0,0,0,0.45)]
       "
     >
+
       {/* HEADER */}
       <ManualEntryModalHeader
         isEditMode={isEditMode}
@@ -84,12 +83,14 @@ const ManualEntryModalContainer = ({
 
       {/* FORM */}
       <div className="mt-5 space-y-4">
+
         {/* TITLE */}
         <ManualEntryTitleInput
           value={form.title}
           onChange={(event) =>
             setForm((prev) => ({
               ...prev,
+
               title:
                 event.target.value,
             }))
@@ -113,6 +114,7 @@ const ManualEntryModalContainer = ({
           onChange={(event) =>
             setForm((prev) => ({
               ...prev,
+
               content:
                 event.target.value,
             }))
@@ -126,6 +128,7 @@ const ManualEntryModalContainer = ({
           onDelete={onDelete}
           onSubmit={onSubmit}
         />
+
       </div>
     </div>
   )

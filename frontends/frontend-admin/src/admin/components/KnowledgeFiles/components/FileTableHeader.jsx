@@ -4,7 +4,6 @@ const FileTableHeader =
     const headerClass =
       `
         border-b
-        border-[#24312b]
 
         px-5
         py-3
@@ -15,8 +14,6 @@ const FileTableHeader =
         uppercase
 
         tracking-[0.14em]
-
-        text-[#70847b]
       `
 
     return (
@@ -26,10 +23,15 @@ const FileTableHeader =
           top-0
           z-10
 
-          bg-[#121a18]/95
-
           backdrop-blur-xl
         "
+        style={{
+          background:
+            "color-mix(in srgb, var(--panel) 95%, transparent)",
+
+          borderColor:
+            "var(--border)",
+        }}
       >
         <tr>
 
@@ -37,6 +39,13 @@ const FileTableHeader =
             className={
               headerClass
             }
+            style={{
+              borderColor:
+                "var(--border)",
+
+              color:
+                "var(--text-muted)",
+            }}
           >
             File
           </th>
@@ -45,6 +54,13 @@ const FileTableHeader =
             className={
               headerClass
             }
+            style={{
+              borderColor:
+                "var(--border)",
+
+              color:
+                "var(--text-muted)",
+            }}
           >
             Category
           </th>
@@ -53,6 +69,13 @@ const FileTableHeader =
             className={
               headerClass
             }
+            style={{
+              borderColor:
+                "var(--border)",
+
+              color:
+                "var(--text-muted)",
+            }}
           >
             Chunks
           </th>
@@ -61,6 +84,13 @@ const FileTableHeader =
             className={
               headerClass
             }
+            style={{
+              borderColor:
+                "var(--border)",
+
+              color:
+                "var(--text-muted)",
+            }}
           >
             Uploaded
           </th>
@@ -71,6 +101,13 @@ const FileTableHeader =
 
               text-center
             `}
+            style={{
+              borderColor:
+                "var(--border)",
+
+              color:
+                "var(--text-muted)",
+            }}
           >
             Actions
           </th>

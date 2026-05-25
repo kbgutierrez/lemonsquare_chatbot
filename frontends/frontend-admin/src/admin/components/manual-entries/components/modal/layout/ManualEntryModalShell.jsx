@@ -1,9 +1,7 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/layout/ManualEntryModalShell.jsx
-
 const ManualEntryModalShell = ({
   children,
 }) => {
+
   return (
     <div
       className="
@@ -20,14 +18,14 @@ const ManualEntryModalShell = ({
         rounded-[28px]
 
         border
-        border-[#2f3c36]
+        theme-border
 
-        bg-[#141c1a]
-
-        shadow-[0_30px_80px_rgba(0,0,0,0.55)]
+        glass-panel
       "
     >
+
       {children}
+
     </div>
   )
 }

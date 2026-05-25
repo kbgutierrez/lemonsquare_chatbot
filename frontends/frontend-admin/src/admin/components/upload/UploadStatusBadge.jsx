@@ -4,45 +4,64 @@ import {
   AlertCircle,
 } from "lucide-react"
 
+const STATUS_STYLES = {
+  loading: {
+    border: "rgba(245, 213, 71, 0.22)",
+    background: "rgba(245, 213, 71, 0.10)",
+    color: "var(--accent)",
+  },
+
+  success: {
+    border: "rgba(34, 197, 94, 0.20)",
+    background: "rgba(34, 197, 94, 0.10)",
+    color: "#4ade80",
+  },
+
+  error: {
+    border: "rgba(239, 68, 68, 0.20)",
+    background: "rgba(239, 68, 68, 0.10)",
+    color: "#f87171",
+  },
+}
+
+const baseClassName = `
+  inline-flex
+  items-center
+  gap-2
+  rounded-xl
+  border
+  px-3
+  py-1.5
+  text-xs
+  font-semibold
+`
+
 const UploadStatusBadge = ({
   status,
   statusType,
 }) => {
-
-  /* LOADING */
-  if (
-    statusType ===
-    "loading"
-  ) {
-
+  /* ========================================
+     LOADING
+  ======================================== */
+  if (statusType === "loading") {
     return (
       <span
-        className="
-          inline-flex
-          items-center
-          gap-2
+        className={baseClassName}
+        style={{
+          borderColor:
+            STATUS_STYLES.loading.border,
 
-          rounded-xl
+          background:
+            STATUS_STYLES.loading.background,
 
-          border
-          border-[#5a4a1c]
-
-          bg-[#2b2414]
-
-          px-3
-          py-1.5
-
-          text-xs
-          font-semibold
-
-          text-[#f5d547]
-        "
+          color:
+            STATUS_STYLES.loading.color,
+        }}
       >
         <LoaderCircle
           className="
             h-3.5
             w-3.5
-
             animate-spin
           "
         />
@@ -52,34 +71,23 @@ const UploadStatusBadge = ({
     )
   }
 
-  /* SUCCESS */
-  if (
-    statusType ===
-    "success"
-  ) {
-
+  /* ========================================
+     SUCCESS
+  ======================================== */
+  if (statusType === "success") {
     return (
       <span
-        className="
-          inline-flex
-          items-center
-          gap-2
+        className={baseClassName}
+        style={{
+          borderColor:
+            STATUS_STYLES.success.border,
 
-          rounded-xl
+          background:
+            STATUS_STYLES.success.background,
 
-          border
-          border-[#294137]
-
-          bg-[#17231f]
-
-          px-3
-          py-1.5
-
-          text-xs
-          font-semibold
-
-          text-[#8dd9a7]
-        "
+          color:
+            STATUS_STYLES.success.color,
+        }}
       >
         <CheckCircle2
           className="
@@ -93,29 +101,22 @@ const UploadStatusBadge = ({
     )
   }
 
-  /* ERROR */
+  /* ========================================
+     ERROR
+  ======================================== */
   return (
     <span
-      className="
-        inline-flex
-        items-center
-        gap-2
+      className={baseClassName}
+      style={{
+        borderColor:
+          STATUS_STYLES.error.border,
 
-        rounded-xl
+        background:
+          STATUS_STYLES.error.background,
 
-        border
-        border-[#4c2626]
-
-        bg-[#2a1818]
-
-        px-3
-        py-1.5
-
-        text-xs
-        font-semibold
-
-        text-[#ff8d8d]
-      "
+        color:
+          STATUS_STYLES.error.color,
+      }}
     >
       <AlertCircle
         className="

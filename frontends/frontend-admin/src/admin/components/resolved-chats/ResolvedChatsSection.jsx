@@ -263,7 +263,19 @@ const ResolvedChatsSection = () => {
       />
 
       {/* FILTERS */}
-      <div className="rounded-[32px] border border-[#26332d] bg-[#101715] p-2">
+      <div
+        className="
+          rounded-[32px]
+          border
+          theme-border
+
+          bg-[color:var(--panel)]
+
+          p-2
+
+          shadow-[var(--shadow-soft)]
+        "
+      >
 
         <div className="grid grid-cols-2 gap-2">
 
@@ -288,11 +300,34 @@ const ResolvedChatsSection = () => {
                       filter.key
                     )
                   }
-                  className={`group relative overflow-hidden rounded-[24px] border px-6 py-5 transition-all duration-300 ${
-                    active
-                      ? "border-[#314136] bg-[#16211d]"
-                      : "border-transparent bg-transparent hover:bg-[#141c19]"
-                  }`}
+                  className={`
+                    group
+                    relative
+                    overflow-hidden
+
+                    rounded-[24px]
+                    border
+
+                    px-6
+                    py-5
+
+                    transition-all
+                    duration-300
+
+                    ${
+                      active
+                        ? `
+                          theme-border
+                          bg-[color:var(--panel-light)]
+                        `
+                        : `
+                          border-transparent
+                          bg-transparent
+
+                          hover:bg-[color:var(--hover)]
+                        `
+                    }
+                  `}
                 >
 
                   <AnimatePresence>
@@ -312,7 +347,12 @@ const ResolvedChatsSection = () => {
                         transition={{
                           duration: 0.25,
                         }}
-                        className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]"
+                        className="
+                          absolute
+                          inset-0
+
+                          bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
+                        "
                       />
                     )}
 
@@ -333,25 +373,54 @@ const ResolvedChatsSection = () => {
                     transition={{
                       duration: 0.25,
                     }}
-                    className="absolute bottom-0 left-1/2 h-[3px] w-[55%] -translate-x-1/2 rounded-full bg-[#f5d547]"
+                    className="
+                      absolute
+                      bottom-0
+                      left-1/2
+
+                      h-[3px]
+                      w-[55%]
+
+                      -translate-x-1/2
+
+                      rounded-full
+
+                      bg-[color:var(--accent)]
+                    "
                   />
 
                   <div className="relative z-10 flex items-center justify-center gap-2">
 
                     <Icon
-                      className={`h-4 w-4 transition-colors duration-300 ${
-                        active
-                          ? "text-[#dff7a3]"
-                          : "text-[#7f948c]"
-                      }`}
+                      className={`
+                        h-4
+                        w-4
+
+                        transition-colors
+                        duration-300
+
+                        ${
+                          active
+                            ? "text-[color:var(--accent-green)]"
+                            : "text-[color:var(--text-muted)]"
+                        }
+                      `}
                     />
 
                     <span
-                      className={`text-sm font-semibold transition-colors duration-300 ${
-                        active
-                          ? "text-white"
-                          : "text-[#8ca29a]"
-                      }`}
+                      className={`
+                        text-sm
+                        font-semibold
+
+                        transition-colors
+                        duration-300
+
+                        ${
+                          active
+                            ? "text-[color:var(--text-primary)]"
+                            : "text-[color:var(--text-secondary)]"
+                        }
+                      `}
                     >
 
                       {filter.label}
@@ -370,13 +439,55 @@ const ResolvedChatsSection = () => {
       </div>
 
       {/* CONTENT */}
-      <div className="relative flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
+      <div
+        className="
+          relative
+          flex-1
+          overflow-auto
+
+          rounded-[28px]
+          border
+          theme-border
+
+          bg-[color:var(--panel)]
+
+          p-5
+
+          shadow-[var(--shadow-soft)]
+        "
+      >
 
         {/* LOADING OVERLAY */}
         {loading && (
-          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-[#121a18]/40 backdrop-blur-[1px]">
+          <div
+            className="
+              pointer-events-none
+              absolute
+              inset-0
+              z-20
 
-            <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#f5d547]/20 border-t-[#f5d547]" />
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--panel)]/40
+
+              backdrop-blur-[1px]
+            "
+          >
+
+            <div
+              className="
+                h-10
+                w-10
+                animate-spin
+                rounded-full
+                border-2
+
+                border-[color:var(--accent)]/20
+                border-t-[color:var(--accent)]
+              "
+            />
 
           </div>
         )}

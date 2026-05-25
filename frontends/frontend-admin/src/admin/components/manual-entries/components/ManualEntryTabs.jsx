@@ -50,8 +50,8 @@ const ManualEntryTabs = ({
           w-12
 
           bg-gradient-to-r
-          from-[#0f1614]
-          via-[#0f1614]
+          from-[color:var(--background)]
+          via-[color:var(--background)]
           to-transparent
         "
       />
@@ -70,8 +70,8 @@ const ManualEntryTabs = ({
           w-12
 
           bg-gradient-to-l
-          from-[#0f1614]
-          via-[#0f1614]
+          from-[color:var(--background)]
+          via-[color:var(--background)]
           to-transparent
         "
       />
@@ -97,19 +97,19 @@ const ManualEntryTabs = ({
           rounded-full
 
           border
-          border-[#2d3b35]
+          theme-border
 
-          bg-[#18211f]/95
+          bg-[color:var(--panel)]/95
 
-          text-[#8ca097]
+          text-[color:var(--text-secondary)]
 
           backdrop-blur-sm
 
           transition-all
           duration-200
 
-          hover:bg-[#202b27]
-          hover:text-white
+          hover:bg-[color:var(--hover)]
+          hover:text-[color:var(--text-primary)]
         "
       >
         <ChevronLeft
@@ -138,19 +138,19 @@ const ManualEntryTabs = ({
           rounded-full
 
           border
-          border-[#2d3b35]
+          theme-border
 
-          bg-[#18211f]/95
+          bg-[color:var(--panel)]/95
 
-          text-[#8ca097]
+          text-[color:var(--text-secondary)]
 
           backdrop-blur-sm
 
           transition-all
           duration-200
 
-          hover:bg-[#202b27]
-          hover:text-white
+          hover:bg-[color:var(--hover)]
+          hover:text-[color:var(--text-primary)]
         "
       >
         <ChevronRight
@@ -167,7 +167,7 @@ const ManualEntryTabs = ({
           overflow-x-auto
 
           border-b
-          border-[#24312b]
+          theme-border
 
           px-12
           pb-2
@@ -230,16 +230,17 @@ const ManualEntryTabs = ({
                         ? `
                           border
                           border-b-0
-                          border-[#2d3b35]
 
-                          bg-[#151d1b]
+                          theme-border
 
-                          text-white
+                          bg-[color:var(--panel-light)]
+
+                          text-[color:var(--text-primary)]
                         `
                         : `
-                          text-[#7f948b]
+                          text-[color:var(--text-muted)]
 
-                          hover:text-white
+                          hover:text-[color:var(--text-primary)]
                         `
                     }
                   `}
@@ -256,7 +257,7 @@ const ManualEntryTabs = ({
                         h-[2px]
                         w-full
 
-                        bg-[#f5d547]
+                        bg-[color:var(--accent)]
                       "
                     />
                   )}

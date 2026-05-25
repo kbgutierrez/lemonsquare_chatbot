@@ -1,6 +1,3 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/category-selector/ManualEntryCategoryTrigger.jsx
-
 import { ChevronDown } from "lucide-react"
 
 const ManualEntryCategoryTrigger = ({
@@ -8,10 +5,12 @@ const ManualEntryCategoryTrigger = ({
   open,
   onClick,
 }) => {
+
   return (
     <button
       type="button"
       onClick={onClick}
+
       className={`
         flex
         h-12
@@ -34,19 +33,23 @@ const ManualEntryCategoryTrigger = ({
         ${
           open
             ? `
-              border-[#d8b93d]/50
-              bg-[#1f2925]
-              shadow-[0_0_0_4px_rgba(216,185,61,0.08)]
+              border-[color:var(--accent)]
+
+              bg-[color:var(--hover)]
+
+              shadow-[0_0_0_4px_rgba(245,213,71,0.08)]
             `
             : `
-              border-[#2f3c36]
-              bg-[#1a2320]
+              theme-border
 
-              hover:border-[#46544e]
+              bg-[color:var(--panel)]
+
+              hover:bg-[color:var(--hover)]
             `
         }
       `}
     >
+
       <div
         className="
           flex
@@ -55,6 +58,7 @@ const ManualEntryCategoryTrigger = ({
           gap-2
         "
       >
+
         <div
           className={`
             h-2.5
@@ -66,8 +70,8 @@ const ManualEntryCategoryTrigger = ({
 
             ${
               category
-                ? "bg-[#f5d547]"
-                : "bg-[#6f847b]"
+                ? "bg-[color:var(--accent)]"
+                : "bg-[color:var(--text-muted)]"
             }
           `}
         />
@@ -78,14 +82,15 @@ const ManualEntryCategoryTrigger = ({
 
             ${
               category
-                ? "text-white"
-                : "text-[#8ea59b]"
+                ? "text-[color:var(--text-primary)]"
+                : "text-[color:var(--text-secondary)]"
             }
           `}
         >
           {category ||
             "Auto Detect Category"}
         </span>
+
       </div>
 
       <ChevronDown
@@ -95,7 +100,7 @@ const ManualEntryCategoryTrigger = ({
 
           shrink-0
 
-          text-[#8ea59b]
+          text-[color:var(--text-secondary)]
 
           transition-transform
           duration-300
@@ -107,6 +112,7 @@ const ManualEntryCategoryTrigger = ({
           }
         `}
       />
+
     </button>
   )
 }

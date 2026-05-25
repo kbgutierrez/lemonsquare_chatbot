@@ -1,8 +1,16 @@
-import { FileText, X } from "lucide-react"
+import {
+  FileText,
+  X,
+} from "lucide-react"
+
 import UploadStatusBadge from "./UploadStatusBadge"
 
-const UploadTableRow = ({ file, removeFile }) => {
-  const isUploading = file.statusType === "loading"
+const UploadTableRow = ({
+  file,
+  removeFile,
+}) => {
+  const isUploading =
+    file.statusType === "loading"
 
   /* ========================================
      CATEGORY LABEL
@@ -15,14 +23,14 @@ const UploadTableRow = ({ file, removeFile }) => {
   return (
     <tr
       className="
+        hover-surface
         border-t
-        border-[#24312b]
-
         transition-all
         duration-300
-
-        hover:bg-[#171f1d]
       "
+      style={{
+        borderColor: "var(--border)",
+      }}
     >
       {/* FILE */}
       <td className="px-5 py-4">
@@ -35,16 +43,20 @@ const UploadTableRow = ({ file, removeFile }) => {
               shrink-0
               items-center
               justify-center
-
               rounded-2xl
-
               border
-              border-[#2d3934]
-
-              bg-[#1b2422]
             "
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--panel-light)",
+            }}
           >
-            <FileText className="h-4.5 w-4.5 text-[#f5d547]" />
+            <FileText
+              className="h-4.5 w-4.5"
+              style={{
+                color: "var(--accent)",
+              }}
+            />
           </div>
 
           <div className="min-w-0">
@@ -52,17 +64,22 @@ const UploadTableRow = ({ file, removeFile }) => {
               className="
                 max-w-[260px]
                 truncate
-
                 text-sm
                 font-semibold
-
-                text-white
               "
+              style={{
+                color: "var(--text-primary)",
+              }}
             >
               {file.name}
             </p>
 
-            <p className="mt-1 text-xs text-[#7f948b]">
+            <p
+              className="mt-1 text-xs"
+              style={{
+                color: "var(--text-secondary)",
+              }}
+            >
               {file.type}
             </p>
           </div>
@@ -70,7 +87,12 @@ const UploadTableRow = ({ file, removeFile }) => {
       </td>
 
       {/* SIZE */}
-      <td className="px-5 py-4 text-sm font-medium text-[#c4d1cb]">
+      <td
+        className="px-5 py-4 text-sm font-medium"
+        style={{
+          color: "var(--text-primary)",
+        }}
+      >
         {file.size}
       </td>
 
@@ -80,24 +102,19 @@ const UploadTableRow = ({ file, removeFile }) => {
           className="
             inline-flex
             items-center
-
             whitespace-nowrap
-
             rounded-xl
-
             border
-            border-[#32403a]
-
-            bg-[#1a2320]
-
             px-3
             py-1.5
-
             text-xs
             font-medium
-
-            text-[#d7e2dd]
           "
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--panel-light)",
+            color: "var(--text-primary)",
+          }}
         >
           {categoryLabel}
         </div>
@@ -112,7 +129,12 @@ const UploadTableRow = ({ file, removeFile }) => {
       </td>
 
       {/* UPLOADED */}
-      <td className="px-5 py-4 text-xs font-medium text-[#81958c]">
+      <td
+        className="px-5 py-4 text-xs font-medium"
+        style={{
+          color: "var(--text-secondary)",
+        }}
+      >
         {file.uploadedAt}
       </td>
 
@@ -127,24 +149,37 @@ const UploadTableRow = ({ file, removeFile }) => {
             w-10
             items-center
             justify-center
-
             rounded-xl
-
             border
             border-transparent
-
-            text-[#9cafa7]
-
             transition-all
             duration-200
-
             disabled:cursor-not-allowed
             disabled:opacity-40
-
-            hover:border-red-500/20
-            hover:bg-red-500/10
-            hover:text-red-400
           "
+          style={{
+            color: "var(--text-secondary)",
+          }}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.background =
+              "rgba(239, 68, 68, 0.10)"
+
+            event.currentTarget.style.borderColor =
+              "rgba(239, 68, 68, 0.20)"
+
+            event.currentTarget.style.color =
+              "#f87171"
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.background =
+              "transparent"
+
+            event.currentTarget.style.borderColor =
+              "transparent"
+
+            event.currentTarget.style.color =
+              "var(--text-secondary)"
+          }}
         >
           <X className="h-4 w-4" />
         </button>

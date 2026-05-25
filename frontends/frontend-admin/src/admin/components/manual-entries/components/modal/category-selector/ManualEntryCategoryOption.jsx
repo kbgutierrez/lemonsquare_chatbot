@@ -1,6 +1,3 @@
-// FILE:
-// frontends/frontend-admin/src/admin/components/manual-entries/components/modal/category-selector/ManualEntryCategoryOption.jsx
-
 import { Check } from "lucide-react"
 
 const ManualEntryCategoryOption = ({
@@ -9,11 +6,15 @@ const ManualEntryCategoryOption = ({
   description,
   onClick,
 }) => {
+
   return (
     <button
       type="button"
       onClick={onClick}
+
       className={`
+        group
+
         flex
         w-full
         items-center
@@ -34,33 +35,47 @@ const ManualEntryCategoryOption = ({
         ${
           active
             ? `
-              border-[#d8b93d]/30
-              bg-[#d8b93d]/10
+              border-[color:var(--accent)]/30
+
+              bg-[color:rgba(245,213,71,0.08)]
+
+              shadow-[0_0_0_1px_rgba(245,213,71,0.06)]
             `
             : `
               border-transparent
-              bg-[#18211f]
 
-              hover:border-[#2f3c36]
-              hover:bg-[#1d2724]
+              bg-[color:var(--panel)]
+
+              hover:border-[color:var(--border)]
+              hover:bg-[color:var(--hover)]
             `
         }
       `}
     >
+
       <div
         className="
           min-w-0
           flex-1
         "
       >
+
         <p
-          className="
+          className={`
             truncate
 
             text-sm
             font-medium
-            text-white
-          "
+
+            transition-colors
+            duration-200
+
+            ${
+              active
+                ? "text-[color:var(--text-primary)]"
+                : "text-[color:var(--text-primary)] group-hover:text-white"
+            }
+          `}
         >
           {label}
         </p>
@@ -71,12 +86,15 @@ const ManualEntryCategoryOption = ({
               mt-1
 
               text-xs
-              text-[#8ea59b]
+              leading-relaxed
+
+              text-[color:var(--text-secondary)]
             "
           >
             {description}
           </p>
         )}
+
       </div>
 
       {active && (
@@ -94,9 +112,12 @@ const ManualEntryCategoryOption = ({
 
             rounded-full
 
-            bg-[#f5d547]
+            bg-[color:var(--accent)]
+
+            shadow-[0_0_18px_rgba(245,213,71,0.28)]
           "
         >
+
           <Check
             className="
               h-4
@@ -105,8 +126,10 @@ const ManualEntryCategoryOption = ({
               text-[#111917]
             "
           />
+
         </div>
       )}
+
     </button>
   )
 }

@@ -5,6 +5,8 @@ import {
   useState,
 } from "react"
 
+import { createPortal } from "react-dom"
+
 import ManualEntryModalBackdrop
   from "./modal/layout/ManualEntryModalBackdrop"
 
@@ -143,10 +145,6 @@ const ManualEntryModal = ({
           "Escape"
         ) {
 
-          /* ========================================
-             CLOSE CATEGORY MODAL FIRST
-          ======================================== */
-
           if (
             categoryModalOpen
           ) {
@@ -191,11 +189,6 @@ const ManualEntryModal = ({
 
     const handleClickOutside =
       (event) => {
-
-        /* ========================================
-           DO NOT CLOSE MAIN MODAL
-           WHILE CATEGORY MODAL OPEN
-        ======================================== */
 
         if (
           categoryModalOpen
@@ -272,11 +265,6 @@ const ManualEntryModal = ({
   const handleSubmit =
     async () => {
 
-      /* ========================================
-         PRESERVE EMPTY CATEGORY
-         FOR AUTO-DETECT
-      ======================================== */
-
       const payload = {
         ...form,
 
@@ -321,14 +309,14 @@ const ManualEntryModal = ({
     return null
   }
 
-  return (
+  return createPortal(
     <>
       {/* MAIN MODAL */}
       <div
         className="
           fixed
           inset-0
-          z-[110]
+          z-[9999]
 
           flex
           items-center
@@ -339,11 +327,6 @@ const ManualEntryModal = ({
       >
         <ManualEntryModalBackdrop
           onClose={() => {
-
-            /* ========================================
-               PREVENT BACKDROP CLOSE
-               WHILE CATEGORY MODAL OPEN
-            ======================================== */
 
             if (
               categoryModalOpen
@@ -359,7 +342,7 @@ const ManualEntryModal = ({
           ref={modalCardRef}
           className="
             relative
-            z-[130]
+            z-[10000]
           "
         >
           <ManualEntryModalContainer
@@ -391,7 +374,8 @@ const ManualEntryModal = ({
         }
         onSelect={handleSelectCategory}
       />
-    </>
+    </>,
+    document.body
   )
 }
 

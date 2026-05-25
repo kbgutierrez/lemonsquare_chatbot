@@ -139,6 +139,7 @@ const ModalPortal = ({
   )
 }
 
+
 /* ========================================
    CONFIRMATION MODAL
 ======================================== */
@@ -175,9 +176,6 @@ const ConfirmationModal = ({
             items-center
             justify-center
 
-            bg-black/75
-            backdrop-blur-xl
-
             p-4
           "
         >
@@ -186,7 +184,13 @@ const ConfirmationModal = ({
             className="
               absolute
               inset-0
+
+              backdrop-blur-xl
             "
+            style={{
+              background:
+                "var(--modal-overlay)",
+            }}
             onClick={() => {
               if (loading) {
                 return
@@ -217,6 +221,8 @@ const ConfirmationModal = ({
               duration: 0.18,
             }}
             className="
+              modal-surface
+
               relative
               z-10
 
@@ -226,14 +232,17 @@ const ConfirmationModal = ({
               overflow-hidden
 
               rounded-[34px]
-
-              border
-              border-white/10
-
-              bg-[#0c1210]
-
-              shadow-[0_30px_120px_rgba(0,0,0,0.8)]
             "
+            style={{
+              border:
+                "1px solid var(--border)",
+
+              background:
+                "var(--panel)",
+
+              boxShadow:
+                "0 30px 120px rgba(0,0,0,0.35)",
+            }}
           >
             {/* TOP LIGHT */}
             <div
@@ -243,9 +252,11 @@ const ConfirmationModal = ({
                 top-0
 
                 h-px
-
-                bg-white/10
               "
+              style={{
+                background:
+                  "var(--border)",
+              }}
             />
 
             {/* CLOSE */}
@@ -266,21 +277,23 @@ const ConfirmationModal = ({
                 rounded-2xl
 
                 border
-                border-white/10
-
-                bg-white/[0.04]
-
-                text-[var(--text-secondary)]
 
                 transition-all
                 duration-200
 
-                hover:bg-white/[0.08]
-                hover:text-white
-
                 disabled:cursor-not-allowed
                 disabled:opacity-50
               "
+              style={{
+                borderColor:
+                  "var(--border)",
+
+                background:
+                  "var(--panel-light)",
+
+                color:
+                  "var(--text-secondary)",
+              }}
             >
               <X
                 className="
@@ -348,9 +361,11 @@ const ConfirmationModal = ({
 
                   leading-tight
                   tracking-tight
-
-                  text-white
                 "
+                style={{
+                  color:
+                    "var(--text-primary)",
+                }}
               >
                 {isBlocked
                   ? "Unblock Ticket?"
@@ -365,10 +380,12 @@ const ConfirmationModal = ({
                   text-sm
                   leading-7
 
-                  text-[var(--text-secondary)]
-
                   sm:text-[15px]
                 "
+                style={{
+                  color:
+                    "var(--text-secondary)",
+                }}
               >
                 {isBlocked
                   ? `
@@ -390,12 +407,16 @@ const ConfirmationModal = ({
                   rounded-[24px]
 
                   border
-                  border-white/10
-
-                  bg-white/[0.03]
 
                   p-5
                 "
+                style={{
+                  borderColor:
+                    "var(--border)",
+
+                  background:
+                    "var(--panel-light)",
+                }}
               >
                 <p
                   className="
@@ -404,9 +425,11 @@ const ConfirmationModal = ({
                     uppercase
 
                     tracking-[0.18em]
-
-                    text-[var(--text-secondary)]
                   "
+                  style={{
+                    color:
+                      "var(--text-secondary)",
+                  }}
                 >
                   Ticket Number
                 </p>
@@ -419,9 +442,11 @@ const ConfirmationModal = ({
 
                     text-sm
                     font-medium
-
-                    text-white
                   "
+                  style={{
+                    color:
+                      "var(--text-primary)",
+                  }}
                 >
                   {ticketNumber}
                 </p>
@@ -449,26 +474,28 @@ const ConfirmationModal = ({
                     rounded-2xl
 
                     border
-                    border-white/10
-
-                    bg-white/[0.03]
 
                     px-5
 
                     text-sm
                     font-medium
 
-                    text-[var(--text-secondary)]
-
                     transition-all
                     duration-200
-
-                    hover:bg-white/[0.06]
-                    hover:text-white
 
                     disabled:cursor-not-allowed
                     disabled:opacity-50
                   "
+                  style={{
+                    borderColor:
+                      "var(--border)",
+
+                    background:
+                      "var(--panel-light)",
+
+                    color:
+                      "var(--text-secondary)",
+                  }}
                 >
                   Cancel
                 </button>

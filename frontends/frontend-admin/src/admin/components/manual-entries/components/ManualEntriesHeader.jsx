@@ -39,7 +39,8 @@ const ManualEntriesHeader =
             className="
               text-2xl
               font-bold
-              text-white
+
+              text-[color:var(--text-primary)]
             "
           >
             Manual Entries
@@ -49,7 +50,8 @@ const ManualEntriesHeader =
             className="
               mt-1
               text-sm
-              text-[#8ea59b]
+
+              text-[color:var(--text-secondary)]
             "
           >
             Custom AI operational
@@ -66,6 +68,7 @@ const ManualEntriesHeader =
             flex-wrap
             items-center
             gap-3
+
             sm:w-auto
           "
         >
@@ -77,12 +80,17 @@ const ManualEntriesHeader =
               w-full
               items-center
               gap-3
+
               rounded-2xl
+
               border
-              border-[#2d3b35]
-              bg-[#18211f]
+              theme-border
+
+              bg-[color:var(--panel)]
+
               px-4
               py-3
+
               sm:w-[300px]
             "
           >
@@ -90,7 +98,8 @@ const ManualEntriesHeader =
               className="
                 h-4
                 w-4
-                text-[#70847b]
+
+                text-[color:var(--text-muted)]
               "
             />
 
@@ -109,11 +118,16 @@ const ManualEntriesHeader =
 
               className="
                 w-full
+
                 bg-transparent
+
                 text-sm
-                text-white
+
+                text-[color:var(--text-primary)]
+
                 outline-none
-                placeholder:text-[#70847b]
+
+                placeholder:text-[color:var(--placeholder)]
               "
             />
           </div>
@@ -130,15 +144,22 @@ const ManualEntriesHeader =
               flex
               items-center
               gap-2
+
               rounded-2xl
-              bg-[#f5d547]
+
+              bg-[color:var(--accent)]
+
               px-5
               py-3
+
               text-sm
               font-semibold
-              text-[#111917]
+
+              text-[color:var(--background)]
+
               transition-all
               duration-200
+
               hover:scale-[1.02]
               hover:brightness-105
             "

@@ -20,11 +20,13 @@ const ResolvedChatsHeader = ({
       "
     >
       <div>
+
         <h1
           className="
             text-2xl
             font-bold
-            text-white
+
+            text-[color:var(--text-primary)]
           "
         >
           Resolved Chats
@@ -34,12 +36,14 @@ const ResolvedChatsHeader = ({
           className="
             mt-1
             text-sm
-            text-[#8ea59b]
+
+            text-[color:var(--text-secondary)]
           "
         >
           AI learned knowledge from
           successful conversations.
         </p>
+
       </div>
 
       <div
@@ -50,21 +54,31 @@ const ResolvedChatsHeader = ({
 
           rounded-2xl
           border
-          border-[#2d3b35]
+          theme-border
 
-          bg-[#18211f]
+          bg-[color:var(--panel)]
 
           px-4
           py-3
 
+          shadow-[var(--shadow-soft)]
+
+          transition-all
+          duration-200
+
+          focus-within:border-[color:var(--accent)]
+          focus-within:shadow-[0_0_0_4px_rgba(245,213,71,0.08)]
+
           lg:w-[360px]
         "
       >
+
         <Search
           className="
             h-4
             w-4
-            text-[#70847b]
+
+            text-[color:var(--text-muted)]
           "
         />
 
@@ -78,13 +92,18 @@ const ResolvedChatsHeader = ({
           placeholder="Search resolved chats..."
           className="
             w-full
+
             bg-transparent
+
             text-sm
-            text-white
+            text-[color:var(--text-primary)]
+
             outline-none
-            placeholder:text-[#70847b]
+
+            placeholder:text-[color:var(--placeholder)]
           "
         />
+
       </div>
     </div>
   )

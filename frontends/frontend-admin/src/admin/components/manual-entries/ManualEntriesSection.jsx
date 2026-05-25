@@ -188,22 +188,24 @@ const ManualEntriesSection = () => {
             rounded-2xl
 
             border
-            border-[#2b3a33]
+            theme-border
 
-            bg-[#131b18]
+            bg-[color:var(--panel)]
 
             px-4
             py-3
 
             text-sm
             font-semibold
-            text-[#d7e0db]
+
+            text-[color:var(--text-primary)]
+
+            shadow-[var(--shadow-soft)]
 
             transition-all
             duration-300
 
-            hover:border-[#3b4d44]
-            hover:bg-[#18211d]
+            hover:bg-[color:var(--hover)]
 
             disabled:cursor-not-allowed
             disabled:opacity-60
@@ -250,13 +252,13 @@ const ManualEntriesSection = () => {
           rounded-[30px]
 
           border
-          border-[#24312b]
+          theme-border
 
-          bg-[#101715]
+          bg-[color:var(--panel)]
 
           p-2
 
-          shadow-[0_10px_30px_rgba(0,0,0,0.22)]
+          shadow-[var(--shadow-soft)]
         "
       >
         <div
@@ -309,19 +311,19 @@ const ManualEntriesSection = () => {
                         "active"
 
                         ? `
-                          border-[#314136]
+                          theme-border
 
-                          bg-[#16211d]
+                          bg-[color:var(--panel-light)]
 
-                          shadow-[0_10px_30px_rgba(0,0,0,0.28)]
+                          shadow-[var(--shadow-soft)]
                         `
 
                         : `
                           border-red-500/20
 
-                          bg-[#241818]
+                          bg-red-500/5
 
-                          shadow-[0_10px_30px_rgba(0,0,0,0.28)]
+                          shadow-[var(--shadow-soft)]
                         `
 
                       : `
@@ -329,7 +331,7 @@ const ManualEntriesSection = () => {
 
                         bg-transparent
 
-                        hover:bg-[#141c19]
+                        hover:bg-[color:var(--hover)]
                       `
                   }
                 `}
@@ -380,7 +382,7 @@ const ManualEntriesSection = () => {
                       tab.id ===
                       "active"
 
-                        ? "bg-[#f5d547]"
+                        ? "bg-[color:var(--accent)]"
 
                         : "bg-red-400"
                     }
@@ -427,11 +429,11 @@ const ManualEntriesSection = () => {
                             "active"
 
                             ? `
-                              border-[#95c11f]/20
+                              border-[color:var(--accent-green)]/20
 
-                              bg-[#95c11f]/10
+                              bg-[color:var(--accent-green)]/10
 
-                              text-[#dff7a3]
+                              text-[color:var(--accent-green)]
                             `
 
                             : `
@@ -443,13 +445,13 @@ const ManualEntriesSection = () => {
                             `
 
                           : `
-                            border-[#26332d]
+                            theme-border
 
-                            bg-[#141c19]
+                            bg-[color:var(--panel-light)]
 
-                            text-[#7f948b]
+                            text-[color:var(--text-muted)]
 
-                            group-hover:text-white
+                            group-hover:text-[color:var(--text-primary)]
                           `
                       }
                     `}
@@ -479,8 +481,8 @@ const ManualEntriesSection = () => {
 
                         ${
                           active
-                            ? "text-white"
-                            : "text-[#8ca29a] group-hover:text-white"
+                            ? "text-[color:var(--text-primary)]"
+                            : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
                         }
                       `}
                     >
@@ -504,7 +506,22 @@ const ManualEntriesSection = () => {
 
       {/* SUCCESS */}
       {successMessage && (
-        <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+        <div
+          className="
+            rounded-2xl
+
+            border
+            border-emerald-500/20
+
+            bg-emerald-500/10
+
+            px-4
+            py-3
+
+            text-sm
+            text-emerald-300
+          "
+        >
           {successMessage}
         </div>
       )}
@@ -518,7 +535,23 @@ const ManualEntriesSection = () => {
       )}
 
       {/* CONTENT */}
-      <div className="flex-1 overflow-auto rounded-[28px] border border-[#26332d] bg-[#121a18] p-5">
+      <div
+        className="
+          flex-1
+          overflow-auto
+
+          rounded-[28px]
+
+          border
+          theme-border
+
+          bg-[color:var(--panel)]
+
+          p-5
+
+          shadow-[var(--shadow-soft)]
+        "
+      >
 
         {loading ? (
           <LoadingSpinner label="Loading manual entries..." />

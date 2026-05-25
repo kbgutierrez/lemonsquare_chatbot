@@ -9,7 +9,6 @@ const UploadMobileCard = ({
   file,
   removeFile,
 }) => {
-
   const isUploading =
     file.statusType ===
     "loading"
@@ -17,23 +16,11 @@ const UploadMobileCard = ({
   return (
     <div
       className="
+        panel-base
+        hover-surface
         group
-
         overflow-hidden
-
         rounded-3xl
-
-        border
-        border-[#28352f]
-
-        bg-[#141d1b]
-
-        transition-all
-        duration-300
-
-        hover:border-[#3a4b43]
-        hover:bg-[#182320]
-        hover:shadow-[0_12px_40px_rgba(0,0,0,0.30)]
       "
     >
       {/* TOP */}
@@ -42,7 +29,6 @@ const UploadMobileCard = ({
           flex
           items-start
           gap-3
-
           p-4
         "
       >
@@ -55,22 +41,22 @@ const UploadMobileCard = ({
             shrink-0
             items-center
             justify-center
-
             rounded-2xl
-
             border
-            border-[#2d3934]
-
-            bg-[#1b2422]
           "
+          style={{
+            borderColor: "var(--border)",
+            background: "var(--panel-light)",
+          }}
         >
           <FileText
             className="
               h-5
               w-5
-
-              text-[#f5d547]
             "
+            style={{
+              color: "var(--accent)",
+            }}
           />
         </div>
 
@@ -79,12 +65,12 @@ const UploadMobileCard = ({
           <h3
             className="
               truncate
-
               text-sm
               font-semibold
-
-              text-white
             "
+            style={{
+              color: "var(--text-primary)",
+            }}
           >
             {file.name}
           </h3>
@@ -92,11 +78,11 @@ const UploadMobileCard = ({
           <p
             className="
               mt-1
-
               text-xs
-
-              text-[#81958c]
             "
+            style={{
+              color: "var(--text-secondary)",
+            }}
           >
             {file.type}
           </p>
@@ -122,24 +108,37 @@ const UploadMobileCard = ({
             shrink-0
             items-center
             justify-center
-
             rounded-xl
-
             border
             border-transparent
-
-            text-[#9baca5]
-
             transition-all
             duration-200
-
             disabled:cursor-not-allowed
             disabled:opacity-40
-
-            hover:border-red-500/20
-            hover:bg-red-500/10
-            hover:text-red-400
           "
+          style={{
+            color: "var(--text-secondary)",
+          }}
+          onMouseEnter={(event) => {
+            event.currentTarget.style.background =
+              "rgba(239, 68, 68, 0.10)"
+
+            event.currentTarget.style.borderColor =
+              "rgba(239, 68, 68, 0.20)"
+
+            event.currentTarget.style.color =
+              "#f87171"
+          }}
+          onMouseLeave={(event) => {
+            event.currentTarget.style.background =
+              "transparent"
+
+            event.currentTarget.style.borderColor =
+              "transparent"
+
+            event.currentTarget.style.color =
+              "var(--text-secondary)"
+          }}
         >
           <Trash2 className="h-4 w-4" />
         </button>
@@ -151,13 +150,12 @@ const UploadMobileCard = ({
           grid
           grid-cols-2
           gap-3
-
-          border-t
-          border-[#24312b]
-
           px-4
           py-3
         "
+        style={{
+          borderTop: "1px solid var(--border)",
+        }}
       >
         {/* SIZE */}
         <div>
@@ -166,11 +164,11 @@ const UploadMobileCard = ({
               text-[10px]
               font-semibold
               uppercase
-
               tracking-[0.18em]
-
-              text-[#70837a]
             "
+            style={{
+              color: "var(--text-muted)",
+            }}
           >
             Size
           </p>
@@ -178,12 +176,12 @@ const UploadMobileCard = ({
           <p
             className="
               mt-1
-
               text-sm
               font-medium
-
-              text-[#d5dfdb]
             "
+            style={{
+              color: "var(--text-primary)",
+            }}
           >
             {file.size}
           </p>
@@ -196,11 +194,11 @@ const UploadMobileCard = ({
               text-[10px]
               font-semibold
               uppercase
-
               tracking-[0.18em]
-
-              text-[#70837a]
             "
+            style={{
+              color: "var(--text-muted)",
+            }}
           >
             Category
           </p>
@@ -208,25 +206,20 @@ const UploadMobileCard = ({
           <div
             className="
               mt-1
-
               inline-flex
               items-center
-
               rounded-xl
-
               border
-              border-[#32403a]
-
-              bg-[#1a2320]
-
               px-2.5
               py-1
-
               text-xs
               font-medium
-
-              text-[#d7e2dd]
             "
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--panel-light)",
+              color: "var(--text-primary)",
+            }}
           >
             {file.category ||
               "General"}
@@ -240,24 +233,23 @@ const UploadMobileCard = ({
           flex
           items-center
           justify-between
-
-          border-t
-          border-[#24312b]
-
           px-4
           py-3
         "
+        style={{
+          borderTop: "1px solid var(--border)",
+        }}
       >
         <span
           className="
             text-[10px]
             font-semibold
             uppercase
-
             tracking-[0.18em]
-
-            text-[#70837a]
           "
+          style={{
+            color: "var(--text-muted)",
+          }}
         >
           Uploaded
         </span>
@@ -266,9 +258,10 @@ const UploadMobileCard = ({
           className="
             text-xs
             font-medium
-
-            text-[#c3d0ca]
           "
+          style={{
+            color: "var(--text-secondary)",
+          }}
         >
           {file.uploadedAt}
         </span>

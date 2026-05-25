@@ -20,8 +20,6 @@ import {
   ChevronDown,
   Check,
   RotateCcw,
-  Database,
-  DatabaseBackup,
   ChevronRight,
   Minimize2,
 } from "lucide-react"
@@ -41,7 +39,15 @@ const FieldBlock = ({
   }
 
   return (
-    <div className="rounded-2xl border border-[#26332d] bg-[#131917] p-4">
+    <div
+      className="
+        rounded-2xl
+        border
+        theme-border
+        muted-card
+        p-4
+      "
+    >
 
       <h3
         className={`mb-2 text-sm font-semibold ${color}`}
@@ -49,7 +55,14 @@ const FieldBlock = ({
         {title}
       </h3>
 
-      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[#d7e0dc]">
+      <p
+        className="
+          whitespace-pre-wrap
+          text-sm
+          leading-relaxed
+          text-[color:var(--text-primary)]
+        "
+      >
         {value}
       </p>
 
@@ -267,8 +280,19 @@ const ManualEntryCard = ({
         }}
         className={`group flex w-full items-center justify-between rounded-[24px] border px-5 py-4 text-left transition-all duration-200 ${
           isInactive
-            ? "border-[#38413d] bg-[#141917] hover:border-[#4f5b55]"
-            : "border-[#26332d] bg-[#18211f] hover:border-[#95c11f]/30 hover:bg-[#1b2421]"
+            ? `
+              border-[color:var(--border)]
+              bg-[color:var(--panel)]
+
+              hover:border-[color:var(--text-muted)]
+            `
+            : `
+              border-[color:var(--border)]
+              bg-[color:var(--panel)]
+
+              hover:border-[color:var(--accent-green)]/30
+              hover:bg-[color:var(--hover)]
+            `
         }`}
       >
 
@@ -280,8 +304,16 @@ const ManualEntryCard = ({
             <span
               className={`rounded-xl border px-2.5 py-1 text-[11px] font-semibold ${
                 isInactive
-                  ? "border-red-500/20 bg-red-500/10 text-red-300"
-                  : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                  ? `
+                    border-red-500/20
+                    bg-red-500/10
+                    text-red-300
+                  `
+                  : `
+                    border-emerald-500/20
+                    bg-emerald-500/10
+                    text-emerald-300
+                  `
               }`}
             >
 
@@ -291,19 +323,50 @@ const ManualEntryCard = ({
 
             </span>
 
-            <span className="rounded-xl border border-[#95c11f]/10 bg-[#95c11f]/10 px-2.5 py-1 text-[11px] font-semibold text-[#95c11f]">
+            <span
+              className="
+                rounded-xl
+
+                border
+                border-[color:var(--accent-green)]/10
+
+                bg-[color:var(--accent-green)]/10
+
+                px-2.5
+                py-1
+
+                text-[11px]
+                font-semibold
+
+                text-[color:var(--accent-green)]
+              "
+            >
 
               {form.category || "General"}
 
             </span>
 
-            <span className="truncate text-sm font-semibold text-white">
+            <span
+              className="
+                truncate
+                text-sm
+                font-semibold
+                text-[color:var(--text-primary)]
+              "
+            >
               {form.title || "Untitled Entry"}
             </span>
 
           </div>
 
-          <p className="mt-2 line-clamp-1 text-sm text-[#8ea59b]">
+          <p
+            className="
+              mt-2
+              line-clamp-1
+              text-sm
+              text-[color:var(--text-secondary)]
+            "
+          >
 
             {form.content ||
               "No content available."}
@@ -315,7 +378,19 @@ const ManualEntryCard = ({
         {/* RIGHT */}
         <div className="ml-4 flex items-center gap-3">
 
-          <ChevronRight className="h-5 w-5 text-[#7f948c] transition-transform duration-200 group-hover:translate-x-1" />
+          <ChevronRight
+            className="
+              h-5
+              w-5
+
+              text-[color:var(--text-muted)]
+
+              transition-transform
+              duration-200
+
+              group-hover:translate-x-1
+            "
+          />
 
         </div>
 
@@ -338,7 +413,21 @@ const ManualEntryCard = ({
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-5 backdrop-blur-md"
+            className="
+              fixed
+              inset-0
+              z-[120]
+
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--modal-overlay)]
+
+              p-5
+
+              backdrop-blur-md
+            "
           >
 
             <motion.div
@@ -360,11 +449,40 @@ const ManualEntryCard = ({
               transition={{
                 duration: 0.18,
               }}
-              className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-[34px] border border-[#2a3631] bg-[#161f1c] shadow-[0_25px_100px_rgba(0,0,0,0.55)]"
+              className="
+                modal-surface
+
+                relative
+
+                flex
+                max-h-[90vh]
+                w-full
+                max-w-4xl
+                flex-col
+
+                overflow-hidden
+
+                rounded-[34px]
+
+                border
+                theme-border
+              "
             >
 
               {/* HEADER */}
-              <div className="flex items-center justify-between border-b border-[#26332d] px-7 py-5">
+              <div
+                className="
+                  flex
+                  items-center
+                  justify-between
+
+                  border-b
+                  theme-border
+
+                  px-7
+                  py-5
+                "
+              >
 
                 <div>
 
@@ -373,8 +491,16 @@ const ManualEntryCard = ({
                     <span
                       className={`rounded-xl border px-3 py-1 text-xs font-semibold ${
                         isInactive
-                          ? "border-red-500/20 bg-red-500/10 text-red-300"
-                          : "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+                          ? `
+                            border-red-500/20
+                            bg-red-500/10
+                            text-red-300
+                          `
+                          : `
+                            border-emerald-500/20
+                            bg-emerald-500/10
+                            text-emerald-300
+                          `
                       }`}
                     >
 
@@ -384,7 +510,24 @@ const ManualEntryCard = ({
 
                     </span>
 
-                    <span className="rounded-xl border border-[#95c11f]/10 bg-[#95c11f]/10 px-3 py-1 text-xs font-semibold text-[#95c11f]">
+                    <span
+                      className="
+                        rounded-xl
+
+                        border
+                        border-[color:var(--accent-green)]/10
+
+                        bg-[color:var(--accent-green)]/10
+
+                        px-3
+                        py-1
+
+                        text-xs
+                        font-semibold
+
+                        text-[color:var(--accent-green)]
+                      "
+                    >
 
                       {form.category || "General"}
 
@@ -392,7 +535,14 @@ const ManualEntryCard = ({
 
                   </div>
 
-                  <h2 className="mt-3 text-2xl font-bold text-white">
+                  <h2
+                    className="
+                      mt-3
+                      text-2xl
+                      font-bold
+                      text-[color:var(--text-primary)]
+                    "
+                  >
                     Manual Knowledge Entry
                   </h2>
 
@@ -403,7 +553,23 @@ const ManualEntryCard = ({
                   onClick={() =>
                     setExpanded(false)
                   }
-                  className="rounded-2xl border border-[#2a3631] bg-[#1a2320] p-3 text-[#8ea59b] transition-all hover:bg-[#212c28] hover:text-white"
+                  className="
+                    rounded-2xl
+
+                    border
+                    theme-border
+
+                    bg-[color:var(--panel-light)]
+
+                    p-3
+
+                    text-[color:var(--text-secondary)]
+
+                    transition-all
+
+                    hover:bg-[color:var(--hover)]
+                    hover:text-[color:var(--text-primary)]
+                  "
                 >
 
                   <Minimize2 className="h-5 w-5" />
@@ -421,7 +587,7 @@ const ManualEntryCard = ({
                     <FieldBlock
                       title="Title"
                       value={form.title}
-                      color="text-[#95c11f]"
+                      color="text-[color:var(--accent-green)]"
                     />
 
                     <FieldBlock
@@ -433,7 +599,7 @@ const ManualEntryCard = ({
                     <FieldBlock
                       title="Knowledge Content"
                       value={form.content}
-                      color="text-[#f5d547]"
+                      color="text-[color:var(--accent)]"
                     />
 
                   </div>
@@ -451,7 +617,7 @@ const ManualEntryCard = ({
                             e.target.value,
                         }))
                       }
-                      className="w-full rounded-2xl border border-[#2d3b35] bg-[#121a18] px-4 py-3 text-white outline-none transition-all duration-200 focus:border-[#95c11f] focus:shadow-[0_0_0_3px_rgba(149,193,31,0.08)]"
+                      className="input-base"
                     />
 
                     {/* CATEGORY */}
@@ -461,14 +627,44 @@ const ManualEntryCard = ({
                       onClick={() =>
                         setShowCategoryModal(true)
                       }
-                      className="flex w-full items-center justify-between rounded-2xl border border-[#2d3b35] bg-[#121a18] px-4 py-3 text-left text-white transition-all duration-200 hover:border-[#95c11f]/40 hover:bg-[#18211f]"
+                      className="
+                        flex
+                        w-full
+                        items-center
+                        justify-between
+
+                        rounded-2xl
+
+                        border
+                        theme-border
+
+                        bg-[color:var(--panel)]
+
+                        px-4
+                        py-3
+
+                        text-left
+                        text-[color:var(--text-primary)]
+
+                        transition-all
+                        duration-200
+
+                        hover:border-[color:var(--accent-green)]/40
+                        hover:bg-[color:var(--hover)]
+                      "
                     >
                       <span className="truncate">
                         {form.category ||
                           "Select category"}
                       </span>
 
-                      <ChevronDown className="h-4 w-4 text-[#95c11f]" />
+                      <ChevronDown
+                        className="
+                          h-4
+                          w-4
+                          text-[color:var(--accent-green)]
+                        "
+                      />
                     </button>
 
                     {/* CONTENT */}
@@ -483,7 +679,16 @@ const ManualEntryCard = ({
                             e.target.value,
                         }))
                       }
-                      className="w-full rounded-2xl border border-[#2d3b35] bg-[#121a18] px-4 py-3 text-white outline-none transition-all duration-200 focus:border-[#95c11f] focus:shadow-[0_0_0_3px_rgba(149,193,31,0.08)] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="
+                        input-base
+
+                        min-h-[280px]
+
+                        resize-none
+
+                        disabled:cursor-not-allowed
+                        disabled:opacity-50
+                      "
                     />
 
                   </div>
@@ -492,7 +697,15 @@ const ManualEntryCard = ({
               </div>
 
               {/* FOOTER */}
-              <div className="border-t border-[#26332d] px-7 py-5">
+              <div
+                className="
+                  border-t
+                  theme-border
+
+                  px-7
+                  py-5
+                "
+              >
 
                 {!editing ? (
                   <div className="flex gap-3">
@@ -501,7 +714,31 @@ const ManualEntryCard = ({
                       onClick={() =>
                         setEditing(true)
                       }
-                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#95c11f]/20 bg-[#95c11f]/10 py-4 text-sm font-semibold text-[#95c11f] transition-all hover:bg-[#95c11f]/20"
+                      className="
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-2
+
+                        rounded-2xl
+
+                        border
+                        border-[color:var(--accent-green)]/20
+
+                        bg-[color:var(--accent-green)]/10
+
+                        py-4
+
+                        text-sm
+                        font-semibold
+
+                        text-[color:var(--accent-green)]
+
+                        transition-all
+
+                        hover:bg-[color:var(--accent-green)]/20
+                      "
                     >
 
                       <Pencil className="h-4 w-4" />
@@ -516,7 +753,33 @@ const ManualEntryCard = ({
                         onClick={
                           handleRestore
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 py-4 text-sm font-semibold text-emerald-300 transition-all hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="
+                          flex
+                          flex-1
+                          items-center
+                          justify-center
+                          gap-2
+
+                          rounded-2xl
+
+                          border
+                          border-emerald-500/20
+
+                          bg-emerald-500/10
+
+                          py-4
+
+                          text-sm
+                          font-semibold
+                          text-emerald-300
+
+                          transition-all
+
+                          hover:bg-emerald-500/20
+
+                          disabled:cursor-not-allowed
+                          disabled:opacity-60
+                        "
                       >
 
                         <RotateCcw className="h-4 w-4" />
@@ -532,7 +795,33 @@ const ManualEntryCard = ({
                             true
                           )
                         }
-                        className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 py-4 text-sm font-semibold text-red-300 transition-all hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="
+                          flex
+                          flex-1
+                          items-center
+                          justify-center
+                          gap-2
+
+                          rounded-2xl
+
+                          border
+                          border-red-500/20
+
+                          bg-red-500/10
+
+                          py-4
+
+                          text-sm
+                          font-semibold
+                          text-red-300
+
+                          transition-all
+
+                          hover:bg-red-500/20
+
+                          disabled:cursor-not-allowed
+                          disabled:opacity-60
+                        "
                       >
 
                         <Trash2 className="h-4 w-4" />
@@ -549,7 +838,26 @@ const ManualEntryCard = ({
                     <button
                       disabled={submitting}
                       onClick={handleCancel}
-                      className="flex-1 rounded-2xl border border-[#2d3b35] bg-[#1b2421] py-4 font-medium text-white hover:bg-[#222d29]"
+                      className="
+                        flex-1
+
+                        rounded-2xl
+
+                        border
+                        theme-border
+
+                        bg-[color:var(--panel-light)]
+
+                        py-4
+
+                        font-medium
+
+                        text-[color:var(--text-primary)]
+
+                        transition-all
+
+                        hover:bg-[color:var(--hover)]
+                      "
                     >
 
                       Cancel
@@ -559,7 +867,34 @@ const ManualEntryCard = ({
                     <button
                       disabled={submitting}
                       onClick={handleSave}
-                      className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-[#95c11f]/20 bg-[#95c11f]/10 py-4 text-sm font-semibold text-[#95c11f] transition-all hover:bg-[#95c11f]/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="
+                        flex
+                        flex-1
+                        items-center
+                        justify-center
+                        gap-2
+
+                        rounded-2xl
+
+                        border
+                        border-[color:var(--accent-green)]/20
+
+                        bg-[color:var(--accent-green)]/10
+
+                        py-4
+
+                        text-sm
+                        font-semibold
+
+                        text-[color:var(--accent-green)]
+
+                        transition-all
+
+                        hover:bg-[color:var(--accent-green)]/20
+
+                        disabled:cursor-not-allowed
+                        disabled:opacity-60
+                      "
                     >
 
                       {submitting ? (
@@ -601,7 +936,21 @@ const ManualEntryCard = ({
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4 backdrop-blur-md"
+            className="
+              fixed
+              inset-0
+              z-[130]
+
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--modal-overlay)]
+
+              p-4
+
+              backdrop-blur-md
+            "
           >
 
             <motion.div
@@ -623,16 +972,53 @@ const ManualEntryCard = ({
               transition={{
                 duration: 0.18,
               }}
-              className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-[32px] border border-[#2f3d37] bg-[#161f1c] shadow-[0_20px_80px_rgba(0,0,0,0.45)]"
+              className="
+                modal-surface
+
+                flex
+                max-h-[85vh]
+                w-full
+                max-w-xl
+                flex-col
+
+                overflow-hidden
+
+                rounded-[32px]
+
+                border
+                theme-border
+              "
             >
 
-              <div className="shrink-0 border-b border-[#26332d] px-6 py-5">
+              <div
+                className="
+                  shrink-0
 
-                <h2 className="text-2xl font-bold text-white">
+                  border-b
+                  theme-border
+
+                  px-6
+                  py-5
+                "
+              >
+
+                <h2
+                  className="
+                    text-2xl
+                    font-bold
+                    text-[color:var(--text-primary)]
+                  "
+                >
                   Select Category
                 </h2>
 
-                <p className="mt-1 text-sm text-[#8ca29a]">
+                <p
+                  className="
+                    mt-1
+                    text-sm
+                    text-[color:var(--text-secondary)]
+                  "
+                >
                   Choose the best category for this manual knowledge entry.
                 </p>
 
@@ -660,8 +1046,23 @@ const ManualEntryCard = ({
                           }
                           className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
                             selected
-                              ? "border-[#95c11f]/40 bg-[#95c11f]/10 text-[#dff7a3]"
-                              : "border-[#26332d] bg-[#121a18] text-[#d7e0dc] hover:border-[#3a4a43] hover:bg-[#18211f]"
+                              ? `
+                                border-[color:var(--accent-green)]/40
+
+                                bg-[color:var(--accent-green)]/10
+
+                                text-[color:var(--accent-green)]
+                              `
+                              : `
+                                border-[color:var(--border)]
+
+                                bg-[color:var(--panel)]
+
+                                text-[color:var(--text-primary)]
+
+                                hover:border-[color:var(--border)]
+                                hover:bg-[color:var(--hover)]
+                              `
                           }`}
                           style={{
                             animationDelay:
@@ -675,8 +1076,17 @@ const ManualEntryCard = ({
                           <div
                             className={`flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200 ${
                               selected
-                                ? "bg-[#95c11f] text-[#101710] scale-100"
-                                : "scale-0 opacity-0"
+                                ? `
+                                  scale-100
+
+                                  bg-[color:var(--accent-green)]
+
+                                  text-[color:var(--background)]
+                                `
+                                : `
+                                  scale-0
+                                  opacity-0
+                                `
                             }`}
                           >
                             <Check className="h-4 w-4" />
@@ -691,14 +1101,46 @@ const ManualEntryCard = ({
 
               </div>
 
-              <div className="shrink-0 border-t border-[#26332d] px-6 py-4">
+              <div
+                className="
+                  shrink-0
+
+                  border-t
+                  theme-border
+
+                  px-6
+                  py-4
+                "
+              >
 
                 <button
                   type="button"
                   onClick={() =>
                     setShowCategoryModal(false)
                   }
-                  className="w-full rounded-2xl border border-[#2d3b35] bg-[#1b2421] px-5 py-3 text-sm font-medium text-white transition-all duration-200 hover:border-[#3d4b45] hover:bg-[#202b27]"
+                  className="
+                    w-full
+
+                    rounded-2xl
+
+                    border
+                    theme-border
+
+                    bg-[color:var(--panel-light)]
+
+                    px-5
+                    py-3
+
+                    text-sm
+                    font-medium
+
+                    text-[color:var(--text-primary)]
+
+                    transition-all
+                    duration-200
+
+                    hover:bg-[color:var(--hover)]
+                  "
                 >
 
                   Close
@@ -731,7 +1173,21 @@ const ManualEntryCard = ({
             exit={{
               opacity: 0,
             }}
-            className="fixed inset-0 z-[140] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+            className="
+              fixed
+              inset-0
+              z-[140]
+
+              flex
+              items-center
+              justify-center
+
+              bg-[color:var(--modal-overlay)]
+
+              p-4
+
+              backdrop-blur-sm
+            "
           >
 
             <motion.div
@@ -750,7 +1206,23 @@ const ManualEntryCard = ({
               transition={{
                 duration: 0.18,
               }}
-              className="relative w-full max-w-md overflow-hidden rounded-[32px] border border-red-500/20 bg-[#161f1c] p-6 shadow-[0_20px_80px_rgba(0,0,0,0.45)]"
+              className="
+                modal-surface
+
+                relative
+
+                w-full
+                max-w-md
+
+                overflow-hidden
+
+                rounded-[32px]
+
+                border
+                border-red-500/20
+
+                p-6
+              "
             >
 
               <button
@@ -759,24 +1231,69 @@ const ManualEntryCard = ({
                     false
                   )
                 }
-                className="absolute right-4 top-4 rounded-xl p-2 text-[#8ea59b] hover:bg-white/5 hover:text-white"
+                className="
+                  absolute
+                  right-4
+                  top-4
+
+                  rounded-xl
+
+                  p-2
+
+                  text-[color:var(--text-secondary)]
+
+                  transition-all
+
+                  hover:bg-[color:var(--hover-light)]
+                  hover:text-[color:var(--text-primary)]
+                "
               >
 
                 <X className="h-4 w-4" />
 
               </button>
 
-              <div className="mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-red-500/20 bg-red-500/10">
+              <div
+                className="
+                  mb-5
+
+                  flex
+                  h-16
+                  w-16
+                  items-center
+                  justify-center
+
+                  rounded-3xl
+
+                  border
+                  border-red-500/20
+
+                  bg-red-500/10
+                "
+              >
 
                 <AlertTriangle className="h-8 w-8 text-red-400" />
 
               </div>
 
-              <h2 className="text-2xl font-bold text-white">
+              <h2
+                className="
+                  text-2xl
+                  font-bold
+                  text-[color:var(--text-primary)]
+                "
+              >
                 Archive Manual Entry?
               </h2>
 
-              <p className="mt-3 text-sm leading-relaxed text-[#9cb0a8]">
+              <p
+                className="
+                  mt-3
+                  text-sm
+                  leading-relaxed
+                  text-[color:var(--text-secondary)]
+                "
+              >
 
                 This removes the manual knowledge entry from active retrieval
                 while preserving the data for future restoration.
@@ -790,7 +1307,28 @@ const ManualEntryCard = ({
                   onClick={() =>
                     setShowDeleteModal(false)
                   }
-                  className="flex-1 rounded-2xl border border-[#2d3b35] bg-[#1b2421] py-3 font-medium text-white hover:bg-[#222d29]"
+                  className="
+                    flex-1
+
+                    rounded-2xl
+
+                    border
+                    theme-border
+
+                    bg-[color:var(--panel-light)]
+
+                    py-3
+
+                    font-medium
+
+                    text-[color:var(--text-primary)]
+
+                    transition-all
+
+                    hover:bg-[color:var(--hover)]
+
+                    disabled:opacity-60
+                  "
                 >
 
                   Cancel
@@ -800,7 +1338,28 @@ const ManualEntryCard = ({
                 <button
                   disabled={submitting}
                   onClick={handleDelete}
-                  className="flex flex-1 items-center justify-center rounded-2xl bg-red-500 py-3 font-semibold text-white transition-all hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="
+                    flex
+                    flex-1
+                    items-center
+                    justify-center
+
+                    rounded-2xl
+
+                    bg-red-500
+
+                    py-3
+
+                    font-semibold
+                    text-white
+
+                    transition-all
+
+                    hover:bg-red-400
+
+                    disabled:cursor-not-allowed
+                    disabled:opacity-60
+                  "
                 >
 
                   {submitting ? (
