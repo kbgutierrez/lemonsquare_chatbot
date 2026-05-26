@@ -89,6 +89,22 @@ const AISettingsPanel = () => {
         </ConfigRow>
       </div>
 
+      {/* PRIMARY LLM */}
+      <div>
+        <SectionHeader
+          title="Primary LLM"
+          description="The main model used for answer generation and chat responses."
+        />
+        <div className="grid gap-5 xl:grid-cols-2">
+          <SettingsSelect
+            label="Active Model"
+            value={settings.ActiveModel}
+            onChange={(e) => bind("ActiveModel")(e.target.value)}
+            options={llmOptions}
+          />
+        </div>
+      </div>
+
       {/* AI CONFIG */}
       <div>
         <SectionHeader
@@ -145,6 +161,43 @@ const AISettingsPanel = () => {
             label="Confidence Threshold"
             value={settings.ConfidenceThreshold}
             onChange={(e) => bind("ConfidenceThreshold")(Number(e.target.value))}
+          />
+        </div>
+      </div>
+
+      {/* PIPELINE MODELS */}
+      <div>
+        <SectionHeader
+          title="Pipeline Models"
+          description="Dedicated LLMs for specific pipeline stages. Leave empty to use the Primary LLM as fallback."
+        />
+        <div className="grid gap-5 xl:grid-cols-2">
+          <SettingsSelect
+            label="Escalation Draft Model"
+            value={settings.EscalationDraftModel}
+            onChange={(e) => bind("EscalationDraftModel")(e.target.value)}
+            options={[{ value: "", label: "Use Primary LLM" }, ...llmOptions]}
+          />
+
+          <SettingsSelect
+            label="Routing Model"
+            value={settings.RoutingModel}
+            onChange={(e) => bind("RoutingModel")(e.target.value)}
+            options={[{ value: "", label: "Use Primary LLM" }, ...llmOptions]}
+          />
+
+          <SettingsSelect
+            label="Document Classifier Model"
+            value={settings.DocumentClassifierModel}
+            onChange={(e) => bind("DocumentClassifierModel")(e.target.value)}
+            options={[{ value: "", label: "Use Primary LLM" }, ...llmOptions]}
+          />
+
+          <SettingsSelect
+            label="Conversation Resolution Model"
+            value={settings.ConversationResolutionModel}
+            onChange={(e) => bind("ConversationResolutionModel")(e.target.value)}
+            options={[{ value: "", label: "Use Primary LLM" }, ...llmOptions]}
           />
         </div>
       </div>
@@ -218,6 +271,47 @@ const AISettingsPanel = () => {
             label="Allowed Categories"
             value={settings.AllowedCategories}
             onChange={(e) => bind("AllowedCategories")(e.target.value)}
+          />
+        </div>
+      </div>
+
+      {/* PIPELINE PROMPTS */}
+      <div>
+        <SectionHeader
+          title="Pipeline Prompts"
+          description="Stage-specific prompts for escalation drafting, ticket routing, document classification, and conversation resolution."
+        />
+        <div className="space-y-5">
+          <SettingsTextarea
+            rows={5}
+            label="Escalation Draft Prompt"
+            placeholder="Generate a structured escalation draft including severity, affected systems, and recommended priority."
+            value={settings.EscalationDraftPrompt}
+            onChange={(e) => bind("EscalationDraftPrompt")(e.target.value)}
+          />
+
+          <SettingsTextarea
+            rows={5}
+            label="Routing Prompt"
+            placeholder="Classify the ticket into the most appropriate department and subcategory based on the issue description."
+            value={settings.RoutingPrompt}
+            onChange={(e) => bind("RoutingPrompt")(e.target.value)}
+          />
+
+          <SettingsTextarea
+            rows={5}
+            label="Document Classifier Prompt"
+            placeholder="Categorize the uploaded document into one of the allowed knowledge categories."
+            value={settings.DocumentClassifierPrompt}
+            onChange={(e) => bind("DocumentClassifierPrompt")(e.target.value)}
+          />
+
+          <SettingsTextarea
+            rows={5}
+            label="Conversation Resolution Prompt"
+            placeholder="Determine whether the conversation has reached a satisfactory resolution and summarize the outcome."
+            value={settings.ConversationResolutionPrompt}
+            onChange={(e) => bind("ConversationResolutionPrompt")(e.target.value)}
           />
         </div>
       </div>

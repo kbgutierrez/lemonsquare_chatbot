@@ -38,6 +38,16 @@ const DEFAULT_SETTINGS = Object.freeze({
   ReformulatorPrompt: "",
   AllowedCategories: "",
   ChatExtractionPrompt: "",
+
+  /* ---- NEW: Pipeline model/prompt fields ---- */
+  EscalationDraftModel: "",
+  EscalationDraftPrompt: "",
+  RoutingModel: "",
+  RoutingPrompt: "",
+  DocumentClassifierModel: "",
+  DocumentClassifierPrompt: "",
+  ConversationResolutionModel: "",
+  ConversationResolutionPrompt: "",
 })
 
 /* ========================================
@@ -70,6 +80,16 @@ const normalizeSettings = (data) => {
     ReformulatorPrompt: d.ReformulatorPrompt || "",
     AllowedCategories: d.AllowedCategories || "",
     ChatExtractionPrompt: d.ChatExtractionPrompt || "",
+
+    /* ---- NEW: Pipeline model/prompt fields ---- */
+    EscalationDraftModel: d.EscalationDraftModel || "",
+    EscalationDraftPrompt: d.EscalationDraftPrompt || "",
+    RoutingModel: d.RoutingModel || "",
+    RoutingPrompt: d.RoutingPrompt || "",
+    DocumentClassifierModel: d.DocumentClassifierModel || "",
+    DocumentClassifierPrompt: d.DocumentClassifierPrompt || "",
+    ConversationResolutionModel: d.ConversationResolutionModel || "",
+    ConversationResolutionPrompt: d.ConversationResolutionPrompt || "",
   }
 }
 
@@ -201,6 +221,24 @@ export const useAISettings = () => {
         AllowedCategories: safeSettings.AllowedCategories.trim(),
         ChatExtractionPrompt:
           safeSettings.ChatExtractionPrompt?.trim() || null,
+
+        /* ---- NEW: Pipeline model/prompt fields ---- */
+        EscalationDraftModel:
+          safeSettings.EscalationDraftModel?.trim() || null,
+        EscalationDraftPrompt:
+          safeSettings.EscalationDraftPrompt?.trim() || null,
+        RoutingModel:
+          safeSettings.RoutingModel?.trim() || null,
+        RoutingPrompt:
+          safeSettings.RoutingPrompt?.trim() || null,
+        DocumentClassifierModel:
+          safeSettings.DocumentClassifierModel?.trim() || null,
+        DocumentClassifierPrompt:
+          safeSettings.DocumentClassifierPrompt?.trim() || null,
+        ConversationResolutionModel:
+          safeSettings.ConversationResolutionModel?.trim() || null,
+        ConversationResolutionPrompt:
+          safeSettings.ConversationResolutionPrompt?.trim() || null,
       })
 
       console.log("SAVE_SETTINGS_PAYLOAD", payload)
