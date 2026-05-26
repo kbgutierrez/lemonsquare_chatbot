@@ -1,15 +1,5 @@
-import {
-  useEffect,
-  useState,
-  useCallback,
-  memo,
-} from "react"
-
-import {
-  motion,
-  AnimatePresence,
-} from "framer-motion"
-
+import { useEffect, useState, useCallback, memo } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import {
   Pencil,
   Trash2,
@@ -24,55 +14,17 @@ import {
   Minimize2,
 } from "lucide-react"
 
-/* ========================================
-   FIELD BLOCK
-======================================== */
-
-const FieldBlock = ({
-  title,
-  value,
-  color,
-}) => {
-
-  if (!value) {
-    return null
-  }
-
+const FieldBlock = ({ title, value, color }) => {
+  if (!value) return null
   return (
-    <div
-      className="
-        rounded-2xl
-        border
-        theme-border
-        muted-card
-        p-4
-      "
-    >
-
-      <h3
-        className={`mb-2 text-sm font-semibold ${color}`}
-      >
-        {title}
-      </h3>
-
-      <p
-        className="
-          whitespace-pre-wrap
-          text-sm
-          leading-relaxed
-          text-[color:var(--text-primary)]
-        "
-      >
+    <div className="py-3">
+      <h3 className={`mb-1 text-sm font-semibold ${color}`}>{title}</h3>
+      <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text-primary)]">
         {value}
       </p>
-
     </div>
   )
 }
-
-/* ========================================
-   COMPONENT
-======================================== */
 
 const ManualEntryCard = ({
   item,
@@ -81,1308 +33,363 @@ const ManualEntryCard = ({
   handleDeleteEntry,
   handleRestoreEntry,
   allowedCategories = [],
+  openEditModal,
 }) => {
-
-  const [
-    expanded,
-    setExpanded,
-  ] = useState(false)
-
-  const [
-    editing,
-    setEditing,
-  ] = useState(false)
-
-  const [
-    showDeleteModal,
-    setShowDeleteModal,
-  ] = useState(false)
-
-  const [
-    showCategoryModal,
-    setShowCategoryModal,
-  ] = useState(false)
-
-  const [form, setForm] = useState({
-    title: "",
-    category: "",
-    content: "",
-  })
-
-  /* ========================================
-     SYNC ITEM → FORM
-  ======================================== */
+  const [expanded, setExpanded] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showCategoryModal, setShowCategoryModal] = useState(false)
+  const [form, setForm] = useState({ title: "", category: "", content: "" })
 
   useEffect(() => {
-
     setForm({
-      title:
-        item?.title || "",
-
-      category:
-        item?.category || "",
-
-      content:
-        item?.content || "",
+      title: item?.title || "",
+      category: item?.category || "",
+      content: item?.content || "",
     })
-
   }, [item])
 
-  /* ========================================
-     CATEGORY OPTIONS
-  ======================================== */
-
   const categoryOptions = [
-    ...new Set(
-      [
-        ...(allowedCategories || []),
-
-        item?.category,
-      ].filter(Boolean)
-    ),
+    ...new Set([...(allowedCategories || []), item?.category].filter(Boolean)),
   ]
 
-  /* ========================================
-     HANDLERS
-  ======================================== */
+  const handleCancel = useCallback(() => {
+    setForm({
+      title: item?.title || "",
+      category: item?.category || "",
+      content: item?.content || "",
+    })
+    setEditing(false)
+    setShowCategoryModal(false)
+  }, [item])
 
-  const handleCancel =
-    useCallback(() => {
+  const handleSave = useCallback(async () => {
+    if (!item?.id) {
+      console.error("Missing manual entry ID.")
+      return
+    }
+    await handleUpdateEntry(item.id, form, () => setEditing(false))
+  }, [item, form, handleUpdateEntry])
 
-      setForm({
-        title:
-          item?.title || "",
+  const handleDelete = useCallback(async () => {
+    if (!item?.id) {
+      console.error("Missing manual entry ID.")
+      return
+    }
+    await handleDeleteEntry(item.id)
+    setShowDeleteModal(false)
+    setExpanded(false)
+  }, [item, handleDeleteEntry])
 
-        category:
-          item?.category || "",
+  const handleRestore = useCallback(async () => {
+    if (!item?.id) {
+      console.error("Missing manual entry ID.")
+      return
+    }
+    await handleRestoreEntry(item.id)
+    setExpanded(false)
+  }, [item, handleRestoreEntry])
 
-        content:
-          item?.content || "",
-      })
+  const handleSelectCategory = useCallback((category) => {
+    setForm((prev) => ({ ...prev, category }))
+    setShowCategoryModal(false)
+  }, [])
 
-      setEditing(false)
-
-      setShowCategoryModal(false)
-
-    }, [item])
-
-  const handleSave =
-    useCallback(async () => {
-
-      if (!item?.id) {
-
-        console.error(
-          "Missing manual entry ID."
-        )
-
-        return
-      }
-
-      await handleUpdateEntry(
-        item.id,
-        form,
-        () => setEditing(false)
-      )
-
-    }, [
-      item,
-      form,
-      handleUpdateEntry,
-    ])
-
-  const handleDelete =
-    useCallback(async () => {
-
-      if (!item?.id) {
-
-        console.error(
-          "Missing manual entry ID."
-        )
-
-        return
-      }
-
-      await handleDeleteEntry(
-        item.id
-      )
-
-      setShowDeleteModal(false)
-
-      setExpanded(false)
-
-    }, [
-      item,
-      handleDeleteEntry,
-    ])
-
-  const handleRestore =
-    useCallback(async () => {
-
-      if (!item?.id) {
-
-        console.error(
-          "Missing manual entry ID."
-        )
-
-        return
-      }
-
-      await handleRestoreEntry(
-        item.id
-      )
-
-      setExpanded(false)
-
-    }, [
-      item,
-      handleRestoreEntry,
-    ])
-
-  const handleSelectCategory =
-    useCallback((category) => {
-
-      setForm((prev) => ({
-        ...prev,
-        category,
-      }))
-
-      setShowCategoryModal(false)
-
-    }, [])
-
-  /* ========================================
-     STATE
-  ======================================== */
-
-  const isInactive =
-    !item.is_active
-
-  /* ========================================
-     RENDER
-  ======================================== */
+  const isInactive = !item.is_active
 
   return (
     <>
-      {/* ========================================
-         LIST ITEM
-      ======================================== */}
-
-      <motion.button
+      {/* LIST ITEM — flat row, no card */}
+      <button
         type="button"
-        onClick={() =>
-          setExpanded(true)
-        }
-        whileHover={{
-          scale: 1.005,
-        }}
-        whileTap={{
-          scale: 0.995,
-        }}
-        className={`group flex w-full items-center justify-between rounded-[24px] border px-5 py-4 text-left transition-all duration-200 ${
-          isInactive
-            ? `
-              border-[color:var(--border)]
-              bg-[color:var(--panel)]
-
-              hover:border-[color:var(--text-muted)]
-            `
-            : `
-              border-[color:var(--border)]
-              bg-[color:var(--panel)]
-
-              hover:border-[color:var(--accent-green)]/30
-              hover:bg-[color:var(--hover)]
-            `
-        }`}
+        onClick={() => setExpanded(true)}
+        className="group flex w-full items-center justify-between border-b theme-border px-4 py-4 text-left transition-colors duration-200 hover:bg-[var(--panel-light)]"
       >
-
-        {/* LEFT */}
         <div className="min-w-0 flex-1">
-
           <div className="flex flex-wrap items-center gap-3">
-
             <span
-              className={`rounded-xl border px-2.5 py-1 text-[11px] font-semibold ${
-                isInactive
-                  ? `
-                    border-red-500/20
-                    bg-red-500/10
-                    text-red-300
-                  `
-                  : `
-                    border-emerald-500/20
-                    bg-emerald-500/10
-                    text-emerald-300
-                  `
+              className={`text-[11px] font-semibold ${
+                isInactive ? "text-red-400" : "text-emerald-400"
               }`}
             >
-
-              {isInactive
-                ? "Inactive"
-                : "Active"}
-
+              {isInactive ? "Inactive" : "Active"}
             </span>
-
-            <span
-              className="
-                rounded-xl
-
-                border
-                border-[color:var(--accent-green)]/10
-
-                bg-[color:var(--accent-green)]/10
-
-                px-2.5
-                py-1
-
-                text-[11px]
-                font-semibold
-
-                text-[color:var(--accent-green)]
-              "
-            >
-
+            <span className="text-[11px] font-semibold text-[var(--accent-green)]">
               {form.category || "General"}
-
             </span>
-
-            <span
-              className="
-                truncate
-                text-sm
-                font-semibold
-                text-[color:var(--text-primary)]
-              "
-            >
+            <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
               {form.title || "Untitled Entry"}
             </span>
-
           </div>
-
-          <p
-            className="
-              mt-2
-              line-clamp-1
-              text-sm
-              text-[color:var(--text-secondary)]
-            "
-          >
-
-            {form.content ||
-              "No content available."}
-
+          <p className="mt-1 line-clamp-1 text-sm text-[var(--text-secondary)]">
+            {form.content || "No content available."}
           </p>
-
         </div>
-
-        {/* RIGHT */}
         <div className="ml-4 flex items-center gap-3">
-
-          <ChevronRight
-            className="
-              h-5
-              w-5
-
-              text-[color:var(--text-muted)]
-
-              transition-transform
-              duration-200
-
-              group-hover:translate-x-1
-            "
-          />
-
+          <ChevronRight className="h-5 w-5 text-[var(--text-muted)] transition-transform duration-200 group-hover:translate-x-1" />
         </div>
+      </button>
 
-      </motion.button>
-
-      {/* ========================================
-         EXPANDED MODAL
-      ======================================== */}
-
+      {/* EXPANDED MODAL */}
       <AnimatePresence>
-
         {expanded && (
           <motion.div
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            className="
-              fixed
-              inset-0
-              z-[120]
-
-              flex
-              items-center
-              justify-center
-
-              bg-[color:var(--modal-overlay)]
-
-              p-5
-
-              backdrop-blur-md
-            "
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-[var(--modal-overlay)] p-5 backdrop-blur-md"
           >
-
             <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.96,
-                y: 10,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-                y: 10,
-              }}
-              transition={{
-                duration: 0.18,
-              }}
-              className="
-                modal-surface
-
-                relative
-
-                flex
-                max-h-[90vh]
-                w-full
-                max-w-4xl
-                flex-col
-
-                overflow-hidden
-
-                rounded-[34px]
-
-                border
-                theme-border
-              "
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.18 }}
+              className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border theme-border bg-[var(--panel)] shadow-[var(--shadow-lg)]"
             >
-
               {/* HEADER */}
-              <div
-                className="
-                  flex
-                  items-center
-                  justify-between
-
-                  border-b
-                  theme-border
-
-                  px-7
-                  py-5
-                "
-              >
-
+              <div className="flex items-center justify-between border-b theme-border px-6 py-4">
                 <div>
-
                   <div className="flex items-center gap-3">
-
                     <span
-                      className={`rounded-xl border px-3 py-1 text-xs font-semibold ${
-                        isInactive
-                          ? `
-                            border-red-500/20
-                            bg-red-500/10
-                            text-red-300
-                          `
-                          : `
-                            border-emerald-500/20
-                            bg-emerald-500/10
-                            text-emerald-300
-                          `
+                      className={`text-xs font-semibold ${
+                        isInactive ? "text-red-400" : "text-emerald-400"
                       }`}
                     >
-
-                      {isInactive
-                        ? "Inactive Entry"
-                        : "Active Entry"}
-
+                      {isInactive ? "Inactive Entry" : "Active Entry"}
                     </span>
-
-                    <span
-                      className="
-                        rounded-xl
-
-                        border
-                        border-[color:var(--accent-green)]/10
-
-                        bg-[color:var(--accent-green)]/10
-
-                        px-3
-                        py-1
-
-                        text-xs
-                        font-semibold
-
-                        text-[color:var(--accent-green)]
-                      "
-                    >
-
+                    <span className="text-xs font-semibold text-[var(--accent-green)]">
                       {form.category || "General"}
-
                     </span>
-
                   </div>
-
-                  <h2
-                    className="
-                      mt-3
-                      text-2xl
-                      font-bold
-                      text-[color:var(--text-primary)]
-                    "
-                  >
+                  <h2 className="mt-2 text-xl font-bold text-[var(--text-primary)]">
                     Manual Knowledge Entry
                   </h2>
-
                 </div>
 
-                {/* MINIMIZE */}
                 <button
-                  onClick={() =>
-                    setExpanded(false)
-                  }
-                  className="
-                    rounded-2xl
-
-                    border
-                    theme-border
-
-                    bg-[color:var(--panel-light)]
-
-                    p-3
-
-                    text-[color:var(--text-secondary)]
-
-                    transition-all
-
-                    hover:bg-[color:var(--hover)]
-                    hover:text-[color:var(--text-primary)]
-                  "
+                  onClick={() => setExpanded(false)}
+                  className="rounded-md border theme-border bg-[var(--panel-light)] p-2 text-[var(--text-secondary)] transition-all hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
                 >
-
                   <Minimize2 className="h-5 w-5" />
-
                 </button>
-
               </div>
 
               {/* CONTENT */}
-              <div className="flex-1 overflow-y-auto px-7 py-6">
-
+              <div className="flex-1 overflow-y-auto px-6 py-5">
                 {!editing ? (
-                  <div className="space-y-5">
-
-                    <FieldBlock
-                      title="Title"
-                      value={form.title}
-                      color="text-[color:var(--accent-green)]"
-                    />
-
-                    <FieldBlock
-                      title="Category"
-                      value={form.category}
-                      color="text-[#7dd3fc]"
-                    />
-
-                    <FieldBlock
-                      title="Knowledge Content"
-                      value={form.content}
-                      color="text-[color:var(--accent)]"
-                    />
-
+                  <div className="divide-y theme-border">
+                    <FieldBlock title="Title" value={form.title} color="text-[var(--accent-green)]" />
+                    <FieldBlock title="Category" value={form.category} color="text-sky-400" />
+                    <FieldBlock title="Knowledge Content" value={form.content} color="text-[var(--accent)]" />
                   </div>
                 ) : (
                   <div className="space-y-4">
-
-                    {/* TITLE */}
                     <input
                       value={form.title}
                       disabled={submitting}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          title:
-                            e.target.value,
-                        }))
-                      }
-                      className="input-base"
+                      onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                      className="input-base w-full"
                     />
 
-                    {/* CATEGORY */}
                     <button
                       type="button"
                       disabled={submitting}
-                      onClick={() =>
-                        setShowCategoryModal(true)
-                      }
-                      className="
-                        flex
-                        w-full
-                        items-center
-                        justify-between
-
-                        rounded-2xl
-
-                        border
-                        theme-border
-
-                        bg-[color:var(--panel)]
-
-                        px-4
-                        py-3
-
-                        text-left
-                        text-[color:var(--text-primary)]
-
-                        transition-all
-                        duration-200
-
-                        hover:border-[color:var(--accent-green)]/40
-                        hover:bg-[color:var(--hover)]
-                      "
+                      onClick={() => setShowCategoryModal(true)}
+                      className="flex w-full items-center justify-between rounded-md border theme-border bg-[var(--panel)] px-4 py-3 text-left text-[var(--text-primary)] transition-all duration-200 hover:border-[var(--accent-green)]/40 hover:bg-[var(--hover)]"
                     >
-                      <span className="truncate">
-                        {form.category ||
-                          "Select category"}
-                      </span>
-
-                      <ChevronDown
-                        className="
-                          h-4
-                          w-4
-                          text-[color:var(--accent-green)]
-                        "
-                      />
+                      <span className="truncate">{form.category || "Select category"}</span>
+                      <ChevronDown className="h-4 w-4 text-[var(--accent-green)]" />
                     </button>
 
-                    {/* CONTENT */}
                     <textarea
                       rows={12}
                       value={form.content}
                       disabled={submitting}
-                      onChange={(e) =>
-                        setForm((p) => ({
-                          ...p,
-                          content:
-                            e.target.value,
-                        }))
-                      }
-                      className="
-                        input-base
-
-                        min-h-[280px]
-
-                        resize-none
-
-                        disabled:cursor-not-allowed
-                        disabled:opacity-50
-                      "
+                      onChange={(e) => setForm((p) => ({ ...p, content: e.target.value }))}
+                      className="input-base min-h-[280px] w-full resize-none disabled:cursor-not-allowed disabled:opacity-50"
                     />
-
                   </div>
                 )}
-
               </div>
 
-              {/* FOOTER */}
-              <div
-                className="
-                  border-t
-                  theme-border
-
-                  px-7
-                  py-5
-                "
-              >
-
+              {/* FOOTER — rounded-md buttons */}
+              <div className="border-t theme-border px-6 py-4">
                 {!editing ? (
                   <div className="flex gap-3">
-
                     <button
-                      onClick={() =>
-                        setEditing(true)
-                      }
-                      className="
-                        flex
-                        flex-1
-                        items-center
-                        justify-center
-                        gap-2
-
-                        rounded-2xl
-
-                        border
-                        border-[color:var(--accent-green)]/20
-
-                        bg-[color:var(--accent-green)]/10
-
-                        py-4
-
-                        text-sm
-                        font-semibold
-
-                        text-[color:var(--accent-green)]
-
-                        transition-all
-
-                        hover:bg-[color:var(--accent-green)]/20
-                      "
+                      onClick={() => setEditing(true)}
+                      className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--accent-green)]/20 bg-[var(--accent-green)]/10 py-3 text-sm font-semibold text-[var(--accent-green)] transition-all hover:bg-[var(--accent-green)]/20"
                     >
-
                       <Pencil className="h-4 w-4" />
-
                       Edit Entry
-
                     </button>
 
                     {isInactive ? (
                       <button
                         disabled={submitting}
-                        onClick={
-                          handleRestore
-                        }
-                        className="
-                          flex
-                          flex-1
-                          items-center
-                          justify-center
-                          gap-2
-
-                          rounded-2xl
-
-                          border
-                          border-emerald-500/20
-
-                          bg-emerald-500/10
-
-                          py-4
-
-                          text-sm
-                          font-semibold
-                          text-emerald-300
-
-                          transition-all
-
-                          hover:bg-emerald-500/20
-
-                          disabled:cursor-not-allowed
-                          disabled:opacity-60
-                        "
+                        onClick={handleRestore}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 py-3 text-sm font-semibold text-emerald-400 transition-all hover:bg-emerald-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-
                         <RotateCcw className="h-4 w-4" />
-
                         Restore Entry
-
                       </button>
                     ) : (
                       <button
                         disabled={submitting}
-                        onClick={() =>
-                          setShowDeleteModal(
-                            true
-                          )
-                        }
-                        className="
-                          flex
-                          flex-1
-                          items-center
-                          justify-center
-                          gap-2
-
-                          rounded-2xl
-
-                          border
-                          border-red-500/20
-
-                          bg-red-500/10
-
-                          py-4
-
-                          text-sm
-                          font-semibold
-                          text-red-300
-
-                          transition-all
-
-                          hover:bg-red-500/20
-
-                          disabled:cursor-not-allowed
-                          disabled:opacity-60
-                        "
+                        onClick={() => setShowDeleteModal(true)}
+                        className="flex flex-1 items-center justify-center gap-2 rounded-md border border-red-500/20 bg-red-500/5 py-3 text-sm font-semibold text-red-400 transition-all hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-60"
                       >
-
                         <Trash2 className="h-4 w-4" />
-
                         Archive Entry
-
                       </button>
                     )}
-
                   </div>
                 ) : (
                   <div className="flex gap-3">
-
                     <button
                       disabled={submitting}
                       onClick={handleCancel}
-                      className="
-                        flex-1
-
-                        rounded-2xl
-
-                        border
-                        theme-border
-
-                        bg-[color:var(--panel-light)]
-
-                        py-4
-
-                        font-medium
-
-                        text-[color:var(--text-primary)]
-
-                        transition-all
-
-                        hover:bg-[color:var(--hover)]
-                      "
+                      className="flex-1 rounded-md border theme-border bg-[var(--panel-light)] py-3 font-medium text-[var(--text-primary)] transition-all hover:bg-[var(--hover)]"
                     >
-
                       Cancel
-
                     </button>
-
                     <button
                       disabled={submitting}
                       onClick={handleSave}
-                      className="
-                        flex
-                        flex-1
-                        items-center
-                        justify-center
-                        gap-2
-
-                        rounded-2xl
-
-                        border
-                        border-[color:var(--accent-green)]/20
-
-                        bg-[color:var(--accent-green)]/10
-
-                        py-4
-
-                        text-sm
-                        font-semibold
-
-                        text-[color:var(--accent-green)]
-
-                        transition-all
-
-                        hover:bg-[color:var(--accent-green)]/20
-
-                        disabled:cursor-not-allowed
-                        disabled:opacity-60
-                      "
+                      className="flex flex-1 items-center justify-center gap-2 rounded-md border border-[var(--accent-green)]/20 bg-[var(--accent-green)]/10 py-3 text-sm font-semibold text-[var(--accent-green)] transition-all hover:bg-[var(--accent-green)]/20 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-
-                      {submitting ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Save className="h-4 w-4" />
-                      )}
-
+                      {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                       Save Changes
-
                     </button>
-
                   </div>
                 )}
-
               </div>
-
             </motion.div>
-
           </motion.div>
         )}
-
       </AnimatePresence>
 
-      {/* ========================================
-         CATEGORY MODAL
-      ======================================== */}
-
+      {/* CATEGORY MODAL */}
       <AnimatePresence>
-
         {showCategoryModal && (
           <motion.div
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            className="
-              fixed
-              inset-0
-              z-[130]
-
-              flex
-              items-center
-              justify-center
-
-              bg-[color:var(--modal-overlay)]
-
-              p-4
-
-              backdrop-blur-md
-            "
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-[var(--modal-overlay)] p-4 backdrop-blur-md"
           >
-
             <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.96,
-                y: 10,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-                y: 0,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-                y: 10,
-              }}
-              transition={{
-                duration: 0.18,
-              }}
-              className="
-                modal-surface
-
-                flex
-                max-h-[85vh]
-                w-full
-                max-w-xl
-                flex-col
-
-                overflow-hidden
-
-                rounded-[32px]
-
-                border
-                theme-border
-              "
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 10 }}
+              transition={{ duration: 0.18 }}
+              className="flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-lg border theme-border bg-[var(--panel)] shadow-[var(--shadow-lg)]"
             >
-
-              <div
-                className="
-                  shrink-0
-
-                  border-b
-                  theme-border
-
-                  px-6
-                  py-5
-                "
-              >
-
-                <h2
-                  className="
-                    text-2xl
-                    font-bold
-                    text-[color:var(--text-primary)]
-                  "
-                >
-                  Select Category
-                </h2>
-
-                <p
-                  className="
-                    mt-1
-                    text-sm
-                    text-[color:var(--text-secondary)]
-                  "
-                >
+              <div className="shrink-0 border-b theme-border px-6 py-5">
+                <h2 className="text-2xl font-bold text-[var(--text-primary)]">Select Category</h2>
+                <p className="mt-1 text-sm text-[var(--text-secondary)]">
                   Choose the best category for this manual knowledge entry.
                 </p>
-
               </div>
 
               <div className="flex-1 overflow-y-auto px-4 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-
                 <div className="space-y-2">
-
-                  {categoryOptions.map(
-                    (category, index) => {
-
-                      const selected =
-                        form.category ===
-                        category
-
-                      return (
-                        <button
-                          key={category}
-                          type="button"
-                          onClick={() =>
-                            handleSelectCategory(
-                              category
-                            )
-                          }
-                          className={`flex w-full items-center justify-between rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
-                            selected
-                              ? `
-                                border-[color:var(--accent-green)]/40
-
-                                bg-[color:var(--accent-green)]/10
-
-                                text-[color:var(--accent-green)]
-                              `
-                              : `
-                                border-[color:var(--border)]
-
-                                bg-[color:var(--panel)]
-
-                                text-[color:var(--text-primary)]
-
-                                hover:border-[color:var(--border)]
-                                hover:bg-[color:var(--hover)]
-                              `
+                  {categoryOptions.map((category, index) => {
+                    const selected = form.category === category
+                    return (
+                      <button
+                        key={category}
+                        type="button"
+                        onClick={() => handleSelectCategory(category)}
+                        className={`flex w-full items-center justify-between rounded-md border px-4 py-4 text-left transition-all duration-200 ${
+                          selected
+                            ? "border-[var(--accent-green)]/40 bg-[var(--accent-green)]/10 text-[var(--accent-green)]"
+                            : "border-[var(--border)] bg-[var(--panel)] text-[var(--text-primary)] hover:bg-[var(--hover)]"
+                        }`}
+                        style={{ animationDelay: `${index * 25}ms` }}
+                      >
+                        <span className="font-medium">{category}</span>
+                        <div
+                          className={`flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200 ${
+                            selected ? "scale-100 bg-[var(--accent-green)] text-[var(--background)]" : "scale-0 opacity-0"
                           }`}
-                          style={{
-                            animationDelay:
-                              `${index * 25}ms`,
-                          }}
                         >
-                          <span className="font-medium">
-                            {category}
-                          </span>
-
-                          <div
-                            className={`flex h-6 w-6 items-center justify-center rounded-full transition-all duration-200 ${
-                              selected
-                                ? `
-                                  scale-100
-
-                                  bg-[color:var(--accent-green)]
-
-                                  text-[color:var(--background)]
-                                `
-                                : `
-                                  scale-0
-                                  opacity-0
-                                `
-                            }`}
-                          >
-                            <Check className="h-4 w-4" />
-                          </div>
-
-                        </button>
-                      )
-                    }
-                  )}
-
+                          <Check className="h-4 w-4" />
+                        </div>
+                      </button>
+                    )
+                  })}
                 </div>
-
               </div>
 
-              <div
-                className="
-                  shrink-0
-
-                  border-t
-                  theme-border
-
-                  px-6
-                  py-4
-                "
-              >
-
+              <div className="shrink-0 border-t theme-border px-6 py-4">
                 <button
                   type="button"
-                  onClick={() =>
-                    setShowCategoryModal(false)
-                  }
-                  className="
-                    w-full
-
-                    rounded-2xl
-
-                    border
-                    theme-border
-
-                    bg-[color:var(--panel-light)]
-
-                    px-5
-                    py-3
-
-                    text-sm
-                    font-medium
-
-                    text-[color:var(--text-primary)]
-
-                    transition-all
-                    duration-200
-
-                    hover:bg-[color:var(--hover)]
-                  "
+                  onClick={() => setShowCategoryModal(false)}
+                  className="w-full rounded-md border theme-border bg-[var(--panel-light)] px-5 py-3 text-sm font-medium text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--hover)]"
                 >
-
                   Close
-
                 </button>
-
               </div>
-
             </motion.div>
-
           </motion.div>
         )}
-
       </AnimatePresence>
 
-      {/* ========================================
-         DELETE MODAL
-      ======================================== */}
-
+      {/* DELETE MODAL */}
       <AnimatePresence>
-
         {showDeleteModal && (
           <motion.div
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            className="
-              fixed
-              inset-0
-              z-[140]
-
-              flex
-              items-center
-              justify-center
-
-              bg-[color:var(--modal-overlay)]
-
-              p-4
-
-              backdrop-blur-sm
-            "
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[140] flex items-center justify-center bg-[var(--modal-overlay)] p-4 backdrop-blur-sm"
           >
-
             <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.96,
-              }}
-              animate={{
-                opacity: 1,
-                scale: 1,
-              }}
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-              }}
-              transition={{
-                duration: 0.18,
-              }}
-              className="
-                modal-surface
-
-                relative
-
-                w-full
-                max-w-md
-
-                overflow-hidden
-
-                rounded-[32px]
-
-                border
-                border-red-500/20
-
-                p-6
-              "
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              transition={{ duration: 0.18 }}
+              className="relative w-full max-w-md overflow-hidden rounded-lg border border-red-500/20 bg-[var(--panel)] p-6 shadow-[var(--shadow-lg)]"
             >
-
               <button
-                onClick={() =>
-                  setShowDeleteModal(
-                    false
-                  )
-                }
-                className="
-                  absolute
-                  right-4
-                  top-4
-
-                  rounded-xl
-
-                  p-2
-
-                  text-[color:var(--text-secondary)]
-
-                  transition-all
-
-                  hover:bg-[color:var(--hover-light)]
-                  hover:text-[color:var(--text-primary)]
-                "
+                onClick={() => setShowDeleteModal(false)}
+                className="absolute right-4 top-4 rounded-md p-2 text-[var(--text-secondary)] transition-all hover:bg-[var(--hover)] hover:text-[var(--text-primary)]"
               >
-
                 <X className="h-4 w-4" />
-
               </button>
 
-              <div
-                className="
-                  mb-5
-
-                  flex
-                  h-16
-                  w-16
-                  items-center
-                  justify-center
-
-                  rounded-3xl
-
-                  border
-                  border-red-500/20
-
-                  bg-red-500/10
-                "
-              >
-
-                <AlertTriangle className="h-8 w-8 text-red-400" />
-
+              <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-md border border-red-500/20 bg-red-500/10">
+                <AlertTriangle className="h-7 w-7 text-red-400" />
               </div>
 
-              <h2
-                className="
-                  text-2xl
-                  font-bold
-                  text-[color:var(--text-primary)]
-                "
-              >
-                Archive Manual Entry?
-              </h2>
-
-              <p
-                className="
-                  mt-3
-                  text-sm
-                  leading-relaxed
-                  text-[color:var(--text-secondary)]
-                "
-              >
-
-                This removes the manual knowledge entry from active retrieval
-                while preserving the data for future restoration.
-
+              <h2 className="text-xl font-bold text-[var(--text-primary)]">Archive Manual Entry?</h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--text-secondary)]">
+                This removes the manual knowledge entry from active retrieval while preserving the data for future restoration.
               </p>
 
               <div className="mt-6 flex gap-3">
-
                 <button
                   disabled={submitting}
-                  onClick={() =>
-                    setShowDeleteModal(false)
-                  }
-                  className="
-                    flex-1
-
-                    rounded-2xl
-
-                    border
-                    theme-border
-
-                    bg-[color:var(--panel-light)]
-
-                    py-3
-
-                    font-medium
-
-                    text-[color:var(--text-primary)]
-
-                    transition-all
-
-                    hover:bg-[color:var(--hover)]
-
-                    disabled:opacity-60
-                  "
+                  onClick={() => setShowDeleteModal(false)}
+                  className="flex-1 rounded-md border theme-border bg-[var(--panel-light)] py-3 font-medium text-[var(--text-primary)] transition-all hover:bg-[var(--hover)] disabled:opacity-60"
                 >
-
                   Cancel
-
                 </button>
-
                 <button
                   disabled={submitting}
                   onClick={handleDelete}
-                  className="
-                    flex
-                    flex-1
-                    items-center
-                    justify-center
-
-                    rounded-2xl
-
-                    bg-red-500
-
-                    py-3
-
-                    font-semibold
-                    text-white
-
-                    transition-all
-
-                    hover:bg-red-400
-
-                    disabled:cursor-not-allowed
-                    disabled:opacity-60
-                  "
+                  className="flex flex-1 items-center justify-center rounded-md bg-red-500 py-3 font-semibold text-white transition-all hover:bg-red-400 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-
-                  {submitting ? (
-                    <Loader2 className="h-5 w-5 animate-spin" />
-                  ) : (
-                    "Archive"
-                  )}
-
+                  {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : "Archive"}
                 </button>
-
               </div>
-
             </motion.div>
-
           </motion.div>
         )}
-
       </AnimatePresence>
-
     </>
   )
 }
 
-export default memo(
-  ManualEntryCard
-)
+export default memo(ManualEntryCard)

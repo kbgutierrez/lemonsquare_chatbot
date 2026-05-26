@@ -67,7 +67,7 @@ const TicketPagination = ({
           className="
             hover-surface
 
-            rounded-xl
+            rounded-l
 
             border
             border-[var(--border)]
@@ -111,7 +111,7 @@ const TicketPagination = ({
           className="
             hover-surface
 
-            rounded-xl
+            rounded-l
 
             border
             border-[var(--border)]

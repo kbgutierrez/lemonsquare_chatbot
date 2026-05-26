@@ -73,6 +73,17 @@
 
   --scroll-thumb-hover-end:
     rgba(149, 193, 31, 0.8);
+
+  /* =====================================
+     GLOBAL UI SCALE TOKENS
+  ===================================== */
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 22px;
+
+  --content-max-width: 100%;
 }
 
 /* =========================================
@@ -82,69 +93,56 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  /* MAIN FOUNDATION */
   --background: #dfe7e2;
 
-  /* PANELS */
   --panel: #e7ede9;
   --panel-light: #dde5e0;
 
-  /* BORDERS */
   --border: #bcc9c1;
   --border-soft: rgba(15, 23, 42, 0.06);
 
-  /* HOVERS */
   --hover: #d7e0da;
   --hover-light: rgba(15,23,42,0.05);
 
-  /* TEXT */
   --text-primary: #202824;
   --text-secondary: #5f6d66;
   --text-muted: #7b8781;
 
   --placeholder: #86928c;
 
-  /* ACCENTS */
   --accent: #caa114;
   --accent-green: #739f16;
 
-  /* INPUTS */
   --input-bg:
     rgba(221, 229, 224, 0.92);
 
   --input-bg-focus:
     rgba(229, 236, 232, 0.98);
 
-  /* MODAL */
   --modal-overlay:
     rgba(15, 23, 42, 0.22);
 
-  /* SHADOWS */
   --shadow-lg:
     0 18px 60px rgba(15, 23, 42, 0.10);
 
   --shadow-soft:
     0 8px 30px rgba(15, 23, 42, 0.08);
 
-  /* GLASS */
   --glass-bg:
     rgba(231, 237, 233, 0.82);
 
   --glass-border:
     rgba(15, 23, 42, 0.06);
 
-  /* GLOWS */
   --bg-glow-primary:
     rgba(245, 213, 71, 0.07);
 
   --bg-glow-secondary:
     rgba(149, 193, 31, 0.05);
 
-  /* GRID */
   --grid-line:
     rgba(15,23,42,0.03);
 
-  /* SCROLL */
   --scroll-track:
     rgba(15,23,42,0.04);
 
@@ -226,6 +224,23 @@ body {
 }
 
 /* =========================================
+   GLOBAL LAYOUT IMPROVEMENTS
+========================================= */
+
+section,
+main,
+aside {
+  min-width: 0;
+}
+
+.panel-base,
+.glass-panel,
+.modal-surface,
+.muted-card {
+  border-radius: var(--radius-lg);
+}
+
+/* =========================================
    APP FOUNDATION
 ========================================= */
 
@@ -246,6 +261,8 @@ body {
 
   height: 100vh;
   height: 100dvh;
+
+  width: 100%;
 }
 
 .app-background {
@@ -283,35 +300,37 @@ body {
    GLOBAL SCROLLBAR
 ========================================= */
 
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+/* HIDE SCROLLBARS GLOBALLY */
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-::-webkit-scrollbar-track {
-  background: var(--scroll-track);
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
-::-webkit-scrollbar-thumb {
-  background:
-    linear-gradient(
-      180deg,
-      var(--scroll-thumb-start),
-      var(--scroll-thumb-end)
-    );
-
-  border-radius: 999px;
+/* OPTIONAL:
+   KEEP SCROLL FUNCTIONALITY */
+html,
+body,
+main,
+section,
+div,
+textarea {
+  scrollbar-width: none;
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background:
-    linear-gradient(
-      180deg,
-      var(--scroll-thumb-hover-start),
-      var(--scroll-thumb-hover-end)
-    );
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+main::-webkit-scrollbar,
+section::-webkit-scrollbar,
+div::-webkit-scrollbar,
+textarea::-webkit-scrollbar {
+  display: none;
 }
-
 /* =========================================
    GLOBAL FORM ELEMENTS
 ========================================= */
@@ -422,7 +441,7 @@ textarea::placeholder {
       var(--text-primary);
 
     border-radius:
-      1rem;
+      var(--radius-md);
 
     padding:
       0.85rem 1rem;
@@ -484,15 +503,15 @@ textarea::placeholder {
   }
 
   .section-padding {
-    @apply p-3 sm:p-4 md:p-5 lg:p-6;
+    @apply p-3 sm:p-4 md:p-5 lg:p-5;
   }
 
   .responsive-gap {
-    @apply gap-3 sm:gap-4 md:gap-5 lg:gap-6;
+    @apply gap-3 sm:gap-4 md:gap-5;
   }
 
   .responsive-radius {
-    @apply rounded-2xl md:rounded-3xl;
+    border-radius: var(--radius-lg);
   }
 
   .responsive-text {

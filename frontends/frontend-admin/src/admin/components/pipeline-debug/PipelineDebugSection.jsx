@@ -1,71 +1,26 @@
 import { useEffect, useState } from "react"
-
 import pipelineDebugService from "../../services/pipelineDebugService"
-
 import PipelineControls from "./components/PipelineControls"
 import PipelinePromptBox from "./components/PipelinePromptBox"
 import PipelineResults from "./components/PipelineResults"
-
 import ErrorState from "../../../shared/components/ErrorState"
 import LoadingSpinner from "../../../shared/components/LoadingSpinner"
-
-import {
-  getCachedData,
-  setCachedData,
-} from "../../../shared/cache/liveQueryCache"
+import { getCachedData, setCachedData } from "../../../shared/cache/liveQueryCache"
 
 const CACHE_KEY = "pipeline_debug_state"
 
 const PipelineDebugSection = () => {
+  const cached = getCachedData(CACHE_KEY) ?? {}
 
-  /* ========================================
-     CACHE HYDRATION (SAFE)
-  ======================================== */
-
-  const cached =
-    getCachedData(CACHE_KEY) ?? {}
-
-  /* ========================================
-     STATE
-  ======================================== */
-
-  const [prompt, setPrompt] =
-    useState(
-      cached.prompt || ""
-    )
-
-  const [userToken, setUserToken] =
-    useState(
-      cached.userToken || ""
-    )
-
-  const [sessionId, setSessionId] =
-    useState(
-      cached.sessionId || ""
-    )
-
-  const [loading, setLoading] =
-    useState(false)
-
-  const [result, setResult] =
-    useState(
-      cached.result || null
-    )
-
-  const [error, setError] =
-    useState("")
-
-  const [showConfig, setShowConfig] =
-    useState(
-      cached.showConfig ?? true
-    )
-
-  /* ========================================
-     PERSIST STATE
-  ======================================== */
+  const [prompt, setPrompt] = useState(cached.prompt || "")
+  const [userToken, setUserToken] = useState(cached.userToken || "")
+  const [sessionId, setSessionId] = useState(cached.sessionId || "")
+  const [loading, setLoading] = useState(false)
+  const [result, setResult] = useState(cached.result || null)
+  const [error, setError] = useState("")
+  const [showConfig, setShowConfig] = useState(cached.showConfig ?? true)
 
   useEffect(() => {
-
     setCachedData(CACHE_KEY, {
       prompt,
       userToken,
@@ -73,130 +28,52 @@ const PipelineDebugSection = () => {
       result,
       showConfig,
     })
-  }, [
-    prompt,
-    userToken,
-    sessionId,
-    result,
-    showConfig,
-  ])
-
-  /* ========================================
-     LOAD TOKEN
-  ======================================== */
+  }, [prompt, userToken, sessionId, result, showConfig])
 
   useEffect(() => {
-
-    const storedToken =
-      localStorage.getItem(
-        "admin_user_token"
-      )
-
+    const storedToken = localStorage.getItem("admin_user_token")
     if (!storedToken) return
     if (userToken) return
-
     setUserToken(storedToken)
   }, [])
 
-  /* ========================================
-     RUN PIPELINE
-  ======================================== */
+  const handleRun = async () => {
+    try {
+      setLoading(true)
+      setError("")
+      setResult(null)
 
-  const handleRun =
-    async () => {
-
-      try {
-        setLoading(true)
-        setError("")
-        setResult(null)
-
-        if (!prompt.trim()) {
-          throw new Error(
-            "Prompt is required."
-          )
-        }
-
-        if (!userToken.trim()) {
-          throw new Error(
-            "User token is missing."
-          )
-        }
-
-        const response =
-          await pipelineDebugService.debugPipeline({
-            message: prompt,
-            user_token: userToken,
-            session_id:
-              sessionId || null,
-          })
-
-        console.log(
-          "PIPELINE_DEBUG_RESULT",
-          response
-        )
-
-        setResult(response)
-        setShowConfig(false)
-
-      } catch (err) {
-
-        console.error(
-          "PIPELINE_DEBUG_ERROR",
-          err
-        )
-
-        setError(
-          err.message ||
-          "Pipeline debug failed."
-        )
-
-      } finally {
-        setLoading(false)
+      if (!prompt.trim()) {
+        throw new Error("Prompt is required.")
       }
+
+      if (!userToken.trim()) {
+        throw new Error("User token is missing.")
+      }
+
+      const response = await pipelineDebugService.debugPipeline({
+        message: prompt,
+        user_token: userToken,
+        session_id: sessionId || null,
+      })
+
+      console.log("PIPELINE_DEBUG_RESULT", response)
+      setResult(response)
+      setShowConfig(false)
+    } catch (err) {
+      console.error("PIPELINE_DEBUG_ERROR", err)
+      setError(err.message || "Pipeline debug failed.")
+    } finally {
+      setLoading(false)
     }
+  }
 
   return (
-    <section
-      className="
-        flex
-        h-full
-        flex-col
-
-        overflow-hidden
-      "
-    >
-      {/* HEADER */}
-      <div
-        className="
-          glass-panel
-
-          mb-4
-
-          rounded-3xl
-
-          p-5
-        "
-      >
-        <h1
-          className="
-            text-2xl
-            font-bold
-
-            text-[var(--text-primary)]
-          "
-        >
-          Pipeline Debug
-        </h1>
-
-        <p
-          className="
-            mt-2
-
-            text-sm
-
-            text-[var(--text-secondary)]
-          "
-        >
+    <section className="flex h-full flex-col overflow-hidden gap-5">
+      {/* HEADER — flat, no card */}
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text-primary)]">Pipeline Debug</h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
           Full RAG orchestration inspector.
         </p>
       </div>
@@ -223,25 +100,19 @@ const PipelineDebugSection = () => {
 
       {/* LOADING */}
       {loading && (
-        <LoadingSpinner
-          label="Running pipeline debug..."
-          size="sm"
-        />
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner label="Running pipeline debug..." size="sm" />
+        </div>
       )}
 
       {/* ERROR */}
       {error && !loading && (
-        <ErrorState
-          title="Pipeline Debug Error"
-          message={error}
-        />
+        <ErrorState title="Pipeline Debug Error" message={error} />
       )}
 
       {/* RESULTS */}
       {!loading && !error && (
-        <PipelineResults
-          result={result}
-        />
+        <PipelineResults result={result} />
       )}
     </section>
   )

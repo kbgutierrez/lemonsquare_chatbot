@@ -4,7 +4,7 @@ import {
   Upload,
   FileUp,
   Plus,
-  X,
+  ArrowLeft,
 } from "lucide-react"
 
 import UploadCategorySelector from "./components/UploadCategorySelector"
@@ -23,26 +23,46 @@ const UploadDropzone = ({
   selectedCategory = "",
   setSelectedCategory,
 }) => {
-  const [isDragging, setIsDragging] =
-    useState(false)
+
+  const [
+    isDragging,
+    setIsDragging,
+  ] = useState(false)
 
   const hasFiles =
     uploadedFiles.length > 0
 
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }
+  const handleDragOver =
+    (e) => {
 
-  const handleDragLeave = (e) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }
+      if (uploading) {
+        return
+      }
 
-  const onDrop = (e) => {
-    setIsDragging(false)
-    handleDrop(e)
-  }
+      e.preventDefault()
+
+      setIsDragging(true)
+    }
+
+  const handleDragLeave =
+    (e) => {
+
+      e.preventDefault()
+
+      setIsDragging(false)
+    }
+
+  const onDrop =
+    (e) => {
+
+      if (uploading) {
+        return
+      }
+
+      setIsDragging(false)
+
+      handleDrop(e)
+    }
 
   const fileInput = (
     <input
@@ -51,6 +71,7 @@ const UploadDropzone = ({
       multiple
       accept=".pdf"
       hidden
+      disabled={uploading}
       onChange={
         handleInputChange
       }
@@ -58,9 +79,11 @@ const UploadDropzone = ({
   )
 
   /* ========================================
-     COMPACT MODE (HAS FILES)
+     COMPACT MODE
   ======================================== */
+
   if (hasFiles) {
+
     return (
       <div
         className="
@@ -171,6 +194,7 @@ const UploadDropzone = ({
           />
 
           <button
+            disabled={uploading}
             onClick={() =>
               inputRef.current.click()
             }
@@ -188,6 +212,9 @@ const UploadDropzone = ({
               font-medium
               transition-all
               duration-200
+
+              disabled:cursor-not-allowed
+              disabled:opacity-50
             "
             style={{
               borderColor:
@@ -226,7 +253,10 @@ const UploadDropzone = ({
           }}
         >
           <button
-            disabled={uploading}
+            disabled={
+              uploading ||
+              !hasPendingUploads
+            }
             onClick={
               confirmUpload
             }
@@ -242,14 +272,20 @@ const UploadDropzone = ({
               font-semibold
               transition-all
               duration-200
+
               disabled:cursor-not-allowed
               disabled:opacity-60
             "
             style={{
               background:
-                "var(--accent)",
+                uploading
+                  ? "var(--panel-light)"
+                  : "var(--accent)",
 
-              color: "#111917",
+              color:
+                uploading
+                  ? "var(--text-secondary)"
+                  : "#111917",
             }}
           >
             <Upload
@@ -280,27 +316,29 @@ const UploadDropzone = ({
               font-medium
               transition-all
               duration-200
+
               disabled:cursor-not-allowed
               disabled:opacity-50
             "
             style={{
               borderColor:
-                "rgba(239, 68, 68, 0.20)",
+                "var(--border)",
 
               background:
-                "rgba(239, 68, 68, 0.10)",
+                "var(--panel-light)",
 
-              color: "#f87171",
+              color:
+                "var(--text-primary)",
             }}
           >
-            <X
+            <ArrowLeft
               className="
                 h-4
                 w-4
               "
             />
 
-            Cancel
+            Back
           </button>
         </div>
       </div>
@@ -308,8 +346,9 @@ const UploadDropzone = ({
   }
 
   /* ========================================
-     EMPTY MODE (DROPZONE)
+     EMPTY MODE
   ======================================== */
+
   return (
     <div
       onDrop={onDrop}
@@ -508,6 +547,7 @@ const UploadDropzone = ({
           />
 
           <button
+            disabled={uploading}
             onClick={() =>
               inputRef.current.click()
             }
@@ -524,6 +564,9 @@ const UploadDropzone = ({
               font-semibold
               transition-all
               duration-300
+
+              disabled:cursor-not-allowed
+              disabled:opacity-50
             "
             style={{
               borderColor:

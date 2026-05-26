@@ -1,36 +1,7 @@
-const CategoryBadge = ({
-  category,
-}) => {
-
+const CategoryBadge = ({ category }) => {
   return (
-    <span
-      className="
-        inline-flex
-        items-center
-
-        rounded-xl
-
-        border
-
-        px-2.5
-        py-1
-
-        text-[11px]
-        font-medium
-
-        leading-none
-      "
-      style={{
-        borderColor:
-          "var(--border)",
-
-        background:
-          "var(--panel-light)",
-
-        color:
-          "var(--text-primary)",
-      }}
-    >
+    <span className="inline-flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)]">
+      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
       {category}
     </span>
   )
