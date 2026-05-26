@@ -38,6 +38,7 @@ const AISettingsPanel = () => {
     success,
     error,
     settings,
+    llmOptions,
     update,
     saveSettings,
   } = useAISettings()

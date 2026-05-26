@@ -46,6 +46,8 @@ class TicketDraftResponse(BaseModel):
     status: str
     summary: str | None = None
     description: str | None = None
+    location: str | None = None
+    equipment: str | None = None
     department_id: int | None = None
     subcategory_id: int | None = None
     department_name: str | None = None

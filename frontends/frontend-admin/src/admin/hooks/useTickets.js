@@ -75,12 +75,18 @@ export const useTickets = () => {
     return Array.isArray(tickets) ? tickets : []
   }, [tickets])
 
-  const filteredTickets = useMemo(() => {
-    const dataset = allTicketsRef.current.length > 0 ? allTicketsRef.current : safeTickets
-    const trimmed = debouncedSearch.trim().toLowerCase()
-    if (!trimmed) return dataset
+  // Sync ref with reactive state for optimistic logic
+  useEffect(() => {
+    if (!mutationRef.current) {
+      allTicketsRef.current = safeTickets
+    }
+  }, [safeTickets])
 
-    return dataset.filter((ticket) => {
+  const filteredTickets = useMemo(() => {
+    const trimmed = debouncedSearch.trim().toLowerCase()
+    if (!trimmed) return safeTickets
+
+    return safeTickets.filter((ticket) => {
       return [ticket.ticket_number, ticket.issue_reported, ticket.work_done]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(trimmed))
@@ -92,39 +98,40 @@ export const useTickets = () => {
       if (mutationRef.current) return
       mutationRef.current = true
 
+      // Capture current state for potential rollback
       const previous = [...allTicketsRef.current]
-      const target = allTicketsRef.current.find((t) => t.ticket_number === ticketNumber)
-      if (!target) {
-        mutationRef.current = false
-        return
-      }
-
+      
       try {
+        let optimistic = []
         if (isBlocked) {
-          const optimistic = allTicketsRef.current.map((t) => {
+          optimistic = previous.map((t) => {
             if (t.ticket_number === ticketNumber) {
               return { ...t, is_blacklisted: false }
             }
             return t
           })
-          allTicketsRef.current = optimistic
-          setCachedData(queryKey, optimistic)
+        } else {
+          optimistic = previous.filter((t) => t.ticket_number !== ticketNumber)
+        }
+
+        // Apply optimistic update to cache and ref
+        allTicketsRef.current = optimistic
+        setCachedData(queryKey, optimistic)
+
+        // Perform network call
+        if (isBlocked) {
           await ticketAdminService.toggleTicketWhitelist(ticketNumber)
         } else {
-          const optimistic = allTicketsRef.current.filter((t) => t.ticket_number !== ticketNumber)
-          allTicketsRef.current = optimistic
-          setCachedData(queryKey, optimistic)
           await ticketAdminService.deleteTicket(ticketNumber)
         }
       } catch (error) {
         console.error("TICKET_MUTATION_ERROR", error)
+        // Rollback on failure
         allTicketsRef.current = previous
         setCachedData(queryKey, previous)
         throw error
       } finally {
-        setTimeout(() => {
-          mutationRef.current = false
-        }, 250)
+        mutationRef.current = false
       }
     },
     [queryKey]

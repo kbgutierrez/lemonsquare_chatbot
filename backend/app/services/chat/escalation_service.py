@@ -6,6 +6,7 @@ AND external API calls in a single file.
 import json
 import logging
 import httpx
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
@@ -121,8 +122,10 @@ class EscalationService:
 
         summary = draft_data.get("summary") or "AI Escalation Issue"
         description = draft_data.get("description") or "Escalated from AI Chatbot"
+        location = draft_data.get("location") or "Unknown"
+        equipment = draft_data.get("equipment") or "Unknown"
         
-        logger.info("Instant AI drafted summary='%s', description='%s'", summary, description)
+        logger.info("Instant AI drafted summary='%s', description='%s', location='%s', equipment='%s'", summary, description, location, equipment)
 
         # --- 4. AI PREDICTS THE ROUTING ---
         try:
@@ -177,6 +180,8 @@ class EscalationService:
             "status": "success",
             "summary": summary,
             "description": description,
+            "location": location,
+            "equipment": equipment,
             "department_id": predicted_dept_id,
             "department_name": predicted_dept_name,
             "subcategory_id": predicted_subcat_id,
@@ -187,27 +192,60 @@ class EscalationService:
             "routing_source": "ai_rac_pipeline",
         }
 
-    async def submit_escalation(self, payload: dict) -> dict:
+    async def submit_escalation(self, payload: dict, file: UploadFile = None) -> dict:
         """
-        Submit an escalation ticket to BizPortal.
+        Submit an escalation ticket to BizPortal with conditional fields and optional attachment.
         Returns dict matching TicketEscalateResponse schema.
         """
         session_id = str(payload["session_id"])
         session = self.repo.validate_session_for_escalation(session_id)
 
+        # 1. Define which departments accept the extra fields
+        # LMD=87, Motorpool=85, TSD=40
+        DEPARTMENTS_WITH_EXTRA_FIELDS = {87, 85, 40}
+        
+        dept_id = int(payload["department_id"])
+        
+        # 2. Build the base payload that EVERY department needs
         bizportal_payload = {
+            "summary": payload["summary"],
             "description": payload["description"],
-            "category_id": payload["department_id"],
+            "category_id": dept_id,
             "subcategory_id": payload["subcategory_id"],
             "requester_id": payload["requester_id"],
             "company_id": payload["company_id"],
-            "summary": payload["summary"],
         }
 
+        # 3. Apply Conditional Logic
+        location = payload.get("location") or "Unknown"
+        equipment = payload.get("equipment") or "Unknown"
+
+        if dept_id in DEPARTMENTS_WITH_EXTRA_FIELDS:
+            # Send as separate fields for LMD, Motorpool, TSD
+            bizportal_payload["location"] = location
+            bizportal_payload["equipment"] = equipment
+        else:
+            # For ICT (29) & TMG (81), append to description
+            bizportal_payload["description"] = (
+                f"{payload['description']}\n\n"
+                f"--- Additional Details ---\n"
+                f"Location: {location}\n"
+                f"Equipment: {equipment}"
+            )
+
+        # 4. Handle the File Upload (attachment[])
+        files_to_send = None
+        if file:
+            file_content = await file.read()
+            # BizPortal expects the array bracket notation for files
+            files_to_send = {'attachment[]': (file.filename, file_content, file.content_type)}
+
+        # 5. Send to BizPortal
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 BIZPORTAL_TICKET_URL,
-                json=bizportal_payload,
+                data=bizportal_payload, # Use data for multipart form data
+                files=files_to_send,
                 timeout=10.0,
             )
             response.raise_for_status()

@@ -287,17 +287,15 @@ ESCALATION_DRAFT_PROMPT = (
 # =========================================================
 TICKET_GENERATION_PROMPT = (
     "You are an expert IT Helpdesk Dispatcher.\n"
-    "Read the chat transcript and draft a ticket summary and description.\n"
-    "CRITICAL RULES:\n"
-    "- THE TICKET IS ALREADY APPROVED. DO NOT evaluate if information is missing. DO NOT ask the user for more details. DO NOT output 'Missing Information'.\n"
-    "- Write the 'summary' and 'description' in natural, conversational Taglish using FULL SENTENCES.\n"
-    "- DO NOT use bullet points, numbered lists, line breaks, or formal formatting.\n"
-    "- Combine the Location, Equipment, and Issue into a smooth sentence. If a detail is missing or unknown in the transcript, just state it naturally in the description (e.g., 'Hindi alam ng user ang specific unit number.').\n"
-    "- DO NOT output any conversational text outside the JSON. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "Read the chat transcript and draft a formal ticket summary and description.\n"
+    "Extract the Location and Equipment into their own fields.\n"
+    "DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
-    '  "summary": "string (Short operational sentence, e.g., \'Aircon on ICT not working.\')",\n'
-    '  "description": "string (1 to 2 full sentences in Taglish combining the details. e.g., \'Nasa ICT ang aircon at hindi gumagana ang pag-adjust ng temperature. Hindi sure ng user kung anong specific equipment.\')"\n'
+    '  "summary": "string (Short operational title)",\n'
+    '  "description": "string (Concise technician-style summary of the ISSUE)",\n'
+    '  "location": "string (e.g., HR Department, Branch A, or \'Unknown\')",\n'
+    '  "equipment": "string (e.g., PC #123, Printer, or \'Unknown\')"\n'
     "}}\n\n"
     "CHAT TRANSCRIPT:\n"
     "=================\n"

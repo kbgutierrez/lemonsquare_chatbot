@@ -7,8 +7,9 @@ import {
 } from "react"
 
 import { AI_DEFAULTS } from "../../shared/config/sqlVariables"
-import { aiModels } from "../data/aiModels"
+import { aiModels, llmOptions as initialLlmOptions } from "../data/aiModels"
 import aiSettingsService from "../services/aiSettingsService"
+import modelsService from "../services/modelsService"
 
 import useLiveQuery from "../../shared/hooks/useLiveQuery"
 import {
@@ -99,6 +100,24 @@ export const useAISettings = () => {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState("")
   const [error, setError] = useState("")
+  const [llmOptions, setLlmOptions] = useState(initialLlmOptions)
+
+  /* ========================================
+     FETCH GROQ MODELS
+  ======================================== */
+  useEffect(() => {
+    const loadModels = async () => {
+      const models = await modelsService.getGroqModels()
+      if (models && models.length > 0) {
+        const options = models.map((m) => ({
+          label: m.name || m.id,
+          value: m.id,
+        }))
+        setLlmOptions(options)
+      }
+    }
+    loadModels()
+  }, [])
 
   /* ========================================
      LIFECYCLE SAFETY
@@ -272,6 +291,7 @@ export const useAISettings = () => {
 
     settings: safeSettings,
     activeModel,
+    llmOptions,
 
     update,
     selectModel,

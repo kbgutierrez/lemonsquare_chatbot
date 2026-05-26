@@ -5,8 +5,9 @@ Router is now pure HTTP: validates input, delegates, formats response.
 """
 import asyncio
 import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -30,7 +31,6 @@ from app.schemas.chat import (
 from app.schemas.tickets import (
     TicketDraftResponse,
     TicketEscalateResponse,
-    TicketSubmitRequest,
 )
 from app.services.chat.escalation_service import EscalationService
 from app.services.chat.message_service import MessageService
@@ -259,12 +259,30 @@ async def draft_escalation(
     response_model=TicketEscalateResponse,
 )
 async def submit_escalation(
-    request: TicketSubmitRequest,
+    session_id: UUID = Form(...),
+    requester_id: int = Form(...),
+    company_id: int = Form(...),
+    summary: str = Form(...),
+    description: str = Form(...),
+    department_id: int = Form(...),
+    subcategory_id: int = Form(...),
+    location: str | None = Form(None),
+    equipment: str | None = Form(None),
+    attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
-    result = await EscalationService(db).submit_escalation(
-        request.model_dump()
-    )
+    payload = {
+        "session_id": session_id,
+        "requester_id": requester_id,
+        "company_id": company_id,
+        "summary": summary,
+        "description": description,
+        "department_id": department_id,
+        "subcategory_id": subcategory_id,
+        "location": location,
+        "equipment": equipment,
+    }
+    result = await EscalationService(db).submit_escalation(payload, attachment)
 
     return TicketEscalateResponse(**result)
 

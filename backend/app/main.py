@@ -35,6 +35,7 @@ from app.api.routers import (
     maintenance,
     routing,
     admin_auth,
+    models,
 )
 from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
@@ -133,6 +134,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(admin_auth.router, prefix="/api")
     app.include_router(self_knowledge.router, prefix="/api")
+    app.include_router(models.router, prefix="/api")
 
     # Health
     @app.get("/health")

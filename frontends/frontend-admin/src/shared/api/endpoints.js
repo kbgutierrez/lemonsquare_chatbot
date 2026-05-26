@@ -105,6 +105,9 @@ export const API_ENDPOINTS = {
 
   AI_SETTINGS:
     "/api/settings",
+
+  MODELS_GROQ:
+    "/api/models/groq",
 }
 
 export default API_ENDPOINTS
