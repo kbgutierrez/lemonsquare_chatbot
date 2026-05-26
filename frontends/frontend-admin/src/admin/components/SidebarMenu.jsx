@@ -1,12 +1,6 @@
-import { LogOut }
-  from "lucide-react"
-
-import {
-  navigationItems,
-} from "../constants/navigation"
-
-import LemonLogo
-  from "../../assets/Lemon_logo_With_CatchPhrase.jpg"
+import { LogOut } from "lucide-react"
+import { navigationItems } from "../constants/navigation"
+import LemonLogo from "../../assets/Lemon_logo_With_CatchPhrase.jpg"
 
 const SidebarMenu = ({
   activeView,
@@ -15,44 +9,7 @@ const SidebarMenu = ({
   adminUser,
   isMobile = false,
 }) => {
-
-  /* ========================================
-     USER INFO
-  ======================================== */
-
-  const displayName =
-    adminUser?.name ||
-    "Authenticated User"
-
-  const displayRole =
-    adminUser?.role ||
-    "Administrator"
-
-  /* ========================================
-     CLASS HELPERS
-  ======================================== */
-
-  const headerLayout =
-    isMobile
-      ? `
-        flex
-        flex-col
-        items-stretch
-        gap-4
-        p-4
-      `
-      : `
-        flex
-        flex-col
-        gap-4
-        px-5
-        py-5
-      `
-
-  const logoutLayout =
-    isMobile
-      ? "w-full px-4 py-3 rounded-xl"
-      : "h-11 w-11 rounded-xl"
+  const displayName = adminUser?.name || "Authenticated User"
 
   return (
     <aside
@@ -65,6 +22,7 @@ const SidebarMenu = ({
         overflow-hidden
 
         border-r
+        theme-border
 
         shadow-[0_10px_40px_rgba(0,0,0,0.12)]
 
@@ -73,14 +31,9 @@ const SidebarMenu = ({
         ${isMobile ? "rounded-r-3xl" : ""}
       `}
       style={{
-        borderColor:
-          "var(--border)",
-
-        background:
-          "var(--panel)",
+        background: "var(--panel)",
       }}
     >
-
       {/* HEADER */}
       <div
         className={`
@@ -88,61 +41,40 @@ const SidebarMenu = ({
           shrink-0
 
           border-b
+          theme-border
 
-          ${headerLayout}
+          ${isMobile ? "flex flex-col items-stretch gap-4 p-4" : "flex flex-col gap-4 px-5 py-5"}
         `}
         style={{
-          borderColor:
-            "var(--border)",
-
-          background:
-            "var(--panel-light)",
+          background: "var(--panel-light)",
         }}
       >
-
         {/* LOGO */}
-        <div
-          className="
-            flex
-            items-center
-            justify-center
-          "
-        >
-
+        <div className="flex items-center justify-center">
           <img
             src={LemonLogo}
-
             alt="Lemon Square"
-
-            className="
-              h-auto
-
-              w-full
-              max-w-[150px]
-
-              object-contain
-            "
+            className="h-auto w-full max-w-[150px] object-contain"
           />
-
         </div>
 
-        {/* USER */}
+        {/* USER + LOGOUT */}
         <div
-          className="
+          className={`
             flex
             items-center
-            justify-between
             gap-3
-          "
-        >
 
+            ${isMobile ? "flex-col" : "justify-between"}
+          `}
+        >
           {/* NAME */}
           <div
-            className="
+            className={`
               min-w-0
               flex-1
 
-              rounded-xl
+              rounded-md
 
               px-3
               py-2
@@ -151,48 +83,21 @@ const SidebarMenu = ({
               duration-200
 
               hover:bg-white/[0.04]
-            "
+
+              ${isMobile ? "w-full text-center" : ""}
+            `}
           >
-
             <h2
-              className="
-                truncate
-
-                text-[15px]
-                font-semibold
-              "
-              style={{
-                color:
-                  "var(--text-primary)",
-              }}
+              className="truncate text-[15px] font-semibold text-[var(--text-primary)]"
             >
               {displayName}
             </h2>
-
-            <p
-              className="
-                mt-0.5
-
-                truncate
-
-                text-xs
-              "
-              style={{
-                color:
-                  "var(--text-secondary)",
-              }}
-            >
-              {displayRole}
-            </p>
-
           </div>
 
           {/* LOGOUT */}
           <button
             type="button"
-
             onClick={onLogout}
-
             className={`
               flex
               shrink-0
@@ -200,76 +105,37 @@ const SidebarMenu = ({
               justify-center
               gap-2
 
+              rounded-md
+
+              border
+              theme-border
+
+              bg-[var(--panel)]
+
+              text-[var(--text-secondary)]
+
               transition-all
               duration-200
 
               hover:bg-red-500/10
               hover:text-red-300
 
-              ${logoutLayout}
+              ${isMobile ? "w-full px-4 py-3" : "h-10 w-10"}
             `}
-            style={{
-              border:
-                "1px solid var(--border)",
-
-              background:
-                "var(--panel)",
-
-              color:
-                "var(--text-secondary)",
-            }}
           >
-
-            <LogOut
-              className="
-                h-4
-                w-4
-              "
-            />
-
+            <LogOut className="h-4 w-4" />
             {isMobile && (
-              <span
-                className="
-                  text-sm
-                  font-medium
-                "
-              >
-                Logout
-              </span>
+              <span className="text-sm font-medium">Logout</span>
             )}
-
           </button>
-
         </div>
-
       </div>
 
       {/* NAV LABEL */}
-      <div
-        className="
-          mb-3
-          shrink-0
-
-          px-4
-        "
-      >
-
-        <p
-          className="
-            text-[11px]
-            font-semibold
-            uppercase
-
-            tracking-[0.22em]
-          "
-          style={{
-            color:
-              "var(--text-secondary)",
-          }}
-        >
+      <div className="mb-3 shrink-0 px-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[var(--text-secondary)]">
           Navigation
         </p>
-
       </div>
 
       {/* MENU */}
@@ -285,144 +151,75 @@ const SidebarMenu = ({
           pb-3
 
           [scrollbar-width:none]
-
           [&::-webkit-scrollbar]:hidden
         "
       >
+        <div className="flex flex-col gap-1">
+          {navigationItems.map(({ id, label, icon: Icon }) => {
+            const active = activeView === id
 
-        <div
-          className="
-            flex
-            flex-col
-            gap-1
-          "
-        >
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setActiveView(id)}
+                className={`
+                  group
 
-          {navigationItems.map(
-            ({
-              id,
-              label,
-              icon: Icon,
-            }) => {
+                  flex
+                  w-full
+                  min-w-0
+                  items-center
+                  gap-3
 
-              const active =
-                activeView === id
+                  rounded-md
 
-              return (
-                <button
-                  key={id}
+                  px-3
+                  py-3
 
-                  type="button"
+                  text-left
 
-                  onClick={() =>
-                    setActiveView(id)
-                  }
+                  transition-all
+                  duration-200
 
-                  className="
-                    group
+                  hover:bg-white/[0.03]
 
+                  ${active ? "border theme-border bg-[var(--panel-light)]" : "border border-transparent bg-transparent"}
+                `}
+                style={{
+                  color: "var(--text-primary)",
+                }}
+              >
+                {/* ICON */}
+                <div
+                  className={`
                     flex
-                    w-full
-                    min-w-0
+                    h-10
+                    w-10
+                    shrink-0
                     items-center
-                    gap-3
+                    justify-center
 
-                    rounded-xl
-
-                    px-3
-                    py-3
-
-                    text-left
+                    rounded-md
 
                     transition-all
                     duration-200
 
-                    hover:bg-white/[0.03]
-                  "
-                  style={{
-                    border:
-                      active
-                        ? `
-                          1px solid
-                          var(--border)
-                        `
-                        : `
-                          1px solid
-                          transparent
-                        `,
-
-                    background:
-                      active
-                        ? "var(--panel-light)"
-                        : "transparent",
-
-                    color:
-                      "var(--text-primary)",
-                  }}
+                    ${active ? "bg-[var(--accent)] text-[#111917]" : "bg-[var(--panel-light)] text-[var(--text-secondary)]"}
+                  `}
                 >
+                  <Icon className="h-4.5 w-4.5 shrink-0" />
+                </div>
 
-                  {/* ICON */}
-                  <div
-                    className="
-                      flex
-                      h-10
-                      w-10
-                      shrink-0
-                      items-center
-                      justify-center
-
-                      rounded-lg
-
-                      transition-all
-                      duration-200
-                    "
-                    style={{
-                      background:
-                        active
-                          ? "var(--accent)"
-                          : "var(--panel-light)",
-
-                      color:
-                        active
-                          ? "#111917"
-                          : "var(--text-secondary)",
-                    }}
-                  >
-
-                    <Icon
-                      className="
-                        h-4.5
-                        w-4.5
-                        shrink-0
-                      "
-                    />
-
-                  </div>
-
-                  {/* LABEL */}
-                  <span
-                    className="
-                      min-w-0
-                      flex-1
-
-                      truncate
-
-                      text-sm
-                      font-medium
-                    "
-                  >
-                    {label}
-                  </span>
-
-                </button>
-              )
-            }
-          )}
-
+                {/* LABEL */}
+                <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                  {label}
+                </span>
+              </button>
+            )
+          })}
         </div>
-
       </div>
-
     </aside>
   )
 }

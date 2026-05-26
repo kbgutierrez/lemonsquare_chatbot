@@ -1,161 +1,79 @@
-import {
-  useState,
-  useCallback,
-  memo,
-} from "react"
-
-import {
-  Database,
-  DatabaseBackup,
-  RefreshCw,
-} from "lucide-react"
-
+import { useState, useCallback, memo } from "react"
+import { Database, DatabaseBackup, RefreshCw } from "lucide-react"
 import useManualEntries from "./hooks/useManualEntries"
-
 import ManualEntriesHeader from "./components/ManualEntriesHeader"
 import ManualEntryTabs from "./components/ManualEntryTabs"
 import ManualEntryCard from "./components/ManualEntryCard"
 import ManualEntriesPagination from "./components/ManualEntriesPagination"
 import ManualEntryModal from "./components/ManualEntryModal"
-
 import EmptyState from "../../../shared/components/EmptyState"
 import ErrorState from "../../../shared/components/ErrorState"
 import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 
-/* ========================================
-   MAIN SECTION
-======================================== */
+const STATUS_TABS = [
+  { id: "active", label: "Active", icon: Database },
+  { id: "inactive", label: "Inactive", icon: DatabaseBackup },
+]
 
 const ManualEntriesSection = () => {
-
-  const [
-    showModal,
-    setShowModal,
-  ] = useState(false)
-
-  const [
-    editingEntry,
-    setEditingEntry,
-  ] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [editingEntry, setEditingEntry] = useState(null)
 
   const {
     items,
-
     loading,
     refreshing,
     submitting,
     error,
     successMessage,
-
+    isStatusStale,
     search,
     setSearch,
-
     page,
     setPage,
-
     categories,
     allowedCategories,
-
     activeCategory,
     setActiveCategory,
-
     activityFilter,
     setActivityFilter,
-
     paginatedItems,
     totalPages,
-
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
     handleRestoreEntry,
-
     reloadEntries,
     setEditingState,
   } = useManualEntries()
 
-  /* ========================================
-     STATUS TABS
-  ======================================== */
+  const openCreateModal = useCallback(() => {
+    setEditingState(true)
+    setEditingEntry(null)
+    setShowModal(true)
+  }, [setEditingState])
 
-  const STATUS_TABS = [
-    {
-      id: "active",
-      label: "Active",
-      icon: Database,
-    },
-    {
-      id: "inactive",
-      label: "Inactive",
-      icon: DatabaseBackup,
-    },
-  ]
+  const openEditModal = useCallback((item) => {
+    setEditingState(true)
+    setEditingEntry(item)
+    setShowModal(true)
+  }, [setEditingState])
 
-  /* ========================================
-     MODAL HANDLERS
-  ======================================== */
+  const closeModal = useCallback(() => {
+    setEditingState(false)
+    setShowModal(false)
+  }, [setEditingState])
 
-  const openCreateModal =
-    useCallback(() => {
+  const handleRefresh = useCallback(async () => {
+    await reloadEntries()
+  }, [reloadEntries])
 
-      setEditingState(true)
-
-      setEditingEntry(null)
-
-      setShowModal(true)
-
-    }, [setEditingState])
-
-  const openEditModal =
-    useCallback((item) => {
-
-      setEditingState(true)
-
-      setEditingEntry(item)
-
-      setShowModal(true)
-
-    }, [setEditingState])
-
-  const closeModal =
-    useCallback(() => {
-
-      setEditingState(false)
-
-      setShowModal(false)
-
-    }, [setEditingState])
-
-  /* ========================================
-     REFRESH
-  ======================================== */
-
-  const handleRefresh =
-    useCallback(async () => {
-
-      await reloadEntries()
-
-    }, [reloadEntries])
+  const showSpinner = loading || isStatusStale
 
   return (
-    <div className="flex h-full flex-col gap-3">
-
-      {/* ========================================
-          HEADER + REFRESH
-      ======================================== */}
-
-      <div
-        className="
-          flex
-          flex-col
-          gap-3
-
-          lg:flex-row
-          lg:items-center
-          lg:justify-between
-        "
-      >
-
+    <div className="flex h-full flex-col gap-5">
+      {/* HEADER + REFRESH */}
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <ManualEntriesHeader
             search={search}
@@ -164,336 +82,43 @@ const ManualEntriesSection = () => {
           />
         </div>
 
-        {/* ========================================
-            MANUAL REFRESH BUTTON
-        ======================================== */}
-
         <button
           onClick={handleRefresh}
-
-          disabled={
-            refreshing ||
-            loading
-          }
-
-          className="
-            group
-
-            flex
-            w-full
-            items-center
-            justify-center
-            gap-2
-
-            rounded-2xl
-
-            border
-            theme-border
-
-            bg-[color:var(--panel)]
-
-            px-4
-            py-3
-
-            text-sm
-            font-semibold
-
-            text-[color:var(--text-primary)]
-
-            shadow-[var(--shadow-soft)]
-
-            transition-all
-            duration-300
-
-            hover:bg-[color:var(--hover)]
-
-            disabled:cursor-not-allowed
-            disabled:opacity-60
-
-            lg:w-auto
-            lg:min-w-[170px]
-          "
+          disabled={refreshing || loading}
+          className="group flex w-full items-center justify-center gap-2 rounded-md border theme-border bg-[var(--panel)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition-all duration-300 hover:bg-[var(--hover)] disabled:cursor-not-allowed disabled:opacity-60 lg:w-auto lg:min-w-[170px]"
         >
-
           <RefreshCw
-            className={`
-              h-4
-              w-4
-
-              transition-transform
-              duration-500
-
-              ${
-                refreshing || loading
-                  ? "animate-spin"
-                  : "group-hover:rotate-180"
-              }
-            `}
+            className={`h-4 w-4 transition-transform duration-500 ${
+              refreshing || loading ? "animate-spin" : "group-hover:rotate-180"
+            }`}
           />
-
-          <span>
-            {
-              refreshing || loading
-
-                ? "Refreshing..."
-
-                : "Refresh Entries"
-            }
-          </span>
+          <span>{refreshing || loading ? "Refreshing..." : "Refresh Entries"}</span>
         </button>
       </div>
 
-      {/* ========================================
-          STATUS TABS
-      ======================================== */}
-
-      <div
-        className="
-          rounded-[30px]
-
-          border
-          theme-border
-
-          bg-[color:var(--panel)]
-
-          p-2
-
-          shadow-[var(--shadow-soft)]
-        "
-      >
-        <div
-          className="
-            grid
-            grid-cols-2
-            gap-2
-          "
-        >
-          {STATUS_TABS.map((tab) => {
-
-            const active =
-              activityFilter ===
-              tab.id
-
-            const Icon =
-              tab.icon
-
-            return (
-              <button
-                key={tab.id}
-
-                onClick={() =>
-                  setActivityFilter(
-                    tab.id
-                  )
-                }
-
-                className={`
-                  group
-
-                  relative
-
-                  overflow-hidden
-
-                  rounded-[22px]
-
-                  border
-
-                  px-5
-                  py-3
-
-                  transition-all
-                  duration-300
-
-                  ${
-                    active
-
-                      ? tab.id ===
-                        "active"
-
-                        ? `
-                          theme-border
-
-                          bg-[color:var(--panel-light)]
-
-                          shadow-[var(--shadow-soft)]
-                        `
-
-                        : `
-                          border-red-500/20
-
-                          bg-red-500/5
-
-                          shadow-[var(--shadow-soft)]
-                        `
-
-                      : `
-                        border-transparent
-
-                        bg-transparent
-
-                        hover:bg-[color:var(--hover)]
-                      `
-                  }
-                `}
-              >
-
-                {/* ACTIVE GLOW */}
-                {active && (
-                  <div
-                    className={`
-                      absolute
-                      inset-0
-
-                      ${
-                        tab.id ===
-                        "active"
-
-                          ? `
-                            bg-[radial-gradient(circle_at_top,rgba(149,193,31,0.08),transparent_70%)]
-                          `
-
-                          : `
-                            bg-[radial-gradient(circle_at_top,rgba(239,68,68,0.08),transparent_70%)]
-                          `
-                      }
-                    `}
-                  />
-                )}
-
-                {/* ACTIVE INDICATOR */}
-                <div
-                  className={`
-                    absolute
-
-                    bottom-0
-                    left-1/2
-
-                    h-[3px]
-                    w-[55%]
-
-                    -translate-x-1/2
-
-                    rounded-full
-
-                    transition-all
-                    duration-300
-
-                    ${
-                      tab.id ===
-                      "active"
-
-                        ? "bg-[color:var(--accent)]"
-
-                        : "bg-red-400"
-                    }
-
-                    ${
-                      active
-                        ? "opacity-100"
-                        : "opacity-0"
-                    }
-                  `}
-                />
-
-                {/* CONTENT */}
-                <div
-                  className="
-                    relative
-                    z-10
-
-                    flex
-                    items-center
-                    justify-center
-                    gap-2.5
-                  "
-                >
-                  <div
-                    className={`
-                      flex
-                      h-6
-                      w-6
-                      items-center
-                      justify-center
-
-                      rounded-xl
-
-                      border
-
-                      transition-all
-                      duration-300
-
-                      ${
-                        active
-
-                          ? tab.id ===
-                            "active"
-
-                            ? `
-                              border-[color:var(--accent-green)]/20
-
-                              bg-[color:var(--accent-green)]/10
-
-                              text-[color:var(--accent-green)]
-                            `
-
-                            : `
-                              border-red-500/20
-
-                              bg-red-500/10
-
-                              text-red-300
-                            `
-
-                          : `
-                            theme-border
-
-                            bg-[color:var(--panel-light)]
-
-                            text-[color:var(--text-muted)]
-
-                            group-hover:text-[color:var(--text-primary)]
-                          `
-                      }
-                    `}
-                  >
-                    <Icon
-                      className="
-                        h-4
-                        w-4
-                      "
-                    />
-                  </div>
-
-                  <div
-                    className="
-                      flex
-                      flex-col
-                      items-start
-                    "
-                  >
-                    <span
-                      className={`
-                        text-sm
-                        font-semibold
-
-                        transition-colors
-                        duration-300
-
-                        ${
-                          active
-                            ? "text-[color:var(--text-primary)]"
-                            : "text-[color:var(--text-secondary)] group-hover:text-[color:var(--text-primary)]"
-                        }
-                      `}
-                    >
-                      {tab.label}
-                    </span>
-                  </div>
-                </div>
-              </button>
-            )
-          })}
-        </div>
+      {/* STATUS TABS — flat text tabs, no card */}
+      <div className="flex items-center gap-8 border-b theme-border px-4">
+        {STATUS_TABS.map((tab) => {
+          const active = activityFilter === tab.id
+          const Icon = tab.icon
+          return (
+            <button
+              key={tab.id}
+              onClick={() => setActivityFilter(tab.id)}
+              className={`relative flex items-center gap-2 pb-3 text-sm font-medium transition-colors duration-200 ${
+                active
+                  ? "text-[var(--text-primary)]"
+                  : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
+              }`}
+            >
+              <Icon className={`h-4 w-4 ${active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`} />
+              {tab.label}
+              {active && (
+                <div className="absolute bottom-0 left-0 h-[2px] w-full bg-[var(--accent)]" />
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* CATEGORY TABS */}
@@ -506,63 +131,32 @@ const ManualEntriesSection = () => {
 
       {/* SUCCESS */}
       {successMessage && (
-        <div
-          className="
-            rounded-2xl
-
-            border
-            border-emerald-500/20
-
-            bg-emerald-500/10
-
-            px-4
-            py-3
-
-            text-sm
-            text-emerald-300
-          "
-        >
+        <div className="rounded-md border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
           {successMessage}
         </div>
       )}
 
       {/* ERROR */}
       {error && !loading && (
-        <ErrorState
-          title="Manual Entries Error"
-          message={error}
-        />
+        <ErrorState title="Manual Entries Error" message={error} />
       )}
 
-      {/* CONTENT */}
+      {/* CONTENT — no card, blends into page */}
       <div
-        className="
-          flex-1
-          overflow-auto
-
-          rounded-[28px]
-
-          border
-          theme-border
-
-          bg-[color:var(--panel)]
-
-          p-5
-
-          shadow-[var(--shadow-soft)]
-        "
+        key={activityFilter}
+        className="flex-1 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
-
-        {loading ? (
-          <LoadingSpinner label="Loading manual entries..." />
+        {showSpinner ? (
+          <div className="flex h-full items-center justify-center">
+            <LoadingSpinner label="Loading manual entries..." />
+          </div>
         ) : paginatedItems.length === 0 ? (
           <EmptyState
             title="No manual entries"
             message="No manual knowledge entries are currently available."
           />
         ) : (
-          <div className="grid gap-4">
-
+          <div className="flex flex-col">
             {paginatedItems.map((item) => (
               <ManualEntryCard
                 key={item.id}
@@ -575,17 +169,12 @@ const ManualEntriesSection = () => {
                 openEditModal={openEditModal}
               />
             ))}
-
           </div>
         )}
       </div>
 
       {/* PAGINATION */}
-      <ManualEntriesPagination
-        page={page}
-        setPage={setPage}
-        totalPages={totalPages}
-      />
+      <ManualEntriesPagination page={page} setPage={setPage} totalPages={totalPages} />
 
       {/* MODAL */}
       <ManualEntryModal
@@ -603,6 +192,4 @@ const ManualEntriesSection = () => {
   )
 }
 
-export default memo(
-  ManualEntriesSection
-)
+export default memo(ManualEntriesSection)

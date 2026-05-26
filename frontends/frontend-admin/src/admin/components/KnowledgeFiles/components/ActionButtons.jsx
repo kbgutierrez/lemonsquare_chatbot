@@ -1,35 +1,6 @@
-import {
-  Pencil,
-  RotateCcw,
-  Trash2,
-} from "lucide-react"
-
-import {
-  useState,
-} from "react"
-
-import DeleteConfirmationModal
-  from "../modals/DeleteConfirmationModal"
-
-const buttonBaseClass =
-  `
-    flex
-    items-center
-    gap-1.5
-
-    rounded-lg
-
-    border
-
-    px-3
-    py-2
-
-    text-[12px]
-    font-medium
-
-    transition-all
-    duration-200
-  `
+import { Pencil, RotateCcw, Trash2 } from "lucide-react"
+import { useState } from "react"
+import DeleteConfirmationModal from "../modals/DeleteConfirmationModal"
 
 const ActionButtons = ({
   file,
@@ -38,166 +9,58 @@ const ActionButtons = ({
   onDelete,
   onRestore,
 }) => {
+  const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const isInactive = file?.is_active === false || file?.is_active === 0
 
-  const [
-    showArchiveModal,
-    setShowArchiveModal,
-  ] = useState(false)
-
-  const isInactive =
-    file?.is_active === false
-
-  const handleArchive =
-    async (
-      documentId
-    ) => {
-
-      try {
-
-        await onDelete?.(
-          documentId
-        )
-
-      } finally {
-
-        setShowArchiveModal(
-          false
-        )
-      }
+  const handleArchive = async (documentId) => {
+    try {
+      await onDelete?.(documentId)
+    } finally {
+      setShowArchiveModal(false)
     }
+  }
 
   return (
     <>
-      <div
-        className="
-          flex
-          items-center
-          justify-center
-          gap-2
-        "
-      >
-        {/* EDIT */}
+      <div className="flex items-center justify-center gap-2">
         {!isInactive && (
           <button
-            onClick={() =>
-              onEdit?.(file)
-            }
-
-            className={`
-              ${buttonBaseClass}
-
-              hover-surface
-            `}
-
-            style={{
-              borderColor:
-                "var(--border)",
-
-              background:
-                "var(--panel-light)",
-
-              color:
-                "var(--text-primary)",
-            }}
+            onClick={() => onEdit?.(file)}
+            className="flex items-center gap-1.5 rounded-sm border border-[var(--border)] bg-[var(--panel-light)] px-3 py-1.5 text-[12px] font-medium text-[var(--text-primary)] transition-all duration-200 hover:bg-[var(--hover)]"
           >
             <Pencil className="h-3.5 w-3.5" />
-
             Edit
           </button>
         )}
 
-        {/* DELETE */}
         {!isInactive && (
           <button
             disabled={deleting}
-
-            onClick={() =>
-              setShowArchiveModal(
-                true
-              )
-            }
-
-            className={`
-              ${buttonBaseClass}
-
-              disabled:cursor-not-allowed
-              disabled:opacity-60
-
-              hover:brightness-110
-            `}
-
-            style={{
-              borderColor:
-                "rgba(239, 68, 68, 0.22)",
-
-              background:
-                "rgba(239, 68, 68, 0.12)",
-
-              color:
-                "#ef4444",
-            }}
+            onClick={() => setShowArchiveModal(true)}
+            className="flex items-center gap-1.5 rounded-sm border border-red-200/30 bg-red-500/5 px-3 py-1.5 text-[12px] font-medium text-red-500 transition-all duration-200 hover:bg-red-500/10 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Trash2 className="h-3.5 w-3.5" />
-
             Archive
           </button>
         )}
 
-        {/* RESTORE */}
         {isInactive && (
           <button
-            onClick={() =>
-              onRestore?.(
-                file.document_id
-              )
-            }
-
-            className={`
-              ${buttonBaseClass}
-
-              hover:brightness-110
-            `}
-
-            style={{
-              borderColor:
-                "rgba(16, 185, 129, 0.22)",
-
-              background:
-                "rgba(16, 185, 129, 0.12)",
-
-              color:
-                "#10b981",
-            }}
+            onClick={() => onRestore?.(file.document_id)}
+            className="flex items-center gap-1.5 rounded-sm border border-emerald-200/30 bg-emerald-500/5 px-3 py-1.5 text-[12px] font-medium text-emerald-500 transition-all duration-200 hover:bg-emerald-500/10"
           >
             <RotateCcw className="h-3.5 w-3.5" />
-
             Restore
           </button>
         )}
       </div>
 
-      {/* ========================================
-          GLOBAL PORTAL MODAL
-      ======================================== */}
-
       <DeleteConfirmationModal
-        open={
-          showArchiveModal
-        }
-
+        open={showArchiveModal}
         file={file}
-
         deleting={deleting}
-
-        onClose={() =>
-          setShowArchiveModal(
-            false
-          )
-        }
-
-        onConfirm={
-          handleArchive
-        }
+        onClose={() => setShowArchiveModal(false)}
+        onConfirm={handleArchive}
       />
     </>
   )

@@ -1,24 +1,7 @@
-import {
-  LoaderCircle,
-  Sparkles,
-  BrainCircuit,
-  SlidersHorizontal,
-  Moon,
-  Sun,
-} from "lucide-react"
-
+import { LoaderCircle, Sparkles, BrainCircuit, SlidersHorizontal, Moon, Sun } from "lucide-react"
 import { useAISettings } from "../../hooks/useAISettings"
-
-import {
-  llmOptions,
-  embeddingModels,
-  rerankerModels,
-} from "../../data/aiModels"
-
-import {
-  useAdminTheme,
-} from "../../../shared/hooks/useAdminTheme"
-
+import { llmOptions, embeddingModels, rerankerModels } from "../../data/aiModels"
+import { useAdminTheme } from "../../../shared/hooks/useAdminTheme"
 import SettingsInput from "./SettingsInput"
 import SettingsSelect from "./SettingsSelect"
 import SettingsToggle from "./SettingsToggle"
@@ -26,72 +9,23 @@ import SettingsTextarea from "./SettingsTextarea"
 import SettingsActions from "./SettingsActions"
 
 /* ========================================
-   CONFIG CARD
+   SECTION HEADER
 ======================================== */
-const ConfigCard = ({
-  title,
-  description,
-  icon: Icon,
-  children,
-}) => {
+const SectionHeader = ({ title, description }) => {
   return (
-    <div
-      className="
-        rounded-[30px]
-        border
-        p-6
-        shadow-[0_0_0_1px_rgba(255,255,255,0.02)]
-        backdrop-blur-xl
-      "
-      style={{
-        borderColor: "var(--border)",
-        background: "var(--glass-bg)",
-      }}
-    >
-      <div className="mb-6 flex items-start gap-4">
-        <div
-          className="
-            flex
-            h-12
-            w-12
-            shrink-0
-            items-center
-            justify-center
-            rounded-2xl
-          "
-          style={{
-            background: "rgba(245, 213, 71, 0.10)",
-          }}
-        >
-          <Icon
-            className="h-5 w-5"
-            style={{
-              color: "var(--accent)",
-            }}
-          />
-        </div>
+    <div className="mb-6">
+      <h3 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h3>
+      <p className="mt-1 text-sm text-[var(--text-secondary)]">{description}</p>
+    </div>
+  )
+}
 
-        <div>
-          <h3
-            className="text-lg font-semibold"
-            style={{
-              color: "var(--text-primary)",
-            }}
-          >
-            {title}
-          </h3>
-
-          <p
-            className="mt-1 text-sm"
-            style={{
-              color: "var(--text-secondary)",
-            }}
-          >
-            {description}
-          </p>
-        </div>
-      </div>
-
+/* ========================================
+   CONFIG ROW
+======================================== */
+const ConfigRow = ({ children }) => {
+  return (
+    <div className="flex items-center justify-between border-b theme-border py-4 last:border-b-0">
       {children}
     </div>
   )
@@ -108,127 +42,37 @@ const AISettingsPanel = () => {
     saveSettings,
   } = useAISettings()
 
-  const {
-    theme,
-    isDark,
-    toggleTheme,
-  } = useAdminTheme()
+  const { theme, isDark, toggleTheme } = useAdminTheme()
 
-  /* ========================================
-     LOADING STATE
-  ======================================== */
+  const bind = (key) => (value) => update(key, value)
+
   if (loading) {
     return (
-      <div
-        className="
-          flex
-          items-center
-          justify-center
-          rounded-[32px]
-          p-16
-        "
-        style={{
-          border: "1px solid var(--border)",
-          background: "var(--glass-bg)",
-        }}
-      >
-        <LoaderCircle
-          className="h-8 w-8 animate-spin"
-          style={{
-            color: "var(--accent)",
-          }}
-        />
+      <div className="flex items-center justify-center py-16">
+        <LoaderCircle className="h-8 w-8 animate-spin text-[var(--accent)]" />
       </div>
     )
   }
 
-  /* ========================================
-     SAFE UPDATE HELPER
-  ======================================== */
-  const bind = (key) => (value) => update(key, value)
-
   return (
-    <div
-      className="
-        mx-auto
-        flex
-        h-full
-        w-full
-        max-w-[1700px]
-        flex-col
-        gap-6
-        overflow-y-auto
-        pr-2
-        [scrollbar-width:none]
-        [&::-webkit-scrollbar]:hidden
-      "
-    >
+    <div className="mx-auto flex h-full w-full max-w-[1700px] flex-col gap-8 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {/* THEME SETTINGS */}
-      <ConfigCard
-        title="Appearance"
-        description="Control the admin dashboard visual theme."
-        icon={isDark ? Moon : Sun}
-      >
-        <div
-          className="
-            flex
-            flex-col
-            gap-4
-            rounded-3xl
-            p-5
-            md:flex-row
-            md:items-center
-            md:justify-between
-          "
-          style={{
-            border: "1px solid var(--border)",
-            background: "var(--panel-light)",
-          }}
-        >
+      <div>
+        <SectionHeader
+          title="Appearance"
+          description="Control the admin dashboard visual theme."
+        />
+        <ConfigRow>
           <div>
-            <p
-              className="text-sm font-semibold"
-              style={{
-                color: "var(--text-primary)",
-              }}
-            >
-              Current Theme
-            </p>
-
-            <p
-              className="mt-1 text-xs"
-              style={{
-                color: "var(--text-secondary)",
-              }}
-            >
-              {isDark
-                ? "Dark mode is currently active."
-                : "Light mode is currently active."}
+            <p className="text-sm font-semibold text-[var(--text-primary)]">Current Theme</p>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {isDark ? "Dark mode is currently active." : "Light mode is currently active."}
             </p>
           </div>
-
           <button
             type="button"
             onClick={toggleTheme}
-            className="
-              flex
-              items-center
-              justify-center
-              gap-2
-              rounded-2xl
-              px-5
-              py-3
-              text-sm
-              font-semibold
-              transition-all
-              duration-300
-              hover:scale-[1.02]
-              active:scale-[0.98]
-            "
-            style={{
-              background: "var(--accent)",
-              color: "#111917",
-            }}
+            className="flex items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#111917] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
           >
             {isDark ? (
               <>
@@ -242,15 +86,15 @@ const AISettingsPanel = () => {
               </>
             )}
           </button>
-        </div>
-      </ConfigCard>
+        </ConfigRow>
+      </div>
 
       {/* AI CONFIG */}
-      <ConfigCard
-        title="AI Configuration"
-        description="Manage retrieval, reranking, embeddings, and response behavior."
-        icon={BrainCircuit}
-      >
+      <div>
+        <SectionHeader
+          title="AI Configuration"
+          description="Manage retrieval, reranking, embeddings, and response behavior."
+        />
         <div className="grid gap-5 xl:grid-cols-2">
           <SettingsSelect
             label="Reformulator Model"
@@ -300,94 +144,52 @@ const AISettingsPanel = () => {
             max="1"
             label="Confidence Threshold"
             value={settings.ConfidenceThreshold}
-            onChange={(e) =>
-              bind("ConfidenceThreshold")(Number(e.target.value))
-            }
+            onChange={(e) => bind("ConfidenceThreshold")(Number(e.target.value))}
           />
         </div>
-      </ConfigCard>
+      </div>
 
       {/* RETRIEVAL CONTROLS */}
-      <ConfigCard
-        title="Retrieval Controls"
-        description="Enable or disable advanced AI processing modules."
-        icon={SlidersHorizontal}
-      >
-        <div className="grid gap-5 xl:grid-cols-2">
-          <div
-            className="flex items-center justify-between rounded-3xl p-5"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--panel-light)",
-            }}
-          >
+      <div>
+        <SectionHeader
+          title="Retrieval Controls"
+          description="Enable or disable advanced AI processing modules."
+        />
+        <div className="grid gap-0 xl:grid-cols-2">
+          <ConfigRow>
             <div>
-              <p
-                className="text-sm font-semibold"
-                style={{
-                  color: "var(--text-primary)",
-                }}
-              >
-                Use Reformulator
-              </p>
-
-              <p
-                className="mt-1 text-xs"
-                style={{
-                  color: "var(--text-secondary)",
-                }}
-              >
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Use Reformulator</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 Enable intelligent query reformulation.
               </p>
             </div>
-
             <SettingsToggle
               value={settings.UseReformulator}
               onChange={bind("UseReformulator")}
             />
-          </div>
+          </ConfigRow>
 
-          <div
-            className="flex items-center justify-between rounded-3xl p-5"
-            style={{
-              border: "1px solid var(--border)",
-              background: "var(--panel-light)",
-            }}
-          >
+          <ConfigRow>
             <div>
-              <p
-                className="text-sm font-semibold"
-                style={{
-                  color: "var(--text-primary)",
-                }}
-              >
-                Use Reranker
-              </p>
-
-              <p
-                className="mt-1 text-xs"
-                style={{
-                  color: "var(--text-secondary)",
-                }}
-              >
+              <p className="text-sm font-semibold text-[var(--text-primary)]">Use Reranker</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">
                 Improve response relevance scoring.
               </p>
             </div>
-
             <SettingsToggle
               value={settings.UseReranker}
               onChange={bind("UseReranker")}
             />
-          </div>
+          </ConfigRow>
         </div>
-      </ConfigCard>
+      </div>
 
       {/* PROMPTS */}
-      <ConfigCard
-        title="Prompt Engineering"
-        description="Configure system prompts and retrieval behavior."
-        icon={Sparkles}
-      >
+      <div>
+        <SectionHeader
+          title="Prompt Engineering"
+          description="Configure system prompts and retrieval behavior."
+        />
         <div className="space-y-5">
           <SettingsTextarea
             rows={7}
@@ -418,7 +220,7 @@ const AISettingsPanel = () => {
             onChange={(e) => bind("AllowedCategories")(e.target.value)}
           />
         </div>
-      </ConfigCard>
+      </div>
 
       {/* ACTIONS */}
       <SettingsActions
