@@ -55,7 +55,7 @@ class TelemetryRepository:
         return self.db.query(LLMUsageLog).order_by(LLMUsageLog.Timestamp.desc()).limit(limit).all()
 
 class TelemetryService:
-    _queue: asyncio.Queue = asyncio.Queue()
+    _queue: asyncio.Queue = asyncio.Queue(maxsize=10_000)
     _worker_task = None
 
     @classmethod
@@ -101,6 +101,8 @@ class TelemetryService:
         }
         try:
             cls._queue.put_nowait(log_entry)
+        except asyncio.QueueFull:
+            logger.debug("telemetry.queue_full; dropping entry model=%s action=%s", model, action)
         except Exception as e:
             logger.error(f"Failed to queue telemetry log: {e}")
 

@@ -131,7 +131,11 @@ class SupportOrchestrator:
         from app.services.chat.escalation_service import EscalationService
 
         if session_id:
-            session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+            session = await asyncio.to_thread(
+                db.query(ChatSession)
+                .filter(ChatSession.SessionID == session_id)
+                .first
+            )
             if session and session.SessionStatus == "Drafting_Ticket":
                 logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")
 

@@ -7,7 +7,7 @@ import uuid
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, update
 from app.models.chatbot import ChatSession, ChatMessage
 from app.core.exceptions import NotFoundError, AuthorizationError
 
@@ -137,9 +137,11 @@ class ChatRepository:
             SenderRole=role,
             MessageContent=content,
         ))
-        session = self.get_session_by_id(session_id)
-        if session:
-            session.LastActive = datetime.utcnow()
+        self.db.execute(
+            update(ChatSession)
+            .where(ChatSession.SessionID == session_id)
+            .values(LastActive=datetime.utcnow())
+        )
         self.db.commit()
 
     def get_recent_history_text(self, session_id: str) -> str:

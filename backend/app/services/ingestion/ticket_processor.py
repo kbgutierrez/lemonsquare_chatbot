@@ -5,6 +5,7 @@ Ingests resolved helpdesk tickets into the knowledge base.
 import logging
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+from app.core.exceptions import VectorStoreError
 from app.models.chatbot import BlacklistedTicket
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
@@ -47,11 +48,16 @@ class TicketProcessor:
 
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            raise VectorStoreError(
+                f"Failed to upsert ticket {ticket_number} to Qdrant."
+            ) from exc
 
         return {
             "status": "success",

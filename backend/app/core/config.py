@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 10
     MAX_UPLOAD_MB: int = 25
     MAX_CONCURRENT_UPLOADS: int = 3
+    SETTINGS_CACHE_TTL_SECONDS: int = 300
     TAXONOMY_CACHE_TTL_SECONDS: int = 1800
 
     class Config:
