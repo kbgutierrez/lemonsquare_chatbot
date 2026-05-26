@@ -29,6 +29,7 @@ backend\app/
 │   ├── logging.py
 │   ├── metadata_contract.py
 │   ├── rate_limit.py
+│   ├── request_context.py
 │   └── retrieval_models.py
 ├── external
 │   └── groqapi.py
@@ -138,9 +139,11 @@ Fixes:
 - keeps auth + health routes alive during partial failures
 """
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 
@@ -171,17 +174,20 @@ from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.request_context import request_id_var
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.retrieval.vector_store import get_shared_vector_store
+from app.services.telemetry_service import TelemetryService
 
-configure_logging()
+configure_logging(app_settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up --- running pre-flight checks...")
+    TelemetryService.start_worker()
 
     # Default safe app state
     app.state.ai_available = False
@@ -251,6 +257,25 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+
+    @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:12]
+        token = request_id_var.set(request_id)
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        finally:
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            logger.info(
+                "http.request method=%s path=%s latency_ms=%d",
+                request.method,
+                request.url.path,
+                latency_ms,
+            )
+            request_id_var.reset(token)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     # Routes
     app.include_router(chat.router, prefix="/api")
@@ -501,6 +526,7 @@ Router is now pure HTTP: validates input, delegates, formats response.
 """
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
@@ -515,6 +541,7 @@ from app.api.deps import (
 )
 from app.core.exceptions import AuthorizationError
 from app.core.exceptions import AuthenticationError
+from app.core.exceptions import ValidationError
 from app.schemas.chat import (
     ChatHistoryResponse,
     ChatRequest,
@@ -578,6 +605,7 @@ async def handle_chat(
 
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
+    started = time.perf_counter()
     display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
         session_id=session_id,
         user_query=chat_request.message,
@@ -585,9 +613,16 @@ async def handle_chat(
         user_name=user_name,
         db=db,
     )
+    logger.info(
+        "chat.pipeline_total_ms=%d session_id=%s user_id=%s",
+        int((time.perf_counter() - started) * 1000),
+        session_id,
+        user_id,
+    )
 
     # Persist only the human-visible assistant text
-    msg_svc.save_ai_message(
+    await asyncio.to_thread(
+        msg_svc.save_ai_message,
         session_id=session_id,
         content=display_text,
     )
@@ -755,18 +790,44 @@ async def draft_escalation(
     response_model=TicketEscalateResponse,
 )
 async def submit_escalation(
-    session_id: UUID = Form(...),
-    requester_id: int = Form(...),
-    company_id: int = Form(...),
-    summary: str = Form(...),
-    description: str = Form(...),
-    department_id: int = Form(...),
-    subcategory_id: int = Form(...),
+    request: Request,
+    session_id: UUID | None = Form(None),
+    requester_id: int | None = Form(None),
+    company_id: int | None = Form(None),
+    summary: str | None = Form(None),
+    description: str | None = Form(None),
+    department_id: int | None = Form(None),
+    subcategory_id: int | None = Form(None),
     location: str | None = Form(None),
     equipment: str | None = Form(None),
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
+    if request.headers.get("content-type", "").startswith("application/json"):
+        body = await request.json()
+        session_id = body.get("session_id")
+        requester_id = body.get("requester_id")
+        company_id = body.get("company_id")
+        summary = body.get("summary")
+        description = body.get("description")
+        department_id = body.get("department_id")
+        subcategory_id = body.get("subcategory_id")
+        location = body.get("location")
+        equipment = body.get("equipment")
+
+    required_payload = {
+        "session_id": session_id,
+        "requester_id": requester_id,
+        "company_id": company_id,
+        "summary": summary,
+        "description": description,
+        "department_id": department_id,
+        "subcategory_id": subcategory_id,
+    }
+    missing = [name for name, value in required_payload.items() if value in (None, "")]
+    if missing:
+        raise ValidationError(f"Missing required escalation fields: {', '.join(missing)}")
+
     payload = {
         "session_id": session_id,
         "requester_id": requester_id,
@@ -870,6 +931,7 @@ async def check_chat_resolution(
         resolution_message=resolution_data.get("resolution_message")
     )
 
+
 --- FILE: backend\app\api\routers\documents.py ---
 """
 Document management endpoints.
@@ -891,6 +953,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator, require_admin_user
 from app.core.rate_limit import limiter
+from app.core.config import settings
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
@@ -909,6 +972,7 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
+_upload_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_UPLOADS)
 
 
 @router.post(
@@ -932,7 +996,24 @@ async def upload_document(
     File validation (PDF magic bytes) is handled inside the service.
     The category must be one of the allowed categories from AIChatbotSettings.
     """
+    max_upload_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if (
+        content_length
+        and content_length.isdigit()
+        and int(content_length) > max_upload_bytes + (1024 * 1024)
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
+        )
+
     file_bytes = await file.read()
+    if len(file_bytes) > max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
+        )
     filename = file.filename
 
     async def process_pdf_in_background():
@@ -940,35 +1021,36 @@ async def upload_document(
         from starlette.datastructures import UploadFile as StarletteUploadFile
         from app.core.database import SessionChatbot
 
-        mem_file = io.BytesIO(file_bytes)
-        mem_file.name = filename
-        upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+        async with _upload_semaphore:
+            mem_file = io.BytesIO(file_bytes)
+            mem_file.name = filename
+            upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
 
-        bg_db = SessionChatbot()
+            bg_db = SessionChatbot()
 
-        try:
-            bg_ingestion_service = DocumentIngestionService(db=bg_db)
+            try:
+                bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
-            await bg_ingestion_service.process_pdf_upload(
-                upload_obj,
-                bg_db,
-                manual_category=category,
-            )
+                await bg_ingestion_service.process_pdf_upload(
+                    upload_obj,
+                    bg_db,
+                    manual_category=category,
+                )
 
-            logger.info(
-                "Background upload completed for %s",
-                filename,
-            )
+                logger.info(
+                    "Background upload completed for %s",
+                    filename,
+                )
 
-        except Exception as e:
-            logger.error(
-                "Background upload failed for %s: %s",
-                filename,
-                e,
-            )
+            except Exception as e:
+                logger.error(
+                    "Background upload failed for %s: %s",
+                    filename,
+                    e,
+                )
 
-        finally:
-            bg_db.close()
+            finally:
+                bg_db.close()
 
     background_tasks.add_task(
         process_pdf_in_background
@@ -1340,6 +1422,7 @@ async def restore_manual_knowledge(
             status_code=404,
             detail=str(exc),
         )
+
 
 --- FILE: backend\app\api\routers\explorer.py ---
 """
@@ -2078,41 +2161,65 @@ async def trigger_bulk_sync(background_tasks: BackgroundTasks):
 --- FILE: backend\app\core\cache.py ---
 import time
 import logging
+import threading
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.chatbot import AIChatbotSetting
-from app.repositories.settings_repository import SettingsRepository
 
 logger = logging.getLogger(__name__)
 
+
+def _snapshot_settings(settings: AIChatbotSetting | None) -> AIChatbotSetting | None:
+    """Copy loaded column values into a detached settings object safe for caching."""
+    if settings is None:
+        return None
+
+    snapshot = AIChatbotSetting()
+    for column in AIChatbotSetting.__table__.columns:
+        setattr(snapshot, column.name, getattr(settings, column.name))
+    return snapshot
+
 class SettingsCache:
     _instance = None
-    _cached_settings = None
-    _last_fetch = 0
-    _ttl = 300  # 5 minutes
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(SettingsCache, cls).__new__(cls)
+            cls._instance._cached_settings = None
+            cls._instance._last_fetch = 0.0
+            cls._instance._ttl = 300
+            cls._instance._lock = threading.RLock()
         return cls._instance
 
     def get_settings(self, db: Session) -> Optional[AIChatbotSetting]:
         now = time.time()
-        if self._cached_settings is None or (now - self._last_fetch) > self._ttl:
-            logger.info("Settings cache miss or expired. Fetching from database...")
+        if self._cached_settings is not None and (now - self._last_fetch) <= self._ttl:
+            return self._cached_settings
+
+        with self._lock:
+            now = time.time()
+            if self._cached_settings is not None and (now - self._last_fetch) <= self._ttl:
+                return self._cached_settings
+
+            logger.info("Settings cache miss or expired; fetching active settings.")
             try:
+                from app.repositories.settings_repository import SettingsRepository
+
                 repo = SettingsRepository(db)
-                self._cached_settings = repo.get_active_settings()
+                self._cached_settings = _snapshot_settings(
+                    repo.get_active_settings_uncached()
+                )
                 self._last_fetch = now
             except Exception as e:
-                logger.error(f"Error refreshing settings cache: {e}")
-                return self._cached_settings  # Return stale if fetch fails
+                logger.error("Error refreshing settings cache: %s", e)
+                return self._cached_settings
         return self._cached_settings
 
     def invalidate(self):
         logger.info("Invalidating settings cache.")
-        self._cached_settings = None
-        self._last_fetch = 0
+        with self._lock:
+            self._cached_settings = None
+            self._last_fetch = 0.0
 
 settings_cache = SettingsCache()
 
@@ -2152,6 +2259,12 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 10
+    MAX_UPLOAD_MB: int = 25
+    MAX_CONCURRENT_UPLOADS: int = 3
+    TAXONOMY_CACHE_TTL_SECONDS: int = 1800
 
     class Config:
         env_file = ".env"
@@ -2173,6 +2286,9 @@ engine_helpdesk = create_engine(
     settings.HELPDESK_DB_CONN,
     pool_pre_ping=True,
     pool_recycle=1800,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
 )
 SessionHelpdesk = sessionmaker(
     autocommit=False,
@@ -2184,6 +2300,9 @@ engine_chatbot = create_engine(
     settings.CHATBOT_DB_CONN,
     pool_pre_ping=True,
     pool_recycle=1800,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
 )
 SessionChatbot = sessionmaker(
     autocommit=False,
@@ -2301,25 +2420,50 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 
 --- FILE: backend\app\core\logging.py ---
-"""
-Logging configuration for the application.
-"""
+"""Logging configuration for the application."""
+from __future__ import annotations
+
+import json
 import logging
 import sys
+from datetime import datetime, timezone
+
+from app.core.request_context import request_id_var
+
+
+class RequestContextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.request_id = request_id_var.get() or "-"
+        return True
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        payload = {
+            "timestamp": datetime.fromtimestamp(
+                record.created,
+                tz=timezone.utc,
+            ).isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "request_id": getattr(record, "request_id", "-"),
+        }
+        if record.exc_info:
+            payload["exception"] = self.formatException(record.exc_info)
+        return json.dumps(payload, default=str)
 
 
 def configure_logging(level: str = "INFO") -> None:
     log_level = getattr(logging, level.upper(), logging.INFO)
-    formatter = logging.Formatter(
-        fmt="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
+    formatter = JsonFormatter()
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(formatter)
+    handler.addFilter(RequestContextFilter())
     root_logger = logging.getLogger()
     root_logger.setLevel(log_level)
-    if not root_logger.handlers:
-        root_logger.addHandler(handler)
+    root_logger.handlers.clear()
+    root_logger.addHandler(handler)
     logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -2462,6 +2606,19 @@ except ImportError:  # pragma: no cover
 
     limiter = _NoOpLimiter()
     rate_limit_enabled = False
+
+--- FILE: backend\app\core\request_context.py ---
+"""Per-request context for log correlation."""
+from __future__ import annotations
+
+from contextvars import ContextVar
+
+
+request_id_var: ContextVar[str | None] = ContextVar(
+    "request_id",
+    default=None,
+)
+
 
 --- FILE: backend\app\core\retrieval_models.py ---
 """
@@ -2824,6 +2981,18 @@ class ChatRepository:
             raise NotFoundError(f"Chat session '{session_id}' not found.")
         return session
 
+    def require_session_for_update(self, session_id: str) -> ChatSession:
+        """Fetch a session with a row lock for concurrent status transitions."""
+        session = (
+            self.db.query(ChatSession)
+            .filter(ChatSession.SessionID == session_id)
+            .with_for_update()
+            .first()
+        )
+        if not session:
+            raise NotFoundError(f"Chat session '{session_id}' not found.")
+        return session
+
     def get_or_create_session(self, session_id, user_id: int) -> str:
         """Get existing session or create new one. Returns session ID string."""
         is_new = (
@@ -3110,7 +3279,7 @@ class SettingsRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_active_settings(self) -> AIChatbotSetting | None:
+    def get_active_settings_uncached(self) -> AIChatbotSetting | None:
         """Return the single active settings row, or None."""
         return (
             self.db.query(AIChatbotSetting)
@@ -3118,6 +3287,12 @@ class SettingsRepository:
             .order_by(AIChatbotSetting.SettingID.desc())
             .first()
         )
+
+    def get_active_settings(self) -> AIChatbotSetting | None:
+        """Return the single active settings row, using the process-local TTL cache."""
+        from app.core.cache import settings_cache
+
+        return settings_cache.get_settings(self.db)
 
     def require_active_settings(self) -> AIChatbotSetting:
         config = self.get_active_settings()
@@ -3135,9 +3310,12 @@ class SettingsRepository:
         ).update({"IsActive": False})
 
     def add_settings(self, config: AIChatbotSetting) -> None:
+        from app.core.cache import settings_cache
+
         self.db.add(config)
         self.db.commit()
         self.db.refresh(config)
+        settings_cache.invalidate()
 
     def create_new_active_settings(
         self,
@@ -3665,10 +3843,36 @@ Eliminates scattered ChatGroq instantiations across services.
 Ensures consistent timeout, API key, and model configuration.
 """
 import logging
+import time
+from functools import lru_cache
+from typing import Any
 from langchain_groq import ChatGroq
 from app.core.config import settings
+from app.services.telemetry_service import TelemetryService
 
 logger = logging.getLogger(__name__)
+
+_GROQ_TIMEOUT_SECONDS = 25.0
+_GROQ_MAX_RETRIES = 3
+
+
+@lru_cache(maxsize=16)
+def _get_cached_llm(model: str, temperature_x100: int) -> ChatGroq:
+    temperature = temperature_x100 / 100.0
+    logger.info(
+        "Creating cached Groq client model=%s temperature=%.2f timeout=%.1fs retries=%d",
+        model,
+        temperature,
+        _GROQ_TIMEOUT_SECONDS,
+        _GROQ_MAX_RETRIES,
+    )
+    return ChatGroq(
+        model=model,
+        temperature=temperature,
+        api_key=settings.GROQ_API_KEY,
+        timeout=_GROQ_TIMEOUT_SECONDS,
+        max_retries=_GROQ_MAX_RETRIES,
+    )
 
 
 def create_llm(
@@ -3686,11 +3890,8 @@ def create_llm(
         Configured ChatGroq instance.
     """
     resolved_model = model or settings.CLASSIFIER_MODEL
-    return ChatGroq(
-        model=resolved_model,
-        temperature=temperature,
-        api_key=settings.GROQ_API_KEY,
-    )
+    temperature_x100 = int(round(float(temperature) * 100))
+    return _get_cached_llm(resolved_model, temperature_x100)
 
 
 def create_main_llm(temperature: float | None = None) -> ChatGroq:
@@ -3707,6 +3908,51 @@ def create_main_llm(temperature: float | None = None) -> ChatGroq:
         return create_llm(model="llama-3.3-70b-versatile", temperature=temperature or 0.2)
     finally:
         db.close()
+
+
+async def invoke_llm(
+    llm: ChatGroq,
+    prompt: str,
+    *,
+    model: str,
+    action: str,
+    session_id: str | None = None,
+) -> Any:
+    """Invoke Groq with consistent latency/error logging and telemetry."""
+    started = time.perf_counter()
+    status_code = 200
+    try:
+        result = await llm.ainvoke(prompt)
+        return result
+    except Exception as exc:
+        status_code = getattr(getattr(exc, "response", None), "status_code", 500)
+        logger.warning(
+            "groq.invoke_failed action=%s model=%s status_code=%s latency_ms=%d error=%s",
+            action,
+            model,
+            status_code,
+            int((time.perf_counter() - started) * 1000),
+            exc,
+        )
+        raise
+    finally:
+        latency_ms = int((time.perf_counter() - started) * 1000)
+        TelemetryService.log(
+            model=model,
+            action=action,
+            prompt_tokens=0,
+            completion_tokens=0,
+            latency_ms=latency_ms,
+            status_code=status_code,
+            session_id=session_id,
+        )
+        logger.info(
+            "groq.latency_ms=%d action=%s model=%s status_code=%s",
+            latency_ms,
+            action,
+            model,
+            status_code,
+        )
 
 
 --- FILE: backend\app\services\prompts.py ---
@@ -3970,27 +4216,79 @@ DEFAULT_REFORMULATOR_PROMPT = (
 # ESCALATION DRAFTING (For Main AI - 70B)
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are a Filipino IT Helpdesk Agent and Dispatcher.\n"
-    "The user wants to submit a ticket. Read the chat transcript and determine if you have enough context to draft a complete ticket.\n\n"
-    "A complete ticket requires:\n"
-    "1. The Issue/Error\n"
-    "2. The Location (e.g., branch, department)\n"
-    "3. The Specific Equipment (e.g., PC number, device name, or specific part)\n\n"
-    "CRITICAL RULES:\n"
-    "- If ANY of these are missing, set 'is_ready' to false and write a natural, casual Taglish 'chat_message' asking the user for ONE missing detail.\n"
-    "- TOLERANCE RULE: If the user explicitly says they don't know a detail (e.g., 'ewan', 'di ko alam', 'not sure'), ACCEPT IT. Treat it as gathered and move on.\n"
-    "- If you have all the details (or accepted their 'I don't know's), set 'is_ready' to true.\n"
-    "- If 'is_ready' is true, 'chat_message' should be null.\n"
-    "- DO NOT output any conversational text outside the JSON. RAW JSON ONLY.\n\n"
+    "You are a friendly Filipino IT Helpdesk Agent and Dispatcher currently assisting a user in a live chat conversation.\n"
+    "The user already wants to submit a ticket, and you are now helping complete the remaining details naturally.\n\n"
+
+    "Your job is to read the chat transcript and determine if there is enough information to proceed with ticket drafting.\n\n"
+
+    "A complete ticket ideally includes:\n"
+    "1. The Issue or Error\n"
+    "2. The Location (branch, department, area, site, etc.)\n"
+    "3. The Specific Equipment (PC number, printer name, device, affected unit, etc.)\n\n"
+
+    "PERSONALITY AND TONE:\n"
+    "- Talk naturally like a real Filipino IT helpdesk staff in a casual professional Taglish conversation.\n"
+    "- Sound friendly, approachable, and conversational.\n"
+    "- The conversation should feel ongoing already, not like a form validation process.\n"
+    "- Avoid robotic wording.\n"
+    "- Avoid corporate/form-style language.\n"
+    "- Keep replies concise and natural.\n"
+    "- Sound like someone casually helping endorse a ticket.\n\n"
+
+    "FIRST MESSAGE BEHAVIOR:\n"
+    "- If this is the first time asking for missing details, sound welcoming and helpful.\n"
+    "- Start naturally as if already assisting the user.\n"
+    "- Example tone:\n"
+    "  'Okay tutulungan kitang gumawa ng ticket. Need ko lang muna ng ilang details para maayos yung endorsement.'\n"
+    "  'Sige sesend natin yan. May maidagdag ka pa bang details like saan nangyari or anong device yung affected?'\n"
+    "  'Okay gagawan natin yan ng ticket. Ask ko lang sana kung saang branch or department ito?'\n\n"
+
+    "MISSING DETAIL STYLE RULES:\n"
+    "- If ANY required detail is missing, set 'is_ready' to false.\n"
+    "- Ask for ONLY ONE missing detail at a time.\n"
+    "- The question must sound contextual and conversational.\n"
+    "- Avoid sounding repetitive or scripted.\n"
+    "- Avoid enumerating missing fields.\n"
+    "- Continue the flow naturally after the first onboarding-style response.\n"
+    "- Good examples:\n"
+    "  'Noted. Anong specific PC or device yung affected?'\n"
+    "  'Gets. Saang area naman ito nangyari?'\n"
+    "  'Okay noted yan. May PC number or equipment name ba tayo?'\n"
+    "  'Saang branch pala ito bossing?'\n\n"
+
+    "TOLERANCE RULE:\n"
+    "- If the user explicitly says they don't know a detail, accept it immediately.\n"
+    "- Examples:\n"
+    "  'ewan'\n"
+    "  'di ko alam'\n"
+    "  'not sure'\n"
+    "  'unknown'\n"
+    "- Treat these as valid gathered answers.\n"
+    "- Do NOT repeatedly ask for the same detail once the user already said they don't know.\n"
+    "- Move on naturally.\n\n"
+
+    "READY RULES:\n"
+    "- If all required details are gathered OR properly acknowledged as unknown, set 'is_ready' to true.\n"
+    "- If 'is_ready' is true, set 'chat_message' to null.\n"
+    "- Do NOT add confirmation messages once ready.\n\n"
+
+    "OUTPUT RULES:\n"
+    "- DO NOT output conversational text outside the JSON.\n"
+    "- RAW JSON ONLY.\n"
+    "- NO markdown.\n"
+    "- NO explanations.\n\n"
+
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
     '  "is_ready": boolean,\n'
-    '  "chat_message": "string | null (e.g., \'Sige, saang branch ka nga pala?\')"\n'
+    '  "chat_message": "string | null"\n'
     "}}\n\n"
+
     "CHAT TRANSCRIPT:\n"
     "=================\n"
     "{transcript}\n"
     "=================\n\n"
+
     "JSON OUTPUT:"
 )
 
@@ -4002,6 +4300,7 @@ TICKET_GENERATION_PROMPT = (
     "Read the chat transcript and draft a formal ticket summary and description.\n"
     "Extract the Location and Equipment into their own fields.\n"
     "DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "Assume that the conversation is already approved for ticketing, regardless if theres sufficient information or not"
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
     '  "summary": "string (Short operational title)",\n'
@@ -4134,7 +4433,11 @@ import logging
 from sqlalchemy.orm import Session
 from app.core.database import SessionChatbot
 from sqlalchemy import func
-from app.models.chatbot import LLMUsageLog
+
+try:
+    from app.models.chatbot import LLMUsageLog
+except ImportError:  # pragma: no cover - schema is optional in current deployments
+    LLMUsageLog = None
 
 logger = logging.getLogger(__name__)
 
@@ -4143,6 +4446,9 @@ class TelemetryRepository:
         self.db = db
 
     def log_usage(self, log_entry: dict):
+        if LLMUsageLog is None:
+            logger.debug("LLM telemetry model is not configured; dropping telemetry entry.")
+            return
         try:
             entry = LLMUsageLog(**log_entry)
             self.db.add(entry)
@@ -4153,6 +4459,8 @@ class TelemetryRepository:
 
     def get_model_summary(self, hours: int = 24):
         """Aggregate LLM usage stats grouped by model name."""
+        if LLMUsageLog is None:
+            return []
         from datetime import datetime, timedelta
         since = datetime.utcnow() - timedelta(hours=hours)
 
@@ -4172,6 +4480,8 @@ class TelemetryRepository:
 
     def get_recent_logs(self, limit: int = 50):
         """Fetch the most recent LLM logs."""
+        if LLMUsageLog is None:
+            return []
         return self.db.query(LLMUsageLog).order_by(LLMUsageLog.Timestamp.desc()).limit(limit).all()
 
 class TelemetryService:
@@ -4294,13 +4604,14 @@ AND external API calls in a single file.
 """
 import json
 import logging
+import asyncio
 import httpx
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
 from app.services.chat.message_service import MessageService
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
@@ -4313,6 +4624,8 @@ from app.services.retrieval.embedding_provider import get_embedding_model
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+_DRAFT_LOCKS: dict[str, asyncio.Lock] = {}
+_DRAFT_LOCKS_GUARD = asyncio.Lock()
 
 # Fallback routing when AI routing is unavailable
 FALLBACK_ROUTING = {
@@ -4325,6 +4638,11 @@ FALLBACK_ROUTING = {
 }
 
 BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
+
+
+async def _get_draft_lock(session_id: str) -> asyncio.Lock:
+    async with _DRAFT_LOCKS_GUARD:
+        return _DRAFT_LOCKS.setdefault(session_id, asyncio.Lock())
 
 
 class EscalationService:
@@ -4341,6 +4659,11 @@ class EscalationService:
         Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
+        draft_lock = await _get_draft_lock(session_id)
+        async with draft_lock:
+            return await self._draft_escalation_locked(session_id)
+
+    async def _draft_escalation_locked(self, session_id: str) -> dict:
         session = self.repo.validate_session_for_escalation(session_id)
         transcript = self.message_svc.get_transcript(session_id)
         runtime_config = RuntimeAIConfig(self.db)
@@ -4355,7 +4678,13 @@ class EscalationService:
             "{transcript}", transcript
         )
 
-        result = await main_llm.ainvoke(prompt)
+        result = await invoke_llm(
+            main_llm,
+            prompt,
+            model=main_model,
+            action="escalation_evaluator",
+            session_id=session_id,
+        )
         raw_output = clean_llm_json_output(result.content)
         logger.info("Main AI raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
@@ -4405,7 +4734,13 @@ class EscalationService:
         instant_llm = create_llm(model=instant_model, temperature=0.0)
 
         draft_prompt = TICKET_GENERATION_PROMPT.replace("{transcript}", transcript)
-        draft_result = await instant_llm.ainvoke(draft_prompt)
+        draft_result = await invoke_llm(
+            instant_llm,
+            draft_prompt,
+            model=instant_model,
+            action="escalation_draft",
+            session_id=session_id,
+        )
         draft_raw = clean_llm_json_output(draft_result.content)
         draft_data = safe_json_loads(draft_raw, context="ticket_generation")
 
@@ -5167,6 +5502,12 @@ logger = logging.getLogger(__name__)
 
 BIZPORTAL_USER_URL = settings.BIZPORTAL_API_URL
 BIZPORTAL_LOGIN_URL = settings.BIZPORTAL_LOGIN_URL
+BIZPORTAL_TIMEOUT = httpx.Timeout(
+    connect=3.0,
+    read=float(getattr(settings, "BIZPORTAL_TIMEOUT", 5.0)),
+    write=5.0,
+    pool=1.0,
+)
 
 
 class BizPortalClient:
@@ -5182,10 +5523,10 @@ class BizPortalClient:
         params = {"user_id": auth_token, "token": auth_token}
 
         logger.debug("BizPortal auth call to: %s", BIZPORTAL_USER_URL)
-        logger.debug("Auth params: %s", params)
+        logger.debug("Auth call token_len=%d", len(auth_token))
 
         async with httpx.AsyncClient(
-            timeout=getattr(settings, "BIZPORTAL_TIMEOUT", 5.0)
+            timeout=BIZPORTAL_TIMEOUT
         ) as client:
             response = await client.get(
                 BIZPORTAL_USER_URL,
@@ -5202,7 +5543,7 @@ class BizPortalClient:
         Perform admin login against BizPortal.
         Returns the HTTP response object.
         """
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 BIZPORTAL_LOGIN_URL,
                 json={"username": username, "password": password},
@@ -5280,12 +5621,27 @@ External user authentication service — REFACTORED.
 Uses BizPortalClient for HTTP calls and centralized JSON parsing.
 """
 import logging
+import time
+import asyncio
+from collections import OrderedDict
 import httpx
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, ExternalServiceError
 from app.services.external.bizportal_client import BizPortalClient
 
 logger = logging.getLogger(__name__)
+
+_TOKEN_CACHE_TTL_SECONDS = 60.0
+_TOKEN_CACHE_MAX_SIZE = 2048
+_token_cache: OrderedDict[str, tuple[dict, float]] = OrderedDict()
+_token_cache_lock = asyncio.Lock()
+
+
+def _cache_user(auth_token: str, user_data: dict, expires_at: float) -> None:
+    _token_cache[auth_token] = (dict(user_data), expires_at)
+    _token_cache.move_to_end(auth_token)
+    while len(_token_cache) > _TOKEN_CACHE_MAX_SIZE:
+        _token_cache.popitem(last=False)
 
 
 async def fetch_user_details(auth_token: str) -> dict:
@@ -5323,7 +5679,21 @@ async def fetch_user_details(auth_token: str) -> dict:
 
     # ── BIZPORTAL AUTH REQUEST ─────────────────────────────────
     try:
+        now = time.time()
+        async with _token_cache_lock:
+            cached = _token_cache.get(auth_token)
+            if cached and cached[1] > now:
+                _token_cache.move_to_end(auth_token)
+                logger.debug("BizPortal user cache hit token_len=%d", len(auth_token))
+                return dict(cached[0])
+
+        started = time.perf_counter()
         response = await BizPortalClient.fetch_user_details(auth_token)
+        logger.info(
+            "auth.bizportal_latency_ms=%d status_code=%s",
+            int((time.perf_counter() - started) * 1000),
+            response.status_code,
+        )
 
         if response.status_code in (401, 403):
             logger.warning("BizPortal rejected token.")
@@ -5353,11 +5723,16 @@ async def fetch_user_details(auth_token: str) -> dict:
             and isinstance(user_data["response"], dict)
         ):
             logger.info("BizPortal authentication successful.")
-            return user_data["response"]
+            resolved_user = user_data["response"]
+            async with _token_cache_lock:
+                _cache_user(auth_token, resolved_user, now + _TOKEN_CACHE_TTL_SECONDS)
+            return resolved_user
 
         # ── FALLBACK DIRECT USER OBJECT ────────────────────────
         if isinstance(user_data, dict) and ("firstname" in user_data or "lastname" in user_data or "id" in user_data):
             logger.info("Detected direct user object response.")
+            async with _token_cache_lock:
+                _cache_user(auth_token, user_data, now + _TOKEN_CACHE_TTL_SECONDS)
             return user_data
 
         # ── UNKNOWN RESPONSE FORMAT ────────────────────────────
@@ -6598,7 +6973,7 @@ from app.models.chatbot import UploadedDocument
 from app.services.settings.runtime_config import RuntimeAIConfig
 from app.services.ingestion.chunking_service import ChunkingService
 from app.services.ingestion.embedding_service import EmbeddingService
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.utils.text_utils import normalize_text, sha256_hash
 
 logger = logging.getLogger(__name__)
@@ -6655,7 +7030,14 @@ class PDFProcessor:
             
             # --- NEW JSON PARSING LOGIC ---
             from app.utils.json_utils import clean_llm_json_output, safe_json_loads
-            raw_response = (await llm.ainvoke(prompt)).content
+            raw_response = (
+                await invoke_llm(
+                    llm,
+                    prompt,
+                    model=self.runtime_config.document_classifier_model,
+                    action="document_classification",
+                )
+            ).content
             cleaned_response = clean_llm_json_output(raw_response)
             parsed_json = safe_json_loads(cleaned_response, context="document_classification")
             
@@ -6850,6 +7232,7 @@ It only tracks a lightweight maintenance pass so the public maintenance
 endpoint remains compatible without mutating raw ticket-level retrieval.
 """
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -6860,25 +7243,32 @@ LIVE_STATUS = {
     "freed_space": 0,
     "current_merge_details": None,
 }
+_LIVE_STATUS_LOCK = asyncio.Lock()
 
 
 async def run_safe_maintenance() -> None:
     global LIVE_STATUS
-    LIVE_STATUS["is_running"] = True
-    LIVE_STATUS["clusters_merged"] = 0
-    LIVE_STATUS["freed_space"] = 0
-    LIVE_STATUS["current_merge_details"] = None
+    async with _LIVE_STATUS_LOCK:
+        if LIVE_STATUS["is_running"]:
+            logger.info("Safe maintenance skipped because another run is active.")
+            return
+        LIVE_STATUS["is_running"] = True
+        LIVE_STATUS["clusters_merged"] = 0
+        LIVE_STATUS["freed_space"] = 0
+        LIVE_STATUS["current_merge_details"] = None
     try:
         LIVE_STATUS["progress_message"] = "Safe maintenance completed. Semantic consolidation is disabled."
         logger.info("Safe maintenance completed; no vectors were merged or deleted.")
     finally:
-        LIVE_STATUS["is_running"] = False
+        async with _LIVE_STATUS_LOCK:
+            LIVE_STATUS["is_running"] = False
 
 
 --- FILE: backend\app\services\maintenance\job_manager.py ---
 import uuid
 import logging
-from datetime import datetime
+import threading
+from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
 from pydantic import BaseModel
 
@@ -6898,12 +7288,22 @@ class JobStatus(BaseModel):
 
 class JobManager:
     _instance = None
-    _jobs: Dict[str, JobStatus] = {}
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(JobManager, cls).__new__(cls)
+            cls._instance._jobs = {}
+            cls._instance._lock = threading.RLock()
+            cls._instance._max_age = timedelta(hours=1)
         return cls._instance
+
+    def _evict_old_jobs_locked(self) -> None:
+        cutoff = datetime.utcnow() - self._max_age
+        self._jobs = {
+            job_id: job
+            for job_id, job in self._jobs.items()
+            if job.updated_at >= cutoff or job.status == "running"
+        }
 
     def create_job(self, name: str) -> str:
         job_id = str(uuid.uuid4())
@@ -6914,41 +7314,48 @@ class JobManager:
             started_at=datetime.utcnow(),
             updated_at=datetime.utcnow()
         )
-        self._jobs[job_id] = job
+        with self._lock:
+            self._evict_old_jobs_locked()
+            self._jobs[job_id] = job
         return job_id
 
     def update_job(self, job_id: str, status: str = None, progress: float = None, message: str = None, details: Dict[str, Any] = None, error: str = None):
-        if job_id not in self._jobs:
-            return
-        
-        job = self._jobs[job_id]
-        if status:
-            job.status = status
-            if status in ["completed", "failed"]:
-                job.completed_at = datetime.utcnow()
-                job.progress_percent = 100.0 if status == "completed" else job.progress_percent
-        
-        if progress is not None:
-            job.progress_percent = min(100.0, max(0.0, progress))
-            
-        if message:
-            job.message = message
-            
-        if details:
-            job.details.update(details)
-            
-        if error:
-            job.error = error
-            
-        job.updated_at = datetime.utcnow()
-        logger.debug(f"Job {job_id} ({job.job_name}) update: {job.status} - {job.progress_percent}% - {job.message}")
+        with self._lock:
+            if job_id not in self._jobs:
+                return
+
+            job = self._jobs[job_id]
+            if status:
+                job.status = status
+                if status in ["completed", "failed"]:
+                    job.completed_at = datetime.utcnow()
+                    job.progress_percent = 100.0 if status == "completed" else job.progress_percent
+
+            if progress is not None:
+                job.progress_percent = min(100.0, max(0.0, progress))
+
+            if message:
+                job.message = message
+
+            if details:
+                job.details.update(details)
+
+            if error:
+                job.error = error
+
+            job.updated_at = datetime.utcnow()
+            logger.debug("Job %s (%s) update: %s - %.1f%% - %s", job_id, job.job_name, job.status, job.progress_percent, job.message)
 
     def get_job(self, job_id: str) -> Optional[JobStatus]:
-        return self._jobs.get(job_id)
+        with self._lock:
+            self._evict_old_jobs_locked()
+            return self._jobs.get(job_id)
 
     def get_all_jobs(self, limit: int = 20) -> list[JobStatus]:
         # Return sorted by updated_at desc
-        all_jobs = list(self._jobs.values())
+        with self._lock:
+            self._evict_old_jobs_locked()
+            all_jobs = list(self._jobs.values())
         all_jobs.sort(key=lambda x: x.updated_at, reverse=True)
         return all_jobs[:limit]
 
@@ -6985,7 +7392,7 @@ Formats context and generates final AI response via LLM.
 Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.core.retrieval_models import RetrievalDocument
 
 logger = logging.getLogger(__name__)
@@ -7044,7 +7451,12 @@ class AnswerGenerator:
         final_prompt = f"{final_prompt}{json_instruction}"
 
         llm = create_llm(model=model, temperature=temperature)
-        result = await llm.ainvoke(final_prompt)
+        result = await invoke_llm(
+            llm,
+            final_prompt,
+            model=model,
+            action="answer_generation",
+        )
         return result.content
 
 
@@ -7056,7 +7468,7 @@ Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
 import json
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.services.prompts import DEFAULT_REFORMULATOR_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -7092,7 +7504,12 @@ class QueryReformulator:
             chat_history=safe_history,
             user_query=user_query,
         )
-        result = await llm.ainvoke(rewrite_prompt)
+        result = await invoke_llm(
+            llm,
+            rewrite_prompt,
+            model=model,
+            action="query_reformulation",
+        )
         raw_output = result.content.strip()
         if raw_output.startswith("```json"):
             raw_output = raw_output[7:-3].strip()
@@ -7122,6 +7539,7 @@ Previously a 350-line monolith with all logic inlined.
 """
 import asyncio
 import logging
+import time
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import AIProcessingError
@@ -7308,21 +7726,33 @@ class SupportOrchestrator:
                     prompt_template=reformulator_prompt,
                 )
                 
-                # --- DEBUG BLOCK ---
-                print("\n" + "="*50)
-                print("🔍 REFORMULATOR DEBUG:")
-                print(f"Original User Query: {user_query}")
-                print(f"Reformulated Query:  {search_query}")
-                print("="*50 + "\n")
-                # -------------------
+                logger.debug(
+                    "Reformulated query original=%r reformulated=%r",
+                    user_query,
+                    search_query,
+                )
 
             except Exception as exc:
                 logger.warning("Reformulator failed; using original query. Error: %s", exc)
                 search_query = user_query
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
+        started = time.perf_counter()
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
-        raw_results = await asyncio.to_thread(self.vector_store.federated_search, query_vector, limit=top_k)
+        logger.info(
+            "embedding.latency_ms=%d session_id=%s",
+            int((time.perf_counter() - started) * 1000),
+            session_id,
+        )
+
+        started = time.perf_counter()
+        raw_results = await self.vector_store.federated_search_async(query_vector, limit=top_k)
+        logger.info(
+            "retrieval.federated_latency_ms=%d session_id=%s result_count=%d",
+            int((time.perf_counter() - started) * 1000),
+            session_id,
+            len(raw_results),
+        )
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
 
@@ -7341,7 +7771,14 @@ class SupportOrchestrator:
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
+            started = time.perf_counter()
             scored_results = await asyncio.to_thread(self.reranker.rerank, search_query, retrieval_docs)
+            logger.info(
+                "reranker.latency_ms=%d session_id=%s result_count=%d",
+                int((time.perf_counter() - started) * 1000),
+                session_id,
+                len(scored_results),
+            )
         else:
             scored_results = sorted(
                 [(doc.score, doc) for doc in retrieval_docs],
@@ -7467,7 +7904,7 @@ Conversation resolution service — REFACTORED.
 Uses centralized LLM client and prompt templates.
 """
 import logging
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from sqlalchemy.orm import Session
 from app.services.settings.runtime_config import RuntimeAIConfig
 from app.utils.json_utils import safe_json_loads
@@ -7501,7 +7938,12 @@ class ConversationResolutionService:
                 ai_response=ai_response,
                 chat_history=chat_history or "No previous history.",
             )
-            result = await self.llm.ainvoke(prompt)
+            result = await invoke_llm(
+                self.llm,
+                prompt,
+                model=self.runtime_config.conversation_resolution_model,
+                action="conversation_resolution",
+            )
             raw_content = result.content
             logger.info("🔍 RESOLUTION RAW OUTPUT: %s", raw_content)
 
@@ -7638,6 +8080,8 @@ Encapsulates all Qdrant interactions — search, upsert, delete.
 Previously embedded directly in the orchestrator and ingestion service.
 """
 import logging
+import asyncio
+import time
 from functools import lru_cache
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -7740,6 +8184,7 @@ class VectorStoreService:
         limit: int = 5,
     ) -> list:
         """Search ticket-like vectors (raw, canonical, resolved chats)."""
+        started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -7751,6 +8196,12 @@ class VectorStoreService:
             with_payload=True,
             limit=limit,
         )
+        logger.info(
+            "qdrant.search collection=%s kind=tickets latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(response.points),
+        )
         return response.points
 
     def search_documents(
@@ -7759,6 +8210,7 @@ class VectorStoreService:
         limit: int = 5,
     ) -> list:
         """Search document-like vectors (PDFs, manual entries)."""
+        started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -7768,6 +8220,12 @@ class VectorStoreService:
             ]),
             with_payload=True,
             limit=limit,
+        )
+        logger.info(
+            "qdrant.search collection=%s kind=documents latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(response.points),
         )
         return response.points
 
@@ -7779,6 +8237,18 @@ class VectorStoreService:
         """Search both tickets and documents, returning combined results."""
         tickets = self.search_tickets(query_vector, limit)
         docs = self.search_documents(query_vector, limit)
+        return tickets + docs
+
+    async def federated_search_async(
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+    ) -> list:
+        """Search tickets and documents concurrently without changing result shape."""
+        tickets, docs = await asyncio.gather(
+            asyncio.to_thread(self.search_tickets, query_vector, limit),
+            asyncio.to_thread(self.search_documents, query_vector, limit),
+        )
         return tickets + docs
 
     def delete_by_filter(self, filter_conditions: list) -> None:
@@ -7865,13 +8335,48 @@ class VectorStoreService:
         )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
-        """Hard-delete blacklisted ticket vectors through the central lifecycle layer."""
-        self.delete_by_filter([
+        """Soft-delete ticket vectors through the central lifecycle layer."""
+        normalized_ticket = str(ticket_number)
+        filters = [
             qdrant_models.FieldCondition(
                 key="metadata.ticket_number",
-                match=qdrant_models.MatchValue(value=ticket_number),
-            )
-        ])
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+            qdrant_models.FieldCondition(
+                key="metadata.source_id",
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+            qdrant_models.FieldCondition(
+                key="metadata.source_ids",
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+        ]
+
+        for condition in filters:
+            try:
+                self._set_metadata_active_by_filter_condition(
+                    condition,
+                    is_active=False,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to soft-delete ticket vectors by %s=%s: %s",
+                    condition.key,
+                    normalized_ticket,
+                    exc,
+                )
+
+    def _set_metadata_active_by_filter_condition(
+        self,
+        condition,
+        is_active: bool,
+    ) -> None:
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload={"is_active": is_active},
+            points=qdrant_models.Filter(must=[condition]),
+            key="metadata",
+        )
 
 
 @lru_cache(maxsize=4)
@@ -7890,10 +8395,11 @@ Uses centralized prompts, LLM client, and JSON utilities.
 """
 import json
 import logging
+import time
 from sqlalchemy.orm import Session
 from app.models.chatbot import TicketRoutingLog
 from app.schemas.routing import RoutingRequest, RoutingResponse, RoutingSuggestion
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.services.prompts import build_routing_prompt
 from app.core.config import settings
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
@@ -7962,11 +8468,19 @@ async def suggest_route(
 
     routing_collection = collection_name or getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
     logger.debug("Routing query collection: %s", routing_collection)
-    search_results = qdrant.query_points(
+    started = time.perf_counter()
+    search_results = await asyncio.to_thread(
+        qdrant.query_points,
         collection_name=routing_collection,
         query=query_vector,
         with_payload=True,
         limit=5,
+    )
+    logger.info(
+        "qdrant.routing_search_latency_ms=%d collection=%s result_count=%d",
+        int((time.perf_counter() - started) * 1000),
+        routing_collection,
+        len(search_results.points),
     )
 
     retrieved_context = ""
@@ -7989,7 +8503,12 @@ async def suggest_route(
     llm = create_llm(model=runtime_config.routing_model,temperature=0.0,)
 
     try:
-        llm_result = await llm.ainvoke(prompt)
+        llm_result = await invoke_llm(
+            llm,
+            prompt,
+            model=runtime_config.routing_model,
+            action="ticket_routing",
+        )
         raw_output = clean_llm_json_output(llm_result.content)
         parsed_routing = json.loads(raw_output)
 
@@ -8243,11 +8762,16 @@ Preserves original implementation with in-memory caching.
 """
 import logging
 import json
+import asyncio
+import time
 import httpx
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_TAXONOMY_CACHE = None
+_TAXONOMY_CACHE: str | None = None
+_TAXONOMY_FETCHED_AT = 0.0
+_TAXONOMY_LOCK = asyncio.Lock()
 
 
 async def get_live_taxonomy() -> str:
@@ -8255,38 +8779,58 @@ async def get_live_taxonomy() -> str:
     Fetches the live taxonomy from BizPortal and formats as compact JSON.
     Uses in-memory cache to avoid repeated API calls.
     """
-    global _TAXONOMY_CACHE
-    if _TAXONOMY_CACHE:
+    global _TAXONOMY_CACHE, _TAXONOMY_FETCHED_AT
+    now = time.time()
+    ttl = float(getattr(settings, "TAXONOMY_CACHE_TTL_SECONDS", 1800))
+    if _TAXONOMY_CACHE and (now - _TAXONOMY_FETCHED_AT) <= ttl:
         return _TAXONOMY_CACHE
 
-    dept_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
-    base_subcat_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories?department_id="
-    taxonomy = []
+    async with _TAXONOMY_LOCK:
+        now = time.time()
+        if _TAXONOMY_CACHE and (now - _TAXONOMY_FETCHED_AT) <= ttl:
+            return _TAXONOMY_CACHE
 
-    try:
-        async with httpx.AsyncClient() as client:
-            dept_res = await client.get(dept_url)
-            dept_res.raise_for_status()
-            departments = dept_res.json().get("data", [])
+        dept_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
+        base_subcat_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories?department_id="
+        taxonomy = []
 
-            for dept in departments:
-                dept_id = dept["department_id"]
-                sub_res = await client.get(f"{base_subcat_url}{dept_id}")
-                subcategories = sub_res.json().get("data", []) if sub_res.status_code == 200 else []
-                taxonomy.append({
-                    "department_id": int(dept_id),
-                    "department_name": dept["short_name"],
-                    "subcategories": [
-                        {"id": int(sub["id"]), "name": sub["sub_category"]}
-                        for sub in subcategories
-                    ]
-                })
+        try:
+            timeout = httpx.Timeout(connect=3.0, read=7.0, write=5.0, pool=1.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                dept_res = await client.get(dept_url)
+                dept_res.raise_for_status()
+                departments = dept_res.json().get("data", [])
 
-        _TAXONOMY_CACHE = json.dumps(taxonomy, separators=(',', ':'))
-        return _TAXONOMY_CACHE
-    except Exception as e:
-        logger.error("Failed to fetch live taxonomy: %s", e)
-        return "[]"
+                async def fetch_subcategories(dept: dict) -> dict:
+                    dept_id = dept["department_id"]
+                    try:
+                        sub_res = await client.get(f"{base_subcat_url}{dept_id}")
+                        subcategories = sub_res.json().get("data", []) if sub_res.status_code == 200 else []
+                    except Exception as exc:
+                        logger.warning("Failed to fetch subcategories for department=%s: %s", dept_id, exc)
+                        subcategories = []
+                    return {
+                        "department_id": int(dept_id),
+                        "department_name": dept["short_name"],
+                        "subcategories": [
+                            {"id": int(sub["id"]), "name": sub["sub_category"]}
+                            for sub in subcategories
+                        ]
+                    }
+
+                taxonomy = await asyncio.gather(
+                    *(fetch_subcategories(dept) for dept in departments)
+                )
+
+            _TAXONOMY_CACHE = json.dumps(taxonomy, separators=(',', ':'))
+            _TAXONOMY_FETCHED_AT = time.time()
+            logger.info("Taxonomy cache refreshed department_count=%d", len(taxonomy))
+            return _TAXONOMY_CACHE
+        except Exception as e:
+            logger.error("Failed to fetch live taxonomy: %s", e)
+            if _TAXONOMY_CACHE:
+                return _TAXONOMY_CACHE
+            return "[]"
 
 
 --- FILE: backend\app\utils\__init__.py ---
