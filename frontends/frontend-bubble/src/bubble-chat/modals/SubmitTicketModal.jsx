@@ -6,6 +6,7 @@ import {
   CheckCircle2,
   ShieldAlert,
   LoaderCircle,
+  AlertCircle,
 } from "lucide-react"
 
 import ModalShell from "../components/ModalShell.jsx"
@@ -231,6 +232,59 @@ const SubmitTicketModal = ({
           </div>
         )}
 
+        {/* ERROR - MISSING INFO */}
+        {summaryLoading === false && aiSummary?.summary?.includes("Unable to") && (
+          <div
+            className="
+              mb-5
+              flex items-start gap-3
+              rounded-2xl
+              border border-red-100
+              bg-red-50
+              p-4
+            "
+          >
+            <AlertCircle
+              className="
+                mt-0.5
+                h-5 w-5
+                text-red-600
+              "
+            />
+
+            <div>
+              <p
+                className="
+                  text-sm font-semibold
+                  text-red-700
+                "
+              >
+                Missing Information
+              </p>
+
+              <p
+                className="
+                  mt-1
+                  text-xs
+                  text-red-600
+                "
+              >
+                {aiSummary?.summary}
+              </p>
+
+              <p
+                className="
+                  mt-2
+                  text-xs
+                  text-red-600
+                "
+              >
+                Please provide the missing details in the chat above, then try submitting the ticket again.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* EDITABLE FORM */}
         <div className="space-y-4">
           {/* SUMMARY */}
@@ -243,10 +297,17 @@ const SubmitTicketModal = ({
               value={form.summary}
               onChange={e => update("summary", e.target.value)}
               placeholder="Brief summary of the issue"
+              disabled={
+                summaryLoading === false &&
+                aiSummary?.summary?.includes("Unable to")
+              }
               className={cn(
                 "w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5",
                 "text-sm text-slate-900 outline-none transition-all",
-                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50",
+                (summaryLoading === false &&
+                  aiSummary?.summary?.includes("Unable to")) &&
+                "cursor-not-allowed opacity-50"
               )}
             />
           </div>
@@ -261,10 +322,17 @@ const SubmitTicketModal = ({
               onChange={e => update("description", e.target.value)}
               placeholder="Detailed description..."
               rows={4}
+              disabled={
+                summaryLoading === false &&
+                aiSummary?.summary?.includes("Unable to")
+              }
               className={cn(
                 "w-full resize-none rounded-xl border border-slate-200 bg-white px-4 py-2.5",
                 "text-sm text-slate-900 outline-none transition-all",
-                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+                "focus:border-violet-400 focus:ring-4 focus:ring-violet-50",
+                (summaryLoading === false &&
+                  aiSummary?.summary?.includes("Unable to")) &&
+                "cursor-not-allowed opacity-50"
               )}
             />
           </div>
@@ -278,10 +346,17 @@ const SubmitTicketModal = ({
               <select
                 value={form.department_id}
                 onChange={e => update("department_id", e.target.value)}
+                disabled={
+                  summaryLoading === false &&
+                  aiSummary?.summary?.includes("Unable to")
+                }
                 className={cn(
                   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5",
                   "text-sm text-slate-900 outline-none transition-all",
-                  "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
+                  "focus:border-violet-400 focus:ring-4 focus:ring-violet-50",
+                  (summaryLoading === false &&
+                    aiSummary?.summary?.includes("Unable to")) &&
+                  "cursor-not-allowed opacity-50"
                 )}
               >
                 <option value="">Select Department</option>
@@ -306,7 +381,11 @@ const SubmitTicketModal = ({
                   "text-sm text-slate-900 outline-none transition-all",
                   "focus:border-violet-400 focus:ring-4 focus:ring-violet-50"
                 )}
-                disabled={!form.department_id}
+                disabled={
+                  !form.department_id ||
+                  (summaryLoading === false &&
+                    aiSummary?.summary?.includes("Unable to"))
+                }
               >
                 <option value="">Select Subcategory</option>
                 {subcategories.map(sub => (
@@ -391,7 +470,9 @@ const SubmitTicketModal = ({
               !form.summary ||
               !form.description ||
               !form.department_id ||
-              !form.subcategory_id
+              !form.subcategory_id ||
+              (summaryLoading === false &&
+                aiSummary?.summary?.includes("Unable to"))
             }
           >
             {buttonContent}

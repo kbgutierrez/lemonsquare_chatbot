@@ -57,27 +57,74 @@ class EscalationService:
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        # --- 1. AI DRAFTS THE TICKET ---
-        llm = create_llm(model=runtime_config.escalation_draft_model, temperature=0.0)
+        # --- 1. MAIN AI EVALUATES (Decides AND Speaks) ---
+        main_model = getattr(runtime_config.settings, "ActiveModel", None) or "llama-3.3-70b-versatile"
+        main_llm = create_llm(model=main_model, temperature=0.2)
         
         prompt = runtime_config.escalation_draft_prompt.replace(
             "{transcript}", transcript
         )
 
-        result = await llm.ainvoke(prompt)
+        result = await main_llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
-        logger.info("Escalation LLM raw output: %s", raw_output)
+        logger.info("Main AI raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
 
         if not extracted_data:
             logger.error("AI failed to generate valid escalation JSON: %s", raw_output)
             raise ValidationError("AI failed to generate a valid escalation draft.")
+        
+        is_ready = extracted_data.get("is_ready", True)
+        
+        # --- 2. IF NOT READY: PUSHBACK ---
+        if not is_ready:
+            logger.info("Escalation rejected by Main AI. Missing info.")
+            session.SessionStatus = "Drafting_Ticket"
+            self.db.commit()
 
-        summary = extracted_data.get("summary") or "AI Escalation Issue"
-        description = extracted_data.get("description") or "Escalated from AI Chatbot"
-        logger.info("Escalation draft parsed summary='%s', description='%s'", summary, description)
+            pushback_msg = extracted_data.get("chat_message") or "Sige, gawan natin ng ticket. Ano nga pala ang detalye (PC number, location)?"
 
-        # --- 2. AI PREDICTS THE ROUTING ---
+            self.message_svc.save_ai_message(
+                session_id=session_id,
+                content=pushback_msg,
+            )
+
+            return {
+                "status": "needs_info",
+                "pushback_message": pushback_msg,
+                "summary": None,
+                "description": None,
+                "department_id": None,
+                "department_name": None,
+                "subcategory_id": None,
+                "subcategory_name": None,
+                "routing_confidence": None,
+                "routing_reasoning": None,
+                "routing_analysis": None,
+                "routing_source": None,
+            }
+
+        # --- 3. IF READY: INSTANT AI DRAFTS THE TICKET ---
+        session.SessionStatus = "Active"
+        self.db.commit()
+        logger.info("Main AI approved ticket creation. Handing over to Instant AI for drafting...")
+
+        from app.services.prompts import TICKET_GENERATION_PROMPT
+        
+        instant_model = runtime_config.escalation_draft_model or "llama-3.1-8b-instant"
+        instant_llm = create_llm(model=instant_model, temperature=0.0)
+
+        draft_prompt = TICKET_GENERATION_PROMPT.replace("{transcript}", transcript)
+        draft_result = await instant_llm.ainvoke(draft_prompt)
+        draft_raw = clean_llm_json_output(draft_result.content)
+        draft_data = safe_json_loads(draft_raw, context="ticket_generation")
+
+        summary = draft_data.get("summary") or "AI Escalation Issue"
+        description = draft_data.get("description") or "Escalated from AI Chatbot"
+        
+        logger.info("Instant AI drafted summary='%s', description='%s'", summary, description)
+
+        # --- 4. AI PREDICTS THE ROUTING ---
         try:
             logger.info("Passing drafted ticket to Routing Engine...")
             vector_store = get_shared_vector_store()

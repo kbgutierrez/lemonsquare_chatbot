@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
@@ -19,6 +20,7 @@ import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
 
 import chatbotService from "./services/chatbotService"
+import ticketService from "./services/ticketService"
 
 import {
   useBubbleDrag,
@@ -45,6 +47,17 @@ const BubbleChat = () => {
     setHistoryRefreshKey,
   ] = useState(0)
 
+  const [
+    checkingEscalation,
+    setCheckingEscalation,
+  ] = useState(false)
+
+  const messagesRef =
+    useRef([])
+
+  const openDraftAutoTriggered =
+    useRef(false)
+
   const {
     position,
     dragging,
@@ -68,6 +81,8 @@ const BubbleChat = () => {
     resolveConversation,
     resolutionCheck,
     dismissResolution,
+    addMessage,
+    removeMessage,
   } = useChatMessages()
 
   useEffect(() => {
@@ -81,6 +96,12 @@ const BubbleChat = () => {
     )
 
   }, [sessionId])
+
+  useEffect(() => {
+
+    messagesRef.current = messages
+
+  }, [messages])
 
   useEffect(() => {
 
@@ -184,6 +205,137 @@ const BubbleChat = () => {
       setActiveModal(null)
     }
 
+  const delay = ms =>
+    new Promise(resolve =>
+      setTimeout(resolve, ms)
+    )
+
+  const handleSubmitTicket =
+    async () => {
+
+      try {
+
+        if (
+          !sessionId ||
+          checkingEscalation
+        ) {
+          return
+        }
+
+        setCheckingEscalation(
+          true
+        )
+
+        console.log(
+          "CHECKING_ESCALATION_GATEKEEPER",
+          sessionId
+        )
+
+        const response =
+          await ticketService.getEscalationDraft(
+            sessionId
+          )
+
+        console.log(
+          "ESCALATION_CHECK_RESPONSE",
+          response
+        )
+
+        // Check if AI rejected the escalation due to missing info
+        if (
+          response?.status === "needs_info" &&
+          response?.pushback_message
+        ) {
+
+          console.log(
+            "ESCALATION_REJECTED_MISSING_INFO",
+            "Message: " + response.pushback_message
+          )
+
+          // Show a typing indicator before the AI follow-up
+          const typingMessage = addMessage(
+            "",
+            "agent",
+            true
+          )
+
+          await delay(1800)
+
+          removeMessage(
+            typingMessage.id
+          )
+
+          // Inject the pushback message into the chat
+          // The AI is asking for more information
+          addMessage(
+            response.pushback_message,
+            "agent"
+          )
+
+          // Do not open the modal
+          setActiveModal(null)
+
+          return
+        }
+
+        // If status is "success", open the modal for user to confirm and finalize
+        if (response?.status === "success") {
+          console.log(
+            "ESCALATION_READY_PROCEED_WITH_MODAL"
+          )
+          setActiveModal("ticket")
+          return
+        }
+
+        console.warn(
+          "ESCALATION_DRAFT_RESPONSE_NOT_READY",
+          response
+        )
+
+        return
+      } catch (error) {
+
+        console.error(
+          "SUBMIT_TICKET_ERROR",
+          error
+        )
+
+        // Do not open the ticket modal when draft generation fails.
+        addMessage(
+          "Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.",
+          "agent"
+        )
+
+        setActiveModal(null)
+
+      } finally {
+
+        setCheckingEscalation(
+          false
+        )
+      }
+    }
+
+  useEffect(() => {
+    if (
+      resolutionCheck?.resolutionAction ===
+        "open_draft" &&
+      !openDraftAutoTriggered.current
+    ) {
+      openDraftAutoTriggered.current = true
+      handleSubmitTicket()
+    }
+
+    if (
+      resolutionCheck?.resolutionAction !==
+      "open_draft"
+    ) {
+      openDraftAutoTriggered.current = false
+    }
+  }, [
+    resolutionCheck?.resolutionAction,
+    handleSubmitTicket,
+  ])
   const handleOpenModal =
     modalId => {
 
@@ -197,6 +349,15 @@ const BubbleChat = () => {
         return
       }
 
+      if (
+        modalId ===
+        "ticket"
+      ) {
+
+        handleSubmitTicket()
+
+        return
+      }
       setActiveModal(modalId)
     }
 

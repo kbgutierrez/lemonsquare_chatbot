@@ -623,8 +623,53 @@ export const useChatMessages =
         []
       )
 
+    /* ========================================
+       ADD MESSAGE (for injecting external messages)
+    ======================================== */
+
+    const addMessage =
+      useCallback(
+        (
+          text,
+          sender = "agent",
+          isTyping = false
+        ) => {
+
+          const message =
+            createMessage({
+              sender,
+              text,
+              isTyping,
+            })
+
+          setMessages(
+            prev => [
+              ...prev,
+              message,
+            ]
+          )
+
+          return message
+        },
+        []
+      )
+
+    const removeMessage =
+      useCallback(
+        id => {
+          setMessages(
+            prev => prev.filter(
+              message =>
+                message.id !== id
+            )
+          )
+        },
+        []
+      )
+
     return {
       messages,
+      removeMessage,
 
       loading:
         isSendingMessage,
@@ -650,5 +695,7 @@ export const useChatMessages =
       resolutionCheck,
 
       dismissResolution,
+
+      addMessage,
       }
       }

@@ -129,6 +129,7 @@ async def debug_full_rag_pipeline(
     user_name = "Debug User"
 
     debug_result = await orchestrator.debug_orchestrate(
+        session_id="",
         user_query=request.query,
         chat_history=chat_history,
         user_name=user_name,

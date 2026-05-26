@@ -160,10 +160,9 @@ from app.api.routers import (
     admin_auth,
 )
 from app.core.config import settings as app_settings
-from app.core.database import SessionChatbot, engine_chatbot
+from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
-from app.models.chatbot import TicketEscalationState
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.retrieval.vector_store import get_shared_vector_store
@@ -180,14 +179,6 @@ async def lifespan(app: FastAPI):
     app.state.ai_available = False
     app.state.orchestrator = None
     app.state.ingestion_service = None
-
-    # Ensure the escalation state table exists before we start handling requests.
-    try:
-        logger.info("Ensuring escalation state table exists...")
-        TicketEscalationState.__table__.create(bind=engine_chatbot, checkfirst=True)
-        logger.info("Escalation state table check complete")
-    except Exception as exc:
-        logger.error("Failed to ensure escalation state table exists: %s", exc, exc_info=True)
 
     # Qdrant check
     try:
@@ -500,7 +491,6 @@ All business logic extracted to chat domain services.
 Router is now pure HTTP: validates input, delegates, formats response.
 """
 import asyncio
-import json
 import logging
 
 from fastapi import APIRouter, Depends, Request
@@ -528,10 +518,7 @@ from app.schemas.tickets import (
     TicketDraftResponse,
     TicketEscalateResponse,
     TicketSubmitRequest,
-    EscalationAnswerRequest,
-    EscalationSubmitStateRequest,
 )
-from app.services.chat.escalation_manager import EscalationManager
 from app.services.chat.escalation_service import EscalationService
 from app.services.chat.message_service import MessageService
 from app.services.chat.session_manager import SessionManager
@@ -571,7 +558,6 @@ async def handle_chat(
 
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
-    escalation_mgr = EscalationManager(db)
 
     session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
 
@@ -581,37 +567,10 @@ async def handle_chat(
         content=chat_request.message,
     )
 
-    escalation_response = await escalation_mgr.process_escalation_chat_message(
-        session_id,
-        chat_request.message,
-    )
-
-    if escalation_response is not None:
-        display_text = escalation_response["response"]
-        action = escalation_response["action"]
-        resolution_message = escalation_response["resolution_message"]
-        ticket_ids = []
-
-        msg_svc.save_ai_message(
-            session_id=session_id,
-            content=display_text,
-        )
-
-        return ChatResponse(
-            session_id=session_id,
-            response=display_text,
-            ticket_ids_used=ticket_ids,
-            show_resolution_prompt=False,
-            allow_ticket_submission=escalation_response["allow_ticket_submission"],
-            conversation_status="need_ticket" if escalation_response["allow_ticket_submission"] else "active",
-            resolution_action=action,
-            resolution_confidence=1.0,
-            resolution_message=resolution_message,
-        )
-
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
+        session_id=session_id,
         user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
@@ -640,6 +599,11 @@ async def handle_chat(
         allow_ticket_submission = False
         conversation_status = "resolved_candidate"
         resolution_action = "resolved_chat"
+    elif str(action).lower() == "open_draft":
+        show_resolution_prompt = False
+        allow_ticket_submission = False
+        conversation_status = "active"
+        resolution_action = "open_draft"
 
     return ChatResponse(
         session_id=session_id,
@@ -772,80 +736,9 @@ async def draft_escalation(
     session_id: str,
     db: Session = Depends(get_chatbot_db),
 ):
-    result = await EscalationManager(db).start_escalation(session_id)
+    result = await EscalationService(db).draft_escalation(session_id)
 
     return TicketDraftResponse(**result)
-
-
-@router.post(
-    "/escalate/start/{session_id}",
-    response_model=TicketDraftResponse,
-)
-async def start_escalation(
-    session_id: str,
-    db: Session = Depends(get_chatbot_db),
-):
-    result = await EscalationManager(db).start_escalation(session_id)
-    return TicketDraftResponse(**result)
-
-
-@router.post(
-    "/escalate/answer/{session_id}",
-    response_model=TicketDraftResponse,
-)
-async def answer_escalation_question(
-    session_id: str,
-    request: EscalationAnswerRequest,
-    db: Session = Depends(get_chatbot_db),
-):
-    result = await EscalationManager(db).answer_escalation_question(
-        session_id,
-        request.user_reply,
-    )
-    return TicketDraftResponse(**result)
-
-
-@router.get(
-    "/escalate/state/{session_id}",
-    response_model=TicketDraftResponse,
-)
-async def get_escalation_state(
-    session_id: str,
-    db: Session = Depends(get_chatbot_db),
-):
-    state = EscalationManager(db).get_escalation_state(session_id)
-    return TicketDraftResponse(
-        status=state.Status,
-        summary=state.DraftSummary,
-        description=state.DraftDescription,
-        extracted_fields=json.loads(state.GatheredDataJSON or "{}"),
-        missing_fields=json.loads(state.MissingFieldsJSON or "[]"),
-        raw_output=state.FinalPayloadJSON,
-        department_id=state.DepartmentID,
-        subcategory_id=state.SubcategoryID,
-        routing_confidence=float(state.RoutingConfidence)
-        if state.RoutingConfidence is not None
-        else None,
-        routing_source="ai_rac_pipeline" if state.RoutingCompleted else None,
-    )
-
-
-@router.post(
-    "/escalate/submit-state/{session_id}",
-    response_model=TicketEscalateResponse,
-)
-async def submit_escalation_state(
-    session_id: str,
-    request: EscalationSubmitStateRequest,
-    db: Session = Depends(get_chatbot_db),
-):
-    payload = await EscalationManager(db).prepare_submit_payload(
-        session_id=session_id,
-        requester_id=request.requester_id,
-        company_id=request.company_id,
-    )
-    result = await EscalationService(db).submit_escalation(payload)
-    return TicketEscalateResponse(**result)
 
 
 @router.post(
@@ -1082,6 +975,7 @@ async def debug_full_rag_pipeline(
     user_name = "Debug User"
 
     debug_result = await orchestrator.debug_orchestrate(
+        session_id="",
         user_query=request.query,
         chat_history=chat_history,
         user_name=user_name,
@@ -1293,20 +1187,44 @@ async def update_document_metadata(
 from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
 
 
-@router.get("/manual", response_model=list[ManualEntryResponse], summary="List all manual rules")
+@router.get(
+    "/manual",
+    response_model=list[ManualEntryResponse],
+    summary="List all manual rules",
+)
 def get_manual_entries(
     skip: int = 0,
     limit: int = 50,
-    db: Session = Depends(get_chatbot_db)
+    status: str = "all",
+    db: Session = Depends(get_chatbot_db),
 ):
 
     from app.models.chatbot import ManualKnowledgeEntry
 
-    entries = (
-        db.query(ManualKnowledgeEntry)
-        .filter(
+    query = db.query(
+        ManualKnowledgeEntry
+    )
+
+    normalized_status = (
+        status
+        .lower()
+        .strip()
+    )
+
+    if normalized_status == "active":
+
+        query = query.filter(
             ManualKnowledgeEntry.IsActive == True
         )
+
+    elif normalized_status == "inactive":
+
+        query = query.filter(
+            ManualKnowledgeEntry.IsActive == False
+        )
+
+    entries = (
+        query
         .order_by(
             ManualKnowledgeEntry.CreatedAt.desc()
         )
@@ -1318,6 +1236,7 @@ def get_manual_entries(
     mapped_results = []
 
     for entry in entries:
+
         mapped_results.append(
             ManualEntryResponse(
                 entry_id=entry.EntryID,
@@ -1326,7 +1245,9 @@ def get_manual_entries(
                 category=entry.Category,
                 created_at=entry.CreatedAt,
                 updated_at=entry.UpdatedAt,
-                is_active=bool(entry.IsActive),
+                is_active=bool(
+                    entry.IsActive
+                ),
             )
         )
 
@@ -1399,95 +1320,391 @@ Knowledge Base Explorer router.
 Queries SQL databases directly for the Admin Dashboard.
 Preserved from original with repository usage.
 """
+
 import json
 import logging
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_helpdesk_db
-from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry, LearnedChat, BlacklistedTicket
-from app.models.helpdesk import TicketEvaluation
-from app.schemas.knowledge import KnowledgeExplorerResponse
-from app.repositories.ticket_repository import TicketRepository
+
+from app.api.deps import (
+    get_chatbot_db,
+    get_helpdesk_db,
+)
+
+from app.models.chatbot import (
+    UploadedDocument,
+    ManualKnowledgeEntry,
+    LearnedChat,
+)
+
+from app.models.helpdesk import (
+    TicketEvaluation,
+)
+
+from app.schemas.knowledge import (
+    KnowledgeExplorerResponse,
+)
+
+from app.repositories.ticket_repository import (
+    TicketRepository,
+)
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/knowledge", tags=["Explorer"])
+
+router = APIRouter(
+    prefix="/knowledge",
+    tags=["Explorer"],
+)
 
 
-@router.get("/explore", response_model=list[KnowledgeExplorerResponse], summary="Browse Knowledge Base (SQL Source of Truth)")
+@router.get(
+    "/explore",
+    response_model=list[KnowledgeExplorerResponse],
+    summary="Browse Knowledge Base (SQL Source of Truth)",
+)
 async def explore_knowledge_base(
     doc_type: str | None = None,
     category: str | None = None,
+
+    # =====================================
+    # LIFECYCLE FILTER
+    #
+    # SUPPORTED:
+    # ?lifecycle=active
+    # ?lifecycle=inactive
+    #
+    # DEFAULT:
+    # active
+    # =====================================
+
+    lifecycle: str = "active",
+
     limit: int = 100,
-    db_chatbot: Session = Depends(get_chatbot_db),
-    db_helpdesk: Session = Depends(get_helpdesk_db),
+
+    db_chatbot: Session = Depends(
+        get_chatbot_db
+    ),
+
+    db_helpdesk: Session = Depends(
+        get_helpdesk_db
+    ),
 ):
+
     results = []
 
-    # 1. Manual Knowledge
-    if doc_type in [None, "general_text"]:
-        query = db_chatbot.query(ManualKnowledgeEntry).filter(ManualKnowledgeEntry.IsActive == True)
-        if category:
-            query = query.filter(ManualKnowledgeEntry.Category == category)
-        for m in query.order_by(ManualKnowledgeEntry.CreatedAt.desc()).limit(limit).all():
-            results.append({"id": m.EntryID, "doc_type": "general_text", "source": m.Title, "category": m.Category, "content": m.Content})
+    normalized_lifecycle = (
+        lifecycle or "active"
+    ).strip().lower()
 
-    # 2. AI-Learned Chats
-    if doc_type in [None, "resolved_chat"] and (category is None or category == "AI Extraction"):
-        chats = db_chatbot.query(LearnedChat).filter(LearnedChat.IsActive == True).order_by(LearnedChat.LearnedAt.desc()).limit(limit).all()
+    include_active = (
+        normalized_lifecycle
+        == "active"
+    )
+
+    include_inactive = (
+        normalized_lifecycle
+        == "inactive"
+    )
+
+    # =====================================
+    # 1. MANUAL KNOWLEDGE
+    # =====================================
+
+    if doc_type in [
+        None,
+        "general_text",
+    ]:
+
+        query = db_chatbot.query(
+            ManualKnowledgeEntry
+        )
+
+        if include_active:
+
+            query = query.filter(
+                ManualKnowledgeEntry.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                ManualKnowledgeEntry.IsActive == False
+            )
+
+        if category:
+
+            query = query.filter(
+                ManualKnowledgeEntry.Category
+                == category
+            )
+
+        for m in (
+            query
+            .order_by(
+                ManualKnowledgeEntry.CreatedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        ):
+
+            results.append({
+                "id":
+                    m.EntryID,
+
+                "doc_type":
+                    "general_text",
+
+                "source":
+                    m.Title,
+
+                "category":
+                    m.Category,
+
+                "content":
+                    m.Content,
+
+                "is_active":
+                    bool(m.IsActive),
+            })
+
+    # =====================================
+    # 2. AI LEARNED CHATS
+    # =====================================
+
+    if (
+        doc_type in [
+            None,
+            "resolved_chat",
+        ]
+        and (
+            category is None
+            or category == "AI Extraction"
+        )
+    ):
+
+        query = db_chatbot.query(
+            LearnedChat
+        )
+
+        if include_active:
+
+            query = query.filter(
+                LearnedChat.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                LearnedChat.IsActive == False
+            )
+
+        chats = (
+            query
+            .order_by(
+                LearnedChat.LearnedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        )
+
         for c in chats:
+
             content_dict = {
-                "Issue Reported": c.IssueReported,
-                "Issue Found": c.IssueFound,
-                "Root Cause": c.RootCause,
-                "Work Done": c.WorkDone,
+                "Issue Reported":
+                    c.IssueReported,
+
+                "Issue Found":
+                    c.IssueFound,
+
+                "Root Cause":
+                    c.RootCause,
+
+                "Work Done":
+                    c.WorkDone,
             }
+
             results.append({
-                "id": c.SessionID,
-                "doc_type": "resolved_chat",
-                "source": f"Chat Session {c.SessionID[:8]}",
-                "category": "AI Extraction",
-                "content": json.dumps(content_dict, indent=2),
+                "id":
+                    c.SessionID,
+
+                "doc_type":
+                    "resolved_chat",
+
+                "source":
+                    f"Chat Session {c.SessionID[:8]}",
+
+                "category":
+                    "AI Extraction",
+
+                "content":
+                    json.dumps(
+                        content_dict,
+                        indent=2,
+                    ),
+
+                "is_active":
+                    bool(c.IsActive),
             })
 
-    # 3. Official Documents / PDFs
-    if doc_type in [None, "official_document"]:
-        query = db_chatbot.query(UploadedDocument).filter(UploadedDocument.IsActive == True)
+    # =====================================
+    # 3. OFFICIAL DOCUMENTS
+    # =====================================
+
+    if doc_type in [
+        None,
+        "official_document",
+    ]:
+
+        query = db_chatbot.query(
+            UploadedDocument
+        )
+
+        if include_active:
+
+            query = query.filter(
+                UploadedDocument.IsActive == True
+            )
+
+        elif include_inactive:
+
+            query = query.filter(
+                UploadedDocument.IsActive == False
+            )
+
         if category:
-            query = query.filter(UploadedDocument.Category == category)
-        for d in query.order_by(UploadedDocument.UploadedAt.desc()).limit(limit).all():
+
+            query = query.filter(
+                UploadedDocument.Category
+                == category
+            )
+
+        for d in (
+            query
+            .order_by(
+                UploadedDocument.UploadedAt.desc()
+            )
+            .limit(limit)
+            .all()
+        ):
+
             results.append({
-                "id": d.DocumentID,
-                "doc_type": "official_document",
-                "source": d.FileName,
-                "category": d.Category,
-                "content": f"[PDF Document containing {d.ChunkCount} vector chunks. AI reads this dynamically during chat.]",
+                "id":
+                    d.DocumentID,
+
+                "doc_type":
+                    "official_document",
+
+                "source":
+                    d.FileName,
+
+                "category":
+                    d.Category,
+
+                "content":
+                    (
+                        "[PDF Document containing "
+                        f"{d.ChunkCount} vector chunks. "
+                        "AI reads this dynamically during chat.]"
+                    ),
+
+                "is_active":
+                    bool(d.IsActive),
             })
 
-    # 4. Helpdesk Tickets
-    if doc_type in [None, "helpdesk_ticket"] and (category is None or category == "IT Helpdesk Sync"):
-        repo = TicketRepository(db_chatbot, db_helpdesk)
-        blacklisted = repo.get_blacklisted_numbers()
-        tickets = db_helpdesk.query(TicketEvaluation).filter(TicketEvaluation.work_done.isnot(None)).order_by(TicketEvaluation.id.desc()).limit(limit * 2).all()
+    # =====================================
+    # 4. HELPDESK TICKETS
+    # =====================================
+
+    if (
+        doc_type in [
+            None,
+            "helpdesk_ticket",
+        ]
+        and (
+            category is None
+            or category
+            == "IT Helpdesk Sync"
+        )
+    ):
+
+        repo = TicketRepository(
+            db_chatbot,
+            db_helpdesk,
+        )
+
+        blacklisted = (
+            repo.get_blacklisted_numbers()
+        )
+
+        tickets = (
+            db_helpdesk.query(
+                TicketEvaluation
+            )
+            .filter(
+                TicketEvaluation.work_done.isnot(None)
+            )
+            .order_by(
+                TicketEvaluation.id.desc()
+            )
+            .limit(limit * 2)
+            .all()
+        )
+
         valid_added = 0
+
         for t in tickets:
-            if t.ticket_number in blacklisted:
+
+            if (
+                t.ticket_number
+                in blacklisted
+            ):
                 continue
+
             if valid_added >= limit:
                 break
+
             results.append({
-                "id": str(t.id),
-                "doc_type": "helpdesk_ticket",
-                "source": f"Ticket {t.ticket_number}",
-                "category": "IT Helpdesk Sync",
-                "content": f"REPORTED: {t.issue_reported}\n\nRESOLUTION: {t.work_done}",
+                "id":
+                    str(t.id),
+
+                "doc_type":
+                    "helpdesk_ticket",
+
+                "source":
+                    f"Ticket {t.ticket_number}",
+
+                "category":
+                    "IT Helpdesk Sync",
+
+                "content":
+                    (
+                        f"REPORTED: {t.issue_reported}\n\n"
+                        f"RESOLUTION: {t.work_done}"
+                    ),
+
+                # =================================
+                # Tickets are always active
+                # from explorer perspective
+                # =================================
+
+                "is_active":
+                    True,
             })
+
             valid_added += 1
 
-    if doc_type is None and category is None:
+    # =====================================
+    # GLOBAL LIMIT SAFETY
+    # =====================================
+
+    if (
+        doc_type is None
+        and category is None
+    ):
         results = results[:limit]
 
     return results
-
 
 --- FILE: backend\app\api\routers\maintenance.py ---
 """
@@ -2429,31 +2646,6 @@ class TicketRoutingLog(BaseChatbot):
     CreatedAt = Column(DateTime, default=datetime.utcnow)
 
 
-class TicketEscalationState(BaseChatbot):
-    __tablename__ = "tbl_ticket_escalation_state"
-
-    EscalationID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    SessionID = Column(
-        String(36),
-        ForeignKey("ChatSession.SessionID"),
-        nullable=False,
-        unique=True,
-    )
-    Status = Column(String(50), default="ESCALATING_GENERIC")
-    DraftSummary = Column(Text)
-    DraftDescription = Column(Text)
-    ProfileType = Column(String(50), default="GENERIC")
-    DepartmentID = Column(Integer, nullable=True)
-    SubcategoryID = Column(Integer, nullable=True)
-    RoutingCompleted = Column(Boolean, default=False)
-    RoutingConfidence = Column(Numeric(4, 3), nullable=True)
-    GatheredDataJSON = Column(Text, default="{}")
-    MissingFieldsJSON = Column(Text, default="[]")
-    FinalPayloadJSON = Column(Text, nullable=True)
-    CreatedAt = Column(DateTime, default=datetime.utcnow)
-    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-
 --- FILE: backend\app\models\helpdesk.py ---
 """
 SQLAlchemy ORM models for the Helpdesk (read-only) database.
@@ -2502,7 +2694,7 @@ import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from app.models.chatbot import ChatSession, ChatMessage, TicketEscalationState
+from app.models.chatbot import ChatSession, ChatMessage
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 logger = logging.getLogger(__name__)
@@ -2710,55 +2902,6 @@ class ChatRepository:
 
     def count_active_sessions(self) -> int:
         return self.db.query(ChatSession).filter(ChatSession.IsActive == True).count()
-
-    def get_escalation_state(self, session_id: str) -> TicketEscalationState | None:
-        return (
-            self.db.query(TicketEscalationState)
-            .filter(TicketEscalationState.SessionID == session_id)
-            .first()
-        )
-
-    def require_escalation_state(self, session_id: str) -> TicketEscalationState:
-        state = self.get_escalation_state(session_id)
-        if not state:
-            raise NotFoundError(f"Escalation state for session '{session_id}' not found.")
-        return state
-
-    def create_escalation_state(
-        self,
-        session_id: str,
-        status: str,
-        draft_summary: str,
-        draft_description: str,
-        profile_type: str,
-        gathered_data_json: str,
-        missing_fields_json: str,
-    ) -> TicketEscalationState:
-        existing = self.get_escalation_state(session_id)
-        if existing:
-            return existing
-        state = TicketEscalationState(
-            SessionID=session_id,
-            Status=status,
-            DraftSummary=draft_summary,
-            DraftDescription=draft_description,
-            ProfileType=profile_type,
-            GatheredDataJSON=gathered_data_json,
-            MissingFieldsJSON=missing_fields_json,
-        )
-        self.db.add(state)
-        self.db.commit()
-        self.db.refresh(state)
-        return state
-
-    def update_escalation_state(self, session_id: str, updates: dict) -> TicketEscalationState:
-        state = self.require_escalation_state(session_id)
-        for key, value in updates.items():
-            if hasattr(state, key):
-                setattr(state, key, value)
-        self.db.commit()
-        self.db.refresh(state)
-        return state
 
     def count_escalated_sessions(self) -> int:
         return (
@@ -3349,18 +3492,10 @@ class TicketEscalateResponse(BaseModel):
     bizportal_response: dict | str | None = None
 
 
-class EscalationSubmitStateRequest(BaseModel):
-    requester_id: int
-    company_id: int
-
-
 class TicketDraftResponse(BaseModel):
     status: str
-    summary: str
-    description: str
-    extracted_fields: dict[str, str | None] | None = None
-    missing_fields: list[str] | None = None
-    next_question: str | None = None
+    summary: str | None = None
+    description: str | None = None
     department_id: int | None = None
     subcategory_id: int | None = None
     department_name: str | None = None
@@ -3368,11 +3503,7 @@ class TicketDraftResponse(BaseModel):
     routing_reasoning: str | None = None
     routing_confidence: float | None = None
     routing_source: str | None = None
-    raw_output: str | None = None
-
-
-class EscalationAnswerRequest(BaseModel):
-    user_reply: str = Field(..., min_length=1)
+    pushback_message: str | None = None
 
 
 class TicketSubmitRequest(BaseModel):
@@ -3701,52 +3832,29 @@ DEFAULT_REFORMULATOR_PROMPT = (
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
     "You are an expert IT Helpdesk Dispatcher.\n"
-    "Read the chat transcript and extract the core issue into a clean, tagalog/taglish 20 yrs old filipino operational ticket for the live agents.\n\n"
+    "The user clicked 'Submit Ticket' or is in the process of submitting one. Read the transcript and extract these 3 details IN EXACT ORDER:\n"
+    "1. The specific Issue/Error\n"
+    "2. The Location (e.g., branch, department like 'HR' or 'ICT')\n"
+    "3. The Specific Equipment (e.g., PC number, device name)\n\n"
     "CRITICAL RULES:\n"
-    "1. Think step-by-step in the 'reasoning' field. Identify the specific device, location, error codes, and what troubleshooting steps the user already tried.\n"
-    "2. Keep the 'summary' between 3 to 8 words (e.g., 'Aircon not cooling in HR office').\n"
-    "3. Write a 'description' that is highly technical, neutral, and actionable. Explicitly list the details you inferred in step 1.\n"
-    "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
+    "- TOLERANCE RULE: If the user explicitly says they do not know a detail (e.g., 'hindi ko sure', 'di ko alam') or gives a vague answer (e.g., 'yung fan'), YOU MUST ACCEPT IT. Treat that detail as 'Unknown' or use their exact words. Do NOT ask for it again.\n"
+    "- If ANY of the 3 details are completely unasked/unanswered, set 'is_ready' to false.\n"
+    "- ONE-BY-ONE RULE: In the 'missing_info' field, ONLY list the FIRST completely missing item. Do NOT list all of them.\n"
+    "- If you have all 3 (even if some are marked as 'Unknown' because the user didn't know), set 'is_ready' to true and draft the summary and description.\n"
+    "- The 'description' MUST explicitly list Location, Equipment, and Issue.\n"
+    "- DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE. NO POSTAMBLE.\n\n"
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
-    '  "reasoning": "Analysis of the user\'s problem, extracting devices, errors, and failed steps",\n'
-    '  "summary": "Short operational title",\n'
-    '  "description": "Concise technician-style summary of the issue, including environment details and steps already taken.",\n'
-    '  "extracted_fields": {\n'
-    '    "location": "string | null",\n'
-    '    "equipment": "string | null"\n'
-    '  }\n'
+    '  "is_ready": boolean,\n'
+    '  "missing_info": "string | null (e.g., ONLY \'Branch Location\' OR ONLY \'PC Number\')",\n'
+    '  "summary": "string | null",\n'
+    '  "description": "string | null"\n'
     "}}\n\n"
     "CHAT TRANSCRIPT:\n"
     "=================\n"
     "{transcript}\n"
     "=================\n\n"
     "JSON OUTPUT:"
-)
-
-# =========================================================
-# FIELD EXTRACTION
-# =========================================================
-FIELD_EXTRACTION_PROMPT = (
-    "You are an expert IT ticket intake parser. "
-    "Read the user reply and extract any requested fields from the list below. "
-    "Return ONLY valid JSON with the fields the user provided. "
-    "Do not add any extra keys or text.\n\n"
-    "REQUESTED FIELDS:\n{fields}\n\n"
-    "USER REPLY:\n{text}\n\n"
-    "JSON OUTPUT:"
-)
-
-# =========================================================
-# QUESTION GENERATION
-# =========================================================
-QUESTION_GENERATION_PROMPT = (
-    "You are a polite Filipino helpdesk assistant. "
-    "Ask exactly one simple Taglish question to collect the missing field below. "
-    "Do not answer the user or add extra commentary. Return only the question text.\n\n"
-    "Missing field: {field}\n"
-    "Profile type: {profile_type}\n\n"
-    "QUESTION:"
 )
 
 # =========================================================
@@ -3918,220 +4026,6 @@ class AnalyticsService:
 
 
 --- FILE: backend\app\services\chat\escalation_manager.py ---
-import json
-import logging
-from sqlalchemy.orm import Session
-
-from app.core.exceptions import ValidationError
-from app.models.chatbot import TicketEscalationState
-from app.repositories.chat_repository import ChatRepository
-from app.services.chat.escalation_service import EscalationService
-from app.services.llm_client import create_llm
-from app.services.prompts import FIELD_EXTRACTION_PROMPT, QUESTION_GENERATION_PROMPT
-from app.services.settings.runtime_config import RuntimeAIConfig
-from app.utils.json_utils import clean_llm_json_output, safe_json_loads
-
-logger = logging.getLogger(__name__)
-
-REQUIRED_FIELDS_BY_PROFILE = {
-    "GENERIC": ["location", "equipment"],
-}
-
-
-class EscalationManager:
-    """Manages stateful escalation intake across a chat session."""
-
-    def __init__(self, db: Session):
-        self.db = db
-        self.repo = ChatRepository(db)
-        self.escalation_service = EscalationService(db)
-        self.runtime_config = RuntimeAIConfig(db)
-
-    def _normalize_fields(self, extracted_fields: dict | None) -> dict:
-        if not isinstance(extracted_fields, dict):
-            return {}
-        return {
-            key: value if value not in (None, "", "null") else None
-            for key, value in extracted_fields.items()
-        }
-
-    def _missing_fields(self, gathered_data: dict, profile_type: str) -> list[str]:
-        profile_fields = REQUIRED_FIELDS_BY_PROFILE.get(profile_type, [])
-        return [field for field in profile_fields if not gathered_data.get(field)]
-
-    def _build_question(self, field: str, profile_type: str) -> str:
-        return QUESTION_GENERATION_PROMPT.format(field=field, profile_type=profile_type)
-
-    async def _extract_user_fields(self, missing_fields: list[str], user_reply: str) -> dict:
-        if not missing_fields:
-            return {}
-
-        llm = create_llm(model=self.runtime_config.escalation_draft_model, temperature=0.0)
-        prompt = FIELD_EXTRACTION_PROMPT.format(
-            fields=", ".join(missing_fields),
-            text=user_reply,
-        )
-
-        result = await llm.ainvoke(prompt)
-        raw_output = clean_llm_json_output(result.content)
-        parsed = safe_json_loads(raw_output, context="escalation_field_extraction")
-
-        if not isinstance(parsed, dict):
-            logger.warning("Field extraction returned non-dict result: %s", raw_output)
-            return {}
-
-        return parsed
-
-    def _merge_gathered_data(self, original: dict, updates: dict) -> dict:
-        merged = dict(original)
-        for key, value in updates.items():
-            if value not in (None, "", "null"):
-                merged[key] = value
-        return merged
-
-    async def start_escalation(self, session_id: str) -> dict:
-        draft = await self.escalation_service.create_escalation_draft(session_id)
-        extracted = self._normalize_fields(draft.get("extracted_fields", {}))
-        missing_fields = self._missing_fields(extracted, "GENERIC")
-
-        status = "ESCALATING_GENERIC"
-        if not missing_fields:
-            status = "ESCALATION_READY"
-
-        state = self.repo.create_escalation_state(
-            session_id=session_id,
-            status=status,
-            draft_summary=draft["summary"],
-            draft_description=draft["description"],
-            profile_type="GENERIC",
-            gathered_data_json=json.dumps(extracted),
-            missing_fields_json=json.dumps(missing_fields),
-        )
-
-        next_question = None
-        if missing_fields:
-            next_question = self._build_question(missing_fields[0], state.ProfileType)
-
-        return {
-            "status": state.Status,
-            "summary": state.DraftSummary,
-            "description": state.DraftDescription,
-            "extracted_fields": extracted,
-            "missing_fields": missing_fields,
-            "next_question": next_question,
-            "raw_output": draft.get("raw_output"),
-        }
-
-    async def answer_escalation_question(self, session_id: str, user_reply: str) -> dict:
-        state = self.repo.require_escalation_state(session_id)
-        missing_fields = json.loads(state.MissingFieldsJSON or "[]")
-        if not missing_fields:
-            raise ValidationError("No missing escalation fields remain.")
-
-        parsed = await self._extract_user_fields(missing_fields, user_reply)
-        existing = self._normalize_fields(json.loads(state.GatheredDataJSON or "{}"))
-        merged = self._merge_gathered_data(existing, parsed)
-        missing_fields = self._missing_fields(merged, state.ProfileType)
-
-        updates = {
-            "GatheredDataJSON": json.dumps(merged),
-            "MissingFieldsJSON": json.dumps(missing_fields),
-        }
-        if not missing_fields:
-            updates["Status"] = "ESCALATION_READY"
-
-        state = self.repo.update_escalation_state(session_id, updates)
-
-        next_question = None
-        if missing_fields:
-            next_question = self._build_question(missing_fields[0], state.ProfileType)
-
-        return {
-            "status": state.Status,
-            "summary": state.DraftSummary,
-            "description": state.DraftDescription,
-            "extracted_fields": merged,
-            "missing_fields": missing_fields,
-            "next_question": next_question,
-            "raw_output": json.dumps(merged, ensure_ascii=False),
-        }
-
-    async def process_escalation_chat_message(self, session_id: str, user_reply: str) -> dict | None:
-        state = self.repo.get_escalation_state(session_id)
-        if not state:
-            return None
-
-        missing_fields = json.loads(state.MissingFieldsJSON or "[]")
-        if not missing_fields:
-            return None
-
-        result = await self.answer_escalation_question(session_id, user_reply)
-
-        if result["missing_fields"]:
-            return {
-                "response": result["next_question"],
-                "action": "none",
-                "resolution_message": None,
-                "allow_ticket_submission": False,
-            }
-
-        return {
-            "response": "Salamat. Nakumpleto na ang required escalation details. Pwede na natin silang isumite.",
-            "action": "show_ticket",
-            "resolution_message": "Ready na ang escalation. Pwede na i-submit.",
-            "allow_ticket_submission": True,
-        }
-
-    async def prepare_submit_payload(
-        self,
-        session_id: str,
-        requester_id: int,
-        company_id: int,
-    ) -> dict:
-        state = self.repo.require_escalation_state(session_id)
-        missing_fields = json.loads(state.MissingFieldsJSON or "[]")
-        if missing_fields:
-            raise ValidationError(
-                "Cannot prepare final escalation payload until all required fields are collected."
-            )
-
-        if not state.DepartmentID or not state.SubcategoryID:
-            routing = await self.escalation_service.route_ticket(
-                state.DraftSummary,
-                state.DraftDescription,
-            )
-            state = self.repo.update_escalation_state(
-                session_id,
-                {
-                    "DepartmentID": routing["department_id"],
-                    "SubcategoryID": routing["subcategory_id"],
-                    "RoutingCompleted": True,
-                    "RoutingConfidence": routing["confidence"],
-                    "FinalPayloadJSON": json.dumps(routing),
-                },
-            )
-
-        payload = {
-            "session_id": session_id,
-            "requester_id": requester_id,
-            "company_id": company_id,
-            "summary": state.DraftSummary,
-            "description": state.DraftDescription,
-            "department_id": state.DepartmentID,
-            "subcategory_id": state.SubcategoryID,
-        }
-
-        self.repo.update_escalation_state(
-            session_id,
-            {
-                "FinalPayloadJSON": json.dumps(payload),
-                "Status": "READY_TO_SUBMIT",
-            },
-        )
-        return payload
-
-    def get_escalation_state(self, session_id: str) -> TicketEscalationState:
-        return self.repo.require_escalation_state(session_id)
 
 
 --- FILE: backend\app\services\chat\escalation_service.py ---
@@ -4182,10 +4076,11 @@ class EscalationService:
         self.repo = ChatRepository(db)
         self.message_svc = MessageService(db)
 
-    async def create_escalation_draft(self, session_id: str) -> dict:
+
+    async def draft_escalation(self, session_id: str) -> dict:
         """
-        Generate only the draft of the ticket from the chat transcript.
-        This is used by the stateful escalation intake flow.
+        Generate a ticket escalation draft, then pass it to the routing engine.
+        Returns dict matching TicketDraftResponse schema.
         """
         session = self.repo.validate_session_for_escalation(session_id)
         transcript = self.message_svc.get_transcript(session_id)
@@ -4193,94 +4088,145 @@ class EscalationService:
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
+        # --- 1. AI DRAFTS THE TICKET ---
         llm = create_llm(model=runtime_config.escalation_draft_model, temperature=0.0)
+        
         prompt = runtime_config.escalation_draft_prompt.replace(
             "{transcript}", transcript
         )
 
         result = await llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
-        logger.info("Escalation draft LLM raw output: %s", raw_output)
+        logger.info("Escalation LLM raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
 
         if not extracted_data:
             logger.error("AI failed to generate valid escalation JSON: %s", raw_output)
             raise ValidationError("AI failed to generate a valid escalation draft.")
+        
+
+        is_ready = extracted_data.get("is_ready", True)
+        
+        if not is_ready:
+            logger.info("Escalation rejected by AI. Missing info.")
+            session.SessionStatus = "Drafting_Ticket"
+            self.db.commit()
+
+            missing_info = extracted_data.get(
+                "missing_info",
+                "branch location, equipment details, and issue specifics"
+            )
+
+            main_model = getattr(
+                runtime_config.settings,
+                "ActiveModel",
+                None,
+            ) or "llama-3.3-70b-versatile"
+
+            main_llm = create_llm(
+                model=main_model,
+                temperature=0.3,
+            )
+
+            pushback_prompt = (
+                "You are a Filipino IT Helpdesk Agent. You are in the MIDDLE of an ongoing chat.\n"
+                "Here is the transcript so far:\n"
+                "=================\n"
+                f"{transcript}\n"
+                "=================\n\n"
+                f"The user clicked 'Submit Ticket', but before we can proceed, we need to ask for this ONE specific detail: {missing_info}.\n"
+                "Write the NEXT chat bubble in natural, casual Taglish asking ONLY for that specific missing detail.\n"
+                "CRITICAL RULES:\n"
+                "1. DO NOT greet the user (no 'Hi', 'Hello', etc.). You are already talking to them.\n"
+                "2. DO NOT use bullet points or numbered lists.\n"
+                "3. DO NOT apologize or over-explain.\n"
+                "4. Keep it to 1 short sentence ONLY.\n"
+                "5. Ask ONLY for the specific detail requested. Do not ask for anything else.\n"
+                "Example style: 'Sige, saang branch ka nga pala?' OR 'Ano nga pala yung PC number mo diyan?'"
+            )
+
+            main_llm_response = await main_llm.ainvoke(pushback_prompt)
+            pushback_msg = main_llm_response.content.strip()
+
+            self.message_svc.save_ai_message(
+                session_id=session_id,
+                content=pushback_msg,
+            )
+
+            return {
+                "status": "needs_info",
+                "pushback_message": pushback_msg,
+                "summary": "",
+                "description": "",
+                "department_id": None,
+                "department_name": None,
+                "subcategory_id": None,
+                "subcategory_name": None,
+                "routing_confidence": None,
+                "routing_reasoning": None,
+                "routing_analysis": None,
+                "routing_source": None,
+            }
 
         summary = extracted_data.get("summary") or "AI Escalation Issue"
         description = extracted_data.get("description") or "Escalated from AI Chatbot"
-        extracted_fields = extracted_data.get("extracted_fields") or {}
+        session.SessionStatus = "Active"
+        self.db.commit()
         logger.info("Escalation draft parsed summary='%s', description='%s'", summary, description)
 
-        return {
-            "summary": summary,
-            "description": description,
-            "extracted_fields": extracted_fields,
-            "raw_output": raw_output,
-        }
-
-    async def route_ticket(self, summary: str, description: str) -> dict:
-        runtime_config = RuntimeAIConfig(self.db)
-        vector_store = get_shared_vector_store()
-        embeddings = get_embedding_model()
-
-        routing_req = RoutingRequest(summary=summary, description=description)
-        routing_response = await suggest_route(
-            request=routing_req,
-            db=self.db,
-            qdrant=vector_store.qdrant,
-            embeddings=embeddings,
-            collection_name=settings.QDRANT_ROUTING_COLLECTION,
-        )
-
-        suggestion = routing_response.suggestion
-        return {
-            "department_id": suggestion.department_id,
-            "department_name": suggestion.department_name,
-            "subcategory_id": suggestion.subcategory_id,
-            "subcategory_name": suggestion.subcategory_name,
-            "confidence": suggestion.confidence_score,
-            "reasoning": suggestion.reasoning,
-            "analysis": suggestion.analysis,
-        }
-
-    async def draft_escalation(self, session_id: str) -> dict:
-        """
-        Generate a ticket escalation draft, then pass it to the routing engine.
-        Returns dict matching TicketDraftResponse schema.
-        """
-        draft = await self.create_escalation_draft(session_id)
-        summary = draft["summary"]
-        description = draft["description"]
-
+        # --- 2. AI PREDICTS THE ROUTING ---
         try:
             logger.info("Passing drafted ticket to Routing Engine...")
-            routing_result = await self.route_ticket(summary, description)
-            predicted_dept_id = routing_result["department_id"]
-            predicted_subcat_id = routing_result["subcategory_id"]
-            predicted_dept_name = routing_result["department_name"]
-            predicted_subcat_name = routing_result["subcategory_name"]
-            routing_confidence = routing_result["confidence"]
-            routing_reasoning = routing_result["reasoning"]
-            routing_analysis = routing_result.get("analysis")
+            vector_store = get_shared_vector_store()
+            embeddings = get_embedding_model()
+            
+            routing_req = RoutingRequest(summary=summary, description=description)
+            
+            routing_response = await suggest_route(
+                request=routing_req,
+                db=self.db,
+                qdrant=vector_store.qdrant,
+                embeddings=embeddings,
+                collection_name=settings.QDRANT_ROUTING_COLLECTION,
+            )
+            
+            # Extract predictions from RoutingResponse
+            suggestion = routing_response.suggestion
+            predicted_dept_id = suggestion.department_id
+            predicted_subcat_id = suggestion.subcategory_id
+            predicted_dept_name = suggestion.department_name
+            predicted_subcat_name = suggestion.subcategory_name
+            routing_confidence = suggestion.confidence_score
+            routing_reasoning = suggestion.reasoning
+            routing_analysis = suggestion.analysis
             routing_source = "ai_rac_pipeline"
+            logger.info(
+                "Escalation routing chosen department=%s (%s), subcategory=%s (%s), confidence=%s",
+                predicted_dept_name,
+                predicted_dept_id,
+                predicted_subcat_name,
+                predicted_subcat_id,
+                routing_confidence,
+            )
+            logger.info("Escalation routing analysis: %s", routing_analysis)
+            
         except Exception as e:
             logger.error("Routing engine failed during escalation draft: %s", e)
+            # Safe fallback if the routing engine crashes
             predicted_dept_id = FALLBACK_ROUTING["department_id"]
             predicted_subcat_id = FALLBACK_ROUTING["subcategory_id"]
             predicted_dept_name = FALLBACK_ROUTING["department_name"]
             predicted_subcat_name = FALLBACK_ROUTING["subcategory_name"]
             routing_confidence = 0.0
             routing_reasoning = "Routing engine failed."
-            routing_analysis = "Routing engine failed."
             routing_source = FALLBACK_ROUTING["routing_source"]
+            routing_analysis = "Routing engine failed."
 
+        # --- 3. RETURN COMBO TO FRONTEND ---
         return {
             "status": "success",
             "summary": summary,
             "description": description,
-            "extracted_fields": draft.get("extracted_fields"),
-            "raw_output": draft.get("raw_output"),
             "department_id": predicted_dept_id,
             "department_name": predicted_dept_name,
             "subcategory_id": predicted_subcat_id,
@@ -4288,7 +4234,7 @@ class EscalationService:
             "routing_confidence": routing_confidence,
             "routing_reasoning": routing_reasoning,
             "routing_analysis": routing_analysis,
-            "routing_source": routing_source,
+            "routing_source": "ai_rac_pipeline",
         }
 
     async def submit_escalation(self, payload: dict) -> dict:
@@ -6828,6 +6774,7 @@ class SupportOrchestrator:
 
     async def orchestrate(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -6835,13 +6782,14 @@ class SupportOrchestrator:
     ) -> tuple[str, str, str | None, list[int]]:
         """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids)."""
         try:
-            return await self._run_pipeline(user_query, chat_history, user_name, db, debug=False)
+            return await self._run_pipeline(session_id, user_query, chat_history, user_name, db, debug=False)
         except Exception as exc:
             logger.error("Orchestrator pipeline failed: %s", exc, exc_info=True)
             raise AIProcessingError(f"AI pipeline error: {exc}") from exc
 
     async def debug_orchestrate(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -6851,6 +6799,7 @@ class SupportOrchestrator:
         """Debug version with detailed pipeline info."""
         try:
             return await self._run_pipeline(
+                session_id,
                 user_query,
                 chat_history,
                 user_name,
@@ -6864,6 +6813,7 @@ class SupportOrchestrator:
 
     async def _run_pipeline(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -6871,7 +6821,28 @@ class SupportOrchestrator:
         debug: bool = False,
         limit: int | None = None,
     ):
-        # ── 1. Load Dynamic Settings ──────────────────────────────
+        # ── 1. Interview State Interceptor ───────────────────────
+        from app.models.chatbot import ChatSession
+        from app.services.chat.escalation_service import EscalationService
+
+        if session_id:
+            session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+            if session and session.SessionStatus == "Drafting_Ticket":
+                logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")
+
+                draft_result = await EscalationService(db).draft_escalation(session_id)
+
+                if draft_result.get("status") == "needs_info":
+                    return draft_result.get("pushback_message", ""), "none", None, []
+
+                return (
+                    "Sige, kumpleto na ang detalye. Binubuksan ko na ang ticket draft...",
+                    "open_draft",
+                    None,
+                    [],
+                )
+
+        # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
         if normalized_query in LOW_SIGNAL_QUERIES:
             greeting_response = "Hello! How can I help you with your IT issue today?"
@@ -7945,8 +7916,73 @@ Centralizes safe JSON handling with consistent error logging.
 """
 import json
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+def _find_matching_closing(text: str, start_index: int, opener: str, closer: str) -> int:
+    depth = 0
+    in_string = False
+    escape = False
+
+    for index in range(start_index, len(text)):
+        char = text[index]
+
+        if escape:
+            escape = False
+            continue
+
+        if char == "\\":
+            escape = True
+            continue
+
+        if char == '"':
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if char == opener:
+            depth += 1
+        elif char == closer:
+            depth -= 1
+            if depth == 0:
+                return index
+
+    return -1
+
+
+def _extract_json_snippet(raw_text: str) -> str:
+    text = raw_text.strip()
+    if not text:
+        return ""
+
+    # Prefer explicit JSON code fences
+    fence_pattern = re.compile(
+        r"```json\s*(.*?)\s*```|```(?:json\s*)?(.*?)\s*```",
+        re.DOTALL | re.IGNORECASE,
+    )
+    matches = fence_pattern.findall(text)
+    for json_block, generic_block in matches:
+        snippet = json_block or generic_block
+        if snippet and snippet.strip():
+            return snippet.strip()
+
+    # Fallback: extract the first top-level JSON object or array from mixed text.
+    for opener, closer in (("{", "}"), ("[", "]")):
+        start_index = text.find(opener)
+        if start_index == -1:
+            continue
+
+        end_index = _find_matching_closing(text, start_index, opener, closer)
+        if end_index != -1:
+            snippet = text[start_index:end_index + 1].strip()
+            if snippet:
+                return snippet
+
+    return text
 
 
 def safe_json_loads(raw_text: str, context: str = "Unknown") -> dict | list:
@@ -7962,16 +7998,10 @@ def safe_json_loads(raw_text: str, context: str = "Unknown") -> dict | list:
     """
     if not raw_text or not raw_text.strip():
         return {}
+
     try:
-        # Strip markdown code fences if present
-        text = raw_text.strip()
-        if text.startswith("```json"):
-            text = text[7:].strip()
-        if text.startswith("```"):
-            text = text[3:].strip()
-        if text.endswith("```"):
-            text = text[:-3].strip()
-        return json.loads(text)
+        cleaned = _extract_json_snippet(raw_text)
+        return json.loads(cleaned)
     except json.JSONDecodeError as exc:
         logger.error(
             "JSON decode failed [%s]: %s. Raw: %s",
@@ -7991,22 +8021,15 @@ def safe_json_loads(raw_text: str, context: str = "Unknown") -> dict | list:
 
 def clean_llm_json_output(raw_output: str) -> str:
     """
-    Remove markdown code fences from LLM JSON responses.
+    Extract clean JSON text from raw LLM output.
 
     Args:
-        raw_output: Raw LLM output that may contain markdown.
+        raw_output: Raw LLM output that may contain markdown or surrounding text.
 
     Returns:
-        Cleaned string ready for JSON parsing.
+        The extracted JSON snippet ready for parsing.
     """
-    text = raw_output.strip()
-    if text.startswith("```json"):
-        text = text[7:].strip()
-    elif text.startswith("```"):
-        text = text[3:].strip()
-    if text.endswith("```"):
-        text = text[:-3].strip()
-    return text
+    return _extract_json_snippet(raw_output)
 
 
 --- FILE: backend\app\utils\text_utils.py ---

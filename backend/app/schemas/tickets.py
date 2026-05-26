@@ -44,8 +44,8 @@ class TicketEscalateResponse(BaseModel):
 
 class TicketDraftResponse(BaseModel):
     status: str
-    summary: str
-    description: str
+    summary: str | None = None
+    description: str | None = None
     department_id: int | None = None
     subcategory_id: int | None = None
     department_name: str | None = None
@@ -53,6 +53,7 @@ class TicketDraftResponse(BaseModel):
     routing_reasoning: str | None = None
     routing_confidence: float | None = None
     routing_source: str | None = None
+    pushback_message: str | None = None
 
 
 class TicketSubmitRequest(BaseModel):

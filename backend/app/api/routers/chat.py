@@ -83,6 +83,7 @@ async def handle_chat(
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
+        session_id=session_id,
         user_query=chat_request.message,
         chat_history=history_text,
         user_name=user_name,
@@ -111,6 +112,11 @@ async def handle_chat(
         allow_ticket_submission = False
         conversation_status = "resolved_candidate"
         resolution_action = "resolved_chat"
+    elif str(action).lower() == "open_draft":
+        show_resolution_prompt = False
+        allow_ticket_submission = False
+        conversation_status = "active"
+        resolution_action = "open_draft"
 
     return ChatResponse(
         session_id=session_id,

@@ -78,6 +78,7 @@ class SupportOrchestrator:
 
     async def orchestrate(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -85,13 +86,14 @@ class SupportOrchestrator:
     ) -> tuple[str, str, str | None, list[int]]:
         """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids)."""
         try:
-            return await self._run_pipeline(user_query, chat_history, user_name, db, debug=False)
+            return await self._run_pipeline(session_id, user_query, chat_history, user_name, db, debug=False)
         except Exception as exc:
             logger.error("Orchestrator pipeline failed: %s", exc, exc_info=True)
             raise AIProcessingError(f"AI pipeline error: {exc}") from exc
 
     async def debug_orchestrate(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -101,6 +103,7 @@ class SupportOrchestrator:
         """Debug version with detailed pipeline info."""
         try:
             return await self._run_pipeline(
+                session_id,
                 user_query,
                 chat_history,
                 user_name,
@@ -114,6 +117,7 @@ class SupportOrchestrator:
 
     async def _run_pipeline(
         self,
+        session_id: str,
         user_query: str,
         chat_history: str,
         user_name: str,
@@ -121,7 +125,28 @@ class SupportOrchestrator:
         debug: bool = False,
         limit: int | None = None,
     ):
-        # ── 1. Load Dynamic Settings ──────────────────────────────
+        # ── 1. Interview State Interceptor ───────────────────────
+        from app.models.chatbot import ChatSession
+        from app.services.chat.escalation_service import EscalationService
+
+        if session_id:
+            session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+            if session and session.SessionStatus == "Drafting_Ticket":
+                logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")
+
+                draft_result = await EscalationService(db).draft_escalation(session_id)
+
+                if draft_result.get("status") == "needs_info":
+                    return draft_result.get("pushback_message", ""), "none", None, []
+
+                return (
+                    "Sige, kumpleto na ang detalye. Binubuksan ko na ang ticket draft...",
+                    "open_draft",
+                    None,
+                    [],
+                )
+
+        # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
         if normalized_query in LOW_SIGNAL_QUERIES:
             greeting_response = "Hello! How can I help you with your IT issue today?"

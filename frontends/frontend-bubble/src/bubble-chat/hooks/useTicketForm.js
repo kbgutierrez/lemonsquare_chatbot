@@ -165,6 +165,41 @@ export const useTicketForm = ({
             return
           }
 
+          // Check if the AI rejected due to missing info
+          if (
+            response?.status ===
+            "needs_info"
+          ) {
+
+            console.log(
+              "DRAFT_REJECTED_MISSING_INFO",
+              response.pushback_message
+            )
+
+            // Show the pushback message as an error
+            setSummaryError(
+              response.pushback_message ||
+              "Missing information. Please provide more details in the chat."
+            )
+
+            setAiSummary({
+              title:
+                "Unable to process escalation",
+
+              summary:
+                response.pushback_message ||
+                "Missing required information.",
+            })
+
+            setForm(prev => ({
+              ...prev,
+              summary: "",
+              description: "",
+            }))
+
+            return
+          }
+
           const normalized =
             normalizeSummary(
               response
