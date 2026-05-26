@@ -4,7 +4,7 @@ Formats context and generates final AI response via LLM.
 Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.core.retrieval_models import RetrievalDocument
 
 logger = logging.getLogger(__name__)
@@ -63,5 +63,10 @@ class AnswerGenerator:
         final_prompt = f"{final_prompt}{json_instruction}"
 
         llm = create_llm(model=model, temperature=temperature)
-        result = await llm.ainvoke(final_prompt)
+        result = await invoke_llm(
+            llm,
+            final_prompt,
+            model=model,
+            action="answer_generation",
+        )
         return result.content

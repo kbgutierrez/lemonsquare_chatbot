@@ -18,7 +18,7 @@ from app.models.chatbot import UploadedDocument
 from app.services.settings.runtime_config import RuntimeAIConfig
 from app.services.ingestion.chunking_service import ChunkingService
 from app.services.ingestion.embedding_service import EmbeddingService
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.utils.text_utils import normalize_text, sha256_hash
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,14 @@ class PDFProcessor:
             
             # --- NEW JSON PARSING LOGIC ---
             from app.utils.json_utils import clean_llm_json_output, safe_json_loads
-            raw_response = (await llm.ainvoke(prompt)).content
+            raw_response = (
+                await invoke_llm(
+                    llm,
+                    prompt,
+                    model=self.runtime_config.document_classifier_model,
+                    action="document_classification",
+                )
+            ).content
             cleaned_response = clean_llm_json_output(raw_response)
             parsed_json = safe_json_loads(cleaned_response, context="document_classification")
             

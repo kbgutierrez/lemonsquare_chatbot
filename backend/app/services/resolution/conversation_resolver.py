@@ -3,7 +3,7 @@ Conversation resolution service — REFACTORED.
 Uses centralized LLM client and prompt templates.
 """
 import logging
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from sqlalchemy.orm import Session
 from app.services.settings.runtime_config import RuntimeAIConfig
 from app.utils.json_utils import safe_json_loads
@@ -37,7 +37,12 @@ class ConversationResolutionService:
                 ai_response=ai_response,
                 chat_history=chat_history or "No previous history.",
             )
-            result = await self.llm.ainvoke(prompt)
+            result = await invoke_llm(
+                self.llm,
+                prompt,
+                model=self.runtime_config.conversation_resolution_model,
+                action="conversation_resolution",
+            )
             raw_content = result.content
             logger.info("🔍 RESOLUTION RAW OUTPUT: %s", raw_content)
 

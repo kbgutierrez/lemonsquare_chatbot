@@ -17,7 +17,7 @@ class SettingsRepository:
     def __init__(self, db: Session):
         self.db = db
 
-    def get_active_settings(self) -> AIChatbotSetting | None:
+    def get_active_settings_uncached(self) -> AIChatbotSetting | None:
         """Return the single active settings row, or None."""
         return (
             self.db.query(AIChatbotSetting)
@@ -25,6 +25,12 @@ class SettingsRepository:
             .order_by(AIChatbotSetting.SettingID.desc())
             .first()
         )
+
+    def get_active_settings(self) -> AIChatbotSetting | None:
+        """Return the single active settings row, using the process-local TTL cache."""
+        from app.core.cache import settings_cache
+
+        return settings_cache.get_settings(self.db)
 
     def require_active_settings(self) -> AIChatbotSetting:
         config = self.get_active_settings()
@@ -42,9 +48,12 @@ class SettingsRepository:
         ).update({"IsActive": False})
 
     def add_settings(self, config: AIChatbotSetting) -> None:
+        from app.core.cache import settings_cache
+
         self.db.add(config)
         self.db.commit()
         self.db.refresh(config)
+        settings_cache.invalidate()
 
     def create_new_active_settings(
         self,

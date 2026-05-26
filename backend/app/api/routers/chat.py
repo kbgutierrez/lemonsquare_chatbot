@@ -5,6 +5,7 @@ Router is now pure HTTP: validates input, delegates, formats response.
 """
 import asyncio
 import logging
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
@@ -19,6 +20,7 @@ from app.api.deps import (
 )
 from app.core.exceptions import AuthorizationError
 from app.core.exceptions import AuthenticationError
+from app.core.exceptions import ValidationError
 from app.schemas.chat import (
     ChatHistoryResponse,
     ChatRequest,
@@ -82,6 +84,7 @@ async def handle_chat(
 
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
+    started = time.perf_counter()
     display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
         session_id=session_id,
         user_query=chat_request.message,
@@ -89,9 +92,16 @@ async def handle_chat(
         user_name=user_name,
         db=db,
     )
+    logger.info(
+        "chat.pipeline_total_ms=%d session_id=%s user_id=%s",
+        int((time.perf_counter() - started) * 1000),
+        session_id,
+        user_id,
+    )
 
     # Persist only the human-visible assistant text
-    msg_svc.save_ai_message(
+    await asyncio.to_thread(
+        msg_svc.save_ai_message,
         session_id=session_id,
         content=display_text,
     )
@@ -259,18 +269,44 @@ async def draft_escalation(
     response_model=TicketEscalateResponse,
 )
 async def submit_escalation(
-    session_id: UUID = Form(...),
-    requester_id: int = Form(...),
-    company_id: int = Form(...),
-    summary: str = Form(...),
-    description: str = Form(...),
-    department_id: int = Form(...),
-    subcategory_id: int = Form(...),
+    request: Request,
+    session_id: UUID | None = Form(None),
+    requester_id: int | None = Form(None),
+    company_id: int | None = Form(None),
+    summary: str | None = Form(None),
+    description: str | None = Form(None),
+    department_id: int | None = Form(None),
+    subcategory_id: int | None = Form(None),
     location: str | None = Form(None),
     equipment: str | None = Form(None),
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
+    if request.headers.get("content-type", "").startswith("application/json"):
+        body = await request.json()
+        session_id = body.get("session_id")
+        requester_id = body.get("requester_id")
+        company_id = body.get("company_id")
+        summary = body.get("summary")
+        description = body.get("description")
+        department_id = body.get("department_id")
+        subcategory_id = body.get("subcategory_id")
+        location = body.get("location")
+        equipment = body.get("equipment")
+
+    required_payload = {
+        "session_id": session_id,
+        "requester_id": requester_id,
+        "company_id": company_id,
+        "summary": summary,
+        "description": description,
+        "department_id": department_id,
+        "subcategory_id": subcategory_id,
+    }
+    missing = [name for name, value in required_payload.items() if value in (None, "")]
+    if missing:
+        raise ValidationError(f"Missing required escalation fields: {', '.join(missing)}")
+
     payload = {
         "session_id": session_id,
         "requester_id": requester_id,

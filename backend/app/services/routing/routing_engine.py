@@ -4,10 +4,11 @@ Uses centralized prompts, LLM client, and JSON utilities.
 """
 import json
 import logging
+import time
 from sqlalchemy.orm import Session
 from app.models.chatbot import TicketRoutingLog
 from app.schemas.routing import RoutingRequest, RoutingResponse, RoutingSuggestion
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.services.prompts import build_routing_prompt
 from app.core.config import settings
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
@@ -76,11 +77,19 @@ async def suggest_route(
 
     routing_collection = collection_name or getattr(settings, "QDRANT_ROUTING_COLLECTION", "helpdesk_routing_v1")
     logger.debug("Routing query collection: %s", routing_collection)
-    search_results = qdrant.query_points(
+    started = time.perf_counter()
+    search_results = await asyncio.to_thread(
+        qdrant.query_points,
         collection_name=routing_collection,
         query=query_vector,
         with_payload=True,
         limit=5,
+    )
+    logger.info(
+        "qdrant.routing_search_latency_ms=%d collection=%s result_count=%d",
+        int((time.perf_counter() - started) * 1000),
+        routing_collection,
+        len(search_results.points),
     )
 
     retrieved_context = ""
@@ -103,7 +112,12 @@ async def suggest_route(
     llm = create_llm(model=runtime_config.routing_model,temperature=0.0,)
 
     try:
-        llm_result = await llm.ainvoke(prompt)
+        llm_result = await invoke_llm(
+            llm,
+            prompt,
+            model=runtime_config.routing_model,
+            action="ticket_routing",
+        )
         raw_output = clean_llm_json_output(llm_result.content)
         parsed_routing = json.loads(raw_output)
 

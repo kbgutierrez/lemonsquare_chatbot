@@ -15,12 +15,14 @@ backend\app/
 │       ├── documents.py
 │       ├── explorer.py
 │       ├── maintenance.py
+│       ├── models.py
 │       ├── routing.py
 │       ├── self_knowledge.py
 │       ├── settings.py
 │       └── tickets.py
 ├── core
 │   ├── __init__.py
+│   ├── cache.py
 │   ├── config.py
 │   ├── database.py
 │   ├── exceptions.py
@@ -43,9 +45,11 @@ backend\app/
 │   └── ticket_repository.py
 ├── schemas
 │   ├── __init__.py
+│   ├── analytics.py
 │   ├── chat.py
 │   ├── documents.py
 │   ├── knowledge.py
+│   ├── models.py
 │   ├── routing.py
 │   ├── self_knowledge.py
 │   ├── settings.py
@@ -67,6 +71,7 @@ backend\app/
 │   ├── external
 │   │   ├── __init__.py
 │   │   ├── bizportal_client.py
+│   │   ├── groq_service.py
 │   │   └── user_service.py
 │   ├── ingestion
 │   │   ├── __init__.py
@@ -82,6 +87,7 @@ backend\app/
 │   ├── maintenance
 │   │   ├── __init__.py
 │   │   ├── consolidation_task.py
+│   │   ├── job_manager.py
 │   │   └── maintenance_service.py
 │   ├── prompts.py
 │   ├── rag
@@ -104,9 +110,10 @@ backend\app/
 │   │   ├── __init__.py
 │   │   ├── runtime_config.py
 │   │   └── settings_service.py
-│   └── taxonomy
-│       ├── __init__.py
-│       └── taxonomy_service.py
+│   ├── taxonomy
+│   │   ├── __init__.py
+│   │   └── taxonomy_service.py
+│   └── telemetry_service.py
 └── utils
     ├── __init__.py
     ├── http_utils.py
@@ -158,6 +165,7 @@ from app.api.routers import (
     maintenance,
     routing,
     admin_auth,
+    models,
 )
 from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
@@ -256,6 +264,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api")
     app.include_router(admin_auth.router, prefix="/api")
     app.include_router(self_knowledge.router, prefix="/api")
+    app.include_router(models.router, prefix="/api")
 
     # Health
     @app.get("/health")
@@ -492,8 +501,9 @@ Router is now pure HTTP: validates input, delegates, formats response.
 """
 import asyncio
 import logging
+from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -517,7 +527,6 @@ from app.schemas.chat import (
 from app.schemas.tickets import (
     TicketDraftResponse,
     TicketEscalateResponse,
-    TicketSubmitRequest,
 )
 from app.services.chat.escalation_service import EscalationService
 from app.services.chat.message_service import MessageService
@@ -746,12 +755,30 @@ async def draft_escalation(
     response_model=TicketEscalateResponse,
 )
 async def submit_escalation(
-    request: TicketSubmitRequest,
+    session_id: UUID = Form(...),
+    requester_id: int = Form(...),
+    company_id: int = Form(...),
+    summary: str = Form(...),
+    description: str = Form(...),
+    department_id: int = Form(...),
+    subcategory_id: int = Form(...),
+    location: str | None = Form(None),
+    equipment: str | None = Form(None),
+    attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
-    result = await EscalationService(db).submit_escalation(
-        request.model_dump()
-    )
+    payload = {
+        "session_id": session_id,
+        "requester_id": requester_id,
+        "company_id": company_id,
+        "summary": summary,
+        "description": description,
+        "department_id": department_id,
+        "subcategory_id": subcategory_id,
+        "location": location,
+        "equipment": equipment,
+    }
+    result = await EscalationService(db).submit_escalation(payload, attachment)
 
     return TicketEscalateResponse(**result)
 
@@ -1750,6 +1777,27 @@ def get_consolidation_status():
     return MaintenanceService.get_status()
 
 
+--- FILE: backend\app\api\routers\models.py ---
+from fastapi import APIRouter, Depends
+from typing import List
+from app.services.external.groq_service import GroqService
+from app.api.deps import require_admin_user
+from app.schemas.models import GroqModelResponse
+
+router = APIRouter(prefix="/models", tags=["Models"])
+
+@router.get("/groq", response_model=List[GroqModelResponse])
+async def get_groq_models(
+    current_user: dict = Depends(require_admin_user)
+) -> List[GroqModelResponse]:
+    """
+    Fetch available models from Groq API.
+    Restricted to admin users as this is used for configuration.
+    """
+    service = GroqService()
+    return await service.get_available_models()
+
+
 --- FILE: backend\app\api\routers\routing.py ---
 """
 Routing engine router.
@@ -2025,6 +2073,48 @@ async def trigger_bulk_sync(background_tasks: BackgroundTasks):
 
 
 --- FILE: backend\app\core\__init__.py ---
+
+
+--- FILE: backend\app\core\cache.py ---
+import time
+import logging
+from typing import Optional
+from sqlalchemy.orm import Session
+from app.models.chatbot import AIChatbotSetting
+from app.repositories.settings_repository import SettingsRepository
+
+logger = logging.getLogger(__name__)
+
+class SettingsCache:
+    _instance = None
+    _cached_settings = None
+    _last_fetch = 0
+    _ttl = 300  # 5 minutes
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SettingsCache, cls).__new__(cls)
+        return cls._instance
+
+    def get_settings(self, db: Session) -> Optional[AIChatbotSetting]:
+        now = time.time()
+        if self._cached_settings is None or (now - self._last_fetch) > self._ttl:
+            logger.info("Settings cache miss or expired. Fetching from database...")
+            try:
+                repo = SettingsRepository(db)
+                self._cached_settings = repo.get_active_settings()
+                self._last_fetch = now
+            except Exception as e:
+                logger.error(f"Error refreshing settings cache: {e}")
+                return self._cached_settings  # Return stale if fetch fails
+        return self._cached_settings
+
+    def invalidate(self):
+        logger.info("Invalidating settings cache.")
+        self._cached_settings = None
+        self._last_fetch = 0
+
+settings_cache = SettingsCache()
 
 
 --- FILE: backend\app\core\config.py ---
@@ -3198,6 +3288,41 @@ class TicketRepository:
 --- FILE: backend\app\schemas\__init__.py ---
 
 
+--- FILE: backend\app\schemas\analytics.py ---
+from pydantic import BaseModel
+from typing import List, Optional
+from datetime import datetime
+
+class LLMModelStats(BaseModel):
+    model_name: str
+    total_requests: int
+    avg_latency_ms: float
+    total_tokens_prompt: int
+    total_tokens_completion: int
+    total_tokens_total: int
+    rate_limit_count: int # Count of 429s
+    error_count: int      # Count of 500s
+
+class TelemetrySummaryResponse(BaseModel):
+    start_time: datetime
+    end_time: datetime
+    stats_by_model: List[LLMModelStats]
+    total_tokens_overall: int
+
+class RecentLLMLog(BaseModel):
+    timestamp: datetime
+    model_name: str
+    action: str
+    latency_ms: int
+    status_code: int
+    tokens_total: int
+    session_id: Optional[str] = None
+
+class DetailedTelemetryResponse(BaseModel):
+    summary: TelemetrySummaryResponse
+    recent_logs: List[RecentLLMLog]
+
+
 --- FILE: backend\app\schemas\chat.py ---
 """Pydantic schemas for the /chat endpoints."""
 from datetime import datetime
@@ -3334,6 +3459,18 @@ class KnowledgeExplorerResponse(BaseModel):
     source: str | None = None
     category: str | None = None
     content: str | dict[str, Any]
+
+
+--- FILE: backend\app\schemas\models.py ---
+from pydantic import BaseModel
+from typing import Optional
+
+class GroqModelResponse(BaseModel):
+    id: str
+    name: str
+    owned_by: Optional[str] = None
+    created: Optional[int] = None
+    context_window: Optional[int] = None
 
 
 --- FILE: backend\app\schemas\routing.py ---
@@ -3496,6 +3633,8 @@ class TicketDraftResponse(BaseModel):
     status: str
     summary: str | None = None
     description: str | None = None
+    location: str | None = None
+    equipment: str | None = None
     department_id: int | None = None
     subcategory_id: int | None = None
     department_name: str | None = None
@@ -3828,27 +3967,47 @@ DEFAULT_REFORMULATOR_PROMPT = (
 )
 
 # =========================================================
-# ESCALATION DRAFTING
+# ESCALATION DRAFTING (For Main AI - 70B)
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are an expert IT Helpdesk Dispatcher.\n"
-    "The user clicked 'Submit Ticket' or is in the process of submitting one. Read the transcript and extract these 3 details IN EXACT ORDER:\n"
-    "1. The specific Issue/Error\n"
-    "2. The Location (e.g., branch, department like 'HR' or 'ICT')\n"
-    "3. The Specific Equipment (e.g., PC number, device name)\n\n"
+    "You are a Filipino IT Helpdesk Agent and Dispatcher.\n"
+    "The user wants to submit a ticket. Read the chat transcript and determine if you have enough context to draft a complete ticket.\n\n"
+    "A complete ticket requires:\n"
+    "1. The Issue/Error\n"
+    "2. The Location (e.g., branch, department)\n"
+    "3. The Specific Equipment (e.g., PC number, device name, or specific part)\n\n"
     "CRITICAL RULES:\n"
-    "- TOLERANCE RULE: If the user explicitly says they do not know a detail (e.g., 'hindi ko sure', 'di ko alam') or gives a vague answer (e.g., 'yung fan'), YOU MUST ACCEPT IT. Treat that detail as 'Unknown' or use their exact words. Do NOT ask for it again.\n"
-    "- If ANY of the 3 details are completely unasked/unanswered, set 'is_ready' to false.\n"
-    "- ONE-BY-ONE RULE: In the 'missing_info' field, ONLY list the FIRST completely missing item. Do NOT list all of them.\n"
-    "- If you have all 3 (even if some are marked as 'Unknown' because the user didn't know), set 'is_ready' to true and draft the summary and description.\n"
-    "- The 'description' MUST explicitly list Location, Equipment, and Issue.\n"
-    "- DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE. NO POSTAMBLE.\n\n"
+    "- If ANY of these are missing, set 'is_ready' to false and write a natural, casual Taglish 'chat_message' asking the user for ONE missing detail.\n"
+    "- TOLERANCE RULE: If the user explicitly says they don't know a detail (e.g., 'ewan', 'di ko alam', 'not sure'), ACCEPT IT. Treat it as gathered and move on.\n"
+    "- If you have all the details (or accepted their 'I don't know's), set 'is_ready' to true.\n"
+    "- If 'is_ready' is true, 'chat_message' should be null.\n"
+    "- DO NOT output any conversational text outside the JSON. RAW JSON ONLY.\n\n"
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
     '  "is_ready": boolean,\n'
-    '  "missing_info": "string | null (e.g., ONLY \'Branch Location\' OR ONLY \'PC Number\')",\n'
-    '  "summary": "string | null",\n'
-    '  "description": "string | null"\n'
+    '  "chat_message": "string | null (e.g., \'Sige, saang branch ka nga pala?\')"\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
+)
+
+# =========================================================
+# TICKET GENERATION (For Instant AI - 8B)
+# =========================================================
+TICKET_GENERATION_PROMPT = (
+    "You are an expert IT Helpdesk Dispatcher.\n"
+    "Read the chat transcript and draft a formal ticket summary and description.\n"
+    "Extract the Location and Equipment into their own fields.\n"
+    "DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "summary": "string (Short operational title)",\n'
+    '  "description": "string (Concise technician-style summary of the ISSUE)",\n'
+    '  "location": "string (e.g., HR Department, Branch A, or \'Unknown\')",\n'
+    '  "equipment": "string (e.g., PC #123, Printer, or \'Unknown\')"\n'
     "}}\n\n"
     "CHAT TRANSCRIPT:\n"
     "=================\n"
@@ -3969,6 +4128,105 @@ def build_document_classifier_prompt(snippet: str, allowed_categories: str) -> s
     )
 
 
+--- FILE: backend\app\services\telemetry_service.py ---
+import asyncio
+import logging
+from sqlalchemy.orm import Session
+from app.core.database import SessionChatbot
+from sqlalchemy import func
+from app.models.chatbot import LLMUsageLog
+
+logger = logging.getLogger(__name__)
+
+class TelemetryRepository:
+    def __init__(self, db: Session):
+        self.db = db
+
+    def log_usage(self, log_entry: dict):
+        try:
+            entry = LLMUsageLog(**log_entry)
+            self.db.add(entry)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"Failed to save LLM usage log: {e}")
+
+    def get_model_summary(self, hours: int = 24):
+        """Aggregate LLM usage stats grouped by model name."""
+        from datetime import datetime, timedelta
+        since = datetime.utcnow() - timedelta(hours=hours)
+
+        results = self.db.query(
+            LLMUsageLog.ModelName,
+            func.count(LLMUsageLog.LogID).label("total_requests"),
+            func.avg(LLMUsageLog.LatencyMs).label("avg_latency"),
+            func.sum(LLMUsageLog.TokensPrompt).label("sum_prompt"),
+            func.sum(LLMUsageLog.TokensCompletion).label("sum_completion"),
+            func.sum(LLMUsageLog.TokensTotal).label("sum_total"),
+            func.sum(func.case((LLMUsageLog.StatusCode == 429, 1), else_=0)).label("count_429"),
+            func.sum(func.case((LLMUsageLog.StatusCode >= 500, 1), else_=0)).label("count_errors")
+        ).filter(LLMUsageLog.Timestamp >= since)\
+         .group_by(LLMUsageLog.ModelName).all()
+
+        return results
+
+    def get_recent_logs(self, limit: int = 50):
+        """Fetch the most recent LLM logs."""
+        return self.db.query(LLMUsageLog).order_by(LLMUsageLog.Timestamp.desc()).limit(limit).all()
+
+class TelemetryService:
+    _queue: asyncio.Queue = asyncio.Queue()
+    _worker_task = None
+
+    @classmethod
+    def start_worker(cls):
+        if cls._worker_task is None:
+            cls._worker_task = asyncio.create_task(cls._process_queue())
+            logger.info("Telemetry background worker started.")
+
+    @classmethod
+    async def _process_queue(cls):
+        while True:
+            try:
+                log_entry = await cls._queue.get()
+                # Run DB interaction in a thread to avoid blocking the event loop
+                await asyncio.to_thread(cls._save_to_db, log_entry)
+                cls._queue.task_done()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error in telemetry worker: {e}")
+
+    @classmethod
+    def _save_to_db(cls, log_entry: dict):
+        db = SessionChatbot()
+        try:
+            repo = TelemetryRepository(db)
+            repo.log_usage(log_entry)
+        finally:
+            db.close()
+
+    @classmethod
+    def log(cls, model: str, action: str, prompt_tokens: int, completion_tokens: int, latency_ms: int, status_code: int = 200, session_id: str = None):
+        """Asynchronously queue a telemetry log entry."""
+        log_entry = {
+            "ModelName": model,
+            "Action": action,
+            "TokensPrompt": prompt_tokens,
+            "TokensCompletion": completion_tokens,
+            "TokensTotal": prompt_tokens + completion_tokens,
+            "LatencyMs": latency_ms,
+            "StatusCode": status_code,
+            "SessionID": session_id,
+        }
+        try:
+            cls._queue.put_nowait(log_entry)
+        except Exception as e:
+            logger.error(f"Failed to queue telemetry log: {e}")
+
+telemetry_service = TelemetryService()
+
+
 --- FILE: backend\app\services\analytics\__init__.py ---
 
 
@@ -4037,6 +4295,7 @@ AND external API calls in a single file.
 import json
 import logging
 import httpx
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
@@ -4088,65 +4347,32 @@ class EscalationService:
         if not transcript:
             raise ValidationError("Chat session is empty. Nothing to escalate.")
 
-        # --- 1. AI DRAFTS THE TICKET ---
-        llm = create_llm(model=runtime_config.escalation_draft_model, temperature=0.0)
+        # --- 1. MAIN AI EVALUATES (Decides AND Speaks) ---
+        main_model = getattr(runtime_config.settings, "ActiveModel", None) or "llama-3.3-70b-versatile"
+        main_llm = create_llm(model=main_model, temperature=0.2)
         
         prompt = runtime_config.escalation_draft_prompt.replace(
             "{transcript}", transcript
         )
 
-        result = await llm.ainvoke(prompt)
+        result = await main_llm.ainvoke(prompt)
         raw_output = clean_llm_json_output(result.content)
-        logger.info("Escalation LLM raw output: %s", raw_output)
+        logger.info("Main AI raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
 
         if not extracted_data:
             logger.error("AI failed to generate valid escalation JSON: %s", raw_output)
             raise ValidationError("AI failed to generate a valid escalation draft.")
         
-
         is_ready = extracted_data.get("is_ready", True)
         
+        # --- 2. IF NOT READY: PUSHBACK ---
         if not is_ready:
-            logger.info("Escalation rejected by AI. Missing info.")
+            logger.info("Escalation rejected by Main AI. Missing info.")
             session.SessionStatus = "Drafting_Ticket"
             self.db.commit()
 
-            missing_info = extracted_data.get(
-                "missing_info",
-                "branch location, equipment details, and issue specifics"
-            )
-
-            main_model = getattr(
-                runtime_config.settings,
-                "ActiveModel",
-                None,
-            ) or "llama-3.3-70b-versatile"
-
-            main_llm = create_llm(
-                model=main_model,
-                temperature=0.3,
-            )
-
-            pushback_prompt = (
-                "You are a Filipino IT Helpdesk Agent. You are in the MIDDLE of an ongoing chat.\n"
-                "Here is the transcript so far:\n"
-                "=================\n"
-                f"{transcript}\n"
-                "=================\n\n"
-                f"The user clicked 'Submit Ticket', but before we can proceed, we need to ask for this ONE specific detail: {missing_info}.\n"
-                "Write the NEXT chat bubble in natural, casual Taglish asking ONLY for that specific missing detail.\n"
-                "CRITICAL RULES:\n"
-                "1. DO NOT greet the user (no 'Hi', 'Hello', etc.). You are already talking to them.\n"
-                "2. DO NOT use bullet points or numbered lists.\n"
-                "3. DO NOT apologize or over-explain.\n"
-                "4. Keep it to 1 short sentence ONLY.\n"
-                "5. Ask ONLY for the specific detail requested. Do not ask for anything else.\n"
-                "Example style: 'Sige, saang branch ka nga pala?' OR 'Ano nga pala yung PC number mo diyan?'"
-            )
-
-            main_llm_response = await main_llm.ainvoke(pushback_prompt)
-            pushback_msg = main_llm_response.content.strip()
+            pushback_msg = extracted_data.get("chat_message") or "Sige, gawan natin ng ticket. Ano nga pala ang detalye (PC number, location)?"
 
             self.message_svc.save_ai_message(
                 session_id=session_id,
@@ -4156,8 +4382,8 @@ class EscalationService:
             return {
                 "status": "needs_info",
                 "pushback_message": pushback_msg,
-                "summary": "",
-                "description": "",
+                "summary": None,
+                "description": None,
                 "department_id": None,
                 "department_name": None,
                 "subcategory_id": None,
@@ -4168,13 +4394,29 @@ class EscalationService:
                 "routing_source": None,
             }
 
-        summary = extracted_data.get("summary") or "AI Escalation Issue"
-        description = extracted_data.get("description") or "Escalated from AI Chatbot"
+        # --- 3. IF READY: INSTANT AI DRAFTS THE TICKET ---
         session.SessionStatus = "Active"
         self.db.commit()
-        logger.info("Escalation draft parsed summary='%s', description='%s'", summary, description)
+        logger.info("Main AI approved ticket creation. Handing over to Instant AI for drafting...")
 
-        # --- 2. AI PREDICTS THE ROUTING ---
+        from app.services.prompts import TICKET_GENERATION_PROMPT
+        
+        instant_model = runtime_config.escalation_draft_model or "llama-3.1-8b-instant"
+        instant_llm = create_llm(model=instant_model, temperature=0.0)
+
+        draft_prompt = TICKET_GENERATION_PROMPT.replace("{transcript}", transcript)
+        draft_result = await instant_llm.ainvoke(draft_prompt)
+        draft_raw = clean_llm_json_output(draft_result.content)
+        draft_data = safe_json_loads(draft_raw, context="ticket_generation")
+
+        summary = draft_data.get("summary") or "AI Escalation Issue"
+        description = draft_data.get("description") or "Escalated from AI Chatbot"
+        location = draft_data.get("location") or "Unknown"
+        equipment = draft_data.get("equipment") or "Unknown"
+        
+        logger.info("Instant AI drafted summary='%s', description='%s', location='%s', equipment='%s'", summary, description, location, equipment)
+
+        # --- 4. AI PREDICTS THE ROUTING ---
         try:
             logger.info("Passing drafted ticket to Routing Engine...")
             vector_store = get_shared_vector_store()
@@ -4227,6 +4469,8 @@ class EscalationService:
             "status": "success",
             "summary": summary,
             "description": description,
+            "location": location,
+            "equipment": equipment,
             "department_id": predicted_dept_id,
             "department_name": predicted_dept_name,
             "subcategory_id": predicted_subcat_id,
@@ -4237,27 +4481,60 @@ class EscalationService:
             "routing_source": "ai_rac_pipeline",
         }
 
-    async def submit_escalation(self, payload: dict) -> dict:
+    async def submit_escalation(self, payload: dict, file: UploadFile = None) -> dict:
         """
-        Submit an escalation ticket to BizPortal.
+        Submit an escalation ticket to BizPortal with conditional fields and optional attachment.
         Returns dict matching TicketEscalateResponse schema.
         """
         session_id = str(payload["session_id"])
         session = self.repo.validate_session_for_escalation(session_id)
 
+        # 1. Define which departments accept the extra fields
+        # LMD=87, Motorpool=85, TSD=40
+        DEPARTMENTS_WITH_EXTRA_FIELDS = {87, 85, 40}
+        
+        dept_id = int(payload["department_id"])
+        
+        # 2. Build the base payload that EVERY department needs
         bizportal_payload = {
+            "summary": payload["summary"],
             "description": payload["description"],
-            "category_id": payload["department_id"],
+            "category_id": dept_id,
             "subcategory_id": payload["subcategory_id"],
             "requester_id": payload["requester_id"],
             "company_id": payload["company_id"],
-            "summary": payload["summary"],
         }
 
+        # 3. Apply Conditional Logic
+        location = payload.get("location") or "Unknown"
+        equipment = payload.get("equipment") or "Unknown"
+
+        if dept_id in DEPARTMENTS_WITH_EXTRA_FIELDS:
+            # Send as separate fields for LMD, Motorpool, TSD
+            bizportal_payload["location"] = location
+            bizportal_payload["equipment"] = equipment
+        else:
+            # For ICT (29) & TMG (81), append to description
+            bizportal_payload["description"] = (
+                f"{payload['description']}\n\n"
+                f"--- Additional Details ---\n"
+                f"Location: {location}\n"
+                f"Equipment: {equipment}"
+            )
+
+        # 4. Handle the File Upload (attachment[])
+        files_to_send = None
+        if file:
+            file_content = await file.read()
+            # BizPortal expects the array bracket notation for files
+            files_to_send = {'attachment[]': (file.filename, file_content, file.content_type)}
+
+        # 5. Send to BizPortal
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 BIZPORTAL_TICKET_URL,
-                json=bizportal_payload,
+                data=bizportal_payload, # Use data for multipart form data
+                files=files_to_send,
                 timeout=10.0,
             )
             response.raise_for_status()
@@ -4932,6 +5209,69 @@ class BizPortalClient:
                 headers={"Content-Type": "application/json"},
             )
             return response
+
+
+--- FILE: backend\app\services\external\groq_service.py ---
+import logging
+import httpx
+from typing import List, Dict, Any
+from app.core.config import settings
+
+logger = logging.getLogger(__name__)
+
+GROQ_MODELS_URL = "https://api.groq.com/openai/v1/models"
+
+class GroqService:
+    """Service to interact with the Groq API for model discovery."""
+
+    def __init__(self):
+        self.api_key = settings.GROQ_API_KEY
+        self.headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+
+    async def get_available_models(self) -> List[Dict[str, Any]]:
+        """
+        Fetches the list of available models from Groq.
+        Returns a list of simplified model objects.
+        """
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await client.get(
+                    GROQ_MODELS_URL,
+                    headers=self.headers,
+                    timeout=10.0
+                )
+                response.raise_for_status()
+                data = response.json()
+                
+                models = data.get("data", [])
+                
+                # Simplify and filter (optional: only return active/valid models)
+                processed_models = []
+                for m in models:
+                    # Groq returns various types, we usually want the ones that are actual LLMs
+                    # We'll just return the essential info for now.
+                    processed_models.append({
+                        "id": m.get("id"),
+                        "name": m.get("id"), # Groq often uses the ID as the display name
+                        "owned_by": m.get("owned_by"),
+                        "created": m.get("created"),
+                        "context_window": m.get("context_window"), # If available in payload
+                    })
+                
+                # Sort by ID for consistent display
+                processed_models.sort(key=lambda x: x["id"])
+                
+                return processed_models
+
+            except httpx.HTTPStatusError as exc:
+                logger.error(f"Groq API error: {exc.response.status_code} - {exc.response.text}")
+                return []
+            except Exception as exc:
+                logger.error(f"Unexpected error fetching Groq models: {exc}")
+                return []
 
 
 --- FILE: backend\app\services\external\user_service.py ---
@@ -6533,6 +6873,86 @@ async def run_safe_maintenance() -> None:
         logger.info("Safe maintenance completed; no vectors were merged or deleted.")
     finally:
         LIVE_STATUS["is_running"] = False
+
+
+--- FILE: backend\app\services\maintenance\job_manager.py ---
+import uuid
+import logging
+from datetime import datetime
+from typing import Dict, Optional, Any
+from pydantic import BaseModel
+
+logger = logging.getLogger(__name__)
+
+class JobStatus(BaseModel):
+    job_id: str
+    job_name: str
+    status: str # "queued", "running", "completed", "failed"
+    progress_percent: float = 0.0
+    message: str = ""
+    started_at: datetime
+    updated_at: datetime
+    completed_at: Optional[datetime] = None
+    error: Optional[str] = None
+    details: Dict[str, Any] = {}
+
+class JobManager:
+    _instance = None
+    _jobs: Dict[str, JobStatus] = {}
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(JobManager, cls).__new__(cls)
+        return cls._instance
+
+    def create_job(self, name: str) -> str:
+        job_id = str(uuid.uuid4())
+        job = JobStatus(
+            job_id=job_id,
+            job_name=name,
+            status="queued",
+            started_at=datetime.utcnow(),
+            updated_at=datetime.utcnow()
+        )
+        self._jobs[job_id] = job
+        return job_id
+
+    def update_job(self, job_id: str, status: str = None, progress: float = None, message: str = None, details: Dict[str, Any] = None, error: str = None):
+        if job_id not in self._jobs:
+            return
+        
+        job = self._jobs[job_id]
+        if status:
+            job.status = status
+            if status in ["completed", "failed"]:
+                job.completed_at = datetime.utcnow()
+                job.progress_percent = 100.0 if status == "completed" else job.progress_percent
+        
+        if progress is not None:
+            job.progress_percent = min(100.0, max(0.0, progress))
+            
+        if message:
+            job.message = message
+            
+        if details:
+            job.details.update(details)
+            
+        if error:
+            job.error = error
+            
+        job.updated_at = datetime.utcnow()
+        logger.debug(f"Job {job_id} ({job.job_name}) update: {job.status} - {job.progress_percent}% - {job.message}")
+
+    def get_job(self, job_id: str) -> Optional[JobStatus]:
+        return self._jobs.get(job_id)
+
+    def get_all_jobs(self, limit: int = 20) -> list[JobStatus]:
+        # Return sorted by updated_at desc
+        all_jobs = list(self._jobs.values())
+        all_jobs.sort(key=lambda x: x.updated_at, reverse=True)
+        return all_jobs[:limit]
+
+job_manager = JobManager()
 
 
 --- FILE: backend\app\services\maintenance\maintenance_service.py ---

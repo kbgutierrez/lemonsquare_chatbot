@@ -5,7 +5,7 @@ Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
 import json
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 from app.services.prompts import DEFAULT_REFORMULATOR_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,12 @@ class QueryReformulator:
             chat_history=safe_history,
             user_query=user_query,
         )
-        result = await llm.ainvoke(rewrite_prompt)
+        result = await invoke_llm(
+            llm,
+            rewrite_prompt,
+            model=model,
+            action="query_reformulation",
+        )
         raw_output = result.content.strip()
         if raw_output.startswith("```json"):
             raw_output = raw_output[7:-3].strip()

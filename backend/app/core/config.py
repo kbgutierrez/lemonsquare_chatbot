@@ -32,6 +32,12 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
+    DB_POOL_SIZE: int = 20
+    DB_MAX_OVERFLOW: int = 30
+    DB_POOL_TIMEOUT: int = 10
+    MAX_UPLOAD_MB: int = 25
+    MAX_CONCURRENT_UPLOADS: int = 3
+    TAXONOMY_CACHE_TTL_SECONDS: int = 1800
 
     class Config:
         env_file = ".env"

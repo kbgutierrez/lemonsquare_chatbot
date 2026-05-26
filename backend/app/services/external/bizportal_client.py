@@ -12,6 +12,12 @@ logger = logging.getLogger(__name__)
 
 BIZPORTAL_USER_URL = settings.BIZPORTAL_API_URL
 BIZPORTAL_LOGIN_URL = settings.BIZPORTAL_LOGIN_URL
+BIZPORTAL_TIMEOUT = httpx.Timeout(
+    connect=3.0,
+    read=float(getattr(settings, "BIZPORTAL_TIMEOUT", 5.0)),
+    write=5.0,
+    pool=1.0,
+)
 
 
 class BizPortalClient:
@@ -27,10 +33,10 @@ class BizPortalClient:
         params = {"user_id": auth_token, "token": auth_token}
 
         logger.debug("BizPortal auth call to: %s", BIZPORTAL_USER_URL)
-        logger.debug("Auth params: %s", params)
+        logger.debug("Auth call token_len=%d", len(auth_token))
 
         async with httpx.AsyncClient(
-            timeout=getattr(settings, "BIZPORTAL_TIMEOUT", 5.0)
+            timeout=BIZPORTAL_TIMEOUT
         ) as client:
             response = await client.get(
                 BIZPORTAL_USER_URL,
@@ -47,7 +53,7 @@ class BizPortalClient:
         Perform admin login against BizPortal.
         Returns the HTTP response object.
         """
-        async with httpx.AsyncClient(timeout=30) as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post(
                 BIZPORTAL_LOGIN_URL,
                 json={"username": username, "password": password},

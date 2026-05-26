@@ -3,12 +3,27 @@ External user authentication service — REFACTORED.
 Uses BizPortalClient for HTTP calls and centralized JSON parsing.
 """
 import logging
+import time
+import asyncio
+from collections import OrderedDict
 import httpx
 from app.core.config import settings
 from app.core.exceptions import AuthenticationError, ExternalServiceError
 from app.services.external.bizportal_client import BizPortalClient
 
 logger = logging.getLogger(__name__)
+
+_TOKEN_CACHE_TTL_SECONDS = 60.0
+_TOKEN_CACHE_MAX_SIZE = 2048
+_token_cache: OrderedDict[str, tuple[dict, float]] = OrderedDict()
+_token_cache_lock = asyncio.Lock()
+
+
+def _cache_user(auth_token: str, user_data: dict, expires_at: float) -> None:
+    _token_cache[auth_token] = (dict(user_data), expires_at)
+    _token_cache.move_to_end(auth_token)
+    while len(_token_cache) > _TOKEN_CACHE_MAX_SIZE:
+        _token_cache.popitem(last=False)
 
 
 async def fetch_user_details(auth_token: str) -> dict:
@@ -46,7 +61,21 @@ async def fetch_user_details(auth_token: str) -> dict:
 
     # ── BIZPORTAL AUTH REQUEST ─────────────────────────────────
     try:
+        now = time.time()
+        async with _token_cache_lock:
+            cached = _token_cache.get(auth_token)
+            if cached and cached[1] > now:
+                _token_cache.move_to_end(auth_token)
+                logger.debug("BizPortal user cache hit token_len=%d", len(auth_token))
+                return dict(cached[0])
+
+        started = time.perf_counter()
         response = await BizPortalClient.fetch_user_details(auth_token)
+        logger.info(
+            "auth.bizportal_latency_ms=%d status_code=%s",
+            int((time.perf_counter() - started) * 1000),
+            response.status_code,
+        )
 
         if response.status_code in (401, 403):
             logger.warning("BizPortal rejected token.")
@@ -76,11 +105,16 @@ async def fetch_user_details(auth_token: str) -> dict:
             and isinstance(user_data["response"], dict)
         ):
             logger.info("BizPortal authentication successful.")
-            return user_data["response"]
+            resolved_user = user_data["response"]
+            async with _token_cache_lock:
+                _cache_user(auth_token, resolved_user, now + _TOKEN_CACHE_TTL_SECONDS)
+            return resolved_user
 
         # ── FALLBACK DIRECT USER OBJECT ────────────────────────
         if isinstance(user_data, dict) and ("firstname" in user_data or "lastname" in user_data or "id" in user_data):
             logger.info("Detected direct user object response.")
+            async with _token_cache_lock:
+                _cache_user(auth_token, user_data, now + _TOKEN_CACHE_TTL_SECONDS)
             return user_data
 
         # ── UNKNOWN RESPONSE FORMAT ────────────────────────────

@@ -5,13 +5,14 @@ AND external API calls in a single file.
 """
 import json
 import logging
+import asyncio
 import httpx
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from app.core.exceptions import ValidationError
 from app.repositories.chat_repository import ChatRepository
 from app.services.chat.message_service import MessageService
-from app.services.llm_client import create_llm
+from app.services.llm_client import create_llm, invoke_llm
 
 from app.utils.json_utils import clean_llm_json_output, safe_json_loads
 from app.services.settings.runtime_config import RuntimeAIConfig
@@ -24,6 +25,8 @@ from app.services.retrieval.embedding_provider import get_embedding_model
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
+_DRAFT_LOCKS: dict[str, asyncio.Lock] = {}
+_DRAFT_LOCKS_GUARD = asyncio.Lock()
 
 # Fallback routing when AI routing is unavailable
 FALLBACK_ROUTING = {
@@ -36,6 +39,11 @@ FALLBACK_ROUTING = {
 }
 
 BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
+
+
+async def _get_draft_lock(session_id: str) -> asyncio.Lock:
+    async with _DRAFT_LOCKS_GUARD:
+        return _DRAFT_LOCKS.setdefault(session_id, asyncio.Lock())
 
 
 class EscalationService:
@@ -52,6 +60,11 @@ class EscalationService:
         Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
+        draft_lock = await _get_draft_lock(session_id)
+        async with draft_lock:
+            return await self._draft_escalation_locked(session_id)
+
+    async def _draft_escalation_locked(self, session_id: str) -> dict:
         session = self.repo.validate_session_for_escalation(session_id)
         transcript = self.message_svc.get_transcript(session_id)
         runtime_config = RuntimeAIConfig(self.db)
@@ -66,7 +79,13 @@ class EscalationService:
             "{transcript}", transcript
         )
 
-        result = await main_llm.ainvoke(prompt)
+        result = await invoke_llm(
+            main_llm,
+            prompt,
+            model=main_model,
+            action="escalation_evaluator",
+            session_id=session_id,
+        )
         raw_output = clean_llm_json_output(result.content)
         logger.info("Main AI raw output: %s", raw_output)
         extracted_data = safe_json_loads(raw_output, context="escalation_draft")
@@ -116,7 +135,13 @@ class EscalationService:
         instant_llm = create_llm(model=instant_model, temperature=0.0)
 
         draft_prompt = TICKET_GENERATION_PROMPT.replace("{transcript}", transcript)
-        draft_result = await instant_llm.ainvoke(draft_prompt)
+        draft_result = await invoke_llm(
+            instant_llm,
+            draft_prompt,
+            model=instant_model,
+            action="escalation_draft",
+            session_id=session_id,
+        )
         draft_raw = clean_llm_json_output(draft_result.content)
         draft_data = safe_json_loads(draft_raw, context="ticket_generation")
 

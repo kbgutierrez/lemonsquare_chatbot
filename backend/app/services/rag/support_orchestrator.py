@@ -6,6 +6,7 @@ Previously a 350-line monolith with all logic inlined.
 """
 import asyncio
 import logging
+import time
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import AIProcessingError
@@ -192,21 +193,33 @@ class SupportOrchestrator:
                     prompt_template=reformulator_prompt,
                 )
                 
-                # --- DEBUG BLOCK ---
-                print("\n" + "="*50)
-                print("🔍 REFORMULATOR DEBUG:")
-                print(f"Original User Query: {user_query}")
-                print(f"Reformulated Query:  {search_query}")
-                print("="*50 + "\n")
-                # -------------------
+                logger.debug(
+                    "Reformulated query original=%r reformulated=%r",
+                    user_query,
+                    search_query,
+                )
 
             except Exception as exc:
                 logger.warning("Reformulator failed; using original query. Error: %s", exc)
                 search_query = user_query
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
+        started = time.perf_counter()
         query_vector = await asyncio.to_thread(self.embeddings.embed_query, search_query)
-        raw_results = await asyncio.to_thread(self.vector_store.federated_search, query_vector, limit=top_k)
+        logger.info(
+            "embedding.latency_ms=%d session_id=%s",
+            int((time.perf_counter() - started) * 1000),
+            session_id,
+        )
+
+        started = time.perf_counter()
+        raw_results = await self.vector_store.federated_search_async(query_vector, limit=top_k)
+        logger.info(
+            "retrieval.federated_latency_ms=%d session_id=%s result_count=%d",
+            int((time.perf_counter() - started) * 1000),
+            session_id,
+            len(raw_results),
+        )
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
 
@@ -225,7 +238,14 @@ class SupportOrchestrator:
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
+            started = time.perf_counter()
             scored_results = await asyncio.to_thread(self.reranker.rerank, search_query, retrieval_docs)
+            logger.info(
+                "reranker.latency_ms=%d session_id=%s result_count=%d",
+                int((time.perf_counter() - started) * 1000),
+                session_id,
+                len(scored_results),
+            )
         else:
             scored_results = sorted(
                 [(doc.score, doc) for doc in retrieval_docs],

@@ -4,6 +4,8 @@ Encapsulates all Qdrant interactions — search, upsert, delete.
 Previously embedded directly in the orchestrator and ingestion service.
 """
 import logging
+import asyncio
+import time
 from functools import lru_cache
 from qdrant_client import QdrantClient
 from qdrant_client.http import models as qdrant_models
@@ -106,6 +108,7 @@ class VectorStoreService:
         limit: int = 5,
     ) -> list:
         """Search ticket-like vectors (raw, canonical, resolved chats)."""
+        started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -117,6 +120,12 @@ class VectorStoreService:
             with_payload=True,
             limit=limit,
         )
+        logger.info(
+            "qdrant.search collection=%s kind=tickets latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(response.points),
+        )
         return response.points
 
     def search_documents(
@@ -125,6 +134,7 @@ class VectorStoreService:
         limit: int = 5,
     ) -> list:
         """Search document-like vectors (PDFs, manual entries)."""
+        started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
@@ -134,6 +144,12 @@ class VectorStoreService:
             ]),
             with_payload=True,
             limit=limit,
+        )
+        logger.info(
+            "qdrant.search collection=%s kind=documents latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(response.points),
         )
         return response.points
 
@@ -145,6 +161,18 @@ class VectorStoreService:
         """Search both tickets and documents, returning combined results."""
         tickets = self.search_tickets(query_vector, limit)
         docs = self.search_documents(query_vector, limit)
+        return tickets + docs
+
+    async def federated_search_async(
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+    ) -> list:
+        """Search tickets and documents concurrently without changing result shape."""
+        tickets, docs = await asyncio.gather(
+            asyncio.to_thread(self.search_tickets, query_vector, limit),
+            asyncio.to_thread(self.search_documents, query_vector, limit),
+        )
         return tickets + docs
 
     def delete_by_filter(self, filter_conditions: list) -> None:

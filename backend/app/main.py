@@ -8,9 +8,11 @@ Fixes:
 - keeps auth + health routes alive during partial failures
 """
 import logging
+import time
+import uuid
 from contextlib import asynccontextmanager
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from qdrant_client import QdrantClient
 
@@ -41,17 +43,20 @@ from app.core.config import settings as app_settings
 from app.core.database import SessionChatbot
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
+from app.core.request_context import request_id_var
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.retrieval.vector_store import get_shared_vector_store
+from app.services.telemetry_service import TelemetryService
 
-configure_logging()
+configure_logging(app_settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Starting up --- running pre-flight checks...")
+    TelemetryService.start_worker()
 
     # Default safe app state
     app.state.ai_available = False
@@ -121,6 +126,25 @@ def create_app() -> FastAPI:
     )
 
     register_exception_handlers(app)
+
+    @app.middleware("http")
+    async def request_context_middleware(request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())[:12]
+        token = request_id_var.set(request_id)
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        finally:
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            logger.info(
+                "http.request method=%s path=%s latency_ms=%d",
+                request.method,
+                request.url.path,
+                latency_ms,
+            )
+            request_id_var.reset(token)
+        response.headers["X-Request-ID"] = request_id
+        return response
 
     # Routes
     app.include_router(chat.router, prefix="/api")

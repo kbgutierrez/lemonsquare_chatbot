@@ -48,6 +48,18 @@ class ChatRepository:
             raise NotFoundError(f"Chat session '{session_id}' not found.")
         return session
 
+    def require_session_for_update(self, session_id: str) -> ChatSession:
+        """Fetch a session with a row lock for concurrent status transitions."""
+        session = (
+            self.db.query(ChatSession)
+            .filter(ChatSession.SessionID == session_id)
+            .with_for_update()
+            .first()
+        )
+        if not session:
+            raise NotFoundError(f"Chat session '{session_id}' not found.")
+        return session
+
     def get_or_create_session(self, session_id, user_id: int) -> str:
         """Get existing session or create new one. Returns session ID string."""
         is_new = (

@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator, require_admin_user
 from app.core.rate_limit import limiter
+from app.core.config import settings
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
 from app.core.metadata_contract import DOCUMENT_DOC_TYPES, TICKET_LIKE_DOC_TYPES
 from app.schemas.documents import (
@@ -36,6 +37,7 @@ from app.services.rag.support_orchestrator import SupportOrchestrator
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/documents", tags=["Documents"])
+_upload_semaphore = asyncio.Semaphore(settings.MAX_CONCURRENT_UPLOADS)
 
 
 @router.post(
@@ -59,7 +61,24 @@ async def upload_document(
     File validation (PDF magic bytes) is handled inside the service.
     The category must be one of the allowed categories from AIChatbotSettings.
     """
+    max_upload_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if (
+        content_length
+        and content_length.isdigit()
+        and int(content_length) > max_upload_bytes + (1024 * 1024)
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
+        )
+
     file_bytes = await file.read()
+    if len(file_bytes) > max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
+        )
     filename = file.filename
 
     async def process_pdf_in_background():
@@ -67,35 +86,36 @@ async def upload_document(
         from starlette.datastructures import UploadFile as StarletteUploadFile
         from app.core.database import SessionChatbot
 
-        mem_file = io.BytesIO(file_bytes)
-        mem_file.name = filename
-        upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+        async with _upload_semaphore:
+            mem_file = io.BytesIO(file_bytes)
+            mem_file.name = filename
+            upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
 
-        bg_db = SessionChatbot()
+            bg_db = SessionChatbot()
 
-        try:
-            bg_ingestion_service = DocumentIngestionService(db=bg_db)
+            try:
+                bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
-            await bg_ingestion_service.process_pdf_upload(
-                upload_obj,
-                bg_db,
-                manual_category=category,
-            )
+                await bg_ingestion_service.process_pdf_upload(
+                    upload_obj,
+                    bg_db,
+                    manual_category=category,
+                )
 
-            logger.info(
-                "Background upload completed for %s",
-                filename,
-            )
+                logger.info(
+                    "Background upload completed for %s",
+                    filename,
+                )
 
-        except Exception as e:
-            logger.error(
-                "Background upload failed for %s: %s",
-                filename,
-                e,
-            )
+            except Exception as e:
+                logger.error(
+                    "Background upload failed for %s: %s",
+                    filename,
+                    e,
+                )
 
-        finally:
-            bg_db.close()
+            finally:
+                bg_db.close()
 
     background_tasks.add_task(
         process_pdf_in_background
