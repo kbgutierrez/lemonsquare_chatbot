@@ -259,13 +259,48 @@ class VectorStoreService:
         )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
-        """Hard-delete blacklisted ticket vectors through the central lifecycle layer."""
-        self.delete_by_filter([
+        """Soft-delete ticket vectors through the central lifecycle layer."""
+        normalized_ticket = str(ticket_number)
+        filters = [
             qdrant_models.FieldCondition(
                 key="metadata.ticket_number",
-                match=qdrant_models.MatchValue(value=ticket_number),
-            )
-        ])
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+            qdrant_models.FieldCondition(
+                key="metadata.source_id",
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+            qdrant_models.FieldCondition(
+                key="metadata.source_ids",
+                match=qdrant_models.MatchValue(value=normalized_ticket),
+            ),
+        ]
+
+        for condition in filters:
+            try:
+                self._set_metadata_active_by_filter_condition(
+                    condition,
+                    is_active=False,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to soft-delete ticket vectors by %s=%s: %s",
+                    condition.key,
+                    normalized_ticket,
+                    exc,
+                )
+
+    def _set_metadata_active_by_filter_condition(
+        self,
+        condition,
+        is_active: bool,
+    ) -> None:
+        self.qdrant.set_payload(
+            collection_name=self.collection_name,
+            payload={"is_active": is_active},
+            points=qdrant_models.Filter(must=[condition]),
+            key="metadata",
+        )
 
 
 @lru_cache(maxsize=4)
