@@ -10,7 +10,7 @@ import {
   History,
   Plus,
   Ticket,
-  Phone,
+  Palette,
   CheckCheck,
   Info,
   Lock,
@@ -39,9 +39,9 @@ const MENU_OPTIONS = [
   },
 
   {
-    id: "call",
-    label: "Call Agent",
-    icon: Phone,
+    id: "theme",
+    label: "Theme Color",
+    icon: Palette,
   },
 
   {

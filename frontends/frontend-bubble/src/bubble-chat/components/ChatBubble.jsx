@@ -1,10 +1,7 @@
 import { motion } from "framer-motion"
 
-import bubblePillIcon
-  from "../../assets/bubble-pill-icon.png"
-
-import expandedPillIcon
-  from "../../assets/expanded-pill-icon.png"
+import bubblePillIcon from "../../assets/bubble-pill-icon.png"
+import expandedPillIcon from "../../assets/expanded-pill-icon.png"
 
 const buttonAnimation = {
   whileHover: {
@@ -64,6 +61,7 @@ const glowAnimation = {
 
 const ChatBubble = ({
   isOpen,
+  onPointerDown,
 }) => {
 
   const icon =
@@ -109,6 +107,20 @@ const ChatBubble = ({
 
           pointer-events-auto
         "
+
+        // CRITICAL MOBILE FIXES:
+        // - onPointerDown passes to drag hook
+        // - touch-action: none prevents browser scroll takeover
+        // - user-select: none prevents text selection
+        onPointerDown={onPointerDown}
+
+        style={{
+          touchAction: 'none',
+          userSelect: 'none',
+          WebkitUserSelect: 'none',
+          WebkitUserDrag: 'none',
+          WebkitTouchCallout: 'none',
+        }}
 
         {...buttonAnimation}
       >

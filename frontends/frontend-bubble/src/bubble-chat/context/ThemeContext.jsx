@@ -1,0 +1,497 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+} from "react"
+
+import themeService from "../services/themeService"
+
+/* ========================================
+   THEME DEFINITIONS
+======================================== */
+
+const LEMON_SQUARE_THEME = {
+  windowBg: "#f6fff7",
+  windowWrapperBg: "rgba(255,255,255,0.95)",
+  windowOverlayStart: "rgba(243,255,244,0.90)",
+  windowOverlayMiddle: "rgba(247,255,248,0.88)",
+  windowOverlayEnd: "rgba(255,255,255,0.96)",
+  windowBorder: "rgba(221,214,254,0.70)",
+  windowShadow: "rgba(139,92,246,0.22)",
+  windowBgImageOpacity: 1,
+  headerGradientStart: "#7BE38E",
+  headerGradientEnd: "#5dd87a",
+  headerText: "#ffffff",
+  headerIcon: "#ffffff",
+  headerBorder: "rgba(16,185,129,0.15)",
+  headerBadgeBg: "rgba(255,255,255,0.15)",
+  headerBadgeText: "#ffffff",
+  headerBadgeBorder: "rgba(255,255,255,0.20)",
+  agentBubbleBg: "rgba(255,255,255,0.85)",
+  agentBubbleBorder: "rgba(16,185,129,0.15)",
+  agentBubbleShadow: "rgba(16,185,129,0.06)",
+  agentText: "#1e293b",
+  agentTimestamp: "#94a3b8",
+  agentAvatarBg: "#d1fae5",
+  agentAvatarText: "#047857",
+  agentAvatarRing: "rgba(16,185,129,0.08)",
+  userBubbleBg: "rgba(255,255,255,0.70)",
+  userBubbleBorder: "rgba(16,185,129,0.20)",
+  userBubbleShadow: "rgba(16,185,129,0.08)",
+  userText: "#1e293b",
+  userTimestamp: "#94a3b8",
+  userAvatarBg: "#22c55e",
+  userAvatarText: "#ffffff",
+  userAvatarRing: "rgba(16,185,129,0.12)",
+  inputBg: "rgba(255,255,255,0.55)",
+  inputBorder: "#d7f5dc",
+  inputText: "#3c4a3f",
+  inputPlaceholder: "#8ca193",
+  inputFocusBorder: "#9be7a7",
+  sendButtonBg: "rgba(142,232,154,0.42)",
+  sendButtonIcon: "#ffffff",
+  sendButtonHoverBg: "rgba(255,255,255,0.12)",
+  sendButtonBorder: "rgba(255,255,255,0.20)",
+  menuBg: "rgba(255,255,255,0.12)",
+  menuText: "#064e3b",
+  menuHoverBg: "rgba(255,255,255,0.20)",
+  menuHeaderText: "#064e3b",
+  accent: "#22c55e",
+  typingDot: "#34d399",
+  resolvedBannerBg: "#ecfdf5",
+  resolvedBannerBorder: "#a7f3d0",
+  resolvedBannerText: "#047857",
+  glowTop: "rgba(34,197,94,0.14)",
+  glowBottom: "rgba(16,185,129,0.08)",
+  statusOnline: "#ffffff",
+}
+
+const LIGHT_THEME = {
+  windowBg: "#ffffff",
+  windowWrapperBg: "rgba(255,255,255,0.95)",
+  windowOverlayStart: "rgba(248,250,252,0.95)",
+  windowOverlayMiddle: "rgba(241,245,249,0.93)",
+  windowOverlayEnd: "rgba(255,255,255,0.98)",
+  windowBorder: "rgba(226,232,240,0.80)",
+  windowShadow: "rgba(148,163,184,0.20)",
+  windowBgImageOpacity: 0,
+  headerGradientStart: "#f1f5f9",
+  headerGradientEnd: "#e2e8f0",
+  headerText: "#0f172a",
+  headerIcon: "#475569",
+  headerBorder: "rgba(148,163,184,0.20)",
+  headerBadgeBg: "rgba(15,23,42,0.08)",
+  headerBadgeText: "#0f172a",
+  headerBadgeBorder: "rgba(15,23,42,0.12)",
+  agentBubbleBg: "#f8fafc",
+  agentBubbleBorder: "rgba(148,163,184,0.25)",
+  agentBubbleShadow: "rgba(148,163,184,0.08)",
+  agentText: "#334155",
+  agentTimestamp: "#94a3b8",
+  agentAvatarBg: "#e2e8f0",
+  agentAvatarText: "#475569",
+  agentAvatarRing: "rgba(148,163,184,0.15)",
+  userBubbleBg: "#eff6ff",
+  userBubbleBorder: "rgba(59,130,246,0.20)",
+  userBubbleShadow: "rgba(59,130,246,0.10)",
+  userText: "#1e40af",
+  userTimestamp: "#94a3b8",
+  userAvatarBg: "#3b82f6",
+  userAvatarText: "#ffffff",
+  userAvatarRing: "rgba(59,130,246,0.15)",
+  inputBg: "#f8fafc",
+  inputBorder: "#e2e8f0",
+  inputText: "#334155",
+  inputPlaceholder: "#94a3b8",
+  inputFocusBorder: "#60a5fa",
+  sendButtonBg: "#3b82f6",
+  sendButtonIcon: "#ffffff",
+  sendButtonHoverBg: "#2563eb",
+  sendButtonBorder: "rgba(59,130,246,0.30)",
+  menuBg: "rgba(241,245,249,0.95)",
+  menuText: "#334155",
+  menuHoverBg: "rgba(226,232,240,0.80)",
+  menuHeaderText: "#64748b",
+  accent: "#3b82f6",
+  typingDot: "#60a5fa",
+  resolvedBannerBg: "#f0fdf4",
+  resolvedBannerBorder: "#bbf7d0",
+  resolvedBannerText: "#15803d",
+  glowTop: "rgba(59,130,246,0.10)",
+  glowBottom: "rgba(59,130,246,0.06)",
+  statusOnline: "#22c55e",
+}
+
+const DARK_THEME = {
+  windowBg: "#0f172a",
+  windowWrapperBg: "rgba(15,23,42,0.95)",
+  windowOverlayStart: "rgba(15,23,42,0.97)",
+  windowOverlayMiddle: "rgba(30,41,59,0.95)",
+  windowOverlayEnd: "rgba(15,23,42,0.98)",
+  windowBorder: "rgba(51,65,85,0.50)",
+  windowShadow: "rgba(0,0,0,0.50)",
+  windowBgImageOpacity: 0,
+  headerGradientStart: "#1e293b",
+  headerGradientEnd: "#0f172a",
+  headerText: "#f8fafc",
+  headerIcon: "#cbd5e1",
+  headerBorder: "rgba(51,65,85,0.30)",
+  headerBadgeBg: "rgba(248,250,252,0.10)",
+  headerBadgeText: "#f8fafc",
+  headerBadgeBorder: "rgba(248,250,252,0.15)",
+  agentBubbleBg: "#1e293b",
+  agentBubbleBorder: "rgba(51,65,85,0.40)",
+  agentBubbleShadow: "rgba(0,0,0,0.20)",
+  agentText: "#e2e8f0",
+  agentTimestamp: "#64748b",
+  agentAvatarBg: "#334155",
+  agentAvatarText: "#94a3b8",
+  agentAvatarRing: "rgba(51,65,85,0.30)",
+  userBubbleBg: "#1e3a8a",
+  userBubbleBorder: "rgba(59,130,246,0.30)",
+  userBubbleShadow: "rgba(59,130,246,0.15)",
+  userText: "#dbeafe",
+  userTimestamp: "#64748b",
+  userAvatarBg: "#3b82f6",
+  userAvatarText: "#ffffff",
+  userAvatarRing: "rgba(59,130,246,0.25)",
+  inputBg: "#1e293b",
+  inputBorder: "#334155",
+  inputText: "#e2e8f0",
+  inputPlaceholder: "#64748b",
+  inputFocusBorder: "#60a5fa",
+  sendButtonBg: "#3b82f6",
+  sendButtonIcon: "#ffffff",
+  sendButtonHoverBg: "#2563eb",
+  sendButtonBorder: "rgba(59,130,246,0.30)",
+  menuBg: "rgba(30,41,59,0.95)",
+  menuText: "#e2e8f0",
+  menuHoverBg: "rgba(51,65,85,0.60)",
+  menuHeaderText: "#94a3b8",
+  accent: "#60a5fa",
+  typingDot: "#60a5fa",
+  resolvedBannerBg: "#064e3b",
+  resolvedBannerBorder: "#059669",
+  resolvedBannerText: "#6ee7b7",
+  glowTop: "rgba(96,165,250,0.12)",
+  glowBottom: "rgba(96,165,250,0.06)",
+  statusOnline: "#22c55e",
+}
+
+const THEME_MAP = {
+  "lemon-square": LEMON_SQUARE_THEME,
+  "light": LIGHT_THEME,
+  "dark": DARK_THEME,
+}
+
+const DEFAULT_CUSTOM_COLORS = { ...LEMON_SQUARE_THEME }
+
+/* ========================================
+   CONTEXT
+======================================== */
+
+const ThemeContext = createContext(null)
+
+export const useTheme = () => {
+  const context = useContext(ThemeContext)
+
+  if (!context) {
+    throw new Error(
+      "useTheme must be used within a ThemeProvider"
+    )
+  }
+
+  return context
+}
+
+/* ========================================
+   PROVIDER
+======================================== */
+
+export const ThemeProvider = ({
+  children,
+}) => {
+
+  const [
+    activeThemeId,
+    setActiveThemeId,
+  ] = useState("lemon-square")
+
+  const [
+    headerGradientEnabled,
+    setHeaderGradientEnabled,
+  ] = useState(true)
+
+  const [
+    customColors,
+    setCustomColors,
+  ] = useState(
+    DEFAULT_CUSTOM_COLORS
+  )
+
+  const [
+    loaded,
+    setLoaded,
+  ] = useState(false)
+
+  /* ========================================
+     LOAD PERSISTED THEME
+  ======================================== */
+
+  useEffect(() => {
+
+    const loadTheme =
+      async () => {
+
+        try {
+
+          const backendTheme =
+            await themeService.getTheme()
+
+          if (
+            backendTheme
+          ) {
+
+            const mappedId =
+              backendTheme.bubbleTheme ||
+              "lemon-square"
+
+            setActiveThemeId(
+              mappedId
+            )
+
+            setHeaderGradientEnabled(
+              backendTheme.headerGradientEnabled !==
+                false
+            )
+
+            setCustomColors(
+              prev => ({
+                ...prev,
+                headerGradientStart:
+                  backendTheme.customHeaderGradientStart ||
+                  prev.headerGradientStart,
+                headerGradientEnd:
+                  backendTheme.customHeaderGradientEnd ||
+                  prev.headerGradientEnd,
+                accent:
+                  backendTheme.customAccent ||
+                  prev.accent,
+                windowBg:
+                  backendTheme.customWindowBg ||
+                  prev.windowBg,
+              })
+            )
+
+            return
+          }
+
+          const local =
+            localStorage.getItem(
+              "lemonsquare-theme"
+            )
+
+          if (local) {
+
+            const parsed =
+              JSON.parse(local)
+
+            setActiveThemeId(
+              parsed.activeThemeId ||
+                "lemon-square"
+            )
+
+            setHeaderGradientEnabled(
+              parsed.headerGradientEnabled !==
+                false
+            )
+
+            setCustomColors(
+              prev => ({
+                ...prev,
+                ...parsed.customColors,
+              })
+            )
+          }
+
+        } catch (error) {
+
+          console.error(
+            "THEME_LOAD_ERROR",
+            error
+          )
+
+        } finally {
+
+          setLoaded(true)
+        }
+      }
+
+    loadTheme()
+
+  }, [])
+
+  /* ========================================
+     SAVE THEME
+  ======================================== */
+
+  useEffect(() => {
+
+    if (!loaded) {
+      return
+    }
+
+    const payload = {
+      activeThemeId,
+      headerGradientEnabled,
+      customColors,
+    }
+
+    localStorage.setItem(
+      "lemonsquare-theme",
+      JSON.stringify(payload)
+    )
+
+    const backendPayload = {
+      bubbleTheme: activeThemeId,
+      headerGradientEnabled,
+      customHeaderGradientStart: customColors.headerGradientStart,
+      customHeaderGradientEnd: customColors.headerGradientEnd,
+      customAccent: customColors.accent,
+      customWindowBg: customColors.windowBg,
+    }
+
+    themeService
+      .saveTheme(backendPayload)
+      .catch(error => {
+        console.error(
+          "THEME_BACKEND_SAVE_ERROR",
+          error
+        )
+      })
+
+  }, [
+    activeThemeId,
+    headerGradientEnabled,
+    customColors,
+    loaded,
+  ])
+
+  /* ========================================
+     DERIVED THEME
+  ======================================== */
+
+  const theme = useMemo(() => {
+
+    const base =
+      activeThemeId === "custom"
+        ? customColors
+        : THEME_MAP[activeThemeId] ||
+          THEME_MAP["lemon-square"]
+
+    const headerGradient =
+      headerGradientEnabled
+        ? `linear-gradient(135deg, ${base.headerGradientStart}, ${base.headerGradientEnd})`
+        : base.headerGradientStart
+
+    return {
+      ...base,
+      id: activeThemeId,
+      isCustom:
+        activeThemeId === "custom",
+      headerGradient,
+    }
+
+  }, [
+    activeThemeId,
+    customColors,
+    headerGradientEnabled,
+  ])
+
+  /* ========================================
+     ACTIONS
+  ======================================== */
+
+  const setTheme =
+    useCallback(
+      id => {
+        setActiveThemeId(id)
+      },
+      []
+    )
+
+  const setCustomColor =
+    useCallback(
+      (key, value) => {
+
+        setCustomColors(
+          prev => ({
+            ...prev,
+            [key]: value,
+          })
+        )
+
+        if (
+          activeThemeId !==
+          "custom"
+        ) {
+
+          setActiveThemeId(
+            "custom"
+          )
+        }
+      },
+      [activeThemeId]
+    )
+
+  const toggleHeaderGradient =
+    useCallback(
+      () => {
+        setHeaderGradientEnabled(
+          prev => !prev
+        )
+      },
+      []
+    )
+
+  /* ========================================
+     VALUE
+  ======================================== */
+
+  const value = useMemo(
+    () => ({
+      theme,
+      activeThemeId,
+      headerGradientEnabled,
+      customColors,
+      setTheme,
+      setCustomColor,
+      setCustomColors,
+      toggleHeaderGradient,
+      loaded,
+    }),
+
+    [
+      theme,
+      activeThemeId,
+      headerGradientEnabled,
+      customColors,
+      setTheme,
+      setCustomColor,
+      setCustomColors,
+      toggleHeaderGradient,
+      loaded,
+    ]
+  )
+
+  return (
+    <ThemeContext.Provider
+      value={value}
+    >
+      {children}
+    </ThemeContext.Provider>
+  )
+}

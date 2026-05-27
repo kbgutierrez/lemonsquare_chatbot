@@ -181,6 +181,52 @@
 }
 
 /* =========================================
+   BUBBLE DRAG SYSTEM — MOBILE FIXES
+   ========================================= */
+
+/* The drag-active body class — applied only during drag */
+body.bubble-drag-active {
+  overscroll-behavior: none;
+  touch-action: none;
+  overflow: hidden;
+}
+
+/* iOS-specific: prevent pull-to-refresh */
+@supports (-webkit-touch-callout: none) {
+  body.bubble-drag-active {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+  }
+}
+
+/* Bubble drag target */
+[data-bubble-drag] {
+  touch-action: none !important;
+  -webkit-user-select: none !important;
+  -moz-user-select: none !important;
+  -ms-user-select: none !important;
+  user-select: none !important;
+  -webkit-user-drag: none !important;
+  -webkit-touch-callout: none !important;
+}
+
+/* Ensure the button inside also has no touch-action */
+[data-bubble-drag] button,
+[data-bubble-drag] [style*="touch-action: none"] {
+  touch-action: none !important;
+}
+
+/* Cursor states */
+[data-bubble-drag] {
+  cursor: grab;
+}
+
+[data-bubble-drag]:active {
+  cursor: grabbing;
+}
+
+/* =========================================
    ANIMATIONS
 ========================================= */
 

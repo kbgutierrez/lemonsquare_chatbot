@@ -13,6 +13,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -89,7 +90,30 @@ class AIChatbotSetting(BaseChatbot):
 
     ConversationResolutionModel = Column(String(100))
     ConversationResolutionPrompt = Column(Text)
-    
+
+    BubbleTheme = Column(String(50), default="lemon-square")
+    HeaderGradientEnabled = Column(Boolean, default=True)
+    CustomHeaderGradientStart = Column(String(7), default="#7BE38E")
+    CustomHeaderGradientEnd = Column(String(7), default="#5dd87a")
+    CustomAccent = Column(String(7), default="#22c55e")
+    CustomWindowBg = Column(String(7), default="#f6fff7")
+
+
+class UserThemePreference(BaseChatbot):
+    __tablename__ = "UserThemePreferences"
+    PreferenceID = Column(Integer, primary_key=True, autoincrement=True)
+    UserID = Column(BigInteger, nullable=False, unique=True)
+    BubbleTheme = Column(String(50), default="lemon-square")
+    HeaderGradientEnabled = Column(Boolean, default=True)
+    CustomHeaderGradientStart = Column(String(7), default="#7BE38E")
+    CustomHeaderGradientEnd = Column(String(7), default="#5dd87a")
+    CustomAccent = Column(String(7), default="#22c55e")
+    CustomWindowBg = Column(String(7), default="#f6fff7")
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("UserID", name="UQ_UserThemePreferences_UserID"),
+    )
 
 
 class UploadedDocument(BaseChatbot):
