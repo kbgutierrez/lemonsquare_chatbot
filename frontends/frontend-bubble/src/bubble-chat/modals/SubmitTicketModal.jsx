@@ -86,11 +86,12 @@ const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
   )
 }
 
-const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [] }) => {
+const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [], initialDraftData = null }) => {
   const { theme } = useTheme()
   const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading, imageFile, imagePreview, imageError } = useTicketForm({
     sessionId, requesterId, userData, messages,
     onSuccess: () => { setTimeout(() => onClose?.(), 1500) },
+    initialDraftData,
   })
 
   const selectedDept = taxonomy.find(d => String(d.department_id) === String(form.department_id))

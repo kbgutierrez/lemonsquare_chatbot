@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
@@ -19,7 +19,18 @@ const BubbleChatContent = () => {
   const [activeModal, setActiveModal] = useState(null)
   const [userData, setUserData] = useState(null)
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
-  const [checkingEscalation, setCheckingEscalation] = useState(false)
+
+  /* ========================================
+     ESCALATION DRAFT STATE
+     Separated concerns:
+     - isGeneratingDraft  → async generation loading
+     - escalationDraft    → hydration readiness
+     - activeModal        → visibility
+  ======================================== */
+
+  const [isGeneratingDraft, setIsGeneratingDraft] = useState(false)
+  const [escalationDraft, setEscalationDraft] = useState(null)
+  const isGeneratingDraftRef = useRef(false)
 
   useEffect(() => {
     const verify = async () => {
@@ -49,6 +60,7 @@ const BubbleChatContent = () => {
   const closeModal = () => {
     if (activeModal === "ticket") {
       makeEscalationDecision(null)
+      setEscalationDraft(null)
     }
     setActiveModal(null)
   }
@@ -66,51 +78,60 @@ const BubbleChatContent = () => {
     catch (e) { console.error("RESOLVE_ERROR", e) }
   }
   const handleNewChat = () => { clearConversation(); repositionForWindow(); setOpen(true); setActiveModal(null) }
-  const delay = ms => new Promise(r => setTimeout(r, ms))
 
-  const handleSubmitTicket = async () => {
-    let loadingMsgId = null
+  /* ========================================
+     SUBMIT TICKET — PROPER ASYNC SEQUENCING
+  ======================================== */
+
+  const handleSubmitTicket = useCallback(async () => {
+    if (!sessionId || isGeneratingDraftRef.current) return
+
+    isGeneratingDraftRef.current = true
+    setIsGeneratingDraft(true)
+    makeEscalationDecision("ticket")
+
+    const loadingMsg = addMessage("Preparing your ticket draft...", "agent", false, true)
+    const loadingMsgId = loadingMsg.id
+
     try {
-      if (!sessionId || checkingEscalation) return
-
-      makeEscalationDecision("ticket")
-
-      const loadingMsg = addMessage("Preparing escalation details...", "agent", false, true)
-      loadingMsgId = loadingMsg.id
-
-      setCheckingEscalation(true)
       const response = await ticketService.getEscalationDraft(sessionId)
 
-      if (loadingMsgId) {
-        removeMessage(loadingMsgId)
-        loadingMsgId = null
-      }
-
+      /* ---- Backend rejected: missing info ---- */
       if (response?.status === "needs_info" && response?.pushback_message) {
-        const typing = addMessage("", "agent", true)
-        await delay(1800)
-        removeMessage(typing.id)
+        removeMessage(loadingMsgId)
         addMessage(response.pushback_message, "agent")
-        setActiveModal(null)
+        makeEscalationDecision(null)
         return
       }
 
-      if (response?.status === "success") {
-        const openLoadingMsg = addMessage("Opening ticket form...", "agent", false, true)
-        await delay(700)
-        removeMessage(openLoadingMsg.id)
+      /* ---- Success: hydrate and open ---- */
+      if (response?.status === "success" || response?.summary || response?.description) {
+        removeMessage(loadingMsgId)
+        setEscalationDraft(response)
         setActiveModal("ticket")
         return
       }
+
+      /* ---- Unexpected response shape ---- */
+      removeMessage(loadingMsgId)
+      addMessage("Unable to prepare ticket draft. Please try again.", "agent")
+      makeEscalationDecision(null)
+
     } catch (e) {
       console.error("SUBMIT_TICKET_ERROR", e)
-      if (loadingMsgId) removeMessage(loadingMsgId)
-      addMessage("Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.", "agent")
-      setActiveModal(null)
+      removeMessage(loadingMsgId)
+      addMessage("Unable to generate escalation draft right now. Please try again later.", "agent")
+      makeEscalationDecision(null)
     } finally {
-      setCheckingEscalation(false)
+      setIsGeneratingDraft(false)
+      isGeneratingDraftRef.current = false
     }
-  }
+  }, [sessionId, addMessage, removeMessage, makeEscalationDecision])
+
+  /* ========================================
+     AUTO-TRIGGER OPEN DRAFT
+     Stable dependency thanks to useCallback.
+  ======================================== */
 
   useEffect(() => {
     if (resolutionCheck?.resolutionAction === "open_draft" && !openDraftAutoTriggered.current) {
@@ -134,7 +155,7 @@ const BubbleChatContent = () => {
 
   const modals = {
     history: <ChatHistoryModal key={historyRefreshKey} refreshKey={historyRefreshKey} onClose={closeModal} onLoadConversation={handleLoadConversation} onClearConversation={clearConversation} />,
-    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} userData={userData} messages={messages} />,
+    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} userData={userData} messages={messages} initialDraftData={escalationDraft} />,
     theme: <ThemeModal isOpen={true} onClose={closeModal} />,
     resolve: <ResolveConversationModal onClose={closeModal} onResolve={handleResolveConversation} />,
     about: <AboutHelpDeskModal onClose={closeModal} />,

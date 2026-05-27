@@ -73,6 +73,7 @@ export const useTicketForm = ({
   userData,
   messages = [],
   onSuccess,
+  initialDraftData = null,
 }) => {
 
   const [loading, setLoading] =
@@ -87,34 +88,57 @@ export const useTicketForm = ({
   const [
     summaryLoading,
     setSummaryLoading,
-  ] = useState(true)
+  ] = useState(!initialDraftData)
 
   const [summaryError, setSummaryError] =
     useState("")
 
   const [aiSummary, setAiSummary] =
-    useState(DEFAULT_SUMMARY)
+    useState(() =>
+      initialDraftData
+        ? normalizeSummary(initialDraftData)
+        : DEFAULT_SUMMARY
+    )
 
   const [taxonomy, setTaxonomy] =
     useState([])
 
   const [form, setForm] =
-    useState({
-      session_id:
-        sessionId || "",
+    useState(() => {
+      const base = {
+        session_id:
+          sessionId || "",
 
-      requester_id:
-        requesterId || "",
+        requester_id:
+          requesterId || "",
 
-      company_id:
-        userData?.company_id || "",
+        company_id:
+          userData?.company_id || "",
 
-      summary: "",
-      description: "",
-      department_id: "",
-      subcategory_id: "",
-      location: "",
-      equipment: "",
+        summary: "",
+        description: "",
+        department_id: "",
+        subcategory_id: "",
+        location: "",
+        equipment: "",
+      }
+
+      if (initialDraftData) {
+        const normalized =
+          normalizeSummary(initialDraftData)
+
+        return {
+          ...base,
+          summary: normalized.title,
+          description: normalized.summary,
+          department_id: initialDraftData?.department_id || "",
+          subcategory_id: initialDraftData?.subcategory_id || "",
+          location: initialDraftData?.location || "",
+          equipment: initialDraftData?.equipment || "",
+        }
+      }
+
+      return base
     })
 
   /* ========================================
@@ -173,6 +197,7 @@ export const useTicketForm = ({
 
   /* ========================================
      FETCH ESCALATION DRAFT
+     SKIPPED when initialDraftData is provided.
   ======================================== */
 
   useEffect(() => {
@@ -183,6 +208,13 @@ export const useTicketForm = ({
       async () => {
 
         if (!sessionId) {
+          return
+        }
+
+        if (initialDraftData) {
+          if (active) {
+            setSummaryLoading(false)
+          }
           return
         }
 
@@ -305,7 +337,7 @@ export const useTicketForm = ({
       active = false
     }
 
-  }, [sessionId])
+  }, [sessionId, initialDraftData])
 
   /* ========================================
      SYNC SESSION
