@@ -1,74 +1,86 @@
 import { Lock } from "lucide-react"
+import { useTheme } from "../../context/ThemeContext.jsx"
 
-const ChatFooterResolved = () => (
-  <div
-    className="
-      mb-3
+const ChatFooterResolved = () => {
+  const { theme } = useTheme()
 
-      flex
-      items-start
-      gap-3
-
-      rounded-2xl
-
-      border
-      border-emerald-200
-
-      bg-emerald-50/90
-
-      px-4
-      py-3
-
-      backdrop-blur-sm
-    "
-  >
-
+  return (
     <div
       className="
+        mb-3
+
         flex
-        h-10
-        w-10
-        shrink-0
-        items-center
-        justify-center
+        items-start
+        gap-3
 
-        rounded-xl
+        rounded-2xl
 
-        bg-emerald-100
+        border
+
+        px-4
+        py-3
+
+        backdrop-blur-sm
       "
+      style={{
+        backgroundColor: theme.resolvedBannerBg,
+        borderColor: theme.resolvedBannerBorder,
+      }}
     >
-      <Lock
+      <div
         className="
-          h-5
-          w-5
-          text-emerald-700
-        "
-      />
-    </div>
+          flex
+          h-10
+          w-10
+          shrink-0
+          items-center
+          justify-center
 
-    <div>
-      <p
-        className="
-          text-sm
-          font-semibold
-          text-emerald-800
+          rounded-xl
         "
+        style={{
+          backgroundColor: theme.agentAvatarBg,
+        }}
       >
-        Conversation Resolved
-      </p>
+        <Lock
+          className="
+            h-5
+            w-5
+          "
+          style={{
+            color: theme.agentAvatarText,
+          }}
+        />
+      </div>
 
-      <p
-        className="
-          mt-1
-          text-xs
-          text-emerald-700
-        "
-      >
-        This chat is now read-only.
-      </p>
+      <div>
+        <p
+          className="
+            text-sm
+            font-semibold
+          "
+          style={{
+            color: theme.resolvedBannerText,
+          }}
+        >
+          Conversation Resolved
+        </p>
+
+        <p
+          className="
+            mt-1
+            text-xs
+          "
+          style={{
+            color: theme.resolvedBannerText,
+            opacity: 0.8,
+          }}
+        >
+          This chat is now read-only.
+        </p>
+      </div>
     </div>
-
-  </div>
-)
+  )
+}
 
 export default ChatFooterResolved

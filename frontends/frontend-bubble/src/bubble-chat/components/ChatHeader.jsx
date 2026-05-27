@@ -5,6 +5,8 @@ import {
 
 import ChatMenu from "./ChatMenu.jsx"
 
+import { useTheme } from "../context/ThemeContext.jsx"
+
 const resolvedBadgeClass = `
   flex
   items-center
@@ -13,9 +15,6 @@ const resolvedBadgeClass = `
   rounded-full
 
   border
-  border-white/20
-
-  bg-white/15
 
   px-1.5
   py-[2px]
@@ -26,8 +25,6 @@ const resolvedBadgeClass = `
 
   tracking-[0.06em]
 
-  text-white
-
   backdrop-blur-sm
 `
 
@@ -35,6 +32,8 @@ const ChatHeader = ({
   resolved = false,
   onOpenModal,
 }) => {
+
+  const { theme } = useTheme()
 
   const title =
     resolved
@@ -51,15 +50,15 @@ const ChatHeader = ({
         justify-between
 
         border-b
-        border-emerald-200/60
-
-        bg-[#7BE38E]
 
         px-4
         py-3
-
-        text-white
       "
+      style={{
+        background: theme.headerGradient,
+        borderColor: theme.headerBorder,
+        color: theme.headerText,
+      }}
     >
 
       {/* SOFT OVERLAY */}
@@ -111,11 +110,11 @@ const ChatHeader = ({
                 w-2.5
 
                 rounded-full
-
-                bg-white
-
-                shadow-[0_0_8px_rgba(255,255,255,0.75)]
               "
+              style={{
+                backgroundColor: theme.statusOnline,
+                boxShadow: `0 0 8px ${theme.statusOnline}`,
+              }}
             />
           )}
 
@@ -141,6 +140,11 @@ const ChatHeader = ({
               className={
                 resolvedBadgeClass
               }
+              style={{
+                backgroundColor: theme.headerBadgeBg,
+                color: theme.headerBadgeText,
+                borderColor: theme.headerBadgeBorder,
+              }}
             >
               <CheckCircle2
                 className="
@@ -174,14 +178,15 @@ const ChatHeader = ({
             rounded-xl
 
             border
-            border-white/20
-
-            bg-white/15
 
             shadow-sm
 
             backdrop-blur-md
           "
+          style={{
+            backgroundColor: theme.menuBg,
+            borderColor: theme.headerBadgeBorder,
+          }}
         >
           <ChatMenu
             resolved={resolved}

@@ -5,9 +5,9 @@ Uses SettingsRepository for all DB operations.
 import logging
 from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundError
-from app.models.chatbot import AIChatbotSetting
+from app.models.chatbot import AIChatbotSetting, UserThemePreference
 from app.repositories.settings_repository import SettingsRepository
-from app.schemas.settings import SettingsUpdate
+from app.schemas.settings import SettingsUpdate, ThemeSettingsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -64,3 +64,65 @@ def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
     if not default_config:
         raise NotFoundError("System default settings (ID 2) not found.")
     return repo.create_new_active_settings(source=default_config, updated_by=updated_by)
+
+
+def get_user_theme(db: Session, user_id: int) -> UserThemePreference:
+    """
+    Get or create theme preference for a specific user.
+    Falls back to global defaults from AIChatbot_Settings if user has no saved preference.
+    """
+    pref = db.query(UserThemePreference).filter(
+        UserThemePreference.UserID == user_id
+    ).first()
+
+    if pref:
+        return pref
+
+    # No user preference yet — seed from global defaults
+    global_defaults = SettingsRepository(db).require_active_settings()
+
+    return UserThemePreference(
+        UserID=user_id,
+        BubbleTheme=global_defaults.BubbleTheme,
+        HeaderGradientEnabled=global_defaults.HeaderGradientEnabled,
+        CustomHeaderGradientStart=global_defaults.CustomHeaderGradientStart,
+        CustomHeaderGradientEnd=global_defaults.CustomHeaderGradientEnd,
+        CustomAccent=global_defaults.CustomAccent,
+        CustomWindowBg=global_defaults.CustomWindowBg,
+    )
+
+
+def update_user_theme(
+    db: Session,
+    user_id: int,
+    theme_update: ThemeSettingsUpdate,
+) -> UserThemePreference:
+    """
+    Upsert theme preference for a specific user.
+    Creates row if none exists, updates if it does.
+    """
+    pref = db.query(UserThemePreference).filter(
+        UserThemePreference.UserID == user_id
+    ).first()
+
+    if not pref:
+        pref = UserThemePreference(UserID=user_id)
+        db.add(pref)
+
+    pref.BubbleTheme = theme_update.BubbleTheme
+    pref.HeaderGradientEnabled = theme_update.HeaderGradientEnabled
+    pref.CustomHeaderGradientStart = theme_update.CustomHeaderGradientStart
+    pref.CustomHeaderGradientEnd = theme_update.CustomHeaderGradientEnd
+    pref.CustomAccent = theme_update.CustomAccent
+    pref.CustomWindowBg = theme_update.CustomWindowBg
+
+    db.commit()
+    db.refresh(pref)
+
+    logger.info(
+        "User theme updated: user_id=%s theme=%s",
+        user_id,
+        theme_update.BubbleTheme,
+    )
+
+    return pref

@@ -7,16 +7,9 @@ import {
 import chatWindowBackground
   from "../../../assets/Chatwindow-background.png"
 
+import { useTheme } from "../../context/ThemeContext.jsx"
+
 const MAX_MESSAGE_LENGTH = 4000
-
-const iconClass =
-  "relative z-10 h-4 w-4 text-white"
-
-const backgroundImageClass = `
-  absolute inset-0
-  h-full w-full
-  object-cover
-`
 
 const ChatFooterInput = ({
   textareaRef,
@@ -27,6 +20,8 @@ const ChatFooterInput = ({
   onKeyDown,
   onSend,
 }) => {
+
+  const { theme } = useTheme()
 
   const canSend =
     !loading &&
@@ -57,62 +52,68 @@ const ChatFooterInput = ({
         rounded-[22px]
 
         border
-        border-[#d7f5dc]
-
-        bg-white/55
 
         px-3
         py-2
 
-        shadow-[0_6px_18px_rgba(34,197,94,0.05)]
+        shadow-[0_6px_18px_rgba(0,0,0,0.05)]
 
         backdrop-blur-xl
 
         transition-all
         duration-300
-
-        focus-within:border-[#9be7a7]
-        focus-within:bg-white/62
       "
+      style={{
+        backgroundColor: theme.inputBg,
+        borderColor: theme.inputBorder,
+      }}
     >
 
-      {/* BACKGROUND */}
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
-
-          overflow-hidden
-        "
-      >
-
-        <img
-          src={chatWindowBackground}
-          alt=""
-          draggable={false}
-          className={`
-            ${backgroundImageClass}
-
-            scale-[1.7]
-
-            opacity-[0.18]
-
-            blur-lg
-          `}
-        />
-
+      {/* BACKGROUND — Lemon Square brand texture only */}
+      {theme.id === "lemon-square" && (
         <div
           className="
+            pointer-events-none
+
             absolute
             inset-0
 
-            bg-[#fffdf9]/55
+            overflow-hidden
           "
-        />
+        >
 
-      </div>
+          <img
+            src={chatWindowBackground}
+            alt=""
+            draggable={false}
+            className="
+              absolute
+              inset-0
+
+              h-full
+              w-full
+
+              object-cover
+
+              scale-[1.7]
+
+              opacity-[0.18]
+
+              blur-lg
+            "
+          />
+
+          <div
+            className="
+              absolute
+              inset-0
+
+              bg-[#fffdf9]/55
+            "
+          />
+
+        </div>
+      )}
 
       {/* INPUT */}
       <textarea
@@ -160,8 +161,6 @@ const ChatFooterInput = ({
           text-[13px]
           leading-[1.45]
 
-          text-[#3c4a3f]
-
           outline-none
 
           placeholder:text-[#8ca193]
@@ -172,6 +171,9 @@ const ChatFooterInput = ({
           disabled:cursor-not-allowed
           disabled:opacity-70
         "
+        style={{
+          color: theme.inputText,
+        }}
       />
 
       {/* SEND BUTTON */}
@@ -200,9 +202,8 @@ const ChatFooterInput = ({
           rounded-[18px]
 
           border
-          border-white/20
 
-          shadow-[0_8px_18px_rgba(34,197,94,0.12)]
+          shadow-[0_8px_18px_rgba(0,0,0,0.12)]
 
           transition-all
           duration-300
@@ -215,6 +216,9 @@ const ChatFooterInput = ({
           disabled:opacity-60
           disabled:hover:scale-100
         "
+        style={{
+          borderColor: theme.sendButtonBorder,
+        }}
       >
 
         {/* BUTTON BG */}
@@ -226,37 +230,51 @@ const ChatFooterInput = ({
             overflow-hidden
           "
         >
+          {theme.id === "lemon-square" ? (
+            <>
+              <img
+                src={chatWindowBackground}
+                alt=""
+                draggable={false}
+                className="
+                  absolute
+                  inset-0
 
-          <img
-            src={chatWindowBackground}
-            alt=""
-            draggable={false}
-            className={`
-              ${backgroundImageClass}
+                  h-full
+                  w-full
 
-              scale-[2.1]
+                  object-cover
 
-              opacity-95
+                  scale-[2.1]
 
-              blur-[2px]
-            `}
-          />
+                  opacity-95
+
+                  blur-[2px]
+                "
+              />
+
+              <div
+                className="
+                  absolute
+                  inset-0
+
+                  bg-[#8ee89a]/42
+                "
+              />
+            </>
+          ) : (
+            <div
+              className="absolute inset-0"
+              style={{
+                backgroundColor: theme.sendButtonBg,
+              }}
+            />
+          )}
 
           <div
             className="
               absolute
               inset-0
-
-              bg-[#8ee89a]/42
-            "
-          />
-
-          <div
-            className="
-              absolute
-              inset-0
-
-              bg-white/12
 
               opacity-0
 
@@ -265,6 +283,9 @@ const ChatFooterInput = ({
 
               group-hover:opacity-100
             "
+            style={{
+              backgroundColor: theme.sendButtonHoverBg,
+            }}
           />
 
         </div>
@@ -272,12 +293,42 @@ const ChatFooterInput = ({
         {/* ICON */}
         {loading ? (
           <LoaderCircle
-            className={`${iconClass} animate-spin`}
+            className="
+              relative
+              z-10
+              h-4
+              w-4
+
+              animate-spin
+            "
+            style={{
+              color: theme.sendButtonIcon,
+            }}
           />
         ) : resolved ? (
-          <Lock className={iconClass} />
+          <Lock
+            className="
+              relative
+              z-10
+              h-4
+              w-4
+            "
+            style={{
+              color: theme.sendButtonIcon,
+            }}
+          />
         ) : (
-          <SendHorizonal className={iconClass} />
+          <SendHorizonal
+            className="
+              relative
+              z-10
+              h-4
+              w-4
+            "
+            style={{
+              color: theme.sendButtonIcon,
+            }}
+          />
         )}
 
       </button>
