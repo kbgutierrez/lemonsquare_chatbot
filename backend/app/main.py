@@ -48,6 +48,8 @@ from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.telemetry_service import TelemetryService
+from dotenv import load_dotenv
+load_dotenv()
 
 configure_logging(app_settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
