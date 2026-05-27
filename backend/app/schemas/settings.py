@@ -27,7 +27,6 @@ class SettingsUpdate(BaseModel):
 
     ConversationResolutionModel: str | None
     ConversationResolutionPrompt: str | None
-    
 
 
 class SettingsResponse(BaseModel):
@@ -58,6 +57,27 @@ class SettingsResponse(BaseModel):
 
     ConversationResolutionModel: str | None
     ConversationResolutionPrompt: str | None
+
+    class Config:
+        from_attributes = True
+
+
+class ThemeSettingsUpdate(BaseModel):
+    BubbleTheme: str = Field(default="lemon-square", max_length=50)
+    HeaderGradientEnabled: bool = Field(default=True)
+    CustomHeaderGradientStart: str = Field(default="#7BE38E", max_length=7)
+    CustomHeaderGradientEnd: str = Field(default="#5dd87a", max_length=7)
+    CustomAccent: str = Field(default="#22c55e", max_length=7)
+    CustomWindowBg: str = Field(default="#f6fff7", max_length=7)
+
+
+class ThemeSettingsResponse(BaseModel):
+    BubbleTheme: str
+    HeaderGradientEnabled: bool
+    CustomHeaderGradientStart: str
+    CustomHeaderGradientEnd: str
+    CustomAccent: str
+    CustomWindowBg: str
 
     class Config:
         from_attributes = True
