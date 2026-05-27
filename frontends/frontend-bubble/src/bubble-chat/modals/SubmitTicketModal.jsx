@@ -30,13 +30,18 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) =
   const { theme } = useTheme()
   const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading } = useTicketForm({
     sessionId, requesterId, messages,
-    onSuccess: () => { setTimeout(() => onClose?.(), 1200) },
+    onSuccess: () => { setTimeout(() => onClose?.(), 1500) },
   })
 
   const selectedDept = taxonomy.find(d => String(d.department_id) === String(form.department_id))
   const subcategories = selectedDept?.subcategories || []
 
-  const buttonContent = loading ? (
+  const isMissingInfo = summaryLoading === false && aiSummary?.summary?.includes("Unable to")
+  const isFrozen = success || isMissingInfo
+
+  const buttonContent = success ? (
+    <><CheckCircle2 className="h-4 w-4" /> Submitted</>
+  ) : loading ? (
     <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Escalating...</>
   ) : summaryLoading ? (
     <><LoaderCircle className="h-4 w-4 animate-spin" /> Preparing Summary...</>
@@ -57,7 +62,7 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) =
             </div>
           </div>
         )}
-        {summaryLoading === false && aiSummary?.summary?.includes("Unable to") && (
+        {isMissingInfo && (
           <div className="mb-5 flex items-start gap-3 rounded-2xl border p-4" style={{ backgroundColor: "#fef2f2", borderColor: "#fecaca" }}>
             <AlertCircle className="mt-0.5 h-5 w-5 text-red-600" />
             <div>
@@ -71,26 +76,23 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) =
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Summary</label>
             <input type="text" value={form.summary} onChange={e => update("summary", e.target.value)} placeholder="Brief summary of the issue"
-              disabled={summaryLoading === false && aiSummary?.summary?.includes("Unable to")}
-              className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4",
-                (summaryLoading === false && aiSummary?.summary?.includes("Unable to")) && "cursor-not-allowed opacity-50")}
+              disabled={isFrozen}
+              className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
               style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Description</label>
             <textarea value={form.description} onChange={e => update("description", e.target.value)} placeholder="Detailed description..." rows={4}
-              disabled={summaryLoading === false && aiSummary?.summary?.includes("Unable to")}
-              className={cn("w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4",
-                (summaryLoading === false && aiSummary?.summary?.includes("Unable to")) && "cursor-not-allowed opacity-50")}
+              disabled={isFrozen}
+              className={cn("w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
               style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Department</label>
               <select value={form.department_id} onChange={e => update("department_id", e.target.value)}
-                disabled={summaryLoading === false && aiSummary?.summary?.includes("Unable to")}
-                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4",
-                  (summaryLoading === false && aiSummary?.summary?.includes("Unable to")) && "cursor-not-allowed opacity-50")}
+                disabled={isFrozen}
+                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
                 style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
                 <option value="">Select Department</option>
                 {taxonomy.map(dept => <option key={dept.department_id} value={dept.department_id}>{dept.department_name}</option>)}
@@ -99,8 +101,8 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) =
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Subcategory</label>
               <select value={form.subcategory_id} onChange={e => update("subcategory_id", e.target.value)}
-                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4")}
-                disabled={!form.department_id || (summaryLoading === false && aiSummary?.summary?.includes("Unable to"))}
+                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4", (!form.department_id || isFrozen) && "cursor-not-allowed opacity-50")}
+                disabled={!form.department_id || isFrozen}
                 style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
                 <option value="">Select Subcategory</option>
                 {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
@@ -120,8 +122,8 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) =
           </div>
         </div>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <ActionButton variant="secondary" onClick={onClose} disabled={loading} theme={theme}>Cancel</ActionButton>
-          <ActionButton onClick={submit} disabled={loading || summaryLoading || !form.summary || !form.description || !form.department_id || !form.subcategory_id || (summaryLoading === false && aiSummary?.summary?.includes("Unable to"))} theme={theme}>
+          <ActionButton variant="secondary" onClick={onClose} disabled={success || loading} theme={theme}>Cancel</ActionButton>
+          <ActionButton onClick={submit} disabled={success || loading || summaryLoading || !form.summary || !form.description || !form.department_id || !form.subcategory_id || isMissingInfo} theme={theme}>
             {buttonContent}
           </ActionButton>
         </div>

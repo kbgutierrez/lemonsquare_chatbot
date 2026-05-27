@@ -14,10 +14,6 @@ import { useBubbleDrag } from "./hooks/useBubbleDrag"
 import { useChatMessages } from "./hooks/useChatMessages"
 import { cn } from "./utils/cn"
 
-/* ========================================
-   INNER COMPONENT — everything inside ThemeProvider
-======================================== */
-
 const BubbleChatContent = () => {
   const [open, setOpen] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
@@ -27,7 +23,7 @@ const BubbleChatContent = () => {
   const openDraftAutoTriggered = useRef(false)
 
   const { position, dragging, isLeftSide, isTopSide, startDrag, wasDragged, repositionForWindow } = useBubbleDrag()
-  const { messages, loading, isLoadingConversation, isResolvingConversation, sessionId, resolved, sendMessage, clearConversation, restoreConversation, resolveConversation, resolutionCheck, dismissResolution, addMessage, removeMessage } = useChatMessages()
+  const { messages, loading, isLoadingConversation, isResolvingConversation, sessionId, resolved, sendMessage, clearConversation, restoreConversation, resolveConversation, resolutionCheck, dismissResolution, addMessage, removeMessage, escalationDecision, makeEscalationDecision } = useChatMessages()
   const { theme } = useTheme()
 
   useEffect(() => { if (!sessionId) return; setHistoryRefreshKey(p => p + 1) }, [sessionId])
@@ -54,8 +50,16 @@ const BubbleChatContent = () => {
   const handleSubmitTicket = async () => {
     try {
       if (!sessionId || checkingEscalation) return
+
+      makeEscalationDecision("ticket")
+
+      const loadingMsg = addMessage("Preparing escalation details...", "agent", false, true)
+
       setCheckingEscalation(true)
       const response = await ticketService.getEscalationDraft(sessionId)
+
+      removeMessage(loadingMsg.id)
+
       if (response?.status === "needs_info" && response?.pushback_message) {
         const typing = addMessage("", "agent", true)
         await delay(1800)
@@ -64,12 +68,21 @@ const BubbleChatContent = () => {
         setActiveModal(null)
         return
       }
-      if (response?.status === "success") { setActiveModal("ticket"); return }
+
+      if (response?.status === "success") {
+        const openLoadingMsg = addMessage("Opening ticket form...", "agent", false, true)
+        await delay(700)
+        removeMessage(openLoadingMsg.id)
+        setActiveModal("ticket")
+        return
+      }
     } catch (e) {
       console.error("SUBMIT_TICKET_ERROR", e)
       addMessage("Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.", "agent")
       setActiveModal(null)
-    } finally { setCheckingEscalation(false) }
+    } finally {
+      setCheckingEscalation(false)
+    }
   }
 
   useEffect(() => {
@@ -110,7 +123,7 @@ const BubbleChatContent = () => {
             <motion.div initial={{ opacity: 0, scale: 0.94, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.24 }}
               className={cn("absolute z-10", "overflow-hidden", "rounded-[28px] sm:rounded-[32px]", "backdrop-blur-2xl")}
               style={{ left: isLeftSide ? 0 : "auto", right: !isLeftSide ? 0 : "auto", top: isTopSide ? "calc(100% + 12px)" : "auto", bottom: !isTopSide ? "calc(100% + 12px)" : "auto", width: "min(96vw,390px)", height: "min(680px,calc(100dvh - 110px))", backgroundColor: theme.windowWrapperBg, border: `1px solid ${theme.windowBorder}`, boxShadow: `0 20px 80px ${theme.windowShadow}` }}>
-              <ChatWindow messages={messages} loading={loading} isLoadingConversation={isLoadingConversation} isResolvingConversation={isResolvingConversation} resolved={resolved} resolutionCheck={resolutionCheck} onSendMessage={sendMessage} onResolveConversation={handleResolveConversation} onDismissResolution={dismissResolution} onClose={() => setOpen(false)} onOpenModal={handleOpenModal} />
+              <ChatWindow messages={messages} loading={loading} isLoadingConversation={isLoadingConversation} isResolvingConversation={isResolvingConversation} resolved={resolved} resolutionCheck={resolutionCheck} onSendMessage={sendMessage} onResolveConversation={handleResolveConversation} onDismissResolution={dismissResolution} onClose={() => setOpen(false)} onOpenModal={handleOpenModal} escalationDecision={escalationDecision} onMakeEscalationDecision={makeEscalationDecision} />
             </motion.div>
           )}
         </AnimatePresence>
@@ -120,7 +133,6 @@ const BubbleChatContent = () => {
         </div>
       </div>
 
-      {/* MODALS — now inside ThemeProvider tree, can use useTheme() */}
       {activeModal && (
         <div className="pointer-events-auto fixed inset-0 z-[10000]">
           {modals[activeModal]}
@@ -129,10 +141,6 @@ const BubbleChatContent = () => {
     </div>
   )
 }
-
-/* ========================================
-   EXPORT — ThemeProvider wraps EVERYTHING
-======================================== */
 
 const BubbleChat = () => (
   <ThemeProvider>
