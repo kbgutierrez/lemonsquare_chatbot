@@ -1,10 +1,11 @@
 import ChatHeader from "./ChatHeader.jsx"
 import ChatMessages from "./ChatMessages.jsx"
-
 import ChatFooter from "./ChatFooter/ChatFooter.jsx"
 
 import chatWindowBackground
   from "../../assets/Chatwindow-background.png"
+
+import { useTheme } from "../context/ThemeContext.jsx"
 
 const overlayClass = `
   pointer-events-none
@@ -35,6 +36,8 @@ const ChatWindow = ({
   sessionKey,
 }) => {
 
+  const { theme } = useTheme()
+
   return (
     <section
       key={sessionKey || "active-chat"}
@@ -51,10 +54,11 @@ const ChatWindow = ({
 
         rounded-[28px]
 
-        bg-[#f6fff7]
-
         shadow-[0_10px_40px_rgba(0,0,0,0.08)]
       "
+      style={{
+        backgroundColor: theme.windowBg,
+      }}
     >
 
       {/* BACKGROUND IMAGE */}
@@ -70,19 +74,21 @@ const ChatWindow = ({
 
           select-none
           object-cover
+
+          transition-opacity
+          duration-300
         `}
+        style={{
+          opacity: theme.windowBgImageOpacity,
+        }}
       />
 
       {/* OVERLAY */}
       <div
-        className={`
-          ${overlayClass}
-
-          bg-gradient-to-b
-          from-[#f3fff4]/90
-          via-[#f7fff8]/88
-          to-white/96
-        `}
+        className={overlayClass}
+        style={{
+          background: `linear-gradient(to bottom, ${theme.windowOverlayStart}, ${theme.windowOverlayMiddle}, ${theme.windowOverlayEnd})`,
+        }}
       />
 
       {/* INNER */}
@@ -112,35 +118,28 @@ const ChatWindow = ({
 
           {/* TOP GLOW */}
           <div
-            className={`
-              ${glowClass}
-
-              inset-x-0
-              top-0
-
-              h-40
-
-              bg-[radial-gradient(circle_at_top,rgba(34,197,94,0.14),transparent_72%)]
-            `}
+            className={glowClass}
+            style={{
+              top: 0,
+              left: 0,
+              right: 0,
+              height: "10rem",
+              background: `radial-gradient(circle at top, ${theme.glowTop}, transparent 72%)`,
+            }}
           />
 
           {/* BOTTOM GLOW */}
           <div
-            className={`
-              ${glowClass}
-
-              bottom-0
-              right-0
-
-              h-52
-              w-52
-
-              rounded-full
-
-              bg-emerald-200/20
-
-              blur-3xl
-            `}
+            className={glowClass}
+            style={{
+              bottom: 0,
+              right: 0,
+              height: "13rem",
+              width: "13rem",
+              borderRadius: "9999px",
+              filter: "blur(64px)",
+              backgroundColor: theme.glowBottom,
+            }}
           />
 
           {/* RESOLVED */}
@@ -156,21 +155,19 @@ const ChatWindow = ({
 
                 rounded-full
 
-                border
-                border-emerald-200
-
-                bg-emerald-50
-
                 px-4
                 py-2
 
                 text-xs
                 font-medium
 
-                text-emerald-700
-
                 shadow-sm
               "
+              style={{
+                backgroundColor: theme.resolvedBannerBg,
+                border: `1px solid ${theme.resolvedBannerBorder}`,
+                color: theme.resolvedBannerText,
+              }}
             >
               This conversation has been resolved.
             </div>

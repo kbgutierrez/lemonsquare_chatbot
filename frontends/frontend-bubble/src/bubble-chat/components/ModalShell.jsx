@@ -66,6 +66,8 @@ const ModalShell = ({
   size = "md",
 
   scrollable = true,
+
+  bodyClassName,
 }) => {
 
   /* ========================================
@@ -392,6 +394,8 @@ const ModalShell = ({
                     `
                     : ""
                 }
+
+                ${bodyClassName || ""}
               `}
             >
               {children}

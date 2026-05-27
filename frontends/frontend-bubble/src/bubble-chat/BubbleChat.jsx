@@ -1,611 +1,123 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
-
-import {
-  AnimatePresence,
-  motion,
-} from "framer-motion"
-
+import { useEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "framer-motion"
 import ChatBubble from "./components/ChatBubble.jsx"
 import ChatWindow from "./components/ChatWindow.jsx"
-
 import ChatHistoryModal from "./modals/ChatHistoryModal.jsx"
 import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
-import CallAgentModal from "./modals/CallAgentModal.jsx"
+import ThemeModal from "./modals/ThemeModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
-
+import { ThemeProvider } from "./context/ThemeContext.jsx"
+import { useTheme } from "./context/ThemeContext.jsx"
 import chatbotService from "./services/chatbotService"
 import ticketService from "./services/ticketService"
-
-import {
-  useBubbleDrag,
-} from "./hooks/useBubbleDrag"
-
-import {
-  useChatMessages,
-} from "./hooks/useChatMessages"
-
+import { useBubbleDrag } from "./hooks/useBubbleDrag"
+import { useChatMessages } from "./hooks/useChatMessages"
 import { cn } from "./utils/cn"
 
-const BubbleChat = () => {
+const BubbleChatContent = () => {
+  const [open, setOpen] = useState(false)
+  const [activeModal, setActiveModal] = useState(null)
+  const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+  const [checkingEscalation, setCheckingEscalation] = useState(false)
+  const messagesRef = useRef([])
+  const openDraftAutoTriggered = useRef(false)
 
-  const [open, setOpen] =
-    useState(false)
+  const { position, dragging, isLeftSide, isTopSide, startDrag, wasDragged, repositionForWindow } = useBubbleDrag()
+  const { messages, loading, isLoadingConversation, isResolvingConversation, sessionId, resolved, sendMessage, clearConversation, restoreConversation, resolveConversation, resolutionCheck, dismissResolution, addMessage, removeMessage } = useChatMessages()
+  const { theme } = useTheme()
 
-  const [
-    activeModal,
-    setActiveModal,
-  ] = useState(null)
+  useEffect(() => { if (!sessionId) return; setHistoryRefreshKey(p => p + 1) }, [sessionId])
+  useEffect(() => { messagesRef.current = messages }, [messages])
+  useEffect(() => { if (!open) return; repositionForWindow() }, [open, repositionForWindow])
 
-  const [
-    historyRefreshKey,
-    setHistoryRefreshKey,
-  ] = useState(0)
+  const closeModal = () => setActiveModal(null)
 
-  const [
-    checkingEscalation,
-    setCheckingEscalation,
-  ] = useState(false)
+  const handlePointerDown = event => {
+    if (open) return
+    startDrag(event)
+  }
 
-  const messagesRef =
-    useRef([])
+  const handlePointerUp = () => {
+    if (wasDragged()) return
+    if (!open) { repositionForWindow(); requestAnimationFrame(() => setOpen(true)); return }
+    setOpen(false)
+  }
 
-  const openDraftAutoTriggered =
-    useRef(false)
+  const handleLoadConversation = ({ sessionId }) => { restoreConversation({ sessionId }); repositionForWindow(); setOpen(true); setActiveModal(null) }
+  const handleResolveConversation = async () => { try { if (!sessionId || !messages.length) return; await resolveConversation(); setHistoryRefreshKey(p => p + 1); setActiveModal(null) } catch (e) { console.error("RESOLVE_ERROR", e) } }
+  const handleNewChat = () => { clearConversation(); repositionForWindow(); setOpen(true); setActiveModal(null) }
+  const delay = ms => new Promise(r => setTimeout(r, ms))
 
-  const {
-    position,
-    dragging,
-    isLeftSide,
-    isTopSide,
-    startDrag,
-    wasDragged,
-    repositionForWindow,
-  } = useBubbleDrag()
-
-  const {
-    messages,
-    loading,
-    isLoadingConversation,
-    isResolvingConversation,
-    sessionId,
-    resolved,
-    sendMessage,
-    clearConversation,
-    restoreConversation,
-    resolveConversation,
-    resolutionCheck,
-    dismissResolution,
-    addMessage,
-    removeMessage,
-  } = useChatMessages()
-
-  useEffect(() => {
-
-    if (!sessionId) {
-      return
-    }
-
-    setHistoryRefreshKey(
-      prev => prev + 1
-    )
-
-  }, [sessionId])
-
-  useEffect(() => {
-
-    messagesRef.current = messages
-
-  }, [messages])
-
-  useEffect(() => {
-
-    if (!open) {
-      return
-    }
-
-    repositionForWindow()
-
-  }, [
-    open,
-    repositionForWindow,
-  ])
-
-  /* ========================================
-     ACTIONS
-  ======================================== */
-
-  const closeModal =
-    () =>
-      setActiveModal(null)
-
-  const handlePointerDown =
-    event => {
-      startDrag(event)
-    }
-
-  const handlePointerUp =
-    () => {
-
-      if (wasDragged()) {
-        return
-      }
-
-      if (!open) {
-
-        repositionForWindow()
-
-        requestAnimationFrame(
-          () => setOpen(true)
-        )
-
-        return
-      }
-
-      setOpen(false)
-    }
-
-  const handleLoadConversation =
-    ({ sessionId }) => {
-
-      restoreConversation({
-        sessionId,
-      })
-
-      repositionForWindow()
-
-      setOpen(true)
-
-      setActiveModal(null)
-    }
-
-  const handleResolveConversation =
-    async () => {
-
-      try {
-
-        if (
-          !sessionId ||
-          !messages.length
-        ) {
-          return
-        }
-
-        await resolveConversation()
-
-        setHistoryRefreshKey(
-          prev => prev + 1
-        )
-
+  const handleSubmitTicket = async () => {
+    try {
+      if (!sessionId || checkingEscalation) return
+      setCheckingEscalation(true)
+      const response = await ticketService.getEscalationDraft(sessionId)
+      if (response?.status === "needs_info" && response?.pushback_message) {
+        const typing = addMessage("", "agent", true)
+        await delay(1800)
+        removeMessage(typing.id)
+        addMessage(response.pushback_message, "agent")
         setActiveModal(null)
-
-      } catch (error) {
-
-        console.error(
-          "RESOLVE_ERROR",
-          error
-        )
-      }
-    }
-
-  const handleNewChat =
-    () => {
-
-      clearConversation()
-
-      repositionForWindow()
-
-      setOpen(true)
-
-      setActiveModal(null)
-    }
-
-  const delay = ms =>
-    new Promise(resolve =>
-      setTimeout(resolve, ms)
-    )
-
-  const handleSubmitTicket =
-    async () => {
-
-      try {
-
-        if (
-          !sessionId ||
-          checkingEscalation
-        ) {
-          return
-        }
-
-        setCheckingEscalation(
-          true
-        )
-
-        console.log(
-          "CHECKING_ESCALATION_GATEKEEPER",
-          sessionId
-        )
-
-        const response =
-          await ticketService.getEscalationDraft(
-            sessionId
-          )
-
-        console.log(
-          "ESCALATION_CHECK_RESPONSE",
-          response
-        )
-
-        // Check if AI rejected the escalation due to missing info
-        if (
-          response?.status === "needs_info" &&
-          response?.pushback_message
-        ) {
-
-          console.log(
-            "ESCALATION_REJECTED_MISSING_INFO",
-            "Message: " + response.pushback_message
-          )
-
-          // Show a typing indicator before the AI follow-up
-          const typingMessage = addMessage(
-            "",
-            "agent",
-            true
-          )
-
-          await delay(1800)
-
-          removeMessage(
-            typingMessage.id
-          )
-
-          // Inject the pushback message into the chat
-          // The AI is asking for more information
-          addMessage(
-            response.pushback_message,
-            "agent"
-          )
-
-          // Do not open the modal
-          setActiveModal(null)
-
-          return
-        }
-
-        // If status is "success", open the modal for user to confirm and finalize
-        if (response?.status === "success") {
-          console.log(
-            "ESCALATION_READY_PROCEED_WITH_MODAL"
-          )
-          setActiveModal("ticket")
-          return
-        }
-
-        console.warn(
-          "ESCALATION_DRAFT_RESPONSE_NOT_READY",
-          response
-        )
-
         return
-      } catch (error) {
-
-        console.error(
-          "SUBMIT_TICKET_ERROR",
-          error
-        )
-
-        // Do not open the ticket modal when draft generation fails.
-        addMessage(
-          "Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.",
-          "agent"
-        )
-
-        setActiveModal(null)
-
-      } finally {
-
-        setCheckingEscalation(
-          false
-        )
       }
-    }
+      if (response?.status === "success") { setActiveModal("ticket"); return }
+    } catch (e) {
+      console.error("SUBMIT_TICKET_ERROR", e)
+      addMessage("Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.", "agent")
+      setActiveModal(null)
+    } finally { setCheckingEscalation(false) }
+  }
 
   useEffect(() => {
-    if (
-      resolutionCheck?.resolutionAction ===
-        "open_draft" &&
-      !openDraftAutoTriggered.current
-    ) {
-      openDraftAutoTriggered.current = true
-      handleSubmitTicket()
-    }
+    if (resolutionCheck?.resolutionAction === "open_draft" && !openDraftAutoTriggered.current) { openDraftAutoTriggered.current = true; handleSubmitTicket() }
+    if (resolutionCheck?.resolutionAction !== "open_draft") openDraftAutoTriggered.current = false
+  }, [resolutionCheck?.resolutionAction, handleSubmitTicket])
 
-    if (
-      resolutionCheck?.resolutionAction !==
-      "open_draft"
-    ) {
-      openDraftAutoTriggered.current = false
-    }
-  }, [
-    resolutionCheck?.resolutionAction,
-    handleSubmitTicket,
-  ])
-  const handleOpenModal =
-    modalId => {
+  const handleOpenModal = modalId => {
+    if (modalId === "new-chat") { handleNewChat(); return }
+    if (modalId === "ticket") { handleSubmitTicket(); return }
+    setActiveModal(modalId)
+  }
 
-      if (
-        modalId ===
-        "new-chat"
-      ) {
-
-        handleNewChat()
-
-        return
-      }
-
-      if (
-        modalId ===
-        "ticket"
-      ) {
-
-        handleSubmitTicket()
-
-        return
-      }
-      setActiveModal(modalId)
-    }
-
-  /* ========================================
-     MEMO
-  ======================================== */
-
-  const requesterId =
-    useMemo(() => {
-
-      try {
-
-        return chatbotService.resolveRequesterId(
-          chatbotService.getUserToken()
-        )
-
-      } catch {
-        return null
-      }
-
-    }, [])
+  const requesterId = useMemo(() => { try { return chatbotService.resolveRequesterId(chatbotService.getUserToken()) } catch { return null } }, [])
 
   const modals = {
-    history: (
-      <ChatHistoryModal
-        key={historyRefreshKey}
-        refreshKey={
-          historyRefreshKey
-        }
-        onClose={closeModal}
-        onLoadConversation={
-          handleLoadConversation
-        }
-        onClearConversation={
-          clearConversation
-        }
-      />
-    ),
-
-    ticket: (
-      <SubmitTicketModal
-        onClose={closeModal}
-        sessionId={sessionId}
-        requesterId={
-          requesterId
-        }
-        messages={messages}
-      />
-    ),
-
-    call: (
-      <CallAgentModal
-        onClose={closeModal}
-      />
-    ),
-
-    resolve: (
-      <ResolveConversationModal
-        onClose={closeModal}
-        onResolve={
-          handleResolveConversation
-        }
-      />
-    ),
-
-    about: (
-      <AboutHelpDeskModal
-        onClose={closeModal}
-      />
-    ),
+    history: <ChatHistoryModal key={historyRefreshKey} refreshKey={historyRefreshKey} onClose={closeModal} onLoadConversation={handleLoadConversation} onClearConversation={clearConversation} />,
+    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} messages={messages} />,
+    theme: <ThemeModal isOpen={true} onClose={closeModal} />,
+    resolve: <ResolveConversationModal onClose={closeModal} onResolve={handleResolveConversation} />,
+    about: <AboutHelpDeskModal onClose={closeModal} />,
   }
 
   return (
-    <div
-      className={cn(
-        "lemonsquare-chat-root",
-        "pointer-events-none",
-        "fixed bottom-0 left-0",
-        "h-0 w-0",
-        "z-[9999]"
-      )}
-    >
-
+    <div className={cn("lemonsquare-chat-root", "pointer-events-none", "fixed bottom-0 left-0", "h-0 w-0", "z-[9999]")}>
       <AnimatePresence>
-        {open && (
-          <motion.div
-            initial={{
-              opacity: 0,
-            }}
-            animate={{
-              opacity: 1,
-            }}
-            exit={{
-              opacity: 0,
-            }}
-            className={cn(
-              "pointer-events-none",
-              "fixed inset-0",
-              "bg-black/[0.02]",
-              "backdrop-blur-[1px]"
-            )}
-          />
-        )}
+        {open && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("pointer-events-none", "fixed inset-0", "bg-black/[0.02]", "backdrop-blur-[1px]")} />}
       </AnimatePresence>
 
-      <motion.div
-        className={cn(
-          "pointer-events-auto",
-          "fixed",
-          "will-change-transform",
-
-          !dragging &&
-            "transition-[left,top] duration-300 ease-out"
-        )}
-        style={{
-          left: position.x,
-          top: position.y,
-        }}
-      >
-
+      {/* DRAGGABLE ROOT — hook writes transform directly to this node */}
+      <div data-bubble-drag className={cn("pointer-events-auto", "fixed", "z-[9999]", !dragging && "transition-transform duration-300 ease-out")} style={{ left: 0, top: 0, willChange: "transform", touchAction: "none" }}>
         <AnimatePresence>
           {open && (
-            <motion.div
-              initial={{
-                opacity: 0,
-                scale: 0.94,
-                y: 14,
-              }}
-
-              animate={{
-                opacity: 1,
-                scale: 1,
-                y: 0,
-              }}
-
-              exit={{
-                opacity: 0,
-                scale: 0.96,
-                y: 10,
-              }}
-
-              transition={{
-                duration: 0.24,
-              }}
-
-              className={cn(
-                "absolute z-10",
-                "overflow-hidden",
-                "rounded-[28px] sm:rounded-[32px]",
-                "border border-violet-200/70",
-                "bg-white/95",
-                "shadow-[0_20px_80px_rgba(139,92,246,0.22)]",
-                "backdrop-blur-2xl"
-              )}
-
-              style={{
-                left:
-                  isLeftSide
-                    ? 0
-                    : "auto",
-
-                right:
-                  !isLeftSide
-                    ? 0
-                    : "auto",
-
-                top:
-                  isTopSide
-                    ? "calc(100% + 12px)"
-                    : "auto",
-
-                bottom:
-                  !isTopSide
-                    ? "calc(100% + 12px)"
-                    : "auto",
-
-                width:
-                  "min(96vw,390px)",
-
-                height:
-                  "min(680px,calc(100dvh - 110px))",
-              }}
-            >
-              <ChatWindow
-                messages={messages}
-                loading={loading}
-                isLoadingConversation={
-                  isLoadingConversation
-                }
-                isResolvingConversation={
-                  isResolvingConversation
-                }
-                resolved={resolved}
-                resolutionCheck={resolutionCheck}
-                onSendMessage={
-                  sendMessage
-                }
-                onResolveConversation={
-                  handleResolveConversation
-                }
-                onDismissResolution={
-                  dismissResolution
-                }
-                onClose={() =>
-                  setOpen(false)
-                }
-                onOpenModal={
-                  handleOpenModal
-                }
-              />
+            <motion.div initial={{ opacity: 0, scale: 0.94, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.24 }}
+              className={cn("absolute z-10", "overflow-hidden", "rounded-[28px] sm:rounded-[32px]", "backdrop-blur-2xl")}
+              style={{ left: isLeftSide ? 0 : "auto", right: !isLeftSide ? 0 : "auto", top: isTopSide ? "calc(100% + 12px)" : "auto", bottom: !isTopSide ? "calc(100% + 12px)" : "auto", width: "min(96vw,390px)", height: "min(680px,calc(100dvh - 110px))", backgroundColor: theme.windowWrapperBg, border: `1px solid ${theme.windowBorder}`, boxShadow: `0 20px 80px ${theme.windowShadow}` }}>
+              <ChatWindow messages={messages} loading={loading} isLoadingConversation={isLoadingConversation} isResolvingConversation={isResolvingConversation} resolved={resolved} resolutionCheck={resolutionCheck} onSendMessage={sendMessage} onResolveConversation={handleResolveConversation} onDismissResolution={dismissResolution} onClose={() => setOpen(false)} onOpenModal={handleOpenModal} />
             </motion.div>
           )}
         </AnimatePresence>
 
-        <div
-          className="
-            relative z-20
-            h-16 w-16
-            select-none
-          "
-          onPointerDown={
-            handlePointerDown
-          }
-          onPointerUp={
-            handlePointerUp
-          }
-        >
-          <ChatBubble
-            isOpen={open}
-          />
+        <div className="relative z-20 h-16 w-16 select-none" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp}>
+          <ChatBubble isOpen={open} />
         </div>
+      </div>
 
-      </motion.div>
-
-      {activeModal && (
-        <div
-          className="
-            pointer-events-auto
-            fixed inset-0
-            z-[10000]
-          "
-        >
-          {modals[activeModal]}
-        </div>
-      )}
-
+      {activeModal && <div className="pointer-events-auto fixed inset-0 z-[10000]">{modals[activeModal]}</div>}
     </div>
   )
 }
 
+const BubbleChat = () => (<ThemeProvider><BubbleChatContent /></ThemeProvider>)
 export default BubbleChat
