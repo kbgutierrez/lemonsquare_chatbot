@@ -436,7 +436,7 @@ You MUST return ONLY valid JSON.
 
 Choose ONLY ONE "action" based on these rules:
 - "show_ticket": The AI mentions, suggests, or advises contacting IT/Facilities/Helpdesk (even conditionally, like "pag di gumana, contact IT"), OR the user explicitly asks for a ticket, OR the issue involves physical office equipment (e.g., aircon, printer, hardware) that employees cannot fix themselves.
-- "show_resolve": The user confirms the issue is fixed, OR the AI proactively asked if the chat can be closed.
+- "show_resolve": The user confirms the issue is fixed, the AI proactively asked if the chat can be closed, OR the AI provided a definitive answer, policy explanation, or troubleshooting steps that do not require an IT ticket.
 - "none": The troubleshooting is still active and neither of the above apply.
 
 If action is "show_ticket" or "show_resolve", you MUST provide a natural Taglish "resolution_message" (e.g., "Gusto mo bang gawan na natin ng ticket 'to para ma-schedule na nila?", "Pwede na ba natin i-close 'tong chat?"). Otherwise, set it to null.

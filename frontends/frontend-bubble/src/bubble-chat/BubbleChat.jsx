@@ -17,8 +17,24 @@ import { cn } from "./utils/cn"
 const BubbleChatContent = () => {
   const [open, setOpen] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
+  const [userData, setUserData] = useState(null)
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const [checkingEscalation, setCheckingEscalation] = useState(false)
+
+  useEffect(() => {
+    const verify = async () => {
+      try {
+        const data = await chatbotService.verifyUserToken()
+        if (data.valid) {
+          setUserData(data)
+        }
+      } catch (err) {
+        console.error("Auth verify failed", err)
+      }
+    }
+    verify()
+  }, [])
+
   const messagesRef = useRef([])
   const openDraftAutoTriggered = useRef(false)
 
@@ -30,7 +46,12 @@ const BubbleChatContent = () => {
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { if (!open) return; repositionForWindow() }, [open, repositionForWindow])
 
-  const closeModal = () => setActiveModal(null)
+  const closeModal = () => {
+    if (activeModal === "ticket") {
+      makeEscalationDecision(null)
+    }
+    setActiveModal(null)
+  }
 
   const handlePointerDown = event => { if (open) return; startDrag(event) }
   const handlePointerUp = () => {
@@ -48,17 +69,22 @@ const BubbleChatContent = () => {
   const delay = ms => new Promise(r => setTimeout(r, ms))
 
   const handleSubmitTicket = async () => {
+    let loadingMsgId = null
     try {
       if (!sessionId || checkingEscalation) return
 
       makeEscalationDecision("ticket")
 
       const loadingMsg = addMessage("Preparing escalation details...", "agent", false, true)
+      loadingMsgId = loadingMsg.id
 
       setCheckingEscalation(true)
       const response = await ticketService.getEscalationDraft(sessionId)
 
-      removeMessage(loadingMsg.id)
+      if (loadingMsgId) {
+        removeMessage(loadingMsgId)
+        loadingMsgId = null
+      }
 
       if (response?.status === "needs_info" && response?.pushback_message) {
         const typing = addMessage("", "agent", true)
@@ -78,6 +104,7 @@ const BubbleChatContent = () => {
       }
     } catch (e) {
       console.error("SUBMIT_TICKET_ERROR", e)
+      if (loadingMsgId) removeMessage(loadingMsgId)
       addMessage("Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.", "agent")
       setActiveModal(null)
     } finally {
@@ -90,7 +117,9 @@ const BubbleChatContent = () => {
       openDraftAutoTriggered.current = true
       handleSubmitTicket()
     }
-    if (resolutionCheck?.resolutionAction !== "open_draft") openDraftAutoTriggered.current = false
+    if (resolutionCheck?.resolutionAction !== "open_draft") {
+      openDraftAutoTriggered.current = false
+    }
   }, [resolutionCheck?.resolutionAction, handleSubmitTicket])
 
   const handleOpenModal = modalId => {
@@ -105,7 +134,7 @@ const BubbleChatContent = () => {
 
   const modals = {
     history: <ChatHistoryModal key={historyRefreshKey} refreshKey={historyRefreshKey} onClose={closeModal} onLoadConversation={handleLoadConversation} onClearConversation={clearConversation} />,
-    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} messages={messages} />,
+    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} userData={userData} messages={messages} />,
     theme: <ThemeModal isOpen={true} onClose={closeModal} />,
     resolve: <ResolveConversationModal onClose={closeModal} onResolve={handleResolveConversation} />,
     about: <AboutHelpDeskModal onClose={closeModal} />,

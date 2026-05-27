@@ -41,6 +41,7 @@ const AISettingsPanel = () => {
     llmOptions,
     update,
     saveSettings,
+    loadFactoryDefaults,
   } = useAISettings()
 
   const { theme, isDark, toggleTheme } = useAdminTheme()
@@ -323,6 +324,7 @@ const AISettingsPanel = () => {
         success={success}
         error={error}
         onSave={saveSettings}
+        onLoadDefaults={loadFactoryDefaults}
       />
     </div>
   )

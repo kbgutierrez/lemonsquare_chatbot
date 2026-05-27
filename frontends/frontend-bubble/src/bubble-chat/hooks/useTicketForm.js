@@ -5,6 +5,7 @@ import {
 } from "react"
 
 import ticketService from "../services/ticketService"
+import chatbotService from "../services/chatbotService"
 
 const MAX_WORDS = 150
 const LONGEST_WORD_LIMIT = 189
@@ -55,6 +56,7 @@ const normalizeSummary = (
 export const useTicketForm = ({
   sessionId,
   requesterId,
+  userData,
   messages = [],
   onSuccess,
 }) => {
@@ -90,10 +92,15 @@ export const useTicketForm = ({
       requester_id:
         requesterId || "",
 
+      company_id:
+        userData?.company_id || "",
+
       summary: "",
       description: "",
       department_id: "",
       subcategory_id: "",
+      location: "",
+      equipment: "",
     })
 
   /* ========================================
@@ -195,6 +202,8 @@ export const useTicketForm = ({
               ...prev,
               summary: "",
               description: "",
+              location: "",
+              equipment: "",
             }))
 
             return
@@ -215,6 +224,8 @@ export const useTicketForm = ({
             description: normalized.summary,
             department_id: response?.department_id || "",
             subcategory_id: response?.subcategory_id || "",
+            location: response?.location || "",
+            equipment: response?.equipment || "",
           }))
 
         } catch (error) {
@@ -271,11 +282,15 @@ export const useTicketForm = ({
 
       requester_id:
         requesterId || "",
+
+      company_id:
+        userData?.company_id || "",
     }))
 
   }, [
     sessionId,
     requesterId,
+    userData,
   ])
 
   /* ========================================
@@ -370,7 +385,10 @@ export const useTicketForm = ({
               form.requester_id
             ),
 
-          company_id: 1,
+          company_id:
+            Number(
+              form.company_id || 1
+            ),
 
           summary:
             form.summary,
@@ -383,6 +401,16 @@ export const useTicketForm = ({
 
           subcategory_id:
             Number(form.subcategory_id),
+
+          location:
+            form.location,
+
+          equipment:
+            form.equipment,
+
+          user_token:
+            chatbotService.getUserToken?.() ||
+            localStorage.getItem("user_token"),
         }
 
         console.log(

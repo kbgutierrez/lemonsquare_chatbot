@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     QDRANT_ROUTING_COLLECTION: str = "LemonSquareRouting"
     QDRANT_TIMEOUT: float = 60.0
     EMBEDDING_MODEL: str = "intfloat/multilingual-e5-large"
-    RERANKER_MODEL: str = "BAAI/bge-reranker-v2-m3"
+    RERANKER_MODEL: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     CLASSIFIER_MODEL: str = "llama-3.1-8b-instant"
     ALLOW_TEST_AUTH: bool = False
     LOG_LEVEL: str = "INFO"
@@ -29,7 +29,13 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/admin/login"
     )
     BIZPORTAL_TICKET_URL: str = (
-        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/send/ticket/"
+    )
+    BIZPORTAL_DEPT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
+    )
+    BIZPORTAL_SUBCAT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
     DB_POOL_SIZE: int = 20

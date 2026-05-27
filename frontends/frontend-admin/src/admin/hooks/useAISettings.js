@@ -283,6 +283,25 @@ export const useAISettings = () => {
     }
   }, [saving, safeSettings, refresh])
 
+  /* ========================================
+     LOAD FACTORY DEFAULTS
+  ======================================== */
+  const loadFactoryDefaults = useCallback(async () => {
+    try {
+      setSuccess("")
+      setError("")
+      
+      const response = await aiSettingsService.getFactoryDefaults()
+      const normalized = normalizeSettings(response)
+      
+      setCachedData(CACHE_KEY, normalized)
+      setSuccess("Factory defaults loaded. Review and click 'Save' to apply.")
+    } catch (err) {
+      console.error("LOAD_DEFAULTS_ERROR", err)
+      setError("Failed to load factory defaults.")
+    }
+  }, [])
+
   return {
     loading,
     saving,
@@ -296,5 +315,6 @@ export const useAISettings = () => {
     update,
     selectModel,
     saveSettings,
+    loadFactoryDefaults,
   }
 }

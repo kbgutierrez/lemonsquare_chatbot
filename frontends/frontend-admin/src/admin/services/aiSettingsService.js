@@ -47,12 +47,30 @@ const updateSettings =
   }
 
 /* ========================================
+   GET FACTORY DEFAULTS
+======================================== */
+
+const getFactoryDefaults =
+  async () => {
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.AI_FACTORY_DEFAULTS
+      )
+
+    return apiClient.get(
+      endpoint
+    )
+  }
+
+/* ========================================
    EXPORT
 ======================================== */
 
 const aiSettingsService = {
   getSettings,
   updateSettings,
+  getFactoryDefaults,
 }
 
 export default aiSettingsService

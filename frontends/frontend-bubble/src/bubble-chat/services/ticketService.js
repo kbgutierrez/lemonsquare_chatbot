@@ -290,6 +290,9 @@ const submitEscalation =
     description,
     department_id,
     subcategory_id,
+    location,
+    equipment,
+    user_token,
   }) => {
 
     const payload = {
@@ -300,6 +303,9 @@ const submitEscalation =
       description,
       department_id,
       subcategory_id,
+      location,
+      equipment,
+      user_token,
     }
 
     log(
