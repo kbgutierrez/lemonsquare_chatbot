@@ -6,7 +6,7 @@ import {
   useState,
 } from "react"
 
-import { uploadDocument } from "../services/uploadService"
+import { uploadDocument, pollUploadStatus } from "../services/uploadService"
 import aiSettingsService from "../services/aiSettingsService"
 import { getKnowledgeFiles } from "../components/KnowledgeFiles/services/knowledgeFilesService.js"
 
@@ -395,19 +395,60 @@ export const useFileUpload =
                 category
               )
 
-            updateFile(
-              localId,
-              {
-                status:
-                  "Uploaded",
+            if (data?.job_id) {
+              updateFile(
+                localId,
+                {
+                  status:
+                    "Queued...",
 
-                statusType:
-                  "success",
+                  statusType:
+                    "loading",
+                }
+              )
 
-                response:
-                  data,
-              }
-            )
+              const details = await pollUploadStatus(data.job_id, (status) => {
+                const displayStatus = status === "queued" ? "Queued..." : "Processing...";
+                updateFile(
+                  localId,
+                  {
+                    status: displayStatus,
+                    statusType: "loading",
+                  }
+                )
+              })
+              
+              updateFile(
+                localId,
+                {
+                  status:
+                    "Uploaded",
+
+                  statusType:
+                    "success",
+
+                  response:
+                    details,
+                    
+                  category:
+                    details?.category || file.category,
+                }
+              )
+            } else {
+              updateFile(
+                localId,
+                {
+                  status:
+                    "Uploaded",
+
+                  statusType:
+                    "success",
+
+                  response:
+                    data,
+                }
+              )
+            }
 
           } catch (error) {
 

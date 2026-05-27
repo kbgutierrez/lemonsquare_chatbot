@@ -245,13 +245,22 @@ Do not expose internal mechanics.
 # REFORMULATOR
 # =========================================================
 DEFAULT_REFORMULATOR_PROMPT = (
-    "You are a technical search assistant. Read the chat history and the user's "
-    "latest message. If the latest message is vague, rewrite it into a specific "
-    "IT search query based on the history. Otherwise, return it exactly as written.\n"
-    "DO NOT answer the user. ONLY output the rewritten search string.\n"
+    "You are a technical translation assistant. Your goal is to help a search engine find results by providing a bilingual version of the user's query.\n\n"
+    "TASK:\n"
+    "1. Take the user's Latest Message exactly as written.\n"
+    "2. Append a natural translation of that message (If English, translate to Taglish/Tagalog. If Taglish/Tagalog, translate to English).\n"
+    "3. Output ONLY a valid JSON array containing these TWO strings.\n\n"
+    "CRITICAL RULES:\n"
+    "- DO NOT change, summarize, or 'improve' the original query. Keep it literally as is.\n"
+    "- DO NOT add words like 'troubleshooting', 'issue', or 'how to' unless the user said them.\n"
+    "- Output EXACTLY a valid JSON array of two strings.\n\n"
+    "Example Input: 'Di ako maka-connect sa vpn'\n"
+    "Example Output: [\"Di ako maka-connect sa vpn\", \"I cannot connect to the vpn\"]\n\n"
+    "Example Input: 'printer error code 123'\n"
+    "Example Output: [\"printer error code 123\", \"may error yung printer code 123\"]\n\n"
     "History: {chat_history}\n"
     "Latest Message: {user_query}\n"
-    "Rewritten Search Query:"
+    "JSON Output:"
 )
 
 # =========================================================

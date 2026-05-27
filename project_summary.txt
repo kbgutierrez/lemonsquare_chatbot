@@ -179,6 +179,8 @@ from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.telemetry_service import TelemetryService
+from dotenv import load_dotenv
+load_dotenv()
 
 configure_logging(app_settings.LOG_LEVEL)
 logger = logging.getLogger(__name__)
@@ -968,6 +970,7 @@ from app.schemas.documents import (
 
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
+from app.services.maintenance.job_manager import job_manager
 
 
 logger = logging.getLogger(__name__)
@@ -1008,39 +1011,65 @@ async def upload_document(
             detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
         )
 
-    file_bytes = await file.read()
-    if len(file_bytes) > max_upload_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
-        )
     filename = file.filename
 
+    existing_doc = db.query(UploadedDocument).filter(UploadedDocument.FileName == filename).first()
+    if existing_doc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{filename}' already exists in the database."
+        )
+
+    job_id = job_manager.create_job(f"upload_{filename}")
+
+    import tempfile
+    import aiofiles
+    import os
+
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    temp_file_path = tmp_file.name
+    tmp_file.close()
+
+    try:
+        total_size = 0
+        async with aiofiles.open(temp_file_path, 'wb') as out_file:
+            while content := await file.read(1024 * 1024):
+                total_size += len(content)
+                if total_size > max_upload_bytes:
+                    raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.")
+                await out_file.write(content)
+    except Exception as e:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        job_manager.update_job(job_id, status="failed", error=str(e), message="File upload failed")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
+
     async def process_pdf_in_background():
-        import io
-        from starlette.datastructures import UploadFile as StarletteUploadFile
         from app.core.database import SessionChatbot
 
         async with _upload_semaphore:
-            mem_file = io.BytesIO(file_bytes)
-            mem_file.name = filename
-            upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+            job_manager.update_job(job_id, status="running", message="Processing PDF...", progress=10.0)
 
             bg_db = SessionChatbot()
 
             try:
                 bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
-                await bg_ingestion_service.process_pdf_upload(
-                    upload_obj,
-                    bg_db,
+                result = await bg_ingestion_service.process_pdf_upload(
+                    file=None,
+                    db=bg_db,
                     manual_category=category,
+                    job_id=job_id,
+                    file_path=temp_file_path,
+                    original_filename=filename
                 )
 
                 logger.info(
                     "Background upload completed for %s",
                     filename,
                 )
+                
+                job_manager.update_job(job_id, status="completed", progress=100.0, message="Upload completed", details=result)
 
             except Exception as e:
                 logger.error(
@@ -1048,6 +1077,7 @@ async def upload_document(
                     filename,
                     e,
                 )
+                job_manager.update_job(job_id, status="failed", error=str(e), message="Upload failed")
 
             finally:
                 bg_db.close()
@@ -1061,7 +1091,16 @@ async def upload_document(
         document_id="pending",
         category=category or "pending",
         chunks_processed=0,
+        job_id=job_id,
     )
+
+
+@router.get("/upload/status/{job_id}", tags=["Documents"])
+async def get_upload_status(job_id: str):
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 class VectorSearchRequest(BaseModel):
@@ -1972,20 +2011,41 @@ AI settings router.
 Thin HTTP layer — business logic in settings_service.
 """
 import logging
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
 from app.api.deps import get_chatbot_db, require_admin_user
-from app.schemas.settings import SettingsResponse, SettingsUpdate
+from app.schemas.settings import (
+    SettingsResponse,
+    SettingsUpdate,
+    ThemeSettingsResponse,
+    ThemeSettingsUpdate,
+)
 from app.services.settings.settings_service import (
     get_active_settings,
     update_settings,
     restore_default_settings,
+    get_user_theme,
+    update_user_theme,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/settings", tags=["Settings"])
 
 _PLACEHOLDER_ADMIN_ID = 1
+
+
+def resolve_user_id(x_user_token: str | None = Header(default=None, alias="X-User-Token")) -> int:
+    """
+    Resolve user ID from token header.
+    Falls back to placeholder 11318 for SDK/dev mode.
+    """
+    if not x_user_token:
+        return 11318
+
+    try:
+        return int(x_user_token)
+    except (ValueError, TypeError):
+        return 11318
 
 
 @router.get("", response_model=SettingsResponse, summary="Fetch active AI configuration")
@@ -2016,6 +2076,29 @@ def restore_settings_to_default(
     config = restore_default_settings(db, updated_by=_PLACEHOLDER_ADMIN_ID)
     return SettingsResponse.model_validate(config)
 
+
+@router.get("/theme", response_model=ThemeSettingsResponse, summary="Fetch user theme configuration")
+def get_theme_settings_endpoint(
+    user_id: int = Depends(resolve_user_id),
+    db: Session = Depends(get_chatbot_db),
+) -> ThemeSettingsResponse:
+    config = get_user_theme(db, user_id)
+    return ThemeSettingsResponse.model_validate(config)
+
+
+@router.put("/theme", response_model=ThemeSettingsResponse, summary="Update user theme configuration")
+def update_theme_settings_endpoint(
+    theme_update: ThemeSettingsUpdate,
+    user_id: int = Depends(resolve_user_id),
+    db: Session = Depends(get_chatbot_db),
+) -> ThemeSettingsResponse:
+    config = update_user_theme(db, user_id, theme_update)
+    logger.info(
+        "Theme updated: user_id=%s theme=%s",
+        user_id,
+        theme_update.BubbleTheme,
+    )
+    return ThemeSettingsResponse.model_validate(config)
 
 --- FILE: backend\app\api\routers\tickets.py ---
 """
@@ -2748,6 +2831,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -2824,7 +2908,30 @@ class AIChatbotSetting(BaseChatbot):
 
     ConversationResolutionModel = Column(String(100))
     ConversationResolutionPrompt = Column(Text)
-    
+
+    BubbleTheme = Column(String(50), default="lemon-square")
+    HeaderGradientEnabled = Column(Boolean, default=True)
+    CustomHeaderGradientStart = Column(String(7), default="#7BE38E")
+    CustomHeaderGradientEnd = Column(String(7), default="#5dd87a")
+    CustomAccent = Column(String(7), default="#22c55e")
+    CustomWindowBg = Column(String(7), default="#f6fff7")
+
+
+class UserThemePreference(BaseChatbot):
+    __tablename__ = "UserThemePreferences"
+    PreferenceID = Column(Integer, primary_key=True, autoincrement=True)
+    UserID = Column(BigInteger, nullable=False, unique=True)
+    BubbleTheme = Column(String(50), default="lemon-square")
+    HeaderGradientEnabled = Column(Boolean, default=True)
+    CustomHeaderGradientStart = Column(String(7), default="#7BE38E")
+    CustomHeaderGradientEnd = Column(String(7), default="#5dd87a")
+    CustomAccent = Column(String(7), default="#22c55e")
+    CustomWindowBg = Column(String(7), default="#f6fff7")
+    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("UserID", name="UQ_UserThemePreferences_UserID"),
+    )
 
 
 class UploadedDocument(BaseChatbot):
@@ -2893,7 +3000,6 @@ class TicketRoutingLog(BaseChatbot):
     FinalDepartment = Column(String(100))
     FinalSubcategory = Column(String(100))
     CreatedAt = Column(DateTime, default=datetime.utcnow)
-
 
 --- FILE: backend\app\models\helpdesk.py ---
 """
@@ -3592,6 +3698,7 @@ class DocumentUploadResponse(BaseModel):
     document_id: str
     category: str
     chunks_processed: int
+    job_id: str | None = None
 
 
 class DocumentDeleteResponse(BaseModel):
@@ -3730,7 +3837,6 @@ class SettingsUpdate(BaseModel):
 
     ConversationResolutionModel: str | None
     ConversationResolutionPrompt: str | None
-    
 
 
 class SettingsResponse(BaseModel):
@@ -3765,6 +3871,26 @@ class SettingsResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class ThemeSettingsUpdate(BaseModel):
+    BubbleTheme: str = Field(default="lemon-square", max_length=50)
+    HeaderGradientEnabled: bool = Field(default=True)
+    CustomHeaderGradientStart: str = Field(default="#7BE38E", max_length=7)
+    CustomHeaderGradientEnd: str = Field(default="#5dd87a", max_length=7)
+    CustomAccent: str = Field(default="#22c55e", max_length=7)
+    CustomWindowBg: str = Field(default="#f6fff7", max_length=7)
+
+
+class ThemeSettingsResponse(BaseModel):
+    BubbleTheme: str
+    HeaderGradientEnabled: bool
+    CustomHeaderGradientStart: str
+    CustomHeaderGradientEnd: str
+    CustomAccent: str
+    CustomWindowBg: str
+
+    class Config:
+        from_attributes = True
 
 --- FILE: backend\app\schemas\tickets.py ---
 """Pydantic schemas for ticket management endpoints."""
@@ -4207,80 +4333,113 @@ Do not expose internal mechanics.
 # REFORMULATOR
 # =========================================================
 DEFAULT_REFORMULATOR_PROMPT = (
-    "You are a technical search assistant. Read the chat history and the user's "
-    "latest message. If the latest message is vague, rewrite it into a specific "
-    "IT search query based on the history. Otherwise, return it exactly as written.\n"
-    "DO NOT answer the user. ONLY output the rewritten search string.\n"
+    "You are a technical translation assistant. Your goal is to help a search engine find results by providing a bilingual version of the user's query.\n\n"
+    "TASK:\n"
+    "1. Take the user's Latest Message exactly as written.\n"
+    "2. Append a natural translation of that message (If English, translate to Taglish/Tagalog. If Taglish/Tagalog, translate to English).\n"
+    "3. Output ONLY a valid JSON array containing these TWO strings.\n\n"
+    "CRITICAL RULES:\n"
+    "- DO NOT change, summarize, or 'improve' the original query. Keep it literally as is.\n"
+    "- DO NOT add words like 'troubleshooting', 'issue', or 'how to' unless the user said them.\n"
+    "- Output EXACTLY a valid JSON array of two strings.\n\n"
+    "Example Input: 'Di ako maka-connect sa vpn'\n"
+    "Example Output: [\"Di ako maka-connect sa vpn\", \"I cannot connect to the vpn\"]\n\n"
+    "Example Input: 'printer error code 123'\n"
+    "Example Output: [\"printer error code 123\", \"may error yung printer code 123\"]\n\n"
     "History: {chat_history}\n"
     "Latest Message: {user_query}\n"
-    "Rewritten Search Query:"
+    "JSON Output:"
 )
 
 # =========================================================
 # ESCALATION DRAFTING (For Main AI - 70B)
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are a friendly Filipino IT Helpdesk Agent and Dispatcher currently assisting a user in a live chat conversation.\n"
-    "The user already wants to submit a ticket, and you are now helping complete the remaining details naturally.\n\n"
+    "You are a friendly Filipino IT Helpdesk Agent assisting a user in an ongoing live chat conversation.\n"
+    "The user already clicked submit ticket before this conversation started.\n\n"
 
-    "Your job is to read the chat transcript and determine if there is enough information to proceed with ticket drafting.\n\n"
+    "Because of this:\n"
+    "- NEVER ask if they want to create a ticket.\n"
+    "- The ticket process is already ongoing.\n"
+    "- Your role is to naturally gather missing details so the ticket can be endorsed properly.\n\n"
+
+    "Your job is to read the chat transcript and determine if enough information exists to proceed with ticket drafting.\n\n"
 
     "A complete ticket ideally includes:\n"
-    "1. The Issue or Error\n"
-    "2. The Location (branch, department, area, site, etc.)\n"
-    "3. The Specific Equipment (PC number, printer name, device, affected unit, etc.)\n\n"
+    "1. Issue or Error\n"
+    "2. Location\n"
+    "3. Specific Equipment or Affected Unit\n\n"
 
     "PERSONALITY AND TONE:\n"
-    "- Talk naturally like a real Filipino IT helpdesk staff in a casual professional Taglish conversation.\n"
-    "- Sound friendly, approachable, and conversational.\n"
-    "- The conversation should feel ongoing already, not like a form validation process.\n"
-    "- Avoid robotic wording.\n"
-    "- Avoid corporate/form-style language.\n"
+    "- Talk naturally like a real Filipino IT helpdesk staff in casual professional Taglish.\n"
+    "- Sound friendly, conversational, and human.\n"
+    "- Avoid robotic or form-style wording.\n"
     "- Keep replies concise and natural.\n"
-    "- Sound like someone casually helping endorse a ticket.\n\n"
+    "- Sound like the SAME agent continuously assisting the user.\n\n"
 
-    "FIRST MESSAGE BEHAVIOR:\n"
-    "- If this is the first time asking for missing details, sound welcoming and helpful.\n"
-    "- Start naturally as if already assisting the user.\n"
-    "- Example tone:\n"
-    "  'Okay tutulungan kitang gumawa ng ticket. Need ko lang muna ng ilang details para maayos yung endorsement.'\n"
-    "  'Sige sesend natin yan. May maidagdag ka pa bang details like saan nangyari or anong device yung affected?'\n"
-    "  'Okay gagawan natin yan ng ticket. Ask ko lang sana kung saang branch or department ito?'\n\n"
+    "RESPONSE START VARIETY RULE:\n"
+    "- Vary the opening naturally across conversations.\n"
+    "- Avoid repeating the same starter every time.\n\n"
 
-    "MISSING DETAIL STYLE RULES:\n"
+    "Possible opening styles:\n"
+    "1. Assistance-focused\n"
+    "- 'Tutulungan kitang...'\n"
+    "- 'Tulungan kita...'\n"
+    "- 'Sige ayusin natin...'\n"
+    "- 'Gagawan natin yan ng ticket...'\n\n"
+
+    "2. Endorsement-focused\n"
+    "- 'Para maipasa ko agad...'\n"
+    "- 'Para ma-endorse natin agad...'\n"
+    "- 'Diretso natin yan sa Facilities...'\n"
+    "- 'Para mabilis ma-check...'\n\n"
+
+    "3. Clarification-focused\n"
+    "- 'Need ko lang ng konting details...'\n"
+    "- 'Ask ko lang sana...'\n"
+    "- 'May details ka pa ba tungkol sa...'\n\n"
+
+    "4. Follow-up acknowledgement-focused\n"
+    "- 'Noted!'\n"
+    "- 'Okay noted!'\n"
+    "- 'Sige noted!'\n"
+    "- 'Ayos noted!'\n\n"
+
+    "FIRST MESSAGE RULE:\n"
+    "- The first missing-detail question should feel welcoming and onboarding-like.\n"
+    "- Use a reassure → clarify flow.\n"
+    "- Example:\n"
+    "  'Tutulungan kitang maipasa yung ticket. Need ko lang muna kung saang branch o area itong issue.'\n\n"
+
+    "FOLLOW-UP RULE:\n"
+    "- Follow-up questions should feel lighter and conversational.\n"
+    "- Example:\n"
+    "  'Okay noted! May specific unit number ba yung aircon?'\n\n"
+
+    "MISSING DETAIL RULES:\n"
     "- If ANY required detail is missing, set 'is_ready' to false.\n"
     "- Ask for ONLY ONE missing detail at a time.\n"
-    "- The question must sound contextual and conversational.\n"
-    "- Avoid sounding repetitive or scripted.\n"
     "- Avoid enumerating missing fields.\n"
-    "- Continue the flow naturally after the first onboarding-style response.\n"
-    "- Good examples:\n"
-    "  'Noted. Anong specific PC or device yung affected?'\n"
-    "  'Gets. Saang area naman ito nangyari?'\n"
-    "  'Okay noted yan. May PC number or equipment name ba tayo?'\n"
-    "  'Saang branch pala ito bossing?'\n\n"
+    "- Continue the conversation naturally.\n\n"
 
     "TOLERANCE RULE:\n"
-    "- If the user explicitly says they don't know a detail, accept it immediately.\n"
+    "- If the user says they do not know a detail, accept it immediately.\n"
     "- Examples:\n"
     "  'ewan'\n"
     "  'di ko alam'\n"
     "  'not sure'\n"
     "  'unknown'\n"
-    "- Treat these as valid gathered answers.\n"
-    "- Do NOT repeatedly ask for the same detail once the user already said they don't know.\n"
-    "- Move on naturally.\n\n"
+    "- Do NOT repeatedly ask for the same detail.\n\n"
 
     "READY RULES:\n"
-    "- If all required details are gathered OR properly acknowledged as unknown, set 'is_ready' to true.\n"
-    "- If 'is_ready' is true, set 'chat_message' to null.\n"
-    "- Do NOT add confirmation messages once ready.\n\n"
+    "- If all required details are gathered OR acknowledged as unknown, set 'is_ready' to true.\n"
+    "- If 'is_ready' is true, set 'chat_message' to null.\n\n"
 
     "OUTPUT RULES:\n"
-    "- DO NOT output conversational text outside the JSON.\n"
     "- RAW JSON ONLY.\n"
     "- NO markdown.\n"
-    "- NO explanations.\n\n"
+    "- NO explanations.\n"
+    "- DO NOT output conversational text outside the JSON.\n\n"
 
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
@@ -4671,7 +4830,7 @@ from app.services.routing.routing_engine import suggest_route
 from app.schemas.routing import RoutingRequest
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.embedding_provider import get_embedding_model
-
+import time
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -4689,6 +4848,7 @@ FALLBACK_ROUTING = {
 }
 
 BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
+_draft_cache: dict[str, tuple[dict, float]] = {}
 
 
 async def _get_draft_lock(session_id: str) -> asyncio.Lock:
@@ -4705,14 +4865,25 @@ class EscalationService:
         self.message_svc = MessageService(db)
 
 
-    async def draft_escalation(self, session_id: str) -> dict:
+    async def draft_escalation(self, session_id: str) -> dict: 
+        global _draft_cache
+        
         """
         Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
         draft_lock = await _get_draft_lock(session_id)
         async with draft_lock:
-            return await self._draft_escalation_locked(session_id)
+            # --- NEW: CHECK CACHE FIRST ---
+            if session_id in _draft_cache:
+                cached_data, timestamp = _draft_cache[session_id]
+                if time.time() - timestamp < 30.0:
+                    logger.info("Serving escalation draft from cache for session %s", session_id)
+                    del _draft_cache[session_id]  # Self-destruct the cache
+                    return cached_data
+
+            # If no cache, run the heavy LLM function
+            return await self._draft_escalation_locked(session_id)  
 
     async def _draft_escalation_locked(self, session_id: str) -> dict:
         session = self.repo.validate_session_for_escalation(session_id)
@@ -4754,7 +4925,8 @@ class EscalationService:
 
             pushback_msg = extracted_data.get("chat_message") or "Sige, gawan natin ng ticket. Ano nga pala ang detalye (PC number, location)?"
 
-            self.message_svc.save_ai_message(
+            await asyncio.to_thread(
+                self.message_svc.save_ai_message,
                 session_id=session_id,
                 content=pushback_msg,
             )
@@ -4851,7 +5023,7 @@ class EscalationService:
             routing_analysis = "Routing engine failed."
 
         # --- 3. RETURN COMBO TO FRONTEND ---
-        return {
+        final_result = {
             "status": "success",
             "summary": summary,
             "description": description,
@@ -4867,6 +5039,11 @@ class EscalationService:
             "routing_source": "ai_rac_pipeline",
         }
 
+        # --- NEW: SAVE TO CACHE BEFORE RETURNING ---
+        global _draft_cache
+        _draft_cache[session_id] = (final_result, time.time())
+        
+        return final_result
     async def submit_escalation(self, payload: dict, file: UploadFile = None) -> dict:
         """
         Submit an escalation ticket to BizPortal with conditional fields and optional attachment.
@@ -6284,11 +6461,14 @@ class DocumentIngestionService:
 
     # ── PDF Upload ─────────────────────────────────────────────
 
-    async def process_pdf_upload(self, file, db, manual_category=None) -> dict:
+    async def process_pdf_upload(self, file=None, db=None, manual_category=None, job_id=None, file_path=None, original_filename=None) -> dict:
         from app.services.ingestion.pdf_processor import PDFProcessor
         return await PDFProcessor(db, self.vector_store, self.embeddings).process(
             file=file,
             manual_category=manual_category,
+            job_id=job_id,
+            file_path=file_path,
+            original_filename=original_filename,
         )
 
     # ── Manual Entry ───────────────────────────────────────────
@@ -7111,16 +7291,36 @@ class PDFProcessor:
         pdf_reader = PdfReader(filepath)
         return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
 
-    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
-        raw_bytes = await file.read()
-        self._validate_pdf_bytes(raw_bytes)
+    async def process(self, file: UploadFile | None = None, manual_category: str | None = None, job_id: str | None = None, file_path: str | None = None, original_filename: str | None = None) -> dict:
+        from app.services.maintenance.job_manager import job_manager
 
-        temp_file_path: str | None = None
+        def _update(prog: float, msg: str):
+            if job_id:
+                job_manager.update_job(job_id, progress=prog, message=msg)
+
+        filename_to_use = original_filename if original_filename else (file.filename if file else "document.pdf")
+        temp_file_path = file_path
+
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(raw_bytes)
-                temp_file_path = tmp.name
+            if not temp_file_path:
+                _update(10.0, "Reading PDF bytes...")
+                raw_bytes = await file.read()
+                self._validate_pdf_bytes(raw_bytes)
 
+                import aiofiles
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                temp_file_path = tmp_file.name
+                tmp_file.close()
+
+                async with aiofiles.open(temp_file_path, 'wb') as out_file:
+                    await out_file.write(raw_bytes)
+            else:
+                _update(10.0, "Validating PDF file...")
+                with open(temp_file_path, 'rb') as f:
+                    header = f.read(5)
+                    self._validate_pdf_bytes(header)
+
+            _update(25.0, "Extracting text from PDF...")
             # FIX: Offload the heavy PDF parsing to a separate thread
             raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
 
@@ -7133,22 +7333,26 @@ class PDFProcessor:
                     raise ValidationError(f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}")
                 category = manual_category
             else:
+                _update(45.0, "AI is classifying document...")
                 category = await self._classify_document(raw_text, allowed_categories)
 
-            document_id = self._document_id(file.filename or "document.pdf", raw_text, category)
+            document_id = self._document_id(filename_to_use, raw_text, category)
+            
+            _update(60.0, "Chunking document text...")
             chunks = self.chunker.split_text(raw_text)
             if not chunks:
                 raise ValidationError("Could not split extracted PDF text into chunks.")
 
+            _update(75.0, "Generating vector embeddings...")
             vectors = await self.embedding_service.embed_documents(chunks)
             points = []
-            cluster_key = sha256_hash(f"{document_id}:{file.filename}:{category}")
+            cluster_key = sha256_hash(f"{document_id}:{filename_to_use}:{category}")
             for index, chunk in enumerate(chunks):
                 chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{index}"))
                 metadata = build_pdf_metadata(
                     cluster_key=cluster_key,
                     document_id=document_id,
-                    file_name=file.filename or "document.pdf",
+                    file_name=filename_to_use,
                     category=category,
                     chunk_index=index,
                 )
@@ -7159,6 +7363,7 @@ class PDFProcessor:
                     payload=build_qdrant_payload(page_content=chunk, metadata=metadata),
                 ))
 
+            _update(90.0, "Saving to vector database...")
             try:
                 self.vector_store.upsert_points(points)
             except Exception as exc:
@@ -7168,7 +7373,7 @@ class PDFProcessor:
             try:
                 self.db.add(UploadedDocument(
                     DocumentID=document_id,
-                    FileName=file.filename or "document.pdf",
+                    FileName=filename_to_use,
                     Category=category,
                     ChunkCount=len(chunks),
                     IsActive=True,
@@ -7185,7 +7390,7 @@ class PDFProcessor:
                         document_id,
                         cleanup_exc,
                     )
-                raise ValidationError(f"File '{file.filename}' already exists in the database.") from exc
+                raise ValidationError(f"File '{filename_to_use}' already exists in the database.") from exc
             except Exception as exc:
                 self.db.rollback()
                 try:
@@ -7527,6 +7732,7 @@ import logging
 import json
 from app.services.llm_client import create_llm, invoke_llm
 from app.services.prompts import DEFAULT_REFORMULATOR_PROMPT
+from app.utils.json_utils import safe_json_loads, clean_llm_json_output
 
 logger = logging.getLogger(__name__)
 
@@ -7543,6 +7749,7 @@ class QueryReformulator:
     ) -> str:
         """
         Rewrite a query using conversation context.
+        Supports single string output or JSON array of query variations.
 
         Args:
             user_query: The raw user message.
@@ -7551,40 +7758,54 @@ class QueryReformulator:
             prompt_template: Custom prompt template (uses default if None).
 
         Returns:
-            The reformulated search query string.
+            The reformulated search query string (merged if multiple variations).
         """
         template = prompt_template or DEFAULT_REFORMULATOR_PROMPT
         safe_history = chat_history.strip() or "No previous history. This is the first message."
 
         llm = create_llm(model=model, temperature=0.0)
-        rewrite_prompt = template.format(
-            chat_history=safe_history,
-            user_query=user_query,
-        )
+        
+        # Self-healing prompt formatting: handles {user_query}, {latest_message}, and {input}
+        # to ensure compatibility with various DB-stored or legacy templates.
+        try:
+            rewrite_prompt = template.format(
+                chat_history=safe_history,
+                user_query=user_query,
+                latest_message=user_query,
+                input=user_query,
+            )
+        except KeyError as exc:
+            logger.error("Reformulator prompt template error: missing key %s", exc)
+            return user_query
+
         result = await invoke_llm(
             llm,
             rewrite_prompt,
             model=model,
             action="query_reformulation",
         )
+        
         raw_output = result.content.strip()
-        if raw_output.startswith("```json"):
-            raw_output = raw_output[7:-3].strip()
-        elif raw_output.startswith("```"):
-            raw_output = raw_output[3:-3].strip()
-
-        try:
-            parsed = json.loads(raw_output)
-            if isinstance(parsed, list):
-                candidates = [str(item).strip() for item in parsed if str(item).strip()]
-                if candidates:
-                    return candidates[0]
-            if isinstance(parsed, str) and parsed.strip():
-                return parsed.strip()
-        except Exception:
-            pass
-
-        return raw_output.strip(' "\'\n')
+        
+        # Robust parsing using centralized utilities
+        parsed = safe_json_loads(raw_output, context="query_reformulation")
+        
+        if isinstance(parsed, list):
+            # Join variations with spaces to create a broad semantic search string
+            # while maintaining the original signal.
+            candidates = [str(item).strip() for item in parsed if str(item).strip()]
+            if candidates:
+                return " ".join(candidates)
+        
+        if isinstance(parsed, str) and parsed.strip():
+            return parsed.strip()
+            
+        # Fallback to cleaned text if not valid JSON
+        cleaned = raw_output.strip(' "\'\n')
+        if cleaned.startswith("```"):
+             cleaned = clean_llm_json_output(raw_output)
+             
+        return cleaned or user_query
 
 
 --- FILE: backend\app\services\rag\support_orchestrator.py ---
@@ -8430,10 +8651,11 @@ class VectorStoreService:
         )
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=1)
 def get_shared_vector_store(collection_name: str | None = None) -> VectorStoreService:
     """Return a shared vector store service for the configured collection."""
-    return VectorStoreService(collection_name)
+    resolved_name = collection_name or settings.QDRANT_COLLECTION
+    return VectorStoreService(resolved_name)
 
 
 --- FILE: backend\app\services\routing\__init__.py ---
@@ -8742,9 +8964,9 @@ Uses SettingsRepository for all DB operations.
 import logging
 from sqlalchemy.orm import Session
 from app.core.exceptions import NotFoundError
-from app.models.chatbot import AIChatbotSetting
+from app.models.chatbot import AIChatbotSetting, UserThemePreference
 from app.repositories.settings_repository import SettingsRepository
-from app.schemas.settings import SettingsUpdate
+from app.schemas.settings import SettingsUpdate, ThemeSettingsUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -8802,6 +9024,67 @@ def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
         raise NotFoundError("System default settings (ID 2) not found.")
     return repo.create_new_active_settings(source=default_config, updated_by=updated_by)
 
+
+def get_user_theme(db: Session, user_id: int) -> UserThemePreference:
+    """
+    Get or create theme preference for a specific user.
+    Falls back to global defaults from AIChatbot_Settings if user has no saved preference.
+    """
+    pref = db.query(UserThemePreference).filter(
+        UserThemePreference.UserID == user_id
+    ).first()
+
+    if pref:
+        return pref
+
+    # No user preference yet — seed from global defaults
+    global_defaults = SettingsRepository(db).require_active_settings()
+
+    return UserThemePreference(
+        UserID=user_id,
+        BubbleTheme=global_defaults.BubbleTheme,
+        HeaderGradientEnabled=global_defaults.HeaderGradientEnabled,
+        CustomHeaderGradientStart=global_defaults.CustomHeaderGradientStart,
+        CustomHeaderGradientEnd=global_defaults.CustomHeaderGradientEnd,
+        CustomAccent=global_defaults.CustomAccent,
+        CustomWindowBg=global_defaults.CustomWindowBg,
+    )
+
+
+def update_user_theme(
+    db: Session,
+    user_id: int,
+    theme_update: ThemeSettingsUpdate,
+) -> UserThemePreference:
+    """
+    Upsert theme preference for a specific user.
+    Creates row if none exists, updates if it does.
+    """
+    pref = db.query(UserThemePreference).filter(
+        UserThemePreference.UserID == user_id
+    ).first()
+
+    if not pref:
+        pref = UserThemePreference(UserID=user_id)
+        db.add(pref)
+
+    pref.BubbleTheme = theme_update.BubbleTheme
+    pref.HeaderGradientEnabled = theme_update.HeaderGradientEnabled
+    pref.CustomHeaderGradientStart = theme_update.CustomHeaderGradientStart
+    pref.CustomHeaderGradientEnd = theme_update.CustomHeaderGradientEnd
+    pref.CustomAccent = theme_update.CustomAccent
+    pref.CustomWindowBg = theme_update.CustomWindowBg
+
+    db.commit()
+    db.refresh(pref)
+
+    logger.info(
+        "User theme updated: user_id=%s theme=%s",
+        user_id,
+        theme_update.BubbleTheme,
+    )
+
+    return pref
 
 --- FILE: backend\app\services\taxonomy\__init__.py ---
 

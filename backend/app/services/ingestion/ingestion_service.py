@@ -50,11 +50,14 @@ class DocumentIngestionService:
 
     # ── PDF Upload ─────────────────────────────────────────────
 
-    async def process_pdf_upload(self, file, db, manual_category=None) -> dict:
+    async def process_pdf_upload(self, file=None, db=None, manual_category=None, job_id=None, file_path=None, original_filename=None) -> dict:
         from app.services.ingestion.pdf_processor import PDFProcessor
         return await PDFProcessor(db, self.vector_store, self.embeddings).process(
             file=file,
             manual_category=manual_category,
+            job_id=job_id,
+            file_path=file_path,
+            original_filename=original_filename,
         )
 
     # ── Manual Entry ───────────────────────────────────────────

@@ -26,6 +26,9 @@ export const API_ENDPOINTS = {
   DOCUMENT_UPLOAD:
     "/api/documents/upload",
 
+  DOCUMENT_UPLOAD_STATUS:
+    "/api/documents/upload/status/:jobId",
+
   DOCUMENT_DELETE:
     "/api/documents/:documentId",
 

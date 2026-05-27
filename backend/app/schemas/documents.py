@@ -20,6 +20,7 @@ class DocumentUploadResponse(BaseModel):
     document_id: str
     category: str
     chunks_processed: int
+    job_id: str | None = None
 
 
 class DocumentDeleteResponse(BaseModel):
