@@ -94,6 +94,8 @@ export const useTicketForm = ({
       description: "",
       department_id: "",
       subcategory_id: "",
+      location: "",
+      equipment: "",
     })
 
   /* ========================================
@@ -195,6 +197,8 @@ export const useTicketForm = ({
               ...prev,
               summary: "",
               description: "",
+              location: "",
+              equipment: "",
             }))
 
             return
@@ -215,6 +219,8 @@ export const useTicketForm = ({
             description: normalized.summary,
             department_id: response?.department_id || "",
             subcategory_id: response?.subcategory_id || "",
+            location: response?.location || "",
+            equipment: response?.equipment || "",
           }))
 
         } catch (error) {
@@ -383,6 +389,16 @@ export const useTicketForm = ({
 
           subcategory_id:
             Number(form.subcategory_id),
+
+          location:
+            form.location,
+
+          equipment:
+            form.equipment,
+
+          user_token:
+            ticketService.getUserToken?.() ||
+            localStorage.getItem("user_token"),
         }
 
         console.log(

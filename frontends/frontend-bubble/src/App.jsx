@@ -24,7 +24,7 @@ const DEFAULT_CONFIG = {
   userToken:
     import.meta.env
       .VITE_DEV_USER_TOKEN ||
-    "11318",
+    "67",
 
   environment:
     import.meta.env.MODE ||
