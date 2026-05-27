@@ -288,7 +288,8 @@ class VectorStoreService:
         )
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=1)
 def get_shared_vector_store(collection_name: str | None = None) -> VectorStoreService:
     """Return a shared vector store service for the configured collection."""
-    return VectorStoreService(collection_name)
+    resolved_name = collection_name or settings.QDRANT_COLLECTION
+    return VectorStoreService(resolved_name)

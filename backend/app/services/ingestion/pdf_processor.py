@@ -111,9 +111,13 @@ class PDFProcessor:
 
         temp_file_path: str | None = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-                tmp.write(raw_bytes)
-                temp_file_path = tmp.name
+            import aiofiles
+            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            temp_file_path = tmp_file.name
+            tmp_file.close()
+
+            async with aiofiles.open(temp_file_path, 'wb') as out_file:
+                await out_file.write(raw_bytes)
 
             # FIX: Offload the heavy PDF parsing to a separate thread
             raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)

@@ -346,7 +346,7 @@ TICKET_GENERATION_PROMPT = (
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
     '  "summary": "string (Short operational title)",\n'
-    '  "description": "string (Concise technician-style summary of the ISSUE)",\n'
+    '  "description": "string (1 to 2 full sentences in Taglish combining the details. No bullet points.)",\n'
     '  "location": "string (e.g., HR Department, Branch A, or \'Unknown\')",\n'
     '  "equipment": "string (e.g., PC #123, Printer, or \'Unknown\')"\n'
     "}}\n\n"
