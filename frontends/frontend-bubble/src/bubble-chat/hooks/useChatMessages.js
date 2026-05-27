@@ -15,11 +15,12 @@ const createMessage = ({
   sender,
   text = "",
   isTyping = false,
+  isLoading = false,
 }) => ({
   id: crypto.randomUUID(),
   sender,
   text,
-  time: isTyping
+  time: isTyping || isLoading
     ? ""
     : new Date().toLocaleTimeString(
         [],
@@ -29,6 +30,7 @@ const createMessage = ({
         }
       ),
   isTyping,
+  isLoading,
 })
 
 /* ========================================
@@ -72,6 +74,16 @@ export const useChatMessages =
       resolutionAction: "active",
       resolutionMessage: null,
     })
+
+    /* ========================================
+       ESCALATION DECISION STATE
+       Permanent one-time action recorder.
+    ======================================== */
+
+    const [
+      escalationDecision,
+      setEscalationDecision,
+    ] = useState(null)
 
     /* ========================================
        REFS
@@ -182,10 +194,6 @@ export const useChatMessages =
           ) {
             return
           }
-
-          /*
-            BLOCK AUTO-RESTORE
-          */
 
           if (
             state.cleared
@@ -298,6 +306,12 @@ export const useChatMessages =
 
     /* ========================================
        SEND MESSAGE
+       
+       CRITICAL: The assistant's conversational response
+       (response.message) is ALWAYS added as a persistent
+       chat message. The escalation prompt is a SEPARATE
+       transient UI layer rendered by ResolutionPrompt
+       using resolutionCheck.resolutionMessage.
     ======================================== */
 
     const sendMessage =
@@ -374,13 +388,15 @@ export const useChatMessages =
               )
             }
 
+            /* ========================================
+               ALWAYS add the assistant's conversational
+               response as a persistent message.
+            ======================================== */
+
             const aiMessage =
               createMessage({
                 sender: "agent",
-
-                text:
-                  response?.message?.trim() ||
-                  "Empty response",
+                text: response?.message?.trim() || "Empty response",
               })
 
             setMessages([
@@ -389,13 +405,24 @@ export const useChatMessages =
               aiMessage,
             ])
 
-            // Apply resolution flags returned by the backend immediately
+            /* ========================================
+               Set escalation flags separately.
+               The prompt text is rendered transiently
+               by ResolutionPrompt, NOT as a message.
+            ======================================== */
+
+            const hasEscalationFlags =
+              Boolean(response?.showResolutionPrompt) ||
+              Boolean(response?.allowTicketSubmission)
+
             setResolutionCheck({
               showResolutionPrompt: Boolean(response?.showResolutionPrompt),
               allowTicketSubmission: Boolean(response?.allowTicketSubmission),
               conversationStatus: response?.conversationStatus || "active",
               resolutionAction: response?.resolutionAction || "active",
-              resolutionMessage: response?.resolutionMessage || null,
+              resolutionMessage: hasEscalationFlags
+                ? (response?.resolutionMessage || response?.message || null)
+                : null,
             })
 
           } catch (error) {
@@ -496,18 +523,15 @@ export const useChatMessages =
               showResolutionPrompt:
                 Boolean(data?.show_resolution_prompt),
 
-              // Force strict boolean based on the new backend logic
               allowTicketSubmission:
                 Boolean(data?.allow_ticket_submission),
 
               conversationStatus:
                 data?.conversation_status || "active",
 
-              // FIXED: Must read from data.resolution_action
               resolutionAction:
                 data?.resolution_action || "active",
 
-              // FIXED: Must read from data.resolution_message
               resolutionMessage:
                 data?.resolution_message || null,
             })
@@ -570,6 +594,7 @@ export const useChatMessages =
             false
 
           setMessages([])
+          setEscalationDecision(null)
 
           state.sessionId =
             sessionId
@@ -601,6 +626,7 @@ export const useChatMessages =
           setMessages([])
           setSessionId(null)
           setResolved(false)
+          setEscalationDecision(null)
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -624,7 +650,24 @@ export const useChatMessages =
       )
 
     /* ========================================
-       ADD MESSAGE (for injecting external messages)
+       ESCALATION DECISION
+    ======================================== */
+
+    const makeEscalationDecision =
+      useCallback(
+        (
+          decision
+        ) => {
+
+          setEscalationDecision(
+            decision
+          )
+        },
+        []
+      )
+
+    /* ========================================
+       ADD MESSAGE
     ======================================== */
 
     const addMessage =
@@ -632,7 +675,8 @@ export const useChatMessages =
         (
           text,
           sender = "agent",
-          isTyping = false
+          isTyping = false,
+          isLoading = false
         ) => {
 
           const message =
@@ -640,6 +684,7 @@ export const useChatMessages =
               sender,
               text,
               isTyping,
+              isLoading,
             })
 
           setMessages(
@@ -697,5 +742,9 @@ export const useChatMessages =
       dismissResolution,
 
       addMessage,
-      }
-      }
+
+      escalationDecision,
+
+      makeEscalationDecision,
+    }
+  }

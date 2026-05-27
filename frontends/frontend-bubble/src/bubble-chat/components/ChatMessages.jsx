@@ -4,6 +4,8 @@ import {
   useRef,
 } from "react"
 
+import { AnimatePresence, motion } from "framer-motion"
+
 import ChatMessage from "./ChatMessage.jsx"
 import ResolutionPrompt from "./ResolutionPrompt.jsx"
 
@@ -58,6 +60,8 @@ const ChatMessages = ({
   onResolve,
   onDismiss,
   onOpenTicket,
+  onMakeEscalationDecision,
+  escalationDecision,
 }) => {
 
   const messagesEndRef =
@@ -163,6 +167,15 @@ const ChatMessages = ({
 
   }, [normalizedMessages])
 
+  const shouldShowEscalationPrompt =
+    !resolved &&
+    !loading &&
+    !escalationDecision &&
+    (
+      resolutionCheck.showResolutionPrompt ||
+      resolutionCheck.allowTicketSubmission
+    )
+
   return (
     <div
       className="
@@ -211,18 +224,29 @@ const ChatMessages = ({
           )
         )}
 
-        {/* RESOLUTION PROMPT AS A MESSAGE */}
-        {/* Render based on backend flags - text is now hardcoded in ResolutionPrompt */}
-        {!resolved && !loading && (resolutionCheck.showResolutionPrompt || resolutionCheck.allowTicketSubmission) && (
-          <ResolutionPrompt
-            onResolve={onResolve}
-            onDismiss={onDismiss}
-            onOpenTicket={onOpenTicket}
-            showResolutionPrompt={resolutionCheck.showResolutionPrompt}
-            allowTicketSubmission={resolutionCheck.allowTicketSubmission}
-            resolutionMessage={resolutionCheck.resolutionMessage}
-          />
-        )}
+        {/* ESCALATION PROMPT — entire block animates out and is removed from DOM after action */}
+        <AnimatePresence>
+          {shouldShowEscalationPrompt && (
+            <motion.div
+              key="resolution-prompt"
+              initial={{ opacity: 0, y: 12, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              <ResolutionPrompt
+                onResolve={onResolve}
+                onDismiss={onDismiss}
+                onOpenTicket={onOpenTicket}
+                onMakeDecision={onMakeEscalationDecision}
+                showResolutionPrompt={resolutionCheck.showResolutionPrompt}
+                allowTicketSubmission={resolutionCheck.allowTicketSubmission}
+                resolutionMessage={resolutionCheck.resolutionMessage}
+                escalationDecision={escalationDecision}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
 
