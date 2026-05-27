@@ -33,6 +33,7 @@ from app.schemas.documents import (
 
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
+from app.services.maintenance.job_manager import job_manager
 
 
 logger = logging.getLogger(__name__)
@@ -73,39 +74,65 @@ async def upload_document(
             detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
         )
 
-    file_bytes = await file.read()
-    if len(file_bytes) > max_upload_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.",
-        )
     filename = file.filename
 
+    existing_doc = db.query(UploadedDocument).filter(UploadedDocument.FileName == filename).first()
+    if existing_doc:
+        raise HTTPException(
+            status_code=400,
+            detail=f"File '{filename}' already exists in the database."
+        )
+
+    job_id = job_manager.create_job(f"upload_{filename}")
+
+    import tempfile
+    import aiofiles
+    import os
+
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    temp_file_path = tmp_file.name
+    tmp_file.close()
+
+    try:
+        total_size = 0
+        async with aiofiles.open(temp_file_path, 'wb') as out_file:
+            while content := await file.read(1024 * 1024):
+                total_size += len(content)
+                if total_size > max_upload_bytes:
+                    raise HTTPException(status_code=413, detail=f"File exceeds {settings.MAX_UPLOAD_MB}MB upload limit.")
+                await out_file.write(content)
+    except Exception as e:
+        if os.path.exists(temp_file_path):
+            os.remove(temp_file_path)
+        job_manager.update_job(job_id, status="failed", error=str(e), message="File upload failed")
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
+
     async def process_pdf_in_background():
-        import io
-        from starlette.datastructures import UploadFile as StarletteUploadFile
         from app.core.database import SessionChatbot
 
         async with _upload_semaphore:
-            mem_file = io.BytesIO(file_bytes)
-            mem_file.name = filename
-            upload_obj = StarletteUploadFile(filename=filename, file=mem_file)
+            job_manager.update_job(job_id, status="running", message="Processing PDF...", progress=10.0)
 
             bg_db = SessionChatbot()
 
             try:
                 bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
-                await bg_ingestion_service.process_pdf_upload(
-                    upload_obj,
-                    bg_db,
+                result = await bg_ingestion_service.process_pdf_upload(
+                    file=None,
+                    db=bg_db,
                     manual_category=category,
+                    job_id=job_id,
+                    file_path=temp_file_path,
+                    original_filename=filename
                 )
 
                 logger.info(
                     "Background upload completed for %s",
                     filename,
                 )
+                
+                job_manager.update_job(job_id, status="completed", progress=100.0, message="Upload completed", details=result)
 
             except Exception as e:
                 logger.error(
@@ -113,6 +140,7 @@ async def upload_document(
                     filename,
                     e,
                 )
+                job_manager.update_job(job_id, status="failed", error=str(e), message="Upload failed")
 
             finally:
                 bg_db.close()
@@ -126,7 +154,16 @@ async def upload_document(
         document_id="pending",
         category=category or "pending",
         chunks_processed=0,
+        job_id=job_id,
     )
+
+
+@router.get("/upload/status/{job_id}", tags=["Documents"])
+async def get_upload_status(job_id: str):
+    job = job_manager.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    return job
 
 
 class VectorSearchRequest(BaseModel):

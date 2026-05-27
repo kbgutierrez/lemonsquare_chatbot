@@ -59,6 +59,7 @@ export const API_ENDPOINTS = {
   /* DOCUMENTS */
   DOCUMENTS: "/documents",
   DOCUMENT_UPLOAD: "/documents/upload",
+  DOCUMENT_UPLOAD_STATUS: "/documents/upload/status/:jobId",
   DOCUMENT_DELETE: "/documents/:documentId",
   DOCUMENT_DEBUG_PIPELINE: "/documents/debug/full-pipeline",
   DOCUMENT_MANUAL_ENTRY: "/documents/manual",

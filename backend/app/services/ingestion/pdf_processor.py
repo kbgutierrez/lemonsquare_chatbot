@@ -105,20 +105,36 @@ class PDFProcessor:
         pdf_reader = PdfReader(filepath)
         return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
 
-    async def process(self, file: UploadFile, manual_category: str | None = None) -> dict:
-        raw_bytes = await file.read()
-        self._validate_pdf_bytes(raw_bytes)
+    async def process(self, file: UploadFile | None = None, manual_category: str | None = None, job_id: str | None = None, file_path: str | None = None, original_filename: str | None = None) -> dict:
+        from app.services.maintenance.job_manager import job_manager
 
-        temp_file_path: str | None = None
+        def _update(prog: float, msg: str):
+            if job_id:
+                job_manager.update_job(job_id, progress=prog, message=msg)
+
+        filename_to_use = original_filename if original_filename else (file.filename if file else "document.pdf")
+        temp_file_path = file_path
+
         try:
-            import aiofiles
-            tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            temp_file_path = tmp_file.name
-            tmp_file.close()
+            if not temp_file_path:
+                _update(10.0, "Reading PDF bytes...")
+                raw_bytes = await file.read()
+                self._validate_pdf_bytes(raw_bytes)
 
-            async with aiofiles.open(temp_file_path, 'wb') as out_file:
-                await out_file.write(raw_bytes)
+                import aiofiles
+                tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+                temp_file_path = tmp_file.name
+                tmp_file.close()
 
+                async with aiofiles.open(temp_file_path, 'wb') as out_file:
+                    await out_file.write(raw_bytes)
+            else:
+                _update(10.0, "Validating PDF file...")
+                with open(temp_file_path, 'rb') as f:
+                    header = f.read(5)
+                    self._validate_pdf_bytes(header)
+
+            _update(25.0, "Extracting text from PDF...")
             # FIX: Offload the heavy PDF parsing to a separate thread
             raw_text = await asyncio.to_thread(self._extract_pdf_text, temp_file_path)
 
@@ -131,22 +147,26 @@ class PDFProcessor:
                     raise ValidationError(f"Invalid category: '{manual_category}'. Must be one of {allowed_categories}")
                 category = manual_category
             else:
+                _update(45.0, "AI is classifying document...")
                 category = await self._classify_document(raw_text, allowed_categories)
 
-            document_id = self._document_id(file.filename or "document.pdf", raw_text, category)
+            document_id = self._document_id(filename_to_use, raw_text, category)
+            
+            _update(60.0, "Chunking document text...")
             chunks = self.chunker.split_text(raw_text)
             if not chunks:
                 raise ValidationError("Could not split extracted PDF text into chunks.")
 
+            _update(75.0, "Generating vector embeddings...")
             vectors = await self.embedding_service.embed_documents(chunks)
             points = []
-            cluster_key = sha256_hash(f"{document_id}:{file.filename}:{category}")
+            cluster_key = sha256_hash(f"{document_id}:{filename_to_use}:{category}")
             for index, chunk in enumerate(chunks):
                 chunk_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"{document_id}_chunk_{index}"))
                 metadata = build_pdf_metadata(
                     cluster_key=cluster_key,
                     document_id=document_id,
-                    file_name=file.filename or "document.pdf",
+                    file_name=filename_to_use,
                     category=category,
                     chunk_index=index,
                 )
@@ -157,6 +177,7 @@ class PDFProcessor:
                     payload=build_qdrant_payload(page_content=chunk, metadata=metadata),
                 ))
 
+            _update(90.0, "Saving to vector database...")
             try:
                 self.vector_store.upsert_points(points)
             except Exception as exc:
@@ -166,7 +187,7 @@ class PDFProcessor:
             try:
                 self.db.add(UploadedDocument(
                     DocumentID=document_id,
-                    FileName=file.filename or "document.pdf",
+                    FileName=filename_to_use,
                     Category=category,
                     ChunkCount=len(chunks),
                     IsActive=True,
@@ -183,7 +204,7 @@ class PDFProcessor:
                         document_id,
                         cleanup_exc,
                     )
-                raise ValidationError(f"File '{file.filename}' already exists in the database.") from exc
+                raise ValidationError(f"File '{filename_to_use}' already exists in the database.") from exc
             except Exception as exc:
                 self.db.rollback()
                 try:
