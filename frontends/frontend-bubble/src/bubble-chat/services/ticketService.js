@@ -34,23 +34,27 @@ const apiRequest = async ({
   body,
   headers = {},
 }) => {
+  const fetchOptions = {
+    method,
+    headers: {
+      ...headers,
+    },
+  };
 
-  const response = await fetch(
-    endpoint,
-    {
-      method,
-
-      headers: {
-        ...API_CONFIG.HEADERS,
-        ...headers,
-      },
-
-      body:
-        body
-          ? JSON.stringify(body)
-          : undefined,
+  // If body is FormData, don't set Content-Type header manually.
+  // The browser will set it with the correct boundary.
+  if (body instanceof FormData) {
+    fetchOptions.body = body;
+  } else {
+    // Standard JSON behavior
+    fetchOptions.headers["Content-Type"] = "application/json";
+    if (API_CONFIG.HEADERS["Content-Type"] && !headers["Content-Type"]) {
+       fetchOptions.headers["Content-Type"] = API_CONFIG.HEADERS["Content-Type"];
     }
-  )
+    fetchOptions.body = body ? JSON.stringify(body) : undefined;
+  }
+
+  const response = await fetch(endpoint, fetchOptions);
 
   const data =
     await parseJsonSafely(
@@ -295,22 +299,21 @@ const submitEscalation =
     user_token,
   }) => {
 
-    const payload = {
-      session_id,
-      requester_id,
-      company_id,
-      summary,
-      description,
-      department_id,
-      subcategory_id,
-      location,
-      equipment,
-      user_token,
-    }
+    const formData = new FormData();
+    formData.append("session_id", session_id);
+    formData.append("requester_id", requester_id);
+    formData.append("company_id", company_id);
+    formData.append("summary", summary);
+    formData.append("description", description);
+    formData.append("department_id", department_id);
+    formData.append("subcategory_id", subcategory_id);
+    formData.append("location", location || "");
+    formData.append("equipment", equipment || "");
+    formData.append("user_token", user_token || "");
 
     log(
-      "ESCALATION_SUBMIT_PAYLOAD",
-      payload
+      "ESCALATION_SUBMIT_FORMDATA",
+      Object.fromEntries(formData)
     )
 
     const endpoint =
@@ -327,7 +330,7 @@ const submitEscalation =
       await apiRequest({
         endpoint,
         method: "POST",
-        body: payload,
+        body: formData,
       })
 
     log(
