@@ -132,9 +132,9 @@ class SupportOrchestrator:
 
         if session_id:
             session = await asyncio.to_thread(
-                db.query(ChatSession)
+                lambda: db.query(ChatSession)
                 .filter(ChatSession.SessionID == session_id)
-                .first
+                .first()
             )
             if session and session.SessionStatus == "Drafting_Ticket":
                 logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")

@@ -68,9 +68,8 @@ class EscalationService:
             # --- NEW: CHECK CACHE FIRST ---
             if session_id in _draft_cache:
                 cached_data, timestamp = _draft_cache[session_id]
-                if time.time() - timestamp < 30.0:
+                if time.time() - timestamp < 60.0:
                     logger.info("Serving escalation draft from cache for session %s", session_id)
-                    del _draft_cache[session_id]  # Self-destruct the cache
                     return cached_data
 
             # If no cache, run the heavy LLM function

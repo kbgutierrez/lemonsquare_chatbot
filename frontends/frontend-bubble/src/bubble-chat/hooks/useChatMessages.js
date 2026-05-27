@@ -363,6 +363,8 @@ export const useChatMessages =
             true
           )
 
+          setEscalationDecision(null)
+
           try {
 
             const response =

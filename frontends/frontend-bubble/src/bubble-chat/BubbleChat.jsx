@@ -30,7 +30,12 @@ const BubbleChatContent = () => {
   useEffect(() => { messagesRef.current = messages }, [messages])
   useEffect(() => { if (!open) return; repositionForWindow() }, [open, repositionForWindow])
 
-  const closeModal = () => setActiveModal(null)
+  const closeModal = () => {
+    if (activeModal === "ticket") {
+      makeEscalationDecision(null)
+    }
+    setActiveModal(null)
+  }
 
   const handlePointerDown = event => { if (open) return; startDrag(event) }
   const handlePointerUp = () => {
@@ -48,17 +53,22 @@ const BubbleChatContent = () => {
   const delay = ms => new Promise(r => setTimeout(r, ms))
 
   const handleSubmitTicket = async () => {
+    let loadingMsgId = null
     try {
       if (!sessionId || checkingEscalation) return
 
       makeEscalationDecision("ticket")
 
       const loadingMsg = addMessage("Preparing escalation details...", "agent", false, true)
+      loadingMsgId = loadingMsg.id
 
       setCheckingEscalation(true)
       const response = await ticketService.getEscalationDraft(sessionId)
 
-      removeMessage(loadingMsg.id)
+      if (loadingMsgId) {
+        removeMessage(loadingMsgId)
+        loadingMsgId = null
+      }
 
       if (response?.status === "needs_info" && response?.pushback_message) {
         const typing = addMessage("", "agent", true)
@@ -78,6 +88,7 @@ const BubbleChatContent = () => {
       }
     } catch (e) {
       console.error("SUBMIT_TICKET_ERROR", e)
+      if (loadingMsgId) removeMessage(loadingMsgId)
       addMessage("Hindi ma-generate ang escalation draft sa ngayon. Paki-try ulit mamaya.", "agent")
       setActiveModal(null)
     } finally {
@@ -90,7 +101,9 @@ const BubbleChatContent = () => {
       openDraftAutoTriggered.current = true
       handleSubmitTicket()
     }
-    if (resolutionCheck?.resolutionAction !== "open_draft") openDraftAutoTriggered.current = false
+    if (resolutionCheck?.resolutionAction !== "open_draft") {
+      openDraftAutoTriggered.current = false
+    }
   }, [resolutionCheck?.resolutionAction, handleSubmitTicket])
 
   const handleOpenModal = modalId => {
