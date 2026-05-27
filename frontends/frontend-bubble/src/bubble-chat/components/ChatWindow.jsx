@@ -34,8 +34,8 @@ const ChatWindow = ({
   onClose,
   onOpenModal,
   sessionKey,
-  consumeResolutionPrompt,
-  isResolutionPromptConsumed,
+  escalationDecision,
+  onMakeEscalationDecision,
 }) => {
 
   const { theme } = useTheme()
@@ -176,8 +176,8 @@ const ChatWindow = ({
               onResolve={onResolveConversation}
               onDismiss={onDismissResolution}
               onOpenTicket={() => onOpenModal("ticket")}
-              consumeResolutionPrompt={consumeResolutionPrompt}
-              isResolutionPromptConsumed={isResolutionPromptConsumed}
+              onMakeEscalationDecision={onMakeEscalationDecision}
+              escalationDecision={escalationDecision}
             />
           </div>
 

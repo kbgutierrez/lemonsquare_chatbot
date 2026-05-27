@@ -60,8 +60,8 @@ const ChatMessages = ({
   onResolve,
   onDismiss,
   onOpenTicket,
-  consumeResolutionPrompt,
-  isResolutionPromptConsumed,
+  onMakeEscalationDecision,
+  escalationDecision,
 }) => {
 
   const messagesEndRef =
@@ -167,6 +167,15 @@ const ChatMessages = ({
 
   }, [normalizedMessages])
 
+  const shouldShowEscalationPrompt =
+    !resolved &&
+    !loading &&
+    !escalationDecision &&
+    (
+      resolutionCheck.showResolutionPrompt ||
+      resolutionCheck.allowTicketSubmission
+    )
+
   return (
     <div
       className="
@@ -215,24 +224,25 @@ const ChatMessages = ({
           )
         )}
 
-        {/* RESOLUTION PROMPT — with AnimatePresence for smooth exit */}
+        {/* ESCALATION PROMPT — entire block animates out and is removed from DOM after action */}
         <AnimatePresence>
-          {!resolved && !loading && (resolutionCheck.showResolutionPrompt || resolutionCheck.allowTicketSubmission) && !isResolutionPromptConsumed && (
+          {shouldShowEscalationPrompt && (
             <motion.div
               key="resolution-prompt"
               initial={{ opacity: 0, y: 12, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95, height: 0, marginTop: 0 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
               <ResolutionPrompt
                 onResolve={onResolve}
                 onDismiss={onDismiss}
                 onOpenTicket={onOpenTicket}
-                onConsume={consumeResolutionPrompt}
+                onMakeDecision={onMakeEscalationDecision}
                 showResolutionPrompt={resolutionCheck.showResolutionPrompt}
                 allowTicketSubmission={resolutionCheck.allowTicketSubmission}
                 resolutionMessage={resolutionCheck.resolutionMessage}
+                escalationDecision={escalationDecision}
               />
             </motion.div>
           )}

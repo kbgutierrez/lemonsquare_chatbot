@@ -23,7 +23,7 @@ const BubbleChatContent = () => {
   const openDraftAutoTriggered = useRef(false)
 
   const { position, dragging, isLeftSide, isTopSide, startDrag, wasDragged, repositionForWindow } = useBubbleDrag()
-  const { messages, loading, isLoadingConversation, isResolvingConversation, sessionId, resolved, sendMessage, clearConversation, restoreConversation, resolveConversation, resolutionCheck, dismissResolution, addMessage, removeMessage, consumeResolutionPrompt, isResolutionPromptConsumed } = useChatMessages()
+  const { messages, loading, isLoadingConversation, isResolvingConversation, sessionId, resolved, sendMessage, clearConversation, restoreConversation, resolveConversation, resolutionCheck, dismissResolution, addMessage, removeMessage, escalationDecision, makeEscalationDecision } = useChatMessages()
   const { theme } = useTheme()
 
   useEffect(() => { if (!sessionId) return; setHistoryRefreshKey(p => p + 1) }, [sessionId])
@@ -51,7 +51,7 @@ const BubbleChatContent = () => {
     try {
       if (!sessionId || checkingEscalation) return
 
-      consumeResolutionPrompt()
+      makeEscalationDecision("ticket")
 
       const loadingMsg = addMessage("Preparing escalation details...", "agent", false, true)
 
@@ -123,7 +123,7 @@ const BubbleChatContent = () => {
             <motion.div initial={{ opacity: 0, scale: 0.94, y: 14 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 10 }} transition={{ duration: 0.24 }}
               className={cn("absolute z-10", "overflow-hidden", "rounded-[28px] sm:rounded-[32px]", "backdrop-blur-2xl")}
               style={{ left: isLeftSide ? 0 : "auto", right: !isLeftSide ? 0 : "auto", top: isTopSide ? "calc(100% + 12px)" : "auto", bottom: !isTopSide ? "calc(100% + 12px)" : "auto", width: "min(96vw,390px)", height: "min(680px,calc(100dvh - 110px))", backgroundColor: theme.windowWrapperBg, border: `1px solid ${theme.windowBorder}`, boxShadow: `0 20px 80px ${theme.windowShadow}` }}>
-              <ChatWindow messages={messages} loading={loading} isLoadingConversation={isLoadingConversation} isResolvingConversation={isResolvingConversation} resolved={resolved} resolutionCheck={resolutionCheck} onSendMessage={sendMessage} onResolveConversation={handleResolveConversation} onDismissResolution={dismissResolution} onClose={() => setOpen(false)} onOpenModal={handleOpenModal} consumeResolutionPrompt={consumeResolutionPrompt} isResolutionPromptConsumed={isResolutionPromptConsumed} />
+              <ChatWindow messages={messages} loading={loading} isLoadingConversation={isLoadingConversation} isResolvingConversation={isResolvingConversation} resolved={resolved} resolutionCheck={resolutionCheck} onSendMessage={sendMessage} onResolveConversation={handleResolveConversation} onDismissResolution={dismissResolution} onClose={() => setOpen(false)} onOpenModal={handleOpenModal} escalationDecision={escalationDecision} onMakeEscalationDecision={makeEscalationDecision} />
             </motion.div>
           )}
         </AnimatePresence>

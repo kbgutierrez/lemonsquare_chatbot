@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, Send, Bot } from "lucide-react"
 import { useTheme } from "../context/ThemeContext.jsx"
 import { cn } from "../utils/cn"
@@ -7,15 +8,16 @@ const ResolutionPrompt = ({
   onResolve,
   onDismiss,
   onOpenTicket,
-  onConsume,
+  onMakeDecision,
   showResolutionPrompt = false,
   allowTicketSubmission = false,
   resolutionMessage = null,
+  escalationDecision = null,
 }) => {
   const { theme } = useTheme()
   const [hasActed, setHasActed] = useState(false)
 
-  if (!showResolutionPrompt && !allowTicketSubmission) return null
+  const isActive = escalationDecision === null
 
   const messageText =
     resolutionMessage ||
@@ -23,10 +25,10 @@ const ResolutionPrompt = ({
       ? "Gusto mo bang gawan na natin ng ticket 'to?"
       : "Nakatulong ba ito sa iyo?")
 
-  const handleAction = (callback) => {
+  const handleAction = (decisionType, callback) => {
     if (hasActed) return
     setHasActed(true)
-    onConsume?.()
+    onMakeDecision?.(decisionType)
     requestAnimationFrame(() => {
       callback?.()
     })
@@ -62,91 +64,101 @@ const ResolutionPrompt = ({
           {messageText}
         </p>
 
-        <div className="flex flex-wrap gap-2 mt-2.5">
-          {allowTicketSubmission && (
-            <>
-              <button
-                onClick={() => handleAction(onOpenTicket)}
-                disabled={hasActed}
-                className={cn(
-                  "flex items-center gap-1.5",
-                  "rounded-lg px-2.5 py-1.5",
-                  "text-[11px] font-semibold text-white shadow-sm",
-                  "transition-all hover:scale-[1.02] active:scale-95",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-                )}
-                style={{
-                  background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})`,
-                }}
-              >
-                <Send className="h-3 w-3" />
-                Submit Ticket
-              </button>
-              <button
-                onClick={() => handleAction(onDismiss)}
-                disabled={hasActed}
-                className={cn(
-                  "flex items-center gap-1.5",
-                  "rounded-lg px-2.5 py-1.5",
-                  "text-[11px] font-semibold border shadow-sm",
-                  "transition-all hover:opacity-80 active:scale-95",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
-                )}
-                style={{
-                  backgroundColor: theme.windowWrapperBg,
-                  borderColor: theme.inputBorder,
-                  color: theme.agentText,
-                }}
-              >
-                <X className="h-3 w-3" />
-                No thanks
-              </button>
-            </>
-          )}
+        <AnimatePresence>
+          {isActive && (
+            <motion.div
+              className="flex flex-wrap gap-2 mt-2.5"
+              initial={{ opacity: 0, y: 6, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95, height: 0, marginTop: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
+            >
+              {allowTicketSubmission && (
+                <>
+                  <button
+                    onClick={() => handleAction("ticket", onOpenTicket)}
+                    disabled={hasActed}
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      "rounded-lg px-2.5 py-1.5",
+                      "text-[11px] font-semibold text-white shadow-sm",
+                      "transition-all hover:scale-[1.02] active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    )}
+                    style={{
+                      background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})`,
+                    }}
+                  >
+                    <Send className="h-3 w-3" />
+                    Submit Ticket
+                  </button>
+                  <button
+                    onClick={() => handleAction("dismiss", onDismiss)}
+                    disabled={hasActed}
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      "rounded-lg px-2.5 py-1.5",
+                      "text-[11px] font-semibold border shadow-sm",
+                      "transition-all hover:opacity-80 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
+                    )}
+                    style={{
+                      backgroundColor: theme.windowWrapperBg,
+                      borderColor: theme.inputBorder,
+                      color: theme.agentText,
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                    No thanks
+                  </button>
+                </>
+              )}
 
-          {showResolutionPrompt && !allowTicketSubmission && (
-            <>
-              <button
-                onClick={() => handleAction(onResolve)}
-                disabled={hasActed}
-                className={cn(
-                  "flex items-center gap-1.5",
-                  "rounded-lg px-2.5 py-1.5",
-                  "text-[11px] font-semibold border shadow-sm",
-                  "transition-all hover:opacity-80 active:scale-95",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
-                )}
-                style={{
-                  backgroundColor: theme.resolvedBannerBg,
-                  borderColor: theme.resolvedBannerBorder,
-                  color: theme.resolvedBannerText,
-                }}
-              >
-                <Check className="h-3 w-3" />
-                Yes, resolved
-              </button>
-              <button
-                onClick={() => handleAction(onDismiss)}
-                disabled={hasActed}
-                className={cn(
-                  "flex items-center gap-1.5",
-                  "rounded-lg px-2.5 py-1.5",
-                  "text-[11px] font-semibold border shadow-sm",
-                  "transition-all hover:opacity-80 active:scale-95",
-                  "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
-                )}
-                style={{
-                  backgroundColor: theme.windowWrapperBg,
-                  borderColor: theme.inputBorder,
-                  color: theme.agentText,
-                }}
-              >
-                <X className="h-3 w-3" />
-                No
-              </button>
-            </>
+              {showResolutionPrompt && !allowTicketSubmission && (
+                <>
+                  <button
+                    onClick={() => handleAction("resolved", onResolve)}
+                    disabled={hasActed}
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      "rounded-lg px-2.5 py-1.5",
+                      "text-[11px] font-semibold border shadow-sm",
+                      "transition-all hover:opacity-80 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
+                    )}
+                    style={{
+                      backgroundColor: theme.resolvedBannerBg,
+                      borderColor: theme.resolvedBannerBorder,
+                      color: theme.resolvedBannerText,
+                    }}
+                  >
+                    <Check className="h-3 w-3" />
+                    Yes, resolved
+                  </button>
+                  <button
+                    onClick={() => handleAction("dismiss", onDismiss)}
+                    disabled={hasActed}
+                    className={cn(
+                      "flex items-center gap-1.5",
+                      "rounded-lg px-2.5 py-1.5",
+                      "text-[11px] font-semibold border shadow-sm",
+                      "transition-all hover:opacity-80 active:scale-95",
+                      "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
+                    )}
+                    style={{
+                      backgroundColor: theme.windowWrapperBg,
+                      borderColor: theme.inputBorder,
+                      color: theme.agentText,
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                    No
+                  </button>
+                </>
+              )}
+            </motion.div>
           )}
-        </div>
+        </AnimatePresence>
       </div>
     </div>
   )

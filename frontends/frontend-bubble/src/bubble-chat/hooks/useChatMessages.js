@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react"
@@ -76,9 +75,14 @@ export const useChatMessages =
       resolutionMessage: null,
     })
 
+    /* ========================================
+       ESCALATION DECISION STATE
+       Permanent one-time action recorder.
+    ======================================== */
+
     const [
-      consumedPromptSignature,
-      setConsumedPromptSignature,
+      escalationDecision,
+      setEscalationDecision,
     ] = useState(null)
 
     /* ========================================
@@ -96,26 +100,6 @@ export const useChatMessages =
 
     const state =
       refs.current
-
-    /* ========================================
-       PROMPT SIGNATURE (for one-time display)
-    ======================================== */
-
-    const promptSignature = useMemo(() => {
-      return JSON.stringify({
-        showResolutionPrompt: resolutionCheck.showResolutionPrompt,
-        allowTicketSubmission: resolutionCheck.allowTicketSubmission,
-        resolutionAction: resolutionCheck.resolutionAction,
-        resolutionMessage: resolutionCheck.resolutionMessage,
-      })
-    }, [resolutionCheck])
-
-    const consumeResolutionPrompt = useCallback(() => {
-      setConsumedPromptSignature(promptSignature)
-    }, [promptSignature])
-
-    const isResolutionPromptConsumed =
-      consumedPromptSignature === promptSignature
 
     /* ========================================
        SYNC MESSAGE REF
@@ -322,6 +306,12 @@ export const useChatMessages =
 
     /* ========================================
        SEND MESSAGE
+       
+       CRITICAL: The assistant's conversational response
+       (response.message) is ALWAYS added as a persistent
+       chat message. The escalation prompt is a SEPARATE
+       transient UI layer rendered by ResolutionPrompt
+       using resolutionCheck.resolutionMessage.
     ======================================== */
 
     const sendMessage =
@@ -398,13 +388,15 @@ export const useChatMessages =
               )
             }
 
+            /* ========================================
+               ALWAYS add the assistant's conversational
+               response as a persistent message.
+            ======================================== */
+
             const aiMessage =
               createMessage({
                 sender: "agent",
-
-                text:
-                  response?.message?.trim() ||
-                  "Empty response",
+                text: response?.message?.trim() || "Empty response",
               })
 
             setMessages([
@@ -413,12 +405,24 @@ export const useChatMessages =
               aiMessage,
             ])
 
+            /* ========================================
+               Set escalation flags separately.
+               The prompt text is rendered transiently
+               by ResolutionPrompt, NOT as a message.
+            ======================================== */
+
+            const hasEscalationFlags =
+              Boolean(response?.showResolutionPrompt) ||
+              Boolean(response?.allowTicketSubmission)
+
             setResolutionCheck({
               showResolutionPrompt: Boolean(response?.showResolutionPrompt),
               allowTicketSubmission: Boolean(response?.allowTicketSubmission),
               conversationStatus: response?.conversationStatus || "active",
               resolutionAction: response?.resolutionAction || "active",
-              resolutionMessage: response?.resolutionMessage || null,
+              resolutionMessage: hasEscalationFlags
+                ? (response?.resolutionMessage || response?.message || null)
+                : null,
             })
 
           } catch (error) {
@@ -468,7 +472,6 @@ export const useChatMessages =
             )
 
             setResolved(true)
-            setConsumedPromptSignature(null)
 
           } catch (error) {
 
@@ -591,7 +594,7 @@ export const useChatMessages =
             false
 
           setMessages([])
-          setConsumedPromptSignature(null)
+          setEscalationDecision(null)
 
           state.sessionId =
             sessionId
@@ -623,7 +626,7 @@ export const useChatMessages =
           setMessages([])
           setSessionId(null)
           setResolved(false)
-          setConsumedPromptSignature(null)
+          setEscalationDecision(null)
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -642,6 +645,23 @@ export const useChatMessages =
             resolutionAction: "active",
             resolutionMessage: null,
           })
+        },
+        []
+      )
+
+    /* ========================================
+       ESCALATION DECISION
+    ======================================== */
+
+    const makeEscalationDecision =
+      useCallback(
+        (
+          decision
+        ) => {
+
+          setEscalationDecision(
+            decision
+          )
         },
         []
       )
@@ -723,8 +743,8 @@ export const useChatMessages =
 
       addMessage,
 
-      consumeResolutionPrompt,
+      escalationDecision,
 
-      isResolutionPromptConsumed,
+      makeEscalationDecision,
     }
   }
