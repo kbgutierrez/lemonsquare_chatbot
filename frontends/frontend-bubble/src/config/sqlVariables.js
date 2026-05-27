@@ -185,6 +185,12 @@ export const API_ENDPOINTS = {
   /* SETTINGS */
   AI_SETTINGS:
     "/settings",
+
+  THEME_GET:
+    "/settings/theme",
+
+  THEME_UPDATE:
+    "/settings/theme",
 }
 
 /* ========================================

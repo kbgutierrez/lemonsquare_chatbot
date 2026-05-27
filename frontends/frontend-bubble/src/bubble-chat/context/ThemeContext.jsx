@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
@@ -189,6 +190,38 @@ const THEME_MAP = {
 
 const DEFAULT_CUSTOM_COLORS = { ...LEMON_SQUARE_THEME }
 
+const STORAGE_KEY = "lemonsquare-theme"
+
+/* ========================================
+   SYNC LOCALSTORAGE HYDRATION
+======================================== */
+
+const loadLocalTheme = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (!raw) return null
+
+    const parsed = JSON.parse(raw)
+
+    return {
+      activeThemeId:
+        typeof parsed.activeThemeId === "string"
+          ? parsed.activeThemeId
+          : "lemon-square",
+
+      headerGradientEnabled:
+        parsed.headerGradientEnabled !== false,
+
+      customColors: {
+        ...DEFAULT_CUSTOM_COLORS,
+        ...(parsed.customColors || {}),
+      },
+    }
+  } catch {
+    return null
+  }
+}
+
 /* ========================================
    CONTEXT
 ======================================== */
@@ -215,132 +248,264 @@ export const ThemeProvider = ({
   children,
 }) => {
 
+  /* ========================================
+     SYNC HYDRATION FROM LOCALSTORAGE
+     Instant first paint with saved theme.
+  ======================================== */
+
+  const localSnapshot = useMemo(
+    () => loadLocalTheme(),
+    []
+  )
+
   const [
     activeThemeId,
     setActiveThemeId,
-  ] = useState("lemon-square")
+  ] = useState(
+    localSnapshot?.activeThemeId ??
+      "lemon-square"
+  )
 
   const [
     headerGradientEnabled,
     setHeaderGradientEnabled,
-  ] = useState(true)
+  ] = useState(
+    localSnapshot?.headerGradientEnabled ??
+      true
+  )
 
   const [
     customColors,
     setCustomColors,
   ] = useState(
-    DEFAULT_CUSTOM_COLORS
+    localSnapshot?.customColors ??
+      { ...DEFAULT_CUSTOM_COLORS }
   )
 
   const [
-    loaded,
-    setLoaded,
-  ] = useState(false)
+    isHydrated,
+    setIsHydrated,
+  ] = useState(
+    Boolean(localSnapshot)
+  )
 
   /* ========================================
-     LOAD PERSISTED THEME
+     REFS
+  ======================================== */
+
+  const stateRef = useRef({
+    activeThemeId,
+    headerGradientEnabled,
+    customColors,
+  })
+
+  stateRef.current = {
+    activeThemeId,
+    headerGradientEnabled,
+    customColors,
+  }
+
+  /* ========================================
+     CRITICAL: Tracks whether user has
+     explicitly changed the theme THIS session.
+     Prevents stale backend reconciliation from
+     overwriting an active user choice.
+  ======================================== */
+
+  const userHasChangedThemeThisSession =
+    useRef(false)
+
+  /* ========================================
+     ASYNC BACKEND RECONCILIATION
+     Fetches authoritative theme. If user has
+     already changed theme this session, skip
+     applying backend data to avoid race.
   ======================================== */
 
   useEffect(() => {
 
-    const loadTheme =
-      async () => {
+    let cancelled = false
 
-        try {
+    const reconcile = async () => {
 
-          const backendTheme =
-            await themeService.getTheme()
+      try {
 
-          if (
-            backendTheme
-          ) {
+        console.log(
+          "[Theme] Starting backend reconciliation..."
+        )
 
-            const mappedId =
-              backendTheme.bubbleTheme ||
-              "lemon-square"
+        const backendTheme =
+          await themeService.getTheme()
 
-            setActiveThemeId(
-              mappedId
-            )
+        console.log(
+          "[Theme] Backend response:",
+          backendTheme
+        )
 
-            setHeaderGradientEnabled(
-              backendTheme.headerGradientEnabled !==
-                false
-            )
+        if (
+          cancelled ||
+          !backendTheme
+        ) {
+          console.log(
+            "[Theme] Reconciliation cancelled or empty response"
+          )
+          return
+        }
 
-            setCustomColors(
-              prev => ({
-                ...prev,
-                headerGradientStart:
-                  backendTheme.customHeaderGradientStart ||
-                  prev.headerGradientStart,
-                headerGradientEnd:
-                  backendTheme.customHeaderGradientEnd ||
-                  prev.headerGradientEnd,
-                accent:
-                  backendTheme.customAccent ||
-                  prev.accent,
-                windowBg:
-                  backendTheme.customWindowBg ||
-                  prev.windowBg,
-              })
-            )
+        /* ========================================
+           RACE CONDITION GUARD
+           If user already clicked a theme before
+           the fetch completed, trust their choice.
+        ======================================== */
 
-            return
-          }
+        if (
+          userHasChangedThemeThisSession.current
+        ) {
 
-          const local =
-            localStorage.getItem(
-              "lemonsquare-theme"
-            )
-
-          if (local) {
-
-            const parsed =
-              JSON.parse(local)
-
-            setActiveThemeId(
-              parsed.activeThemeId ||
-                "lemon-square"
-            )
-
-            setHeaderGradientEnabled(
-              parsed.headerGradientEnabled !==
-                false
-            )
-
-            setCustomColors(
-              prev => ({
-                ...prev,
-                ...parsed.customColors,
-              })
-            )
-          }
-
-        } catch (error) {
-
-          console.error(
-            "THEME_LOAD_ERROR",
-            error
+          console.log(
+            "[Theme] User changed theme this session — skipping backend reconciliation to prevent overwrite"
           )
 
-        } finally {
+          setIsHydrated(true)
 
-          setLoaded(true)
+          return
+        }
+
+        const {
+          activeThemeId: currentId,
+          headerGradientEnabled: currentGrad,
+          customColors: currentCustom,
+        } = stateRef.current
+
+        /* ========================================
+           PASCALCASE WIRE FORMAT
+        ======================================== */
+
+        const nextId =
+          backendTheme.BubbleTheme ||
+          "lemon-square"
+
+        const nextGrad =
+          backendTheme.HeaderGradientEnabled !==
+            false
+
+        const nextCustom = {
+          ...currentCustom,
+        }
+
+        if (
+          backendTheme.CustomHeaderGradientStart
+        ) {
+          nextCustom.headerGradientStart =
+            backendTheme.CustomHeaderGradientStart
+        }
+
+        if (
+          backendTheme.CustomHeaderGradientEnd
+        ) {
+          nextCustom.headerGradientEnd =
+            backendTheme.CustomHeaderGradientEnd
+        }
+
+        if (
+          backendTheme.CustomAccent
+        ) {
+          nextCustom.accent =
+            backendTheme.CustomAccent
+        }
+
+        if (
+          backendTheme.CustomWindowBg
+        ) {
+          nextCustom.windowBg =
+            backendTheme.CustomWindowBg
+        }
+
+        console.log(
+          "[Theme] Reconciling — current:",
+          { currentId, currentGrad },
+          "backend:",
+          { nextId, nextGrad }
+        )
+
+        if (
+          nextId !== currentId
+        ) {
+          setActiveThemeId(
+            nextId
+          )
+        }
+
+        if (
+          nextGrad !==
+          currentGrad
+        ) {
+          setHeaderGradientEnabled(
+            nextGrad
+          )
+        }
+
+        const customChanged =
+          Object.keys(
+            nextCustom
+          ).some(
+            key =>
+              nextCustom[key] !==
+              currentCustom[key]
+          )
+
+        if (
+          customChanged
+        ) {
+          setCustomColors(
+            nextCustom
+          )
+        }
+
+      } catch (error) {
+
+        console.error(
+          "[Theme] Backend reconciliation failed:",
+          error
+        )
+
+      } finally {
+
+        if (
+          !cancelled
+        ) {
+
+          setIsHydrated(
+            true
+          )
+
+          console.log(
+            "[Theme] Reconciliation complete. isHydrated = true"
+          )
         }
       }
+    }
 
-    loadTheme()
+    reconcile()
+
+    return () => {
+      cancelled = true
+    }
 
   }, [])
 
   /* ========================================
-     SAVE THEME
+     PERSISTENCE EFFECT
+     Saves to localStorage + backend.
+     CRITICAL FIX: Removed isFirstSaveEffectRun
+     guard that was blocking the first real save.
   ======================================== */
 
   useEffect(() => {
 
-    if (!loaded) {
+    if (
+      !isHydrated
+    ) {
       return
     }
 
@@ -351,33 +516,59 @@ export const ThemeProvider = ({
     }
 
     localStorage.setItem(
-      "lemonsquare-theme",
+      STORAGE_KEY,
       JSON.stringify(payload)
     )
 
+    /* ========================================
+       BACKEND PAYLOAD — PASCALCASE
+       Matches ThemeSettingsUpdate schema.
+    ======================================== */
+
     const backendPayload = {
-      bubbleTheme: activeThemeId,
-      headerGradientEnabled,
-      customHeaderGradientStart: customColors.headerGradientStart,
-      customHeaderGradientEnd: customColors.headerGradientEnd,
-      customAccent: customColors.accent,
-      customWindowBg: customColors.windowBg,
+      BubbleTheme: activeThemeId,
+      HeaderGradientEnabled: headerGradientEnabled,
+      CustomHeaderGradientStart:
+        customColors.headerGradientStart,
+      CustomHeaderGradientEnd:
+        customColors.headerGradientEnd,
+      CustomAccent:
+        customColors.accent,
+      CustomWindowBg:
+        customColors.windowBg,
     }
 
+    console.log(
+      "[Theme] Saving to backend:",
+      backendPayload
+    )
+
     themeService
-      .saveTheme(backendPayload)
-      .catch(error => {
-        console.error(
-          "THEME_BACKEND_SAVE_ERROR",
-          error
-        )
-      })
+      .saveTheme(
+        backendPayload
+      )
+      .then(
+        response => {
+          console.log(
+            "[Theme] Backend save success:",
+            response
+          )
+        }
+      )
+      .catch(
+        error => {
+          console.error(
+            "[Theme] Backend save FAILED:",
+            error
+          )
+        }
+      )
 
   }, [
     activeThemeId,
     headerGradientEnabled,
     customColors,
-    loaded,
+    isHydrated,
   ])
 
   /* ========================================
@@ -413,12 +604,25 @@ export const ThemeProvider = ({
 
   /* ========================================
      ACTIONS
+     CRITICAL: Set userHasChangedThemeThisSession
+     so reconciliation knows not to overwrite.
   ======================================== */
 
   const setTheme =
     useCallback(
       id => {
-        setActiveThemeId(id)
+
+        userHasChangedThemeThisSession.current =
+          true
+
+        console.log(
+          "[Theme] User explicitly set theme:",
+          id
+        )
+
+        setActiveThemeId(
+          id
+        )
       },
       []
     )
@@ -426,6 +630,9 @@ export const ThemeProvider = ({
   const setCustomColor =
     useCallback(
       (key, value) => {
+
+        userHasChangedThemeThisSession.current =
+          true
 
         setCustomColors(
           prev => ({
@@ -471,7 +678,7 @@ export const ThemeProvider = ({
       setCustomColor,
       setCustomColors,
       toggleHeaderGradient,
-      loaded,
+      isHydrated,
     }),
 
     [
@@ -483,7 +690,7 @@ export const ThemeProvider = ({
       setCustomColor,
       setCustomColors,
       toggleHeaderGradient,
-      loaded,
+      isHydrated,
     ]
   )
 
