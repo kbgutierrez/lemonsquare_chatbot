@@ -7,13 +7,16 @@ import SubmitTicketModal from "./modals/SubmitTicketModal.jsx"
 import ThemeModal from "./modals/ThemeModal.jsx"
 import ResolveConversationModal from "./modals/ResolveConversationModal.jsx"
 import AboutHelpDeskModal from "./modals/AboutHelpDeskModal.jsx"
-import { ThemeProvider } from "./context/ThemeContext.jsx"
-import { useTheme } from "./context/ThemeContext.jsx"
+import { ThemeProvider, useTheme } from "./context/ThemeContext.jsx"
 import chatbotService from "./services/chatbotService"
 import ticketService from "./services/ticketService"
 import { useBubbleDrag } from "./hooks/useBubbleDrag"
 import { useChatMessages } from "./hooks/useChatMessages"
 import { cn } from "./utils/cn"
+
+/* ========================================
+   INNER COMPONENT — everything inside ThemeProvider
+======================================== */
 
 const BubbleChatContent = () => {
   const [open, setOpen] = useState(false)
@@ -33,11 +36,7 @@ const BubbleChatContent = () => {
 
   const closeModal = () => setActiveModal(null)
 
-  const handlePointerDown = event => {
-    if (open) return
-    startDrag(event)
-  }
-
+  const handlePointerDown = event => { if (open) return; startDrag(event) }
   const handlePointerUp = () => {
     if (wasDragged()) return
     if (!open) { repositionForWindow(); requestAnimationFrame(() => setOpen(true)); return }
@@ -45,7 +44,10 @@ const BubbleChatContent = () => {
   }
 
   const handleLoadConversation = ({ sessionId }) => { restoreConversation({ sessionId }); repositionForWindow(); setOpen(true); setActiveModal(null) }
-  const handleResolveConversation = async () => { try { if (!sessionId || !messages.length) return; await resolveConversation(); setHistoryRefreshKey(p => p + 1); setActiveModal(null) } catch (e) { console.error("RESOLVE_ERROR", e) } }
+  const handleResolveConversation = async () => {
+    try { if (!sessionId || !messages.length) return; await resolveConversation(); setHistoryRefreshKey(p => p + 1); setActiveModal(null) }
+    catch (e) { console.error("RESOLVE_ERROR", e) }
+  }
   const handleNewChat = () => { clearConversation(); repositionForWindow(); setOpen(true); setActiveModal(null) }
   const delay = ms => new Promise(r => setTimeout(r, ms))
 
@@ -71,7 +73,10 @@ const BubbleChatContent = () => {
   }
 
   useEffect(() => {
-    if (resolutionCheck?.resolutionAction === "open_draft" && !openDraftAutoTriggered.current) { openDraftAutoTriggered.current = true; handleSubmitTicket() }
+    if (resolutionCheck?.resolutionAction === "open_draft" && !openDraftAutoTriggered.current) {
+      openDraftAutoTriggered.current = true
+      handleSubmitTicket()
+    }
     if (resolutionCheck?.resolutionAction !== "open_draft") openDraftAutoTriggered.current = false
   }, [resolutionCheck?.resolutionAction, handleSubmitTicket])
 
@@ -81,7 +86,9 @@ const BubbleChatContent = () => {
     setActiveModal(modalId)
   }
 
-  const requesterId = useMemo(() => { try { return chatbotService.resolveRequesterId(chatbotService.getUserToken()) } catch { return null } }, [])
+  const requesterId = useMemo(() => {
+    try { return chatbotService.resolveRequesterId(chatbotService.getUserToken()) } catch { return null }
+  }, [])
 
   const modals = {
     history: <ChatHistoryModal key={historyRefreshKey} refreshKey={historyRefreshKey} onClose={closeModal} onLoadConversation={handleLoadConversation} onClearConversation={clearConversation} />,
@@ -97,7 +104,6 @@ const BubbleChatContent = () => {
         {open && <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className={cn("pointer-events-none", "fixed inset-0", "bg-black/[0.02]", "backdrop-blur-[1px]")} />}
       </AnimatePresence>
 
-      {/* DRAGGABLE ROOT — hook writes transform directly to this node */}
       <div data-bubble-drag className={cn("pointer-events-auto", "fixed", "z-[9999]", !dragging && "transition-transform duration-300 ease-out")} style={{ left: 0, top: 0, willChange: "transform", touchAction: "none" }}>
         <AnimatePresence>
           {open && (
@@ -114,10 +120,24 @@ const BubbleChatContent = () => {
         </div>
       </div>
 
-      {activeModal && <div className="pointer-events-auto fixed inset-0 z-[10000]">{modals[activeModal]}</div>}
+      {/* MODALS — now inside ThemeProvider tree, can use useTheme() */}
+      {activeModal && (
+        <div className="pointer-events-auto fixed inset-0 z-[10000]">
+          {modals[activeModal]}
+        </div>
+      )}
     </div>
   )
 }
 
-const BubbleChat = () => (<ThemeProvider><BubbleChatContent /></ThemeProvider>)
+/* ========================================
+   EXPORT — ThemeProvider wraps EVERYTHING
+======================================== */
+
+const BubbleChat = () => (
+  <ThemeProvider>
+    <BubbleChatContent />
+  </ThemeProvider>
+)
+
 export default BubbleChat
