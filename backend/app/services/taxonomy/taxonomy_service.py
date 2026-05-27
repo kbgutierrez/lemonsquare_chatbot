@@ -32,8 +32,8 @@ async def get_live_taxonomy() -> str:
         if _TAXONOMY_CACHE and (now - _TAXONOMY_FETCHED_AT) <= ttl:
             return _TAXONOMY_CACHE
 
-        dept_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
-        base_subcat_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories?department_id="
+        dept_url = settings.BIZPORTAL_DEPT_URL
+        base_subcat_url = f"{settings.BIZPORTAL_SUBCAT_URL}?department_id="
         taxonomy = []
 
         try:

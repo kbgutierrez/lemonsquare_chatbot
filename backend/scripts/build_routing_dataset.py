@@ -34,12 +34,8 @@ JSONL_PATH = OUTPUT_DIR / "routing_dataset.jsonl"
 CSV_PATH = OUTPUT_DIR / "routing_dataset.csv"
 STATS_PATH = OUTPUT_DIR / "routing_dataset_stats.json"
 
-DEPARTMENTS_API = (
-    "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
-)
-SUBCATEGORIES_API = (
-    "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories"
-)
+DEPARTMENTS_API = settings.BIZPORTAL_DEPT_URL
+SUBCATEGORIES_API = settings.BIZPORTAL_SUBCAT_URL
 
 
 @dataclass
