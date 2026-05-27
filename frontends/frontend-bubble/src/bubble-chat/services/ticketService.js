@@ -34,23 +34,27 @@ const apiRequest = async ({
   body,
   headers = {},
 }) => {
+  const fetchOptions = {
+    method,
+    headers: {
+      ...headers,
+    },
+  };
 
-  const response = await fetch(
-    endpoint,
-    {
-      method,
-
-      headers: {
-        ...API_CONFIG.HEADERS,
-        ...headers,
-      },
-
-      body:
-        body
-          ? JSON.stringify(body)
-          : undefined,
+  // If body is FormData, don't set Content-Type header manually.
+  // The browser will set it with the correct boundary.
+  if (body instanceof FormData) {
+    fetchOptions.body = body;
+  } else {
+    // Standard JSON behavior
+    fetchOptions.headers["Content-Type"] = "application/json";
+    if (API_CONFIG.HEADERS["Content-Type"] && !headers["Content-Type"]) {
+       fetchOptions.headers["Content-Type"] = API_CONFIG.HEADERS["Content-Type"];
     }
-  )
+    fetchOptions.body = body ? JSON.stringify(body) : undefined;
+  }
+
+  const response = await fetch(endpoint, fetchOptions);
 
   const data =
     await parseJsonSafely(
@@ -296,100 +300,21 @@ const submitEscalation =
     image,
   }) => {
 
-    const endpoint =
-      buildApiUrl(
-        "/chat/escalate/submit"
-      )
-
-    /* ========================================
-       MULTIPATH SUBMISSION
-       If an image is attached, send as
-       multipart/form-data so the backend
-       can receive the file. Otherwise keep
-       the existing JSON contract unchanged.
-    ======================================== */
-
-    if (image) {
-      const formData = new FormData()
-
-      formData.append("session_id", session_id)
-      formData.append("requester_id", String(requester_id))
-      formData.append("company_id", String(company_id || 1))
-      formData.append("summary", summary)
-      formData.append("description", description)
-      formData.append("department_id", String(department_id))
-      formData.append("subcategory_id", String(subcategory_id))
-
-      if (location) {
-        formData.append("location", location)
-      }
-
-      if (equipment) {
-        formData.append("equipment", equipment)
-      }
-
-      if (user_token) {
-        formData.append("user_token", user_token)
-      }
-
-      formData.append("attachment", image)
-
-      // Strip explicit Content-Type so the browser sets
-      // the correct multipart boundary automatically.
-      const headers = {}
-      for (const [key, value] of Object.entries(API_CONFIG.HEADERS)) {
-        if (key.toLowerCase() !== "content-type") {
-          headers[key] = value
-        }
-      }
-
-      log(
-        "ESCALATION_SUBMIT_ENDPOINT",
-        endpoint
-      )
-
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers,
-        body: formData,
-      })
-
-      const data = await parseJsonSafely(response)
-
-      if (!response.ok) {
-        throw new Error(
-          data?.detail ||
-          data?.message ||
-          "Request failed."
-        )
-      }
-
-      log(
-        "ESCALATION_SUBMIT_RESPONSE",
-        data
-      )
-
-      return data
-    }
-
-    /* ---- JSON path (no image) ---- */
-
-    const payload = {
-      session_id,
-      requester_id,
-      company_id,
-      summary,
-      description,
-      department_id,
-      subcategory_id,
-      location,
-      equipment,
-      user_token,
-    }
+    const formData = new FormData();
+    formData.append("session_id", session_id);
+    formData.append("requester_id", requester_id);
+    formData.append("company_id", company_id);
+    formData.append("summary", summary);
+    formData.append("description", description);
+    formData.append("department_id", department_id);
+    formData.append("subcategory_id", subcategory_id);
+    formData.append("location", location || "");
+    formData.append("equipment", equipment || "");
+    formData.append("user_token", user_token || "");
 
     log(
-      "ESCALATION_SUBMIT_PAYLOAD",
-      payload
+      "ESCALATION_SUBMIT_FORMDATA",
+      Object.fromEntries(formData)
     )
 
     log(
@@ -401,7 +326,7 @@ const submitEscalation =
       await apiRequest({
         endpoint,
         method: "POST",
-        body: payload,
+        body: formData,
       })
 
     log(

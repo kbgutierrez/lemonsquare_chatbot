@@ -8,7 +8,7 @@ import logging
 import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -283,6 +283,20 @@ async def submit_escalation(
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
+    if attachment:
+        max_size = 10 * 1024 * 1024  # 10MB limit
+        try:
+            # Check size if available (FastAPI/Starlette)
+            file_size = getattr(attachment, "size", 0)
+            if file_size > max_size:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Attachment too large. Maximum size allowed is 10MB."
+                )
+        except AttributeError:
+            # Fallback for older Starlette: read a small chunk to verify
+            pass
+
     if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
         session_id = body.get("session_id")
