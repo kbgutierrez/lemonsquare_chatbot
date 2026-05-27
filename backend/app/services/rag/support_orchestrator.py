@@ -180,7 +180,8 @@ class SupportOrchestrator:
 
         db_threshold = float(config.ConfidenceThreshold) if config and config.ConfidenceThreshold is not None else None
         if db_threshold is None or db_threshold <= -2.0:
-            confidence_threshold = 0.0 if use_reranker else 0.7
+            # 0.15 is a safe probability threshold for Sigmoid-normalized reranker scores.
+            confidence_threshold = 0.15 if use_reranker else 0.7
         else:
             confidence_threshold = db_threshold
 
@@ -286,29 +287,10 @@ class SupportOrchestrator:
             # Non-debug: return standardized 4-tuple
             return fallback_msg, "none", None, []
 
-        doc_budget = max(2, int(top_k * 0.4))
-        ticket_budget = top_k - doc_budget
-        final_hits: list = []
-        tickets_added = 0
-        docs_added = 0
-
-        for hit in valid_hits:
-            is_doc = hit.is_document
-            if not is_doc and tickets_added < ticket_budget:
-                final_hits.append(hit)
-                tickets_added += 1
-            elif is_doc and docs_added < doc_budget:
-                final_hits.append(hit)
-                docs_added += 1
-            if len(final_hits) == top_k:
-                break
-
-        if len(final_hits) < top_k:
-            for hit in valid_hits:
-                if hit not in final_hits:
-                    final_hits.append(hit)
-                    if len(final_hits) == top_k:
-                        break
+        # Survival of the Fittest: Just take the absolute best items up to top_k, 
+        # regardless of whether they are docs or tickets. This prevents "context starvation"
+        # when answering deep policy questions from PDFs.
+        final_hits = valid_hits[:top_k]
 
         ticket_ids = []
         for hit in final_hits:

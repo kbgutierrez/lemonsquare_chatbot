@@ -16,6 +16,7 @@ from app.services.settings.settings_service import (
     get_active_settings,
     update_settings,
     restore_default_settings,
+    get_factory_defaults,
     get_user_theme,
     update_user_theme,
 )
@@ -67,6 +68,14 @@ def restore_settings_to_default(
 ) -> SettingsResponse:
     config = restore_default_settings(db, updated_by=_PLACEHOLDER_ADMIN_ID)
     return SettingsResponse.model_validate(config)
+
+
+@router.get("/factory-defaults", response_model=SettingsResponse, summary="Get hardcoded system defaults")
+def get_factory_defaults_endpoint(
+    current_user: dict = Depends(require_admin_user),
+) -> SettingsResponse:
+    defaults = get_factory_defaults()
+    return SettingsResponse.model_validate(defaults)
 
 
 @router.get("/theme", response_model=ThemeSettingsResponse, summary="Fetch user theme configuration")

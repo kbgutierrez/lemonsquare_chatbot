@@ -92,6 +92,67 @@ def get_user_theme(db: Session, user_id: int) -> UserThemePreference:
     )
 
 
+def get_factory_defaults() -> dict:
+    """
+    Return hardcoded system defaults from the codebase.
+    Used for 'Load Defaults' feature in Admin UI.
+    """
+    from app.core.config import settings
+    from app.services.prompts import (
+        DEFAULT_SYSTEM_PROMPT,
+        DEFAULT_REFORMULATOR_PROMPT,
+        ESCALATION_DRAFT_PROMPT,
+        CONVERSATION_RESOLUTION_PROMPT,
+        build_document_classifier_prompt,
+    )
+    from app.services.settings.runtime_config import (
+        DEFAULT_ROUTING_MODEL,
+        DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
+        DEFAULT_ESCALATION_MODEL,
+        DEFAULT_CONVERSATION_RESOLUTION_MODEL,
+    )
+
+    # Replicate internal categories from PDFProcessor
+    default_categories = [
+        "Network_Infrastructure",
+        "Hardware_Guide",
+        "Software_Documentation",
+        "HR_IT_Policy",
+        "Troubleshooting_Manual",
+        "General_IT",
+    ]
+
+    return {
+        "SettingID": 0,
+        "ActiveModel": "llama-3.3-70b-versatile",
+        "ReformulatorModel": "llama-3.1-8b-instant",
+        "SystemPrompt": DEFAULT_SYSTEM_PROMPT,
+        "ReformulatorPrompt": DEFAULT_REFORMULATOR_PROMPT,
+        "Temperature": 0.2,
+        "ConfidenceThreshold": 0.15,
+        "EmbeddingModel": settings.EMBEDDING_MODEL,
+        "RerankerModel": settings.RERANKER_MODEL,
+        "TopK_Tickets": 5,
+        "UseReformulator": True,
+        "UseReranker": True,
+        "ChatExtractionPrompt": None,
+        "AllowedCategories": ",".join(default_categories),
+        "IsActive": True,
+
+        "EscalationDraftModel": DEFAULT_ESCALATION_MODEL,
+        "EscalationDraftPrompt": ESCALATION_DRAFT_PROMPT,
+        "RoutingModel": DEFAULT_ROUTING_MODEL,
+        "RoutingPrompt": "",
+        "DocumentClassifierModel": DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
+        "DocumentClassifierPrompt": build_document_classifier_prompt(
+            snippet="{snippet}", 
+            allowed_categories="{allowed_categories}"
+        ),
+        "ConversationResolutionModel": DEFAULT_CONVERSATION_RESOLUTION_MODEL,
+        "ConversationResolutionPrompt": CONVERSATION_RESOLUTION_PROMPT,
+    }
+
+
 def update_user_theme(
     db: Session,
     user_id: int,

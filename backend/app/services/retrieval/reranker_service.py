@@ -3,6 +3,7 @@ Reranking service using cross-encoder.
 Extracted from SupportOrchestrator._run_pipeline().
 """
 import logging
+import math
 from sentence_transformers import CrossEncoder
 from app.core.retrieval_models import RetrievalDocument
 
@@ -30,7 +31,13 @@ class RerankerService:
             return []
 
         pairs = [[query, doc.page_content] for doc in documents]
-        scores = self.reranker.predict(pairs)
+        
+        # 1. Get raw logits from the cross-encoder
+        raw_scores = self.reranker.predict(pairs)
+        
+        # 2. Apply Sigmoid to convert logits to 0.0 - 1.0 probabilities.
+        # This ensures our confidence thresholds in the orchestrator work correctly.
+        scores = [1 / (1 + math.exp(-score)) for score in raw_scores]
 
         scored = sorted(
             zip(scores, documents),

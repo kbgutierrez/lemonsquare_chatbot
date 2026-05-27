@@ -1,6 +1,6 @@
-import { Save, LoaderCircle, CheckCircle2, AlertTriangle } from "lucide-react"
+import { Save, LoaderCircle, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react"
 
-const SettingsActions = ({ saving, success, error, onSave }) => {
+const SettingsActions = ({ saving, success, error, onSave, onLoadDefaults }) => {
   return (
     <div className="flex flex-col gap-5 border-t theme-border pt-5 lg:flex-row lg:items-center lg:justify-between">
       {/* LEFT */}
@@ -18,7 +18,7 @@ const SettingsActions = ({ saving, success, error, onSave }) => {
         {success && (
           <div className="inline-flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400">
             <CheckCircle2 className="h-4 w-4" />
-            Settings saved successfully
+            {success}
           </div>
         )}
 
@@ -32,19 +32,31 @@ const SettingsActions = ({ saving, success, error, onSave }) => {
       </div>
 
       {/* ACTION */}
-      <button
-        type="button"
-        disabled={saving}
-        onClick={onSave}
-        className="inline-flex min-w-[210px] items-center justify-center gap-2.5 rounded-md bg-[var(--accent)] px-6 py-3.5 text-sm font-semibold text-[#1b211e] transition-all duration-300 hover:scale-[1.015] hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        {saving ? (
-          <LoaderCircle className="h-4.5 w-4.5 animate-spin" />
-        ) : (
-          <Save className="h-4.5 w-4.5" />
-        )}
-        {saving ? "Saving..." : "Save Configuration"}
-      </button>
+      <div className="flex flex-col gap-3 sm:flex-row lg:justify-end">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onLoadDefaults}
+          className="inline-flex min-w-[180px] items-center justify-center gap-2.5 rounded-md border border-[var(--accent)]/30 bg-transparent px-6 py-3.5 text-sm font-semibold text-[var(--accent)] transition-all duration-300 hover:bg-[var(--accent)]/5 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <RefreshCw className="h-4.5 w-4.5" />
+          Load Defaults
+        </button>
+
+        <button
+          type="button"
+          disabled={saving}
+          onClick={onSave}
+          className="inline-flex min-w-[210px] items-center justify-center gap-2.5 rounded-md bg-[var(--accent)] px-6 py-3.5 text-sm font-semibold text-[#1b211e] transition-all duration-300 hover:scale-[1.015] hover:brightness-105 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {saving ? (
+            <LoaderCircle className="h-4.5 w-4.5 animate-spin" />
+          ) : (
+            <Save className="h-4.5 w-4.5" />
+          )}
+          {saving ? "Saving..." : "Save Configuration"}
+        </button>
+      </div>
     </div>
   )
 }
