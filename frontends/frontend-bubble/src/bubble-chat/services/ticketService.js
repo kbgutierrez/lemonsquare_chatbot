@@ -293,7 +293,86 @@ const submitEscalation =
     location,
     equipment,
     user_token,
+    image,
   }) => {
+
+    const endpoint =
+      buildApiUrl(
+        "/chat/escalate/submit"
+      )
+
+    /* ========================================
+       MULTIPATH SUBMISSION
+       If an image is attached, send as
+       multipart/form-data so the backend
+       can receive the file. Otherwise keep
+       the existing JSON contract unchanged.
+    ======================================== */
+
+    if (image) {
+      const formData = new FormData()
+
+      formData.append("session_id", session_id)
+      formData.append("requester_id", String(requester_id))
+      formData.append("company_id", String(company_id || 1))
+      formData.append("summary", summary)
+      formData.append("description", description)
+      formData.append("department_id", String(department_id))
+      formData.append("subcategory_id", String(subcategory_id))
+
+      if (location) {
+        formData.append("location", location)
+      }
+
+      if (equipment) {
+        formData.append("equipment", equipment)
+      }
+
+      if (user_token) {
+        formData.append("user_token", user_token)
+      }
+
+      formData.append("attachment", image)
+
+      // Strip explicit Content-Type so the browser sets
+      // the correct multipart boundary automatically.
+      const headers = {}
+      for (const [key, value] of Object.entries(API_CONFIG.HEADERS)) {
+        if (key.toLowerCase() !== "content-type") {
+          headers[key] = value
+        }
+      }
+
+      log(
+        "ESCALATION_SUBMIT_ENDPOINT",
+        endpoint
+      )
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: formData,
+      })
+
+      const data = await parseJsonSafely(response)
+
+      if (!response.ok) {
+        throw new Error(
+          data?.detail ||
+          data?.message ||
+          "Request failed."
+        )
+      }
+
+      log(
+        "ESCALATION_SUBMIT_RESPONSE",
+        data
+      )
+
+      return data
+    }
+
+    /* ---- JSON path (no image) ---- */
 
     const payload = {
       session_id,
@@ -312,11 +391,6 @@ const submitEscalation =
       "ESCALATION_SUBMIT_PAYLOAD",
       payload
     )
-
-    const endpoint =
-      buildApiUrl(
-        "/chat/escalate/submit"
-      )
 
     log(
       "ESCALATION_SUBMIT_ENDPOINT",

@@ -50,6 +50,20 @@ const normalizeSummary = (
 })
 
 /* ========================================
+   IMAGE VALIDATION
+======================================== */
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
+
+/* ========================================
    HOOK
 ======================================== */
 
@@ -102,6 +116,31 @@ export const useTicketForm = ({
       location: "",
       equipment: "",
     })
+
+  /* ========================================
+     IMAGE ATTACHMENT STATE
+  ======================================== */
+
+  const [imageFile, setImageFile] =
+    useState(null)
+
+  const [imagePreview, setImagePreview] =
+    useState(null)
+
+  const [imageError, setImageError] =
+    useState(null)
+
+  /* ========================================
+     CLEANUP OBJECT URL ON UNMOUNT / CHANGE
+  ======================================== */
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
 
   /* ========================================
      FETCH TAXONOMY
@@ -315,6 +354,38 @@ export const useTicketForm = ({
     value
   ) => {
 
+    /* ---- IMAGE ATTACHMENT HANDLER ---- */
+    if (name === "image") {
+      if (value === null) {
+        if (imagePreview) {
+          URL.revokeObjectURL(imagePreview)
+        }
+        setImageFile(null)
+        setImagePreview(null)
+        setImageError(null)
+        return
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.includes(value.type)) {
+        setImageError("Only PNG, JPG, JPEG, WEBP, and GIF images are allowed.")
+        return
+      }
+
+      if (value.size > MAX_IMAGE_SIZE) {
+        setImageError("Image must be smaller than 5 MB.")
+        return
+      }
+
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+
+      setImageFile(value)
+      setImagePreview(URL.createObjectURL(value))
+      setImageError(null)
+      return
+    }
+
     if (
       name ===
       "description"
@@ -411,6 +482,9 @@ export const useTicketForm = ({
           user_token:
             chatbotService.getUserToken?.() ||
             localStorage.getItem("user_token"),
+
+          image:
+            imageFile,
         }
 
         console.log(
@@ -479,5 +553,11 @@ export const useTicketForm = ({
     summaryError,
 
     MAX_WORDS,
+
+    imageFile,
+
+    imagePreview,
+
+    imageError,
   }
 }
