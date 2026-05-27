@@ -211,28 +211,13 @@ class VectorStoreService:
     def update_metadata_by_filter(self, filter_conditions: list, metadata_updates: dict) -> None:
         """Update nested metadata fields without depending on dotted payload semantics."""
         filter_selector = qdrant_models.Filter(must=filter_conditions)
-        offset = None
-        while True:
-            points, offset = self.qdrant.scroll(
+        for key, value in metadata_updates.items():
+            self.qdrant.set_payload(
                 collection_name=self.collection_name,
-                scroll_filter=filter_selector,
-                limit=100,
-                offset=offset,
-                with_payload=True,
-                with_vectors=True,
+                payload={key: value},
+                points=filter_selector,
+                key="metadata",
             )
-            if not points:
-                break
-            updated = []
-            for point in points:
-                payload = dict(getattr(point, "payload", {}) or {})
-                metadata = normalize_metadata(payload.get("metadata", {}))
-                metadata.update(metadata_updates)
-                payload["metadata"] = metadata
-                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
-            self.upsert_points(updated)
-            if offset is None:
-                break
 
     def soft_delete_by_metadata(self, key: str, value) -> None:
         """Mark matching vectors inactive without removing them from Qdrant."""
@@ -303,7 +288,8 @@ class VectorStoreService:
         )
 
 
-@lru_cache(maxsize=4)
+@lru_cache(maxsize=1)
 def get_shared_vector_store(collection_name: str | None = None) -> VectorStoreService:
     """Return a shared vector store service for the configured collection."""
-    return VectorStoreService(collection_name)
+    resolved_name = collection_name or settings.QDRANT_COLLECTION
+    return VectorStoreService(resolved_name)

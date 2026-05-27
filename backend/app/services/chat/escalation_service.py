@@ -104,7 +104,8 @@ class EscalationService:
 
             pushback_msg = extracted_data.get("chat_message") or "Sige, gawan natin ng ticket. Ano nga pala ang detalye (PC number, location)?"
 
-            self.message_svc.save_ai_message(
+            await asyncio.to_thread(
+                self.message_svc.save_ai_message,
                 session_id=session_id,
                 content=pushback_msg,
             )

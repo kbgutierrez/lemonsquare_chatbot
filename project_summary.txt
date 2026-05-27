@@ -2165,6 +2165,7 @@ import threading
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.chatbot import AIChatbotSetting
+from app.core.config import settings as app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -2187,7 +2188,7 @@ class SettingsCache:
             cls._instance = super(SettingsCache, cls).__new__(cls)
             cls._instance._cached_settings = None
             cls._instance._last_fetch = 0.0
-            cls._instance._ttl = 300
+            cls._instance._ttl = app_settings.SETTINGS_CACHE_TTL_SECONDS
             cls._instance._lock = threading.RLock()
         return cls._instance
 
@@ -2264,6 +2265,7 @@ class Settings(BaseSettings):
     DB_POOL_TIMEOUT: int = 10
     MAX_UPLOAD_MB: int = 25
     MAX_CONCURRENT_UPLOADS: int = 3
+    SETTINGS_CACHE_TTL_SECONDS: int = 300
     TAXONOMY_CACHE_TTL_SECONDS: int = 1800
 
     class Config:
@@ -2940,7 +2942,7 @@ import uuid
 import logging
 from datetime import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, update
 from app.models.chatbot import ChatSession, ChatMessage
 from app.core.exceptions import NotFoundError, AuthorizationError
 
@@ -3070,9 +3072,11 @@ class ChatRepository:
             SenderRole=role,
             MessageContent=content,
         ))
-        session = self.get_session_by_id(session_id)
-        if session:
-            session.LastActive = datetime.utcnow()
+        self.db.execute(
+            update(ChatSession)
+            .where(ChatSession.SessionID == session_id)
+            .values(LastActive=datetime.utcnow())
+        )
         self.db.commit()
 
     def get_recent_history_text(self, session_id: str) -> str:
@@ -4485,7 +4489,7 @@ class TelemetryRepository:
         return self.db.query(LLMUsageLog).order_by(LLMUsageLog.Timestamp.desc()).limit(limit).all()
 
 class TelemetryService:
-    _queue: asyncio.Queue = asyncio.Queue()
+    _queue: asyncio.Queue = asyncio.Queue(maxsize=10_000)
     _worker_task = None
 
     @classmethod
@@ -4531,6 +4535,8 @@ class TelemetryService:
         }
         try:
             cls._queue.put_nowait(log_entry)
+        except asyncio.QueueFull:
+            logger.debug("telemetry.queue_full; dropping entry model=%s action=%s", model, action)
         except Exception as e:
             logger.error(f"Failed to queue telemetry log: {e}")
 
@@ -4546,7 +4552,16 @@ Analytics service — REFACTORED from inline router logic.
 Centralizes all analytics data aggregation.
 """
 import logging
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
+from app.models.chatbot import (
+    BlacklistedTicket,
+    ChatSession,
+    LearnedChat,
+    ManualKnowledgeEntry,
+    UploadedDocument,
+)
+from app.models.helpdesk import TicketEvaluation
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.document_repository import DocumentRepository
 from app.repositories.ticket_repository import TicketRepository
@@ -4558,19 +4573,55 @@ class AnalyticsService:
     """Aggregates dashboard metrics from multiple repositories."""
 
     def __init__(self, db_chatbot: Session, db_helpdesk: Session):
+        self.db_chatbot = db_chatbot
+        self.db_helpdesk = db_helpdesk
         self.chat_repo = ChatRepository(db_chatbot)
         self.doc_repo = DocumentRepository(db_chatbot)
         self.ticket_repo = TicketRepository(db_chatbot, db_helpdesk)
 
     def get_summary(self) -> dict:
         """Return KPI dashboard metrics."""
-        total_chats = self.chat_repo.count_active_sessions()
-        escalated_chats = self.chat_repo.count_escalated_sessions()
-        total_pdfs = self.doc_repo.count_active_documents()
-        total_rules = self.doc_repo.count_active_manual_entries()
-        total_learned = self.doc_repo.count_active_learned_chats()
-        blacklisted_count = self.ticket_repo.count_blacklisted()
-        total_resolved = self.ticket_repo.count_resolved_with_work()
+        chatbot_counts = self.db_chatbot.query(
+            select(func.count())
+            .select_from(ChatSession)
+            .where(ChatSession.IsActive == True)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(ChatSession)
+            .where(ChatSession.IsActive == True)
+            .where(ChatSession.SessionStatus == "Escalated")
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(UploadedDocument)
+            .where(UploadedDocument.IsActive == True)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(ManualKnowledgeEntry)
+            .where(ManualKnowledgeEntry.IsActive == True)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(LearnedChat)
+            .where(LearnedChat.IsActive == True)
+            .scalar_subquery(),
+            select(func.count())
+            .select_from(BlacklistedTicket)
+            .scalar_subquery(),
+        ).one()
+        (
+            total_chats,
+            escalated_chats,
+            total_pdfs,
+            total_rules,
+            total_learned,
+            blacklisted_count,
+        ) = [int(value or 0) for value in chatbot_counts]
+
+        total_resolved = int(
+            self.db_helpdesk.query(func.count(TicketEvaluation.id))
+            .filter(TicketEvaluation.work_done.isnot(None))
+            .scalar()
+            or 0
+        )
         active_ai_tickets = total_resolved - blacklisted_count
 
         return {
@@ -7166,6 +7217,7 @@ Ingests resolved helpdesk tickets into the knowledge base.
 import logging
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+from app.core.exceptions import VectorStoreError
 from app.models.chatbot import BlacklistedTicket
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
@@ -7208,11 +7260,16 @@ class TicketProcessor:
 
         import asyncio
         vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        self.vector_store.upsert_points([PointStruct(
-            id=record.point_id,
-            vector=vector,
-            payload={"page_content": record.page_content, "metadata": record.metadata}
-        )])
+        try:
+            self.vector_store.upsert_points([PointStruct(
+                id=record.point_id,
+                vector=vector,
+                payload={"page_content": record.page_content, "metadata": record.metadata}
+            )])
+        except Exception as exc:
+            raise VectorStoreError(
+                f"Failed to upsert ticket {ticket_number} to Qdrant."
+            ) from exc
 
         return {
             "status": "success",
@@ -7664,7 +7721,11 @@ class SupportOrchestrator:
         from app.services.chat.escalation_service import EscalationService
 
         if session_id:
-            session = db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
+            session = await asyncio.to_thread(
+                db.query(ChatSession)
+                .filter(ChatSession.SessionID == session_id)
+                .first
+            )
             if session and session.SessionStatus == "Drafting_Ticket":
                 logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")
 
@@ -8022,9 +8083,14 @@ from app.core.config import settings
 
 
 @lru_cache(maxsize=4)
-def get_embedding_model(model_name: str | None = None) -> HuggingFaceEmbeddings:
+def _get_embedding_model(resolved_model_name: str) -> HuggingFaceEmbeddings:
     """Load each embedding model once per process."""
-    return HuggingFaceEmbeddings(model_name=model_name or settings.EMBEDDING_MODEL)
+    return HuggingFaceEmbeddings(model_name=resolved_model_name)
+
+
+def get_embedding_model(model_name: str | None = None) -> HuggingFaceEmbeddings:
+    """Normalize cache keys so None and the default model share one instance."""
+    return _get_embedding_model(model_name or settings.EMBEDDING_MODEL)
 
 
 --- FILE: backend\app\services\retrieval\reranker_service.py ---
@@ -8287,28 +8353,13 @@ class VectorStoreService:
     def update_metadata_by_filter(self, filter_conditions: list, metadata_updates: dict) -> None:
         """Update nested metadata fields without depending on dotted payload semantics."""
         filter_selector = qdrant_models.Filter(must=filter_conditions)
-        offset = None
-        while True:
-            points, offset = self.qdrant.scroll(
+        for key, value in metadata_updates.items():
+            self.qdrant.set_payload(
                 collection_name=self.collection_name,
-                scroll_filter=filter_selector,
-                limit=100,
-                offset=offset,
-                with_payload=True,
-                with_vectors=True,
+                payload={key: value},
+                points=filter_selector,
+                key="metadata",
             )
-            if not points:
-                break
-            updated = []
-            for point in points:
-                payload = dict(getattr(point, "payload", {}) or {})
-                metadata = normalize_metadata(payload.get("metadata", {}))
-                metadata.update(metadata_updates)
-                payload["metadata"] = metadata
-                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
-            self.upsert_points(updated)
-            if offset is None:
-                break
 
     def soft_delete_by_metadata(self, key: str, value) -> None:
         """Mark matching vectors inactive without removing them from Qdrant."""

@@ -4,6 +4,7 @@ import threading
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.models.chatbot import AIChatbotSetting
+from app.core.config import settings as app_settings
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ class SettingsCache:
             cls._instance = super(SettingsCache, cls).__new__(cls)
             cls._instance._cached_settings = None
             cls._instance._last_fetch = 0.0
-            cls._instance._ttl = 300
+            cls._instance._ttl = app_settings.SETTINGS_CACHE_TTL_SECONDS
             cls._instance._lock = threading.RLock()
         return cls._instance
 
