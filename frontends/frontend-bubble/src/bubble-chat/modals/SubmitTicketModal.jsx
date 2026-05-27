@@ -26,10 +26,10 @@ const ActionButton = ({ children, disabled, onClick, variant = "primary", theme 
   )
 }
 
-const SubmitTicketModal = ({ onClose, sessionId, requesterId, messages = [] }) => {
+const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [] }) => {
   const { theme } = useTheme()
   const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading } = useTicketForm({
-    sessionId, requesterId, messages,
+    sessionId, requesterId, userData, messages,
     onSuccess: () => { setTimeout(() => onClose?.(), 1500) },
   })
 

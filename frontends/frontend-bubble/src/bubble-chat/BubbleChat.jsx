@@ -17,8 +17,24 @@ import { cn } from "./utils/cn"
 const BubbleChatContent = () => {
   const [open, setOpen] = useState(false)
   const [activeModal, setActiveModal] = useState(null)
+  const [userData, setUserData] = useState(null)
   const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
   const [checkingEscalation, setCheckingEscalation] = useState(false)
+
+  useEffect(() => {
+    const verify = async () => {
+      try {
+        const data = await chatbotService.verifyUserToken()
+        if (data.valid) {
+          setUserData(data)
+        }
+      } catch (err) {
+        console.error("Auth verify failed", err)
+      }
+    }
+    verify()
+  }, [])
+
   const messagesRef = useRef([])
   const openDraftAutoTriggered = useRef(false)
 
@@ -118,7 +134,7 @@ const BubbleChatContent = () => {
 
   const modals = {
     history: <ChatHistoryModal key={historyRefreshKey} refreshKey={historyRefreshKey} onClose={closeModal} onLoadConversation={handleLoadConversation} onClearConversation={clearConversation} />,
-    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} messages={messages} />,
+    ticket: <SubmitTicketModal onClose={closeModal} sessionId={sessionId} requesterId={requesterId} userData={userData} messages={messages} />,
     theme: <ThemeModal isOpen={true} onClose={closeModal} />,
     resolve: <ResolveConversationModal onClose={closeModal} onResolve={handleResolveConversation} />,
     about: <AboutHelpDeskModal onClose={closeModal} />,

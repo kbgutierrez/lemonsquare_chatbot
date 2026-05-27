@@ -19,6 +19,7 @@ async def verify_user(user_token: str):
         return {
             "valid": True,
             "user_id": user_data.get("id"),
+            "company_id": user_data.get("company"),
             "name": name if name else "Unknown User",
         }
     except AuthenticationError as exc:
