@@ -21,7 +21,7 @@ from app.services.routing.routing_engine import suggest_route
 from app.schemas.routing import RoutingRequest
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.embedding_provider import get_embedding_model
-
+import time
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -39,6 +39,7 @@ FALLBACK_ROUTING = {
 }
 
 BIZPORTAL_TICKET_URL = settings.BIZPORTAL_TICKET_URL
+_draft_cache: dict[str, tuple[dict, float]] = {}
 
 
 async def _get_draft_lock(session_id: str) -> asyncio.Lock:
@@ -55,14 +56,25 @@ class EscalationService:
         self.message_svc = MessageService(db)
 
 
-    async def draft_escalation(self, session_id: str) -> dict:
+    async def draft_escalation(self, session_id: str) -> dict: 
+        global _draft_cache
+        
         """
         Generate a ticket escalation draft, then pass it to the routing engine.
         Returns dict matching TicketDraftResponse schema.
         """
         draft_lock = await _get_draft_lock(session_id)
         async with draft_lock:
-            return await self._draft_escalation_locked(session_id)
+            # --- NEW: CHECK CACHE FIRST ---
+            if session_id in _draft_cache:
+                cached_data, timestamp = _draft_cache[session_id]
+                if time.time() - timestamp < 30.0:
+                    logger.info("Serving escalation draft from cache for session %s", session_id)
+                    del _draft_cache[session_id]  # Self-destruct the cache
+                    return cached_data
+
+            # If no cache, run the heavy LLM function
+            return await self._draft_escalation_locked(session_id)  
 
     async def _draft_escalation_locked(self, session_id: str) -> dict:
         session = self.repo.validate_session_for_escalation(session_id)
@@ -202,7 +214,7 @@ class EscalationService:
             routing_analysis = "Routing engine failed."
 
         # --- 3. RETURN COMBO TO FRONTEND ---
-        return {
+        final_result = {
             "status": "success",
             "summary": summary,
             "description": description,
@@ -218,6 +230,11 @@ class EscalationService:
             "routing_source": "ai_rac_pipeline",
         }
 
+        # --- NEW: SAVE TO CACHE BEFORE RETURNING ---
+        global _draft_cache
+        _draft_cache[session_id] = (final_result, time.time())
+        
+        return final_result
     async def submit_escalation(self, payload: dict, file: UploadFile = None) -> dict:
         """
         Submit an escalation ticket to BizPortal with conditional fields and optional attachment.
