@@ -1,6 +1,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from "react"
@@ -15,11 +16,12 @@ const createMessage = ({
   sender,
   text = "",
   isTyping = false,
+  isLoading = false,
 }) => ({
   id: crypto.randomUUID(),
   sender,
   text,
-  time: isTyping
+  time: isTyping || isLoading
     ? ""
     : new Date().toLocaleTimeString(
         [],
@@ -29,6 +31,7 @@ const createMessage = ({
         }
       ),
   isTyping,
+  isLoading,
 })
 
 /* ========================================
@@ -73,6 +76,11 @@ export const useChatMessages =
       resolutionMessage: null,
     })
 
+    const [
+      consumedPromptSignature,
+      setConsumedPromptSignature,
+    ] = useState(null)
+
     /* ========================================
        REFS
     ======================================== */
@@ -88,6 +96,26 @@ export const useChatMessages =
 
     const state =
       refs.current
+
+    /* ========================================
+       PROMPT SIGNATURE (for one-time display)
+    ======================================== */
+
+    const promptSignature = useMemo(() => {
+      return JSON.stringify({
+        showResolutionPrompt: resolutionCheck.showResolutionPrompt,
+        allowTicketSubmission: resolutionCheck.allowTicketSubmission,
+        resolutionAction: resolutionCheck.resolutionAction,
+        resolutionMessage: resolutionCheck.resolutionMessage,
+      })
+    }, [resolutionCheck])
+
+    const consumeResolutionPrompt = useCallback(() => {
+      setConsumedPromptSignature(promptSignature)
+    }, [promptSignature])
+
+    const isResolutionPromptConsumed =
+      consumedPromptSignature === promptSignature
 
     /* ========================================
        SYNC MESSAGE REF
@@ -182,10 +210,6 @@ export const useChatMessages =
           ) {
             return
           }
-
-          /*
-            BLOCK AUTO-RESTORE
-          */
 
           if (
             state.cleared
@@ -389,7 +413,6 @@ export const useChatMessages =
               aiMessage,
             ])
 
-            // Apply resolution flags returned by the backend immediately
             setResolutionCheck({
               showResolutionPrompt: Boolean(response?.showResolutionPrompt),
               allowTicketSubmission: Boolean(response?.allowTicketSubmission),
@@ -445,6 +468,7 @@ export const useChatMessages =
             )
 
             setResolved(true)
+            setConsumedPromptSignature(null)
 
           } catch (error) {
 
@@ -496,18 +520,15 @@ export const useChatMessages =
               showResolutionPrompt:
                 Boolean(data?.show_resolution_prompt),
 
-              // Force strict boolean based on the new backend logic
               allowTicketSubmission:
                 Boolean(data?.allow_ticket_submission),
 
               conversationStatus:
                 data?.conversation_status || "active",
 
-              // FIXED: Must read from data.resolution_action
               resolutionAction:
                 data?.resolution_action || "active",
 
-              // FIXED: Must read from data.resolution_message
               resolutionMessage:
                 data?.resolution_message || null,
             })
@@ -570,6 +591,7 @@ export const useChatMessages =
             false
 
           setMessages([])
+          setConsumedPromptSignature(null)
 
           state.sessionId =
             sessionId
@@ -601,6 +623,7 @@ export const useChatMessages =
           setMessages([])
           setSessionId(null)
           setResolved(false)
+          setConsumedPromptSignature(null)
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -624,7 +647,7 @@ export const useChatMessages =
       )
 
     /* ========================================
-       ADD MESSAGE (for injecting external messages)
+       ADD MESSAGE
     ======================================== */
 
     const addMessage =
@@ -632,7 +655,8 @@ export const useChatMessages =
         (
           text,
           sender = "agent",
-          isTyping = false
+          isTyping = false,
+          isLoading = false
         ) => {
 
           const message =
@@ -640,6 +664,7 @@ export const useChatMessages =
               sender,
               text,
               isTyping,
+              isLoading,
             })
 
           setMessages(
@@ -697,5 +722,9 @@ export const useChatMessages =
       dismissResolution,
 
       addMessage,
-      }
-      }
+
+      consumeResolutionPrompt,
+
+      isResolutionPromptConsumed,
+    }
+  }

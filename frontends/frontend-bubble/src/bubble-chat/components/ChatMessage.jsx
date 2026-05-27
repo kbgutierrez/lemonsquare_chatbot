@@ -7,6 +7,7 @@ import {
 import {
   Bot,
   User,
+  LoaderCircle,
 } from "lucide-react"
 
 import { useTheme } from "../context/ThemeContext.jsx"
@@ -81,6 +82,11 @@ const ChatMessage = ({
       message?.isTyping
     )
 
+  const isLoading =
+    Boolean(
+      message?.isLoading
+    )
+
   const timestamp =
     message?.time || ""
 
@@ -147,12 +153,10 @@ const ChatMessage = ({
       `}
     >
 
-      {/* LEFT AVATAR */}
       {isAgent && (
         <Avatar {...avatarProps} />
       )}
 
-      {/* BUBBLE */}
       <div
         className="
           max-w-[75%]
@@ -172,8 +176,14 @@ const ChatMessage = ({
         style={bubbleStyle}
       >
 
-        {/* CONTENT */}
-        {isTyping ? (
+        {isLoading ? (
+          <div className="flex items-center gap-2">
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin" style={{ color: theme.typingDot }} />
+            <p className="whitespace-pre-wrap break-words text-[12px] leading-snug">
+              {text}
+            </p>
+          </div>
+        ) : isTyping ? (
           <TypingDots color={theme.typingDot} />
         ) : (
           <p
@@ -189,8 +199,7 @@ const ChatMessage = ({
           </p>
         )}
 
-        {/* TIME */}
-        {!!timestamp && !isTyping && (
+        {!!timestamp && !isTyping && !isLoading && (
           <div
             className="
               mt-1
@@ -213,7 +222,6 @@ const ChatMessage = ({
 
       </div>
 
-      {/* RIGHT AVATAR */}
       {!isAgent && (
         <Avatar {...avatarProps} />
       )}

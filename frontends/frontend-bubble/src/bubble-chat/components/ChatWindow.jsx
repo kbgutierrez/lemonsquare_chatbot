@@ -34,6 +34,8 @@ const ChatWindow = ({
   onClose,
   onOpenModal,
   sessionKey,
+  consumeResolutionPrompt,
+  isResolutionPromptConsumed,
 }) => {
 
   const { theme } = useTheme()
@@ -61,7 +63,6 @@ const ChatWindow = ({
       }}
     >
 
-      {/* BACKGROUND IMAGE */}
       <img
         src={chatWindowBackground}
         alt=""
@@ -83,7 +84,6 @@ const ChatWindow = ({
         }}
       />
 
-      {/* OVERLAY */}
       <div
         className={overlayClass}
         style={{
@@ -91,7 +91,6 @@ const ChatWindow = ({
         }}
       />
 
-      {/* INNER */}
       <div
         className="
           relative
@@ -104,7 +103,6 @@ const ChatWindow = ({
         "
       >
 
-        {/* HEADER */}
         <div className="relative z-[5000]">
           <ChatHeader
             resolved={resolved}
@@ -113,10 +111,8 @@ const ChatWindow = ({
           />
         </div>
 
-        {/* CHAT AREA */}
         <main className="relative flex-1 min-h-0 overflow-hidden">
 
-          {/* TOP GLOW */}
           <div
             className={glowClass}
             style={{
@@ -128,7 +124,6 @@ const ChatWindow = ({
             }}
           />
 
-          {/* BOTTOM GLOW */}
           <div
             className={glowClass}
             style={{
@@ -142,7 +137,6 @@ const ChatWindow = ({
             }}
           />
 
-          {/* RESOLVED */}
           {resolved && (
             <div
               className="
@@ -173,7 +167,6 @@ const ChatWindow = ({
             </div>
           )}
 
-          {/* MESSAGES */}
           <div className="relative z-10 h-full">
             <ChatMessages
               messages={messages}
@@ -183,12 +176,13 @@ const ChatWindow = ({
               onResolve={onResolveConversation}
               onDismiss={onDismissResolution}
               onOpenTicket={() => onOpenModal("ticket")}
+              consumeResolutionPrompt={consumeResolutionPrompt}
+              isResolutionPromptConsumed={isResolutionPromptConsumed}
             />
           </div>
 
         </main>
 
-        {/* FOOTER */}
         <ChatFooter
           loading={loading}
           resolved={resolved}

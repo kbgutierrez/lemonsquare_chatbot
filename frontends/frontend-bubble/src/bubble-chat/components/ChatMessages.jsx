@@ -4,6 +4,8 @@ import {
   useRef,
 } from "react"
 
+import { AnimatePresence, motion } from "framer-motion"
+
 import ChatMessage from "./ChatMessage.jsx"
 import ResolutionPrompt from "./ResolutionPrompt.jsx"
 
@@ -58,6 +60,8 @@ const ChatMessages = ({
   onResolve,
   onDismiss,
   onOpenTicket,
+  consumeResolutionPrompt,
+  isResolutionPromptConsumed,
 }) => {
 
   const messagesEndRef =
@@ -211,18 +215,28 @@ const ChatMessages = ({
           )
         )}
 
-        {/* RESOLUTION PROMPT AS A MESSAGE */}
-        {/* Render based on backend flags - text is now hardcoded in ResolutionPrompt */}
-        {!resolved && !loading && (resolutionCheck.showResolutionPrompt || resolutionCheck.allowTicketSubmission) && (
-          <ResolutionPrompt
-            onResolve={onResolve}
-            onDismiss={onDismiss}
-            onOpenTicket={onOpenTicket}
-            showResolutionPrompt={resolutionCheck.showResolutionPrompt}
-            allowTicketSubmission={resolutionCheck.allowTicketSubmission}
-            resolutionMessage={resolutionCheck.resolutionMessage}
-          />
-        )}
+        {/* RESOLUTION PROMPT — with AnimatePresence for smooth exit */}
+        <AnimatePresence>
+          {!resolved && !loading && (resolutionCheck.showResolutionPrompt || resolutionCheck.allowTicketSubmission) && !isResolutionPromptConsumed && (
+            <motion.div
+              key="resolution-prompt"
+              initial={{ opacity: 0, y: 12, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ duration: 0.25, ease: "easeOut" }}
+            >
+              <ResolutionPrompt
+                onResolve={onResolve}
+                onDismiss={onDismiss}
+                onOpenTicket={onOpenTicket}
+                onConsume={consumeResolutionPrompt}
+                showResolutionPrompt={resolutionCheck.showResolutionPrompt}
+                allowTicketSubmission={resolutionCheck.allowTicketSubmission}
+                resolutionMessage={resolutionCheck.resolutionMessage}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
 
       </div>
 
