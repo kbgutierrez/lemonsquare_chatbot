@@ -1,89 +1,234 @@
-import chatbotService from "./chatbotService"
-
-const API_BASE =
-  import.meta.env
-    .VITE_API_BASE_URL ||
-  "/api"
-
-const STORAGE_KEY = "lemonsquare-theme-v1"
+import {
+  API_CONFIG,
+  API_ENDPOINTS,
+  buildApiUrl,
+  getRuntimeConfig,
+} from "../../config/sqlVariables"
 
 /* ========================================
-   THEME SERVICE
-   Per-user backend persistence with localStorage fallback.
-   Sends X-User-Token header for user identification.
+   CONFIG
 ======================================== */
 
-const themeService = {
+const REQUEST_TIMEOUT =
+  API_CONFIG.TIMEOUT
 
-  getAuthHeaders: () => {
-    const token = chatbotService.getUserToken?.() || "11318"
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-      "X-User-Token": String(token),
-    }
-  },
+/* ========================================
+   HELPERS
+======================================== */
 
-  async getTheme() {
+const parseJsonSafely =
+  async (response) => {
+
     try {
-      const response = await fetch(
-        `${API_BASE}/settings/theme`,
-        { method: "GET", headers: this.getAuthHeaders() }
+      return await response.json()
+    } catch {
+      return null
+    }
+  }
+
+const isValidToken = (
+  token
+) =>
+  token &&
+  token !== "null" &&
+  token !== "undefined"
+
+const getUserToken =
+  () => {
+
+    const runtimeToken =
+      getRuntimeConfig()
+        ?.userToken
+
+    if (
+      isValidToken(
+        runtimeToken
+      )
+    ) {
+      return runtimeToken
+    }
+
+    const globalToken =
+      window
+        ?.LemonSquareChatConfig
+        ?.userToken
+
+    if (
+      isValidToken(
+        globalToken
+      )
+    ) {
+      return globalToken
+    }
+
+    const localToken =
+      localStorage.getItem(
+        "user_token"
       )
 
-      if (response.ok) {
-        const data = await response.json()
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
-        return data
-      }
-
-      if (response.status === 404) {
-        console.warn("THEME_BACKEND_404 — using localStorage fallback")
-      } else {
-        throw new Error(`HTTP ${response.status}`)
-      }
-    } catch (error) {
-      console.error("THEME_BACKEND_GET_FAIL", error)
+    if (
+      isValidToken(
+        localToken
+      )
+    ) {
+      return localToken
     }
 
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY)
-      if (raw) return JSON.parse(raw)
-    } catch (e) {
-      console.error("THEME_LOCAL_GET_FAIL", e)
+    if (
+      import.meta.env.DEV &&
+      import.meta.env
+        .VITE_DEV_USER_TOKEN
+    ) {
+      return import.meta.env
+        .VITE_DEV_USER_TOKEN
     }
 
-    return null
-  },
+    throw new Error(
+      "User authentication token not found."
+    )
+  }
 
-  async saveTheme(payload) {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-    } catch (e) {
-      console.error("THEME_LOCAL_SAVE_FAIL", e)
+/* ========================================
+   API REQUEST
+======================================== */
+
+const apiRequest = async ({
+  endpoint,
+  method = "GET",
+  body,
+  headers = {},
+}) => {
+
+  const controller =
+    new AbortController()
+
+  const timeoutId =
+    setTimeout(
+      () =>
+        controller.abort(),
+      REQUEST_TIMEOUT
+    )
+
+  try {
+
+    const requestHeaders = {
+      ...API_CONFIG.HEADERS,
+      "X-User-Token":
+        getUserToken(),
+      ...headers,
     }
 
-    try {
-      const response = await fetch(
-        `${API_BASE}/settings/theme`,
+    const requestBody =
+      body
+        ? JSON.stringify(
+            body
+          )
+        : undefined
+
+    console.log(
+      "[ThemeService] Request:",
+      method,
+      endpoint,
+      "headers:",
+      requestHeaders,
+      "body:",
+      body
+    )
+
+    const response =
+      await fetch(
+        endpoint,
         {
-          method: "PUT",
-          headers: this.getAuthHeaders(),
-          body: JSON.stringify(payload),
+          method,
+
+          headers: requestHeaders,
+
+          body: requestBody,
+
+          signal:
+            controller.signal,
         }
       )
 
-      if (response.ok) return await response.json()
-      if (response.status === 404) {
-        console.warn("THEME_BACKEND_404 — saved to localStorage only")
-        return { success: true, source: "localStorage", backend: false }
-      }
-      throw new Error(`HTTP ${response.status}`)
-    } catch (error) {
-      console.error("THEME_BACKEND_SAVE_FAIL", error)
-      return { success: true, source: "localStorage", backend: false, error: error.message }
+    const data =
+      await parseJsonSafely(
+        response
+      )
+
+    console.log(
+      "[ThemeService] Response:",
+      response.status,
+      data
+    )
+
+    if (!response.ok) {
+
+      throw new Error(
+        data?.detail ||
+        data?.message ||
+        `API request failed (${response.status}).`
+      )
     }
-  },
+
+    return data
+
+  } catch (error) {
+
+    if (
+      error.name ===
+      "AbortError"
+    ) {
+
+      throw new Error(
+        "Request timeout exceeded."
+      )
+    }
+
+    throw error
+
+  } finally {
+
+    clearTimeout(
+      timeoutId
+    )
+  }
+}
+
+/* ========================================
+   THEME API
+======================================== */
+
+const getTheme =
+  async () =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.THEME_GET
+        ),
+    })
+
+const saveTheme =
+  async (
+    payload
+  ) =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.THEME_UPDATE
+        ),
+
+      method: "PUT",
+
+      body: payload,
+    })
+
+/* ========================================
+   EXPORT
+======================================== */
+
+const themeService = {
+  getTheme,
+  saveTheme,
 }
 
 export default themeService
