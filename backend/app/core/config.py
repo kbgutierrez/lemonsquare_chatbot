@@ -29,7 +29,13 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/admin/login"
     )
     BIZPORTAL_TICKET_URL: str = (
-        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/send/ticket/"
+    )
+    BIZPORTAL_DEPT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
+    )
+    BIZPORTAL_SUBCAT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
     DB_POOL_SIZE: int = 20

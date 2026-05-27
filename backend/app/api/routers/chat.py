@@ -279,6 +279,7 @@ async def submit_escalation(
     subcategory_id: int | None = Form(None),
     location: str | None = Form(None),
     equipment: str | None = Form(None),
+    user_token: str | None = Form(None),
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
@@ -293,6 +294,19 @@ async def submit_escalation(
         subcategory_id = body.get("subcategory_id")
         location = body.get("location")
         equipment = body.get("equipment")
+        user_token = body.get("user_token")
+
+    # --- RESOLVE CORRECT COMPANY_ID FROM TOKEN ---
+    if user_token:
+        from app.services.external.user_service import fetch_user_details
+        try:
+            user_data = await fetch_user_details(user_token)
+            if user_data and user_data.get("company"):
+                resolved_company = user_data.get("company")
+                logger.info("Overriding company_id %s with resolved company %s", company_id, resolved_company)
+                company_id = resolved_company
+        except Exception as exc:
+            logger.warning("Failed to resolve company_id from token: %s", exc)
 
     required_payload = {
         "session_id": session_id,

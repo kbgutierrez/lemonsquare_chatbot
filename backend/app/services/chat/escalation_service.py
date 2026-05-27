@@ -250,17 +250,17 @@ class EscalationService:
         
         # 2. Build the base payload that EVERY department needs
         bizportal_payload = {
-            "summary": payload["summary"],
-            "description": payload["description"],
-            "category_id": dept_id,
-            "subcategory_id": payload["subcategory_id"],
-            "requester_id": payload["requester_id"],
-            "company_id": payload["company_id"],
+            "summary": str(payload["summary"]),
+            "description": str(payload["description"]),
+            "category_id": str(dept_id),
+            "subcategory_id": str(payload["subcategory_id"]),
+            "requester_id": str(payload["requester_id"]),
+            "company_id": str(payload["company_id"]),
         }
 
         # 3. Apply Conditional Logic
-        location = payload.get("location") or "Unknown"
-        equipment = payload.get("equipment") or "Unknown"
+        location = str(payload.get("location") or "Unknown")
+        equipment = str(payload.get("equipment") or "Unknown")
 
         if dept_id in DEPARTMENTS_WITH_EXTRA_FIELDS:
             # Send as separate fields for LMD, Motorpool, TSD
@@ -269,18 +269,18 @@ class EscalationService:
         else:
             # For ICT (29) & TMG (81), append to description
             bizportal_payload["description"] = (
-                f"{payload['description']}\n\n"
+                f"{bizportal_payload['description']}\n\n"
                 f"--- Additional Details ---\n"
                 f"Location: {location}\n"
                 f"Equipment: {equipment}"
             )
 
-        # 4. Handle the File Upload (attachment[])
+        # 4. Handle the File Upload (attachment)
         files_to_send = None
         if file:
             file_content = await file.read()
-            # BizPortal expects the array bracket notation for files
-            files_to_send = {'attachment[]': (file.filename, file_content, file.content_type)}
+            # BizPortal expects the field name 'attachment'
+            files_to_send = {'attachment': (file.filename, file_content, file.content_type)}
 
         # 5. Send to BizPortal
         async with httpx.AsyncClient() as client:
@@ -291,6 +291,17 @@ class EscalationService:
                 timeout=10.0,
             )
             response.raise_for_status()
+
+            # Check for logical errors even if HTTP status is 200
+            try:
+                resp_json = response.json()
+                if resp_json.get("status") == "error" or resp_json.get("success") is False:
+                    error_msg = resp_json.get("message") or resp_json.get("response") or "BizPortal rejected the ticket."
+                    logger.error("BizPortal logical error during escalation: %s", resp_json)
+                    raise ValidationError(f"Ticket submission failed: {error_msg}")
+            except ValueError:
+                # If it's not JSON, assume success if HTTP status is 200
+                pass
 
         self.repo.escalate_session(session_id)
 
