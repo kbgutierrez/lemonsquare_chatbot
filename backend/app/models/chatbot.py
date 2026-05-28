@@ -67,6 +67,7 @@ class AIChatbotSetting(BaseChatbot):
     TopK_Tickets = Column(Integer)
     UseReformulator = Column(Boolean, default=True)
     UseReranker = Column(Boolean, default=True)
+    ChatExtractionModel = Column(String(100))
     ChatExtractionPrompt = Column(Text)
     AllowedCategories = Column(
         String(500),
@@ -149,6 +150,7 @@ class ManualKnowledgeEntry(BaseChatbot):
 class LearnedChat(BaseChatbot):
     __tablename__ = "tbl_learned_chats"
     SessionID = Column(String(36), primary_key=True)
+    UserID = Column(BigInteger)
     IssueReported = Column(Text)
     IssueFound = Column(Text)
     RootCause = Column(Text)

@@ -80,6 +80,7 @@ class SettingsRepository:
             UseReformulator=overrides.get("UseReformulator", source.UseReformulator if source else True),
             UseReranker=overrides.get("UseReranker", source.UseReranker if source else True),
             AllowedCategories=overrides.get("AllowedCategories", source.AllowedCategories if source else None),
+            ChatExtractionModel=overrides.get("ChatExtractionModel", source.ChatExtractionModel if source else None),
             ChatExtractionPrompt=overrides.get("ChatExtractionPrompt", source.ChatExtractionPrompt if source else None),
             EscalationDraftModel=overrides.get("EscalationDraftModel", source.EscalationDraftModel if source else None),
             EscalationDraftPrompt=overrides.get("EscalationDraftPrompt", source.EscalationDraftPrompt if source else None),

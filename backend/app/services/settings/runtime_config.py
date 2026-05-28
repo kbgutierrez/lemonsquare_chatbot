@@ -30,6 +30,7 @@ DEFAULT_ROUTING_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_DOCUMENT_CLASSIFIER_MODEL = "llama-3.1-8b-instant"
 DEFAULT_ESCALATION_MODEL = "llama-3.1-8b-instant"
 DEFAULT_CONVERSATION_RESOLUTION_MODEL = "llama-3.1-8b-instant"
+DEFAULT_CHAT_EXTRACTION_MODEL = "llama-3.1-8b-instant"
 
 
 class RuntimeAIConfig:
@@ -93,4 +94,17 @@ class RuntimeAIConfig:
             or CONVERSATION_RESOLUTION_PROMPT
         )
     
-    
+    @property
+    def chat_extraction_model(self) -> str:
+        return (
+            self.settings.ChatExtractionModel
+            or DEFAULT_CHAT_EXTRACTION_MODEL
+        )
+
+    @property
+    def chat_extraction_prompt(self) -> str:
+        from app.services.prompts import RESOLVED_CHAT_EXTRACTION_PROMPT
+        return (
+            self.settings.ChatExtractionPrompt
+            or RESOLVED_CHAT_EXTRACTION_PROMPT
+        )
