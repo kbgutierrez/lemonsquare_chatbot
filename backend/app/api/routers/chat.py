@@ -400,9 +400,24 @@ async def check_chat_resolution(
     db: Session = Depends(get_chatbot_db)
 ):
     """Analyzes the recent chat history to see if buttons should be shown."""
+    # 1. First, check if the session is already terminated (Resolved or Escalated)
+    # This prevents the popup from reappearing after a successful ticket submission.
+    from app.repositories.chat_repository import ChatRepository
+    session = ChatRepository(db).get_session_by_id(session_id)
+    
+    if session and session.SessionStatus in ("Resolved", "Escalated"):
+        return ResolutionCheckResponse(
+            show_resolution_prompt=False,
+            allow_ticket_submission=False,
+            conversation_status=session.SessionStatus.lower(),
+            resolution_action="active",
+            resolution_confidence=1.0,
+            resolution_message=None
+        )
+
     msg_svc = MessageService(db)
     
-    # 1. Grab the latest history
+    # 2. Grab the latest history
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
     messages = msg_svc.get_all_messages(session_id)
     
@@ -415,11 +430,11 @@ async def check_chat_resolution(
             resolution_confidence=0.0,
         )
 
-    # 2. Get the very last user message and AI response
+    # 3. Get the very last user message and AI response
     user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
     ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
 
-    # 3. Run the LLM Analyzer
+    # 4. Run the LLM Analyzer
     resolver = ConversationResolutionService(db)
     resolution_data = await resolver.analyze_conversation(
         user_query=user_query,

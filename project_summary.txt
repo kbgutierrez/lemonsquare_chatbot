@@ -509,6 +509,7 @@ async def verify_user(user_token: str):
         return {
             "valid": True,
             "user_id": user_data.get("id"),
+            "company_id": user_data.get("company"),
             "name": name if name else "Unknown User",
         }
     except AuthenticationError as exc:
@@ -531,7 +532,7 @@ import logging
 import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request, Form, File, UploadFile
+from fastapi import APIRouter, Depends, Request, Form, File, UploadFile, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -802,9 +803,22 @@ async def submit_escalation(
     subcategory_id: int | None = Form(None),
     location: str | None = Form(None),
     equipment: str | None = Form(None),
+    user_token: str | None = Form(None),
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
+    if attachment:
+        max_size = 10 * 1024 * 1024  # 10MB limit
+        try:
+            file_size = getattr(attachment, "size", 0)
+            if file_size > max_size:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Attachment too large. Maximum size allowed is 10MB."
+                )
+        except AttributeError:
+            pass
+
     if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
         session_id = body.get("session_id")
@@ -816,6 +830,19 @@ async def submit_escalation(
         subcategory_id = body.get("subcategory_id")
         location = body.get("location")
         equipment = body.get("equipment")
+        user_token = body.get("user_token")
+
+    # --- RESOLVE CORRECT COMPANY_ID FROM TOKEN ---
+    if user_token:
+        from app.services.external.user_service import fetch_user_details
+        try:
+            user_data = await fetch_user_details(user_token)
+            if user_data and user_data.get("company"):
+                resolved_company = user_data.get("company")
+                logger.info("Overriding company_id %s with resolved company %s", company_id, resolved_company)
+                company_id = resolved_company
+        except Exception as exc:
+            logger.warning("Failed to resolve company_id from token: %s", exc)
 
     required_payload = {
         "session_id": session_id,
@@ -897,9 +924,24 @@ async def check_chat_resolution(
     db: Session = Depends(get_chatbot_db)
 ):
     """Analyzes the recent chat history to see if buttons should be shown."""
+    # 1. First, check if the session is already terminated (Resolved or Escalated)
+    # This prevents the popup from reappearing after a successful ticket submission.
+    from app.repositories.chat_repository import ChatRepository
+    session = ChatRepository(db).get_session_by_id(session_id)
+    
+    if session and session.SessionStatus in ("Resolved", "Escalated"):
+        return ResolutionCheckResponse(
+            show_resolution_prompt=False,
+            allow_ticket_submission=False,
+            conversation_status=session.SessionStatus.lower(),
+            resolution_action="active",
+            resolution_confidence=1.0,
+            resolution_message=None
+        )
+
     msg_svc = MessageService(db)
     
-    # 1. Grab the latest history
+    # 2. Grab the latest history
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
     messages = msg_svc.get_all_messages(session_id)
     
@@ -912,11 +954,11 @@ async def check_chat_resolution(
             resolution_confidence=0.0,
         )
 
-    # 2. Get the very last user message and AI response
+    # 3. Get the very last user message and AI response
     user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
     ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
 
-    # 3. Run the LLM Analyzer
+    # 4. Run the LLM Analyzer
     resolver = ConversationResolutionService(db)
     resolution_data = await resolver.analyze_conversation(
         user_query=user_query,
@@ -2349,7 +2391,13 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/admin/login"
     )
     BIZPORTAL_TICKET_URL: str = (
-        "https://lsbizportal.lemonsquare.com.ph/testportal/api/chatbot/send/ticket/"
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/send/ticket/"
+    )
+    BIZPORTAL_DEPT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
+    )
+    BIZPORTAL_SUBCAT_URL: str = (
+        "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
     DB_POOL_SIZE: int = 20
@@ -4533,7 +4581,7 @@ You MUST return ONLY valid JSON.
 
 Choose ONLY ONE "action" based on these rules:
 - "show_ticket": The AI mentions, suggests, or advises contacting IT/Facilities/Helpdesk (even conditionally, like "pag di gumana, contact IT"), OR the user explicitly asks for a ticket, OR the issue involves physical office equipment (e.g., aircon, printer, hardware) that employees cannot fix themselves.
-- "show_resolve": The user confirms the issue is fixed, OR the AI proactively asked if the chat can be closed.
+- "show_resolve": The user confirms the issue is fixed, the AI proactively asked if the chat can be closed, OR the AI provided a definitive answer, policy explanation, or troubleshooting steps that do not require an IT ticket.
 - "none": The troubleshooting is still active and neither of the above apply.
 
 If action is "show_ticket" or "show_resolve", you MUST provide a natural Taglish "resolution_message" (e.g., "Gusto mo bang gawan na natin ng ticket 'to para ma-schedule na nila?", "Pwede na ba natin i-close 'tong chat?"). Otherwise, set it to null.
@@ -4886,9 +4934,8 @@ class EscalationService:
             # --- NEW: CHECK CACHE FIRST ---
             if session_id in _draft_cache:
                 cached_data, timestamp = _draft_cache[session_id]
-                if time.time() - timestamp < 30.0:
+                if time.time() - timestamp < 60.0:
                     logger.info("Serving escalation draft from cache for session %s", session_id)
-                    del _draft_cache[session_id]  # Self-destruct the cache
                     return cached_data
 
             # If no cache, run the heavy LLM function
@@ -5069,17 +5116,17 @@ class EscalationService:
         
         # 2. Build the base payload that EVERY department needs
         bizportal_payload = {
-            "summary": payload["summary"],
-            "description": payload["description"],
-            "category_id": dept_id,
-            "subcategory_id": payload["subcategory_id"],
-            "requester_id": payload["requester_id"],
-            "company_id": payload["company_id"],
+            "summary": str(payload["summary"]),
+            "description": str(payload["description"]),
+            "category_id": str(dept_id),
+            "subcategory_id": str(payload["subcategory_id"]),
+            "requester_id": str(payload["requester_id"]),
+            "company_id": str(payload["company_id"]),
         }
 
         # 3. Apply Conditional Logic
-        location = payload.get("location") or "Unknown"
-        equipment = payload.get("equipment") or "Unknown"
+        location = str(payload.get("location") or "Unknown")
+        equipment = str(payload.get("equipment") or "Unknown")
 
         if dept_id in DEPARTMENTS_WITH_EXTRA_FIELDS:
             # Send as separate fields for LMD, Motorpool, TSD
@@ -5088,28 +5135,45 @@ class EscalationService:
         else:
             # For ICT (29) & TMG (81), append to description
             bizportal_payload["description"] = (
-                f"{payload['description']}\n\n"
+                f"{bizportal_payload['description']}\n\n"
                 f"--- Additional Details ---\n"
                 f"Location: {location}\n"
                 f"Equipment: {equipment}"
             )
 
-        # 4. Handle the File Upload (attachment[])
+        # 4. Handle the File Upload (attachment)
         files_to_send = None
         if file:
             file_content = await file.read()
-            # BizPortal expects the array bracket notation for files
-            files_to_send = {'attachment[]': (file.filename, file_content, file.content_type)}
+            # BizPortal expects the field name 'attachment'
+            files_to_send = {'attachment': (file.filename, file_content, file.content_type)}
 
         # 5. Send to BizPortal
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json",
+        }
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 BIZPORTAL_TICKET_URL,
                 data=bizportal_payload, # Use data for multipart form data
                 files=files_to_send,
+                headers=headers,
                 timeout=10.0,
             )
             response.raise_for_status()
+
+            # Check for logical errors even if HTTP status is 200
+            try:
+                resp_json = response.json()
+                if resp_json.get("status") == "error" or resp_json.get("success") is False:
+                    error_msg = resp_json.get("message") or resp_json.get("response") or "BizPortal rejected the ticket."
+                    logger.error("BizPortal logical error during escalation: %s", resp_json)
+                    raise ValidationError(f"Ticket submission failed: {error_msg}")
+            except ValueError:
+                # If it's not JSON, assume success if HTTP status is 200
+                pass
 
         self.repo.escalate_session(session_id)
 
@@ -7952,9 +8016,9 @@ class SupportOrchestrator:
 
         if session_id:
             session = await asyncio.to_thread(
-                db.query(ChatSession)
+                lambda: db.query(ChatSession)
                 .filter(ChatSession.SessionID == session_id)
-                .first
+                .first()
             )
             if session and session.SessionStatus == "Drafting_Ticket":
                 logger.info("Chat intercepted: User is currently in Drafting_Ticket state.")
@@ -9183,8 +9247,8 @@ async def get_live_taxonomy() -> str:
         if _TAXONOMY_CACHE and (now - _TAXONOMY_FETCHED_AT) <= ttl:
             return _TAXONOMY_CACHE
 
-        dept_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/departments"
-        base_subcat_url = "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories?department_id="
+        dept_url = settings.BIZPORTAL_DEPT_URL
+        base_subcat_url = f"{settings.BIZPORTAL_SUBCAT_URL}?department_id="
         taxonomy = []
 
         try:
