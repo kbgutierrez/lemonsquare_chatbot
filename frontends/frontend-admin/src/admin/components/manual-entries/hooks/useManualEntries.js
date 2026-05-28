@@ -177,8 +177,8 @@ const useManualEntries = () => {
      MANUAL REFRESH
   ======================================== */
 
-  const reloadEntries = useCallback(async () => {
-    if (isEditingRef.current) return
+  const reloadEntries = useCallback(async (force = false) => {
+    if (isEditingRef.current && !force) return
     invalidateCache(CACHE_KEY)
     await refresh()
   }, [refresh])
@@ -217,7 +217,12 @@ const useManualEntries = () => {
           items: [optimistic, ...safeItems],
         })
         const response = await createManualEntry(form)
-        await reloadEntries()
+        
+        // CRITICAL: Exit editing state BEFORE reloading
+        // so the guard in reloadEntries doesn't block the sync
+        setEditingState(false)
+        await reloadEntries(true)
+        
         if (mountedRef.current) {
           setSuccessMessage(
             `AI categorized entry as ${response?.category || form?.category || "General"}`
@@ -226,7 +231,9 @@ const useManualEntries = () => {
           closeModal?.()
         }
       } catch (error) {
-        await reloadEntries()
+        // Even on error, we should reload to clear the optimistic temp ID
+        setEditingState(false)
+        await reloadEntries(true)
         if (mountedRef.current) {
           setError(error.message || "Failed to create entry.")
         }
@@ -234,7 +241,7 @@ const useManualEntries = () => {
         if (mountedRef.current) setSubmitting(false)
       }
     },
-    [data, safeItems, reloadEntries]
+    [data, safeItems, reloadEntries, setEditingState]
   )
 
   /* ========================================
@@ -253,12 +260,16 @@ const useManualEntries = () => {
         )
         setCachedData(CACHE_KEY, { ...data, items: optimistic })
         await updateManualEntry(entryId, form)
-        await reloadEntries()
+        
+        setEditingState(false)
+        await reloadEntries(true)
+        
         if (mountedRef.current) {
           setSuccessMessage("Entry updated successfully")
           onFinish?.()
         }
       } catch (error) {
+        setEditingState(false)
         setCachedData(CACHE_KEY, previous)
         if (mountedRef.current) {
           setError(error.message || "Failed to update entry.")
@@ -267,7 +278,7 @@ const useManualEntries = () => {
         if (mountedRef.current) setSubmitting(false)
       }
     },
-    [data, safeItems, reloadEntries]
+    [data, safeItems, reloadEntries, setEditingState]
   )
 
   /* ========================================
