@@ -237,7 +237,7 @@ def build_cluster_documents(
     tickets: list[TicketEvaluation],
     blacklisted_nums: set[Any],
     previous_state: dict[str, str],
-) -> tuple[list[ClusterDocument], list[ClusterDocument], dict[str, str], int, int]:
+) -> tuple[list[ClusterDocument], list[ClusterDocument], dict[str, str], int, int, int]:
     """
     Build BOTH raw ticket documents AND canonical cluster documents.
 
@@ -247,10 +247,13 @@ def build_cluster_documents(
       - updated state map
       - skipped blacklisted count
       - skipped unchanged cluster count
+      - skipped unchanged raw count
     """
     grouped: dict[str, list[TicketEvaluation]] = defaultdict(list)
     raw_docs: list[ClusterDocument] = []
     skipped_blacklisted = 0
+    skipped_raw = 0
+    updated_state = dict(previous_state)
 
     for ticket in tickets:
         if ticket.ticket_number in blacklisted_nums:
@@ -258,7 +261,7 @@ def build_cluster_documents(
             continue
 
         # Build raw ticket document (one per ticket)
-        raw_vector_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket.ticket_number}"))
+        raw_key = f"raw_{ticket.ticket_number}"
         raw_content = (
             f"TICKET NUMBER: {stable_text(ticket.ticket_number)}\n"
             f"ISSUE REPORTED: {stable_text(ticket.issue_reported)}\n"
@@ -267,22 +270,29 @@ def build_cluster_documents(
             f"RESOLUTION (WORK DONE): {stable_text(ticket.work_done)}\n"
             f"ADVANCED RESOLUTION: {stable_text(ticket.advanced_work_done)}\n"
         )
-        raw_metadata = {
-            "doc_type": "raw_ticket",
-            "category": "Database Helpdesk Sync",
-            "ticket_number": stable_text(ticket.ticket_number),
-            "frequency": 1,
-        }
-        raw_doc = Document(page_content=raw_content, metadata=raw_metadata)
-        raw_docs.append(
-            ClusterDocument(
-                cluster_key=f"raw_{ticket.ticket_number}",
-                document=raw_doc,
-                vector_id=raw_vector_id,
-                content_hash=build_content_hash(raw_content),
-                ticket_count=1,
+        raw_content_hash = build_content_hash(raw_content)
+
+        if previous_state.get(raw_key) == raw_content_hash:
+            skipped_raw += 1
+        else:
+            raw_vector_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket.ticket_number}"))
+            raw_metadata = {
+                "doc_type": "raw_ticket",
+                "category": "Database Helpdesk Sync",
+                "ticket_number": stable_text(ticket.ticket_number),
+                "frequency": 1,
+            }
+            raw_doc = Document(page_content=raw_content, metadata=raw_metadata)
+            raw_docs.append(
+                ClusterDocument(
+                    cluster_key=raw_key,
+                    document=raw_doc,
+                    vector_id=raw_vector_id,
+                    content_hash=raw_content_hash,
+                    ticket_count=1,
+                )
             )
-        )
+            updated_state[raw_key] = raw_content_hash
 
         # Group for canonical clustering
         group_key = build_grouping_signature(ticket)
@@ -290,7 +300,6 @@ def build_cluster_documents(
 
     # Build canonical clusters
     cluster_docs: list[ClusterDocument] = []
-    updated_state = dict(previous_state)
     skipped_unchanged = 0
 
     for cluster_key, cluster_tickets in grouped.items():
@@ -337,11 +346,10 @@ def build_cluster_documents(
         updated_state[cluster_key] = content_hash
 
     logger.info("Skipped %d blacklisted tickets.", skipped_blacklisted)
-    logger.info("Built %d raw ticket documents.", len(raw_docs))
-    logger.info("Built %d canonical clusters.", len(cluster_docs))
-    logger.info("Skipped %d unchanged clusters.", skipped_unchanged)
+    logger.info("Built %d new/updated raw ticket documents (skipped %d unchanged).", len(raw_docs), skipped_raw)
+    logger.info("Built %d new/updated canonical clusters (skipped %d unchanged).", len(cluster_docs), skipped_unchanged)
 
-    return raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged
+    return raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged, skipped_raw
 
 
 def upload_batches(
@@ -407,16 +415,17 @@ def run_ingestion(batch_size: int = 20) -> None:
         logger.info("Fetched %d resolved tickets.", len(resolved_tickets))
 
         logger.info("Grouping tickets into canonical clusters...")
-        raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged = build_cluster_documents(
+        raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged, skipped_raw = build_cluster_documents(
             tickets=resolved_tickets,
             blacklisted_nums=blacklisted_nums,
             previous_state=previous_state,
         )
 
         logger.info(
-            "Ready to upload %d raw tickets + %d canonical clusters (%d unchanged clusters skipped).",
+            "Ready to upload %d raw tickets + %d canonical clusters (%d raw and %d clusters skipped as unchanged).",
             len(raw_docs),
             len(cluster_docs),
+            skipped_raw,
             skipped_unchanged,
         )
 
