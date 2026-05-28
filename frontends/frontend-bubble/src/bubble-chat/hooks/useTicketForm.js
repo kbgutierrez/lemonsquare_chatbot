@@ -51,14 +51,18 @@ const normalizeSummary = (
 
 /* ========================================
    IMAGE VALIDATION
+   CONSTRAINT: PNG and JPEG only.
 ======================================== */
 
 const ALLOWED_IMAGE_TYPES = [
   "image/png",
   "image/jpeg",
-  "image/jpg",
-  "image/webp",
-  "image/gif",
+]
+
+const ALLOWED_IMAGE_EXTENSIONS = [
+  ".png",
+  ".jpg",
+  ".jpeg",
 ]
 
 const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -379,6 +383,10 @@ export const useTicketForm = ({
 
   /* ========================================
      UPDATE
+     
+     CONSTRAINT: PNG and JPEG only.
+     Validates both MIME type and file extension
+     for defense in depth.
   ======================================== */
 
   const update = (
@@ -398,13 +406,38 @@ export const useTicketForm = ({
         return
       }
 
-      if (!ALLOWED_IMAGE_TYPES.includes(value.type)) {
-        setImageError("Only PNG, JPG, JPEG, WEBP, and GIF images are allowed.")
+      const ext =
+        value.name
+          ?.toLowerCase()
+          ?.match(/\.[^.]+$/)?.[0]
+
+      const typeValid =
+        ALLOWED_IMAGE_TYPES.includes(
+          value.type
+        )
+
+      const extValid =
+        ALLOWED_IMAGE_EXTENSIONS.includes(
+          ext
+        )
+
+      if (
+        !typeValid ||
+        !extValid
+      ) {
+        setImageError(
+          "Only PNG and JPEG images are allowed."
+        )
         return
       }
 
-      if (value.size > MAX_IMAGE_SIZE) {
-        setImageError("Image must be smaller than 5 MB.")
+      if (
+        value.size >
+        MAX_IMAGE_SIZE
+      ) {
+        setImageError(
+          "Image must be smaller than 5 MB."
+        )
         return
       }
 
@@ -413,7 +446,9 @@ export const useTicketForm = ({
       }
 
       setImageFile(value)
-      setImagePreview(URL.createObjectURL(value))
+      setImagePreview(
+        URL.createObjectURL(value)
+      )
       setImageError(null)
       return
     }

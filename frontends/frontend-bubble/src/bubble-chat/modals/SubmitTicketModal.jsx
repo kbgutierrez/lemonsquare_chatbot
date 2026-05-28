@@ -29,6 +29,8 @@ const ActionButton = ({ children, disabled, onClick, variant = "primary", theme 
 
 /* ========================================
    IMAGE UPLOAD BUTTON
+   CONSTRAINT: PNG and JPEG only.
+   Validation is centralized in useTicketForm.
 ======================================== */
 
 const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
@@ -45,8 +47,6 @@ const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
     if (file) {
       onFileSelect(file)
     }
-
-    // Reset input so same file can be selected again
     e.target.value = ""
   }, [onFileSelect])
 
@@ -55,7 +55,7 @@ const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
       <input
         ref={inputRef}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/png,image/jpeg"
         className="hidden"
         onChange={handleChange}
         aria-label="Select image attachment"
@@ -86,11 +86,14 @@ const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
   )
 }
 
-const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [], initialDraftData = null }) => {
+const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userData, messages = [], initialDraftData = null }) => {
   const { theme } = useTheme()
   const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading, imageFile, imagePreview, imageError } = useTicketForm({
     sessionId, requesterId, userData, messages,
-    onSuccess: () => { setTimeout(() => onClose?.(), 1500) },
+    onSuccess: () => {
+      onSubmitted?.()
+      setTimeout(() => onClose?.(), 1500)
+    },
     initialDraftData,
   })
 
@@ -162,7 +165,7 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages
             <div className="space-y-1.5">
               <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Subcategory</label>
               <select value={form.subcategory_id} onChange={e => update("subcategory_id", e.target.value)}
-                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4", (!form.department_id || isFrozen) && "cursor-not-allowed opacity-50")}
+                className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus-:ring-4", (!form.department_id || isFrozen) && "cursor-not-allowed opacity-50")}
                 disabled={!form.department_id || isFrozen}
                 style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
                 <option value="">Select Subcategory</option>
@@ -173,6 +176,7 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages
 
           {/* ========================================
              IMAGE ATTACHMENT SECTION
+             CONSTRAINT: PNG and JPEG only.
           ======================================== */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Attachment</label>
@@ -231,7 +235,7 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages
         </div>
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
           <ActionButton variant="secondary" onClick={onClose} disabled={success || loading} theme={theme}>Cancel</ActionButton>
-          <ActionButton onClick={submit} disabled={success || loading || summaryLoading || !form.summary || !form.description || !form.department_id || !form.subcategory_id || isMissingInfo} theme={theme}>
+          <ActionButton onClick={submit} disabled={success || loading || summaryLoading || !form.summary || !form.description || !form.department_id || !form.subcategory_id || isMissingInfo || imageError} theme={theme}>
             {buttonContent}
           </ActionButton>
         </div>
