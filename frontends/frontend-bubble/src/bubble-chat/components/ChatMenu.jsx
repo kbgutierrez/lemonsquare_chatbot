@@ -9,7 +9,6 @@ import {
   EllipsisVertical,
   History,
   Plus,
-  Ticket,
   Palette,
   CheckCheck,
   Info,
@@ -30,12 +29,6 @@ const MENU_OPTIONS = [
     id: "new-chat",
     label: "New Chat",
     icon: Plus,
-  },
-
-  {
-    id: "ticket",
-    label: "Submit Ticket",
-    icon: Ticket,
   },
 
   {

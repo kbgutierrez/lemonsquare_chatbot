@@ -50,6 +50,20 @@ const normalizeSummary = (
 })
 
 /* ========================================
+   IMAGE VALIDATION
+======================================== */
+
+const ALLOWED_IMAGE_TYPES = [
+  "image/png",
+  "image/jpeg",
+  "image/jpg",
+  "image/webp",
+  "image/gif",
+]
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024 // 5 MB
+
+/* ========================================
    HOOK
 ======================================== */
 
@@ -59,6 +73,7 @@ export const useTicketForm = ({
   userData,
   messages = [],
   onSuccess,
+  initialDraftData = null,
 }) => {
 
   const [loading, setLoading] =
@@ -73,35 +88,83 @@ export const useTicketForm = ({
   const [
     summaryLoading,
     setSummaryLoading,
-  ] = useState(true)
+  ] = useState(!initialDraftData)
 
   const [summaryError, setSummaryError] =
     useState("")
 
   const [aiSummary, setAiSummary] =
-    useState(DEFAULT_SUMMARY)
+    useState(() =>
+      initialDraftData
+        ? normalizeSummary(initialDraftData)
+        : DEFAULT_SUMMARY
+    )
 
   const [taxonomy, setTaxonomy] =
     useState([])
 
   const [form, setForm] =
-    useState({
-      session_id:
-        sessionId || "",
+    useState(() => {
+      const base = {
+        session_id:
+          sessionId || "",
 
-      requester_id:
-        requesterId || "",
+        requester_id:
+          requesterId || "",
 
-      company_id:
-        userData?.company_id || "",
+        company_id:
+          userData?.company_id || "",
 
-      summary: "",
-      description: "",
-      department_id: "",
-      subcategory_id: "",
-      location: "",
-      equipment: "",
+        summary: "",
+        description: "",
+        department_id: "",
+        subcategory_id: "",
+        location: "",
+        equipment: "",
+      }
+
+      if (initialDraftData) {
+        const normalized =
+          normalizeSummary(initialDraftData)
+
+        return {
+          ...base,
+          summary: normalized.title,
+          description: normalized.summary,
+          department_id: initialDraftData?.department_id || "",
+          subcategory_id: initialDraftData?.subcategory_id || "",
+          location: initialDraftData?.location || "",
+          equipment: initialDraftData?.equipment || "",
+        }
+      }
+
+      return base
     })
+
+  /* ========================================
+     IMAGE ATTACHMENT STATE
+  ======================================== */
+
+  const [imageFile, setImageFile] =
+    useState(null)
+
+  const [imagePreview, setImagePreview] =
+    useState(null)
+
+  const [imageError, setImageError] =
+    useState(null)
+
+  /* ========================================
+     CLEANUP OBJECT URL ON UNMOUNT / CHANGE
+  ======================================== */
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+    }
+  }, [imagePreview])
 
   /* ========================================
      FETCH TAXONOMY
@@ -134,6 +197,7 @@ export const useTicketForm = ({
 
   /* ========================================
      FETCH ESCALATION DRAFT
+     SKIPPED when initialDraftData is provided.
   ======================================== */
 
   useEffect(() => {
@@ -144,6 +208,13 @@ export const useTicketForm = ({
       async () => {
 
         if (!sessionId) {
+          return
+        }
+
+        if (initialDraftData) {
+          if (active) {
+            setSummaryLoading(false)
+          }
           return
         }
 
@@ -266,7 +337,7 @@ export const useTicketForm = ({
       active = false
     }
 
-  }, [sessionId])
+  }, [sessionId, initialDraftData])
 
   /* ========================================
      SYNC SESSION
@@ -314,6 +385,38 @@ export const useTicketForm = ({
     name,
     value
   ) => {
+
+    /* ---- IMAGE ATTACHMENT HANDLER ---- */
+    if (name === "image") {
+      if (value === null) {
+        if (imagePreview) {
+          URL.revokeObjectURL(imagePreview)
+        }
+        setImageFile(null)
+        setImagePreview(null)
+        setImageError(null)
+        return
+      }
+
+      if (!ALLOWED_IMAGE_TYPES.includes(value.type)) {
+        setImageError("Only PNG, JPG, JPEG, WEBP, and GIF images are allowed.")
+        return
+      }
+
+      if (value.size > MAX_IMAGE_SIZE) {
+        setImageError("Image must be smaller than 5 MB.")
+        return
+      }
+
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview)
+      }
+
+      setImageFile(value)
+      setImagePreview(URL.createObjectURL(value))
+      setImageError(null)
+      return
+    }
 
     if (
       name ===
@@ -411,6 +514,9 @@ export const useTicketForm = ({
           user_token:
             chatbotService.getUserToken?.() ||
             localStorage.getItem("user_token"),
+
+          image:
+            imageFile,
         }
 
         console.log(
@@ -479,5 +585,11 @@ export const useTicketForm = ({
     summaryError,
 
     MAX_WORDS,
+
+    imageFile,
+
+    imagePreview,
+
+    imageError,
   }
 }

@@ -37,24 +37,26 @@ const apiRequest = async ({
   const fetchOptions = {
     method,
     headers: {
+      ...API_CONFIG.HEADERS,
       ...headers,
     },
-  };
+  }
 
   // If body is FormData, don't set Content-Type header manually.
   // The browser will set it with the correct boundary.
   if (body instanceof FormData) {
-    fetchOptions.body = body;
+    fetchOptions.body = body
+    // Strip Content-Type so browser generates correct multipart boundary
+    Object.keys(fetchOptions.headers).forEach(key => {
+      if (key.toLowerCase() === "content-type") {
+        delete fetchOptions.headers[key]
+      }
+    })
   } else {
-    // Standard JSON behavior
-    fetchOptions.headers["Content-Type"] = "application/json";
-    if (API_CONFIG.HEADERS["Content-Type"] && !headers["Content-Type"]) {
-       fetchOptions.headers["Content-Type"] = API_CONFIG.HEADERS["Content-Type"];
-    }
-    fetchOptions.body = body ? JSON.stringify(body) : undefined;
+    fetchOptions.body = body ? JSON.stringify(body) : undefined
   }
 
-  const response = await fetch(endpoint, fetchOptions);
+  const response = await fetch(endpoint, fetchOptions)
 
   const data =
     await parseJsonSafely(
@@ -300,44 +302,54 @@ const submitEscalation =
     image,
   }) => {
 
-    const formData = new FormData();
-    formData.append("session_id", session_id);
-    formData.append("requester_id", requester_id);
-    formData.append("company_id", company_id || 1);
-    formData.append("summary", summary);
-    formData.append("description", description);
-    formData.append("department_id", department_id);
-    formData.append("subcategory_id", subcategory_id);
-    
-    if (location) {
-        formData.append("location", location);
-    }
-    
-    if (equipment) {
-        formData.append("equipment", equipment);
-    }
-    
-    if (user_token) {
-        formData.append("user_token", user_token);
-    }
-    
-    if (image) {
-        formData.append("attachment", image);
-    }
-
-    log(
-      "ESCALATION_SUBMIT_FORMDATA",
-      Object.fromEntries(formData)
-    )
-
     const endpoint =
       buildApiUrl(
         "/chat/escalate/submit"
       )
 
+    const formData = new FormData()
+
+    formData.append("session_id", session_id)
+    formData.append("requester_id", String(requester_id))
+    formData.append("company_id", String(company_id || 1))
+    formData.append("summary", summary)
+    formData.append("description", description)
+    formData.append("department_id", String(department_id))
+    formData.append("subcategory_id", String(subcategory_id))
+
+    if (location) {
+      formData.append("location", location)
+    }
+
+    if (equipment) {
+      formData.append("equipment", equipment)
+    }
+
+    if (user_token) {
+      formData.append("user_token", user_token)
+    }
+
+    if (image) {
+      formData.append("attachment", image)
+    }
+
     log(
       "ESCALATION_SUBMIT_ENDPOINT",
       endpoint
+    )
+
+    log(
+      "ESCALATION_SUBMIT_FIELDS",
+      {
+        session_id,
+        requester_id,
+        company_id,
+        department_id,
+        subcategory_id,
+        location,
+        equipment,
+        has_attachment: Boolean(image),
+      }
     )
 
     const response =
