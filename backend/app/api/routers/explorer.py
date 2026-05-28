@@ -6,8 +6,11 @@ Preserved from original with repository usage.
 
 import json
 import logging
+import csv
+import io
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -388,3 +391,54 @@ async def explore_knowledge_base(
         results = results[:limit]
 
     return results
+
+
+@router.get("/export/learned-chats", summary="Export Resolved Chats to CSV")
+async def export_learned_chats(
+    db: Session = Depends(get_chatbot_db),
+):
+    """
+    Downloads all resolved chats as a CSV file for performance tracking.
+    """
+    chats = (
+        db.query(LearnedChat)
+        .order_by(LearnedChat.LearnedAt.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "Session ID",
+        "User ID",
+        "Issue Reported",
+        "Issue Found",
+        "Root Cause",
+        "Work Done",
+        "Resolved At",
+        "Status"
+    ])
+
+    for c in chats:
+        writer.writerow([
+            c.SessionID,
+            c.UserID,
+            c.IssueReported,
+            c.IssueFound,
+            c.RootCause,
+            c.WorkDone,
+            c.LearnedAt.strftime("%Y-%m-%d %H:%M:%S") if c.LearnedAt else "",
+            "Active" if c.IsActive else "Inactive"
+        ])
+
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=resolved_chats_export.csv"
+        }
+    )

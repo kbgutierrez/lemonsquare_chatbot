@@ -393,35 +393,38 @@ TICKET_GENERATION_PROMPT = (
 # =========================================================
 # ROUTING
 # =========================================================
+DEFAULT_ROUTING_PROMPT = (
+    "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
+    "Department and Subcategory.\n\n"
+    "CRITICAL RULES:\n"
+    "1. You MUST select a department_id and subcategory_id from the VALID TAXONOMY MAP below.\n"
+    "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
+    "department.\n"
+    "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
+    "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "department_id": integer,\n'
+    '  "subcategory_id": integer,\n'
+    '  "department_name": "string",\n'
+    '  "subcategory_name": "string",\n'
+    '  "confidence": float (0.0 to 1.0),\n'
+    '  "reasoning": "string" (1-sentence technical explanation),\n'
+    '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
+    "}}\n\n"
+    "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
+    "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+    "INSTRUCTIONS:\n"
+    "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
+    "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
+    "- Choose the single best department and subcategory from the taxonomy.\n"
+    "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
+    "JSON OUTPUT:"
+)
+
+
 def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrieved_context: str,prompt_template: str | None = None,) -> str:
-    template = prompt_template or (
-        "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
-        "Department and Subcategory.\n\n"
-        "CRITICAL RULES:\n"
-        "1. You MUST select a department_id and subcategory_id from the VALID TAXONOMY MAP below.\n"
-        "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
-        "department.\n"
-        "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
-        "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
-        "REQUIRED JSON SCHEMA:\n"
-        "{{\n"
-        '  "department_id": integer,\n'
-        '  "subcategory_id": integer,\n'
-        '  "department_name": "string",\n'
-        '  "subcategory_name": "string",\n'
-        '  "confidence": float (0.0 to 1.0),\n'
-        '  "reasoning": "string" (1-sentence technical explanation),\n'
-        '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
-        "}}\n\n"
-        "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
-        "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
-        "INSTRUCTIONS:\n"
-        "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
-        "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
-        "- Choose the single best department and subcategory from the taxonomy.\n"
-        "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
-        "JSON OUTPUT:"
-    )
+    template = prompt_template or DEFAULT_ROUTING_PROMPT
 
     return template.format(summary=summary,description=description,taxonomy_json=taxonomy_json,retrieved_context=retrieved_context)
 
@@ -458,6 +461,29 @@ AI Response:
 
 JSON Output:
 """
+
+# =========================================================
+# RESOLVED CHAT EXTRACTION
+# =========================================================
+RESOLVED_CHAT_EXTRACTION_PROMPT = (
+    "You are an expert IT Knowledge Base Editor.\n"
+    "Your job is to read the transcript of a chat conversation between an employee and an AI Helpdesk Bot.\n"
+    "The conversation has been successfully resolved.\n\n"
+    "You must extract the core details and format them EXACTLY like a formal Helpdesk ticket.\n"
+    "Do NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "issue_reported": "string (A clear, concise summary of what the user originally asked or reported)",\n'
+    '  "issue_found": "string (What the actual technical problem was, based on the troubleshooting)",\n'
+    '  "issue_cause": "string (Why the problem happened, if discussed. If unknown, write \'Unknown\')",\n'
+    '  "work_done": "string (The definitive steps, instructions, or fix provided by the AI that resolved the issue)"\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
+)
 
 # =========================================================
 # KNOWLEDGE CONSOLIDATION

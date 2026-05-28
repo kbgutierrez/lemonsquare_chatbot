@@ -14,6 +14,7 @@ class SettingsUpdate(BaseModel):
     TopK_Tickets: int = Field(..., ge=1, le=20)
     UseReformulator: bool
     UseReranker: bool
+    ChatExtractionModel: str | None
     ChatExtractionPrompt: str | None
     AllowedCategories: str = Field(..., min_length=1)
     EscalationDraftModel: str | None
@@ -41,6 +42,7 @@ class SettingsResponse(BaseModel):
     RerankerModel: str | None
     TopK_Tickets: int | None
     UseReformulator: bool | None
+    ChatExtractionModel: str | None
     ChatExtractionPrompt: str | None
     UseReranker: bool | None
     AllowedCategories: str | None

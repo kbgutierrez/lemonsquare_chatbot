@@ -42,6 +42,7 @@ def update_settings(
         UseReformulator=new_settings.UseReformulator,
         UseReranker=new_settings.UseReranker,
         AllowedCategories=new_settings.AllowedCategories,
+        ChatExtractionModel=new_settings.ChatExtractionModel,
         ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
         EscalationDraftModel=new_settings.EscalationDraftModel,
         EscalationDraftPrompt=new_settings.EscalationDraftPrompt,
@@ -103,6 +104,8 @@ def get_factory_defaults() -> dict:
         DEFAULT_REFORMULATOR_PROMPT,
         ESCALATION_DRAFT_PROMPT,
         CONVERSATION_RESOLUTION_PROMPT,
+        RESOLVED_CHAT_EXTRACTION_PROMPT,
+        DEFAULT_ROUTING_PROMPT,
         build_document_classifier_prompt,
     )
     from app.services.settings.runtime_config import (
@@ -110,6 +113,7 @@ def get_factory_defaults() -> dict:
         DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
         DEFAULT_ESCALATION_MODEL,
         DEFAULT_CONVERSATION_RESOLUTION_MODEL,
+        DEFAULT_CHAT_EXTRACTION_MODEL,
     )
 
     # Replicate internal categories from PDFProcessor
@@ -135,14 +139,15 @@ def get_factory_defaults() -> dict:
         "TopK_Tickets": 5,
         "UseReformulator": True,
         "UseReranker": True,
-        "ChatExtractionPrompt": None,
+        "ChatExtractionModel": DEFAULT_CHAT_EXTRACTION_MODEL,
+        "ChatExtractionPrompt": RESOLVED_CHAT_EXTRACTION_PROMPT,
         "AllowedCategories": ",".join(default_categories),
         "IsActive": True,
 
         "EscalationDraftModel": DEFAULT_ESCALATION_MODEL,
         "EscalationDraftPrompt": ESCALATION_DRAFT_PROMPT,
         "RoutingModel": DEFAULT_ROUTING_MODEL,
-        "RoutingPrompt": "",
+        "RoutingPrompt": DEFAULT_ROUTING_PROMPT,
         "DocumentClassifierModel": DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
         "DocumentClassifierPrompt": build_document_classifier_prompt(
             snippet="{snippet}", 
