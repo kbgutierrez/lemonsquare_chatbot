@@ -285,6 +285,32 @@ export const useConversationHistory =
               Boolean(
                 conversation?.resolved
               ),
+
+            locked:
+              Boolean(
+                conversation?.locked
+              ),
+
+            status:
+              conversation?.status ||
+              "active",
+
+            ticketSubmitted:
+              Boolean(
+                conversation?.ticketSubmitted
+              ),
+
+            archived:
+              String(
+                conversation?.status || ""
+              ).toLowerCase() ===
+              "archived",
+
+            escalated:
+              String(
+                conversation?.status || ""
+              ).toLowerCase() ===
+              "escalated",
           }
         },
         [conversations]

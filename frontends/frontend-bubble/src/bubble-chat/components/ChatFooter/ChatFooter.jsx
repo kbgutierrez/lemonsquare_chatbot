@@ -18,22 +18,38 @@ const MAX_TEXTAREA_HEIGHT = 160
 
 const ChatFooter = ({
   onSendMessage,
+
   loading = false,
+
   resolved = false,
+
   sessionTicketSubmitted = false,
+
+  locked = false,
 }) => {
 
   const [message, setMessage] =
     useState("")
 
-  const [showQuestions, setShowQuestions] =
-    useState(true)
+  const [
+    showQuestions,
+    setShowQuestions,
+  ] = useState(true)
 
   const textareaRef =
     useRef(null)
 
   const sendingRef =
     useRef(false)
+
+  /* ========================================
+     GLOBAL LOCK
+  ======================================== */
+
+  const isLocked =
+    locked ||
+    resolved ||
+    sessionTicketSubmitted
 
   /* ========================================
      AUTO RESIZE
@@ -60,16 +76,16 @@ const ChatFooter = ({
   }, [message])
 
   /* ========================================
-     RESET ON RESOLVE
+     RESET ON LOCK
   ======================================== */
 
   useEffect(() => {
 
-    if (resolved) {
+    if (isLocked) {
       setMessage("")
     }
 
-  }, [resolved])
+  }, [isLocked])
 
   /* ========================================
      SEND
@@ -82,8 +98,7 @@ const ChatFooter = ({
       ) => {
 
         if (
-          resolved ||
-          sessionTicketSubmitted ||
+          isLocked ||
           sendingRef.current
         ) {
           return
@@ -128,9 +143,8 @@ const ChatFooter = ({
         }
       },
       [
+        isLocked,
         message,
-        resolved,
-        sessionTicketSubmitted,
         onSendMessage,
       ]
     )
@@ -141,7 +155,7 @@ const ChatFooter = ({
 
   const handleKeyDown =
     useCallback(
-      (event) => {
+      event => {
 
         if (
           event.key !== "Enter" ||
@@ -164,14 +178,12 @@ const ChatFooter = ({
 
   const handleQuickQuestion =
     useCallback(
-      (question) =>
-        !resolved &&
-        !sessionTicketSubmitted &&
+      question =>
+        !isLocked &&
         handleSend(question),
 
       [
-        resolved,
-        sessionTicketSubmitted,
+        isLocked,
         handleSend,
       ]
     )
@@ -195,31 +207,53 @@ const ChatFooter = ({
 
       <div className="relative z-10">
 
-        {/* RESOLVED */}
-        {resolved && (
+        {/* LOCKED */}
+        {isLocked && (
           <ChatFooterResolved />
         )}
 
         {/* FAQ */}
-        {!resolved && !sessionTicketSubmitted && (
+        {!isLocked && (
           <ChatFooterFAQ
             loading={loading}
-            showQuestions={showQuestions}
-            setShowQuestions={setShowQuestions}
-            onQuestionClick={handleQuickQuestion}
+
+            showQuestions={
+              showQuestions
+            }
+
+            setShowQuestions={
+              setShowQuestions
+            }
+
+            onQuestionClick={
+              handleQuickQuestion
+            }
           />
         )}
 
         {/* INPUT */}
         <ChatFooterInput
           textareaRef={textareaRef}
+
           message={message}
+
           setMessage={setMessage}
+
           loading={loading}
-          resolved={resolved}
-          sessionTicketSubmitted={sessionTicketSubmitted}
-          onKeyDown={handleKeyDown}
-          onSend={handleSend}
+
+          resolved={isLocked}
+
+          sessionTicketSubmitted={
+            isLocked
+          }
+
+          onKeyDown={
+            handleKeyDown
+          }
+
+          onSend={
+            handleSend
+          }
         />
 
       </div>

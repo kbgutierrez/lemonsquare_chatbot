@@ -18,18 +18,24 @@ const createMessage = ({
   isLoading = false,
 }) => ({
   id: crypto.randomUUID(),
+
   sender,
+
   text,
-  time: isTyping || isLoading
-    ? ""
-    : new Date().toLocaleTimeString(
-        [],
-        {
-          hour: "2-digit",
-          minute: "2-digit",
-        }
-      ),
+
+  time:
+    isTyping || isLoading
+      ? ""
+      : new Date().toLocaleTimeString(
+          [],
+          {
+            hour: "2-digit",
+            minute: "2-digit",
+          }
+        ),
+
   isTyping,
+
   isLoading,
 })
 
@@ -64,6 +70,21 @@ export const useChatMessages =
     const [resolved, setResolved] =
       useState(false)
 
+    const [locked, setLocked] =
+      useState(false)
+
+    const [lockReason, setLockReason] =
+      useState(null)
+
+    /* ========================================
+       PERSISTENT TICKET LOCK
+    ======================================== */
+
+    const [
+      ticketSubmitted,
+      setTicketSubmitted,
+    ] = useState(false)
+
     const [
       resolutionCheck,
       setResolutionCheck,
@@ -76,36 +97,30 @@ export const useChatMessages =
       escalationId: null,
     })
 
-    /* ========================================
-       ESCALATION DECISION STATE
-       Permanent one-time action recorder.
-    ======================================== */
-
     const [
       escalationDecision,
       setEscalationDecision,
     ] = useState(null)
-
-    /* ========================================
-       CONSUMED ESCALATION TRACKING
-       Prevents resurrected prompts from rendering.
-    ======================================== */
 
     const [
       consumedEscalationIds,
       setConsumedEscalationIds,
     ] = useState(new Set())
 
-    /* ========================================
-       SESSION TICKET SUBMITTED LOCK
-       Blocks all escalation UI after successful
-       ticket submission in this session.
-    ======================================== */
-
     const [
       sessionTicketSubmitted,
       setSessionTicketSubmitted,
     ] = useState(false)
+
+    /* ========================================
+       GLOBAL LOCK
+    ======================================== */
+
+    const isSessionLocked =
+      locked ||
+      resolved ||
+      ticketSubmitted ||
+      sessionTicketSubmitted
 
     /* ========================================
        REFS
@@ -129,12 +144,13 @@ export const useChatMessages =
 
     useEffect(() => {
 
-      state.messages = messages
+      state.messages =
+        messages
 
     }, [messages, state])
 
     /* ========================================
-       MOUNT LIFECYCLE
+       MOUNT
     ======================================== */
 
     useEffect(() => {
@@ -142,13 +158,14 @@ export const useChatMessages =
       state.mounted = true
 
       return () => {
+
         state.mounted = false
       }
 
     }, [state])
 
     /* ========================================
-       RESOLVED STATUS
+       SESSION STATUS SYNC
     ======================================== */
 
     const syncResolvedStatus =
@@ -157,11 +174,15 @@ export const useChatMessages =
           targetSessionId
         ) => {
 
-          if (
-            !targetSessionId
-          ) {
+          if (!targetSessionId) {
 
             setResolved(false)
+
+            setLocked(false)
+
+            setLockReason(null)
+
+            setTicketSubmitted(false)
 
             return
           }
@@ -178,17 +199,95 @@ export const useChatMessages =
                   targetSessionId
               )
 
-            if (
-              !state.mounted
-            ) {
+            if (!state.mounted) {
               return
             }
 
-            setResolved(
+            const normalizedStatus =
+              String(
+                matched?.status || ""
+              ).toLowerCase()
+
+            const resolvedStatus =
               Boolean(
                 matched?.resolved
               )
+
+            const escalatedStatus =
+              normalizedStatus ===
+              "escalated"
+
+            const archivedStatus =
+              normalizedStatus ===
+              "archived"
+
+            const draftingTicketStatus =
+              normalizedStatus ===
+              "drafting_ticket"
+
+            const ticketStatus =
+              Boolean(
+                matched?.ticketSubmitted ||
+                matched?.ticket_submitted ||
+                draftingTicketStatus
+              )
+
+            const shouldLock =
+              resolvedStatus ||
+              escalatedStatus ||
+              archivedStatus ||
+              ticketStatus
+
+            setResolved(
+              resolvedStatus
             )
+
+            setTicketSubmitted(
+              ticketStatus
+            )
+
+            setLocked(
+              shouldLock
+            )
+
+            if (
+              escalatedStatus
+            ) {
+
+              setLockReason(
+                "escalated"
+              )
+
+            } else if (
+              archivedStatus
+            ) {
+
+              setLockReason(
+                "archived"
+              )
+
+            } else if (
+              resolvedStatus
+            ) {
+
+              setLockReason(
+                "resolved"
+              )
+
+            } else if (
+              ticketStatus
+            ) {
+
+              setLockReason(
+                "ticket"
+              )
+
+            } else {
+
+              setLockReason(
+                null
+              )
+            }
 
           } catch (error) {
 
@@ -283,8 +382,16 @@ export const useChatMessages =
             }
 
             setMessages([])
+
             setSessionId(null)
+
             setResolved(false)
+
+            setLocked(false)
+
+            setLockReason(null)
+
+            setTicketSubmitted(false)
 
             state.sessionId =
               null
@@ -328,17 +435,6 @@ export const useChatMessages =
 
     /* ========================================
        SEND MESSAGE
-       
-       CRITICAL: The assistant's conversational response
-       (response.message) is ALWAYS added as a persistent
-       chat message. The escalation prompt is a SEPARATE
-       transient UI layer rendered by ResolutionPrompt
-       using resolutionCheck.resolutionMessage.
-       
-       Each escalation prompt instance receives a unique
-       escalationId. Once consumed, it never renders again.
-       sessionTicketSubmitted blocks ALL escalation UI for
-       the remainder of the session.
     ======================================== */
 
     const sendMessage =
@@ -346,9 +442,13 @@ export const useChatMessages =
         async text => {
 
           if (
-            resolved ||
-            sessionTicketSubmitted
+            isSessionLocked
           ) {
+
+            console.warn(
+              "CHAT_SESSION_LOCKED"
+            )
+
             return
           }
 
@@ -391,7 +491,9 @@ export const useChatMessages =
             true
           )
 
-          setEscalationDecision(null)
+          setEscalationDecision(
+            null
+          )
 
           try {
 
@@ -418,15 +520,13 @@ export const useChatMessages =
               )
             }
 
-            /* ========================================
-               ALWAYS add the assistant's conversational
-               response as a persistent message.
-            ======================================== */
-
             const aiMessage =
               createMessage({
                 sender: "agent",
-                text: response?.message?.trim() || "Empty response",
+
+                text:
+                  response?.message?.trim() ||
+                  "Empty response",
               })
 
             setMessages([
@@ -435,32 +535,28 @@ export const useChatMessages =
               aiMessage,
             ])
 
-            /* ========================================
-               Build resolution / escalation state.
-               Escalation prompts are ONLY generated here.
-               checkResolutionStatus is forbidden from
-               creating or resurrecting them.
-            ======================================== */
-
             const hasEscalationFlags =
-              Boolean(response?.showResolutionPrompt) ||
-              Boolean(response?.allowTicketSubmission)
+              Boolean(
+                response?.showResolutionPrompt
+              ) ||
+              Boolean(
+                response?.allowTicketSubmission
+              )
 
             if (
               hasEscalationFlags &&
-              sessionTicketSubmitted
+              isSessionLocked
             ) {
-
-              /* ---- Session already has a submitted ticket.
-                 Suppress escalation UI entirely. Backend
-                 should return a conversational message.
-              ---- */
 
               setResolutionCheck({
                 showResolutionPrompt: false,
                 allowTicketSubmission: false,
-                conversationStatus: response?.conversationStatus || "active",
-                resolutionAction: response?.resolutionAction || "active",
+                conversationStatus:
+                  response?.conversationStatus ||
+                  "active",
+                resolutionAction:
+                  response?.resolutionAction ||
+                  "active",
                 resolutionMessage: null,
                 escalationId: null,
               })
@@ -469,19 +565,33 @@ export const useChatMessages =
               hasEscalationFlags
             ) {
 
-              /* ---- Generate a unique ID for THIS prompt
-                 instance. Old consumed IDs never return.
-              ---- */
-
               const escalationId =
                 `esc_${response.sessionId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
               setResolutionCheck({
-                showResolutionPrompt: Boolean(response?.showResolutionPrompt),
-                allowTicketSubmission: Boolean(response?.allowTicketSubmission),
-                conversationStatus: response?.conversationStatus || "active",
-                resolutionAction: response?.resolutionAction || "active",
-                resolutionMessage: response?.resolutionMessage || response?.message || null,
+                showResolutionPrompt:
+                  Boolean(
+                    response?.showResolutionPrompt
+                  ),
+
+                allowTicketSubmission:
+                  Boolean(
+                    response?.allowTicketSubmission
+                  ),
+
+                conversationStatus:
+                  response?.conversationStatus ||
+                  "active",
+
+                resolutionAction:
+                  response?.resolutionAction ||
+                  "active",
+
+                resolutionMessage:
+                  response?.resolutionMessage ||
+                  response?.message ||
+                  null,
+
                 escalationId,
               })
 
@@ -490,8 +600,12 @@ export const useChatMessages =
               setResolutionCheck({
                 showResolutionPrompt: false,
                 allowTicketSubmission: false,
-                conversationStatus: response?.conversationStatus || "active",
-                resolutionAction: response?.resolutionAction || "active",
+                conversationStatus:
+                  response?.conversationStatus ||
+                  "active",
+                resolutionAction:
+                  response?.resolutionAction ||
+                  "active",
                 resolutionMessage: null,
                 escalationId: null,
               })
@@ -514,7 +628,10 @@ export const useChatMessages =
               false
           }
         },
-        [resolved, state, sessionTicketSubmitted]
+        [
+          isSessionLocked,
+          state,
+        ]
       )
 
     /* ========================================
@@ -527,8 +644,7 @@ export const useChatMessages =
 
           if (
             !state.sessionId ||
-            resolved ||
-            sessionTicketSubmitted
+            isSessionLocked
           ) {
 
             return
@@ -546,9 +662,16 @@ export const useChatMessages =
 
             setResolved(true)
 
+            setLocked(true)
+
+            setLockReason(
+              "resolved"
+            )
+
           } catch (error) {
 
             console.error(
+              "RESOLVE_CONVERSATION_ERROR",
               error
             )
 
@@ -561,17 +684,14 @@ export const useChatMessages =
             )
           }
         },
-        [resolved, sessionTicketSubmitted, state]
+        [
+          isSessionLocked,
+          state,
+        ]
       )
 
     /* ========================================
-       RESOLUTION CHECK
-       
-       WARNING: This is NOT an escalation prompt source.
-       It ONLY updates conversationStatus / resolutionAction
-       for auto-behaviors (e.g. open_draft). It must NEVER
-       overwrite showResolutionPrompt, allowTicketSubmission,
-       resolutionMessage, or escalationId.
+       CHECK RESOLUTION
     ======================================== */
 
     const checkResolutionStatus =
@@ -580,8 +700,7 @@ export const useChatMessages =
 
           if (
             !state.sessionId ||
-            resolved ||
-            sessionTicketSubmitted
+            isSessionLocked
           ) {
             return
           }
@@ -613,10 +732,6 @@ export const useChatMessages =
                   prev?.resolutionAction ||
                   "active",
 
-                /* ---- Explicitly preserve escalation fields.
-                   Do NOT let the backend resurrect consumed
-                   prompts through this side-channel.
-                ---- */
                 showResolutionPrompt:
                   prev?.showResolutionPrompt ||
                   false,
@@ -643,22 +758,21 @@ export const useChatMessages =
             )
           }
         },
-        [resolved, sessionTicketSubmitted, state]
+        [
+          isSessionLocked,
+          state,
+        ]
       )
 
     /* ========================================
-       RESOLUTION EFFECT
-       
-       CRITICAL FIX: messages.length removed from deps.
-       This stops the automatic resurrection of escalation
-       prompts after every new message.
+       EFFECT
     ======================================== */
 
     useEffect(() => {
 
       if (
         !sessionId ||
-        resolved
+        isSessionLocked
       ) {
 
         setResolutionCheck({
@@ -677,7 +791,7 @@ export const useChatMessages =
 
     }, [
       sessionId,
-      resolved,
+      isSessionLocked,
       checkResolutionStatus,
     ])
 
@@ -691,9 +805,7 @@ export const useChatMessages =
           sessionId,
         }) => {
 
-          if (
-            !sessionId
-          ) {
+          if (!sessionId) {
             return
           }
 
@@ -701,9 +813,26 @@ export const useChatMessages =
             false
 
           setMessages([])
-          setEscalationDecision(null)
-          setConsumedEscalationIds(new Set())
-          setSessionTicketSubmitted(false)
+
+          setEscalationDecision(
+            null
+          )
+
+          setConsumedEscalationIds(
+            new Set()
+          )
+
+          setSessionTicketSubmitted(
+            false
+          )
+
+          setResolved(false)
+
+          setLocked(false)
+
+          setLockReason(null)
+
+          setTicketSubmitted(false)
 
           state.sessionId =
             sessionId
@@ -733,11 +862,28 @@ export const useChatMessages =
             true
 
           setMessages([])
+
           setSessionId(null)
+
           setResolved(false)
-          setEscalationDecision(null)
-          setConsumedEscalationIds(new Set())
-          setSessionTicketSubmitted(false)
+
+          setLocked(false)
+
+          setLockReason(null)
+
+          setTicketSubmitted(false)
+
+          setEscalationDecision(
+            null
+          )
+
+          setConsumedEscalationIds(
+            new Set()
+          )
+
+          setSessionTicketSubmitted(
+            false
+          )
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -746,9 +892,14 @@ export const useChatMessages =
         [state]
       )
 
+    /* ========================================
+       DISMISS
+    ======================================== */
+
     const dismissResolution =
       useCallback(
         () => {
+
           setResolutionCheck({
             showResolutionPrompt: false,
             allowTicketSubmission: false,
@@ -757,6 +908,7 @@ export const useChatMessages =
             resolutionMessage: null,
             escalationId: null,
           })
+
         },
         []
       )
@@ -767,28 +919,23 @@ export const useChatMessages =
 
     const makeEscalationDecision =
       useCallback(
-        (
-          decision
-        ) => {
+        decision => {
 
           setEscalationDecision(
             decision
           )
+
         },
         []
       )
 
     /* ========================================
        CONSUME ESCALATION
-       Marks a specific escalation prompt instance
-       as permanently handled.
     ======================================== */
 
     const consumeEscalation =
       useCallback(
-        (
-          escalationId
-        ) => {
+        escalationId => {
 
           if (
             !escalationId
@@ -846,24 +993,28 @@ export const useChatMessages =
         []
       )
 
+    /* ========================================
+       REMOVE MESSAGE
+    ======================================== */
+
     const removeMessage =
       useCallback(
         id => {
+
           setMessages(
-            prev => prev.filter(
-              message =>
-                message.id !== id
-            )
+            prev =>
+              prev.filter(
+                message =>
+                  message.id !== id
+              )
           )
+
         },
         []
       )
 
     /* ========================================
-       MARK TICKET SUBMITTED
-       Locks escalation UI for the remainder
-       of this session and appends a system
-       closure message to the conversation.
+       TICKET SUBMITTED
     ======================================== */
 
     const markTicketSubmitted =
@@ -873,6 +1024,31 @@ export const useChatMessages =
           setSessionTicketSubmitted(
             true
           )
+
+          setTicketSubmitted(
+            true
+          )
+
+          setResolved(
+            true
+          )
+
+          setLocked(
+            true
+          )
+
+          setLockReason(
+            "ticket"
+          )
+
+          setResolutionCheck({
+            showResolutionPrompt: false,
+            allowTicketSubmission: false,
+            conversationStatus: "resolved",
+            resolutionAction: "locked",
+            resolutionMessage: null,
+            escalationId: null,
+          })
 
           addMessage(
             "Ticket submitted successfully. This chat session is now closed.",
@@ -884,6 +1060,7 @@ export const useChatMessages =
 
     return {
       messages,
+
       removeMessage,
 
       loading:
@@ -898,6 +1075,14 @@ export const useChatMessages =
       sessionId,
 
       resolved,
+
+      locked,
+
+      lockReason,
+
+      ticketSubmitted,
+
+      isSessionLocked,
 
       sendMessage,
 
