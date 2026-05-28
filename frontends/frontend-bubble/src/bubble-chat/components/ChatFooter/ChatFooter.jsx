@@ -20,6 +20,7 @@ const ChatFooter = ({
   onSendMessage,
   loading = false,
   resolved = false,
+  sessionTicketSubmitted = false,
 }) => {
 
   const [message, setMessage] =
@@ -82,6 +83,7 @@ const ChatFooter = ({
 
         if (
           resolved ||
+          sessionTicketSubmitted ||
           sendingRef.current
         ) {
           return
@@ -128,6 +130,7 @@ const ChatFooter = ({
       [
         message,
         resolved,
+        sessionTicketSubmitted,
         onSendMessage,
       ]
     )
@@ -163,10 +166,12 @@ const ChatFooter = ({
     useCallback(
       (question) =>
         !resolved &&
+        !sessionTicketSubmitted &&
         handleSend(question),
 
       [
         resolved,
+        sessionTicketSubmitted,
         handleSend,
       ]
     )
@@ -196,7 +201,7 @@ const ChatFooter = ({
         )}
 
         {/* FAQ */}
-        {!resolved && (
+        {!resolved && !sessionTicketSubmitted && (
           <ChatFooterFAQ
             loading={loading}
             showQuestions={showQuestions}
@@ -212,6 +217,7 @@ const ChatFooter = ({
           setMessage={setMessage}
           loading={loading}
           resolved={resolved}
+          sessionTicketSubmitted={sessionTicketSubmitted}
           onKeyDown={handleKeyDown}
           onSend={handleSend}
         />

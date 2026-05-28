@@ -175,6 +175,36 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
           </div>
 
           {/* ========================================
+             LOCATION & EQUIPMENT
+          ======================================== */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Location</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={e => update("location", e.target.value)}
+                placeholder="e.g. Building A, Floor 3"
+                disabled={isFrozen}
+                className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Equipment</label>
+              <input
+                type="text"
+                value={form.equipment}
+                onChange={e => update("equipment", e.target.value)}
+                placeholder="e.g. Laptop, Printer"
+                disabled={isFrozen}
+                className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
+              />
+            </div>
+          </div>
+
+          {/* ========================================
              IMAGE ATTACHMENT SECTION
              CONSTRAINT: PNG and JPEG only.
           ======================================== */}

@@ -193,6 +193,7 @@ const ChatWindow = ({
         <ChatFooter
           loading={loading}
           resolved={resolved}
+          sessionTicketSubmitted={sessionTicketSubmitted}
           onSendMessage={onSendMessage}
         />
 

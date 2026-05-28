@@ -346,7 +346,8 @@ export const useChatMessages =
         async text => {
 
           if (
-            resolved
+            resolved ||
+            sessionTicketSubmitted
           ) {
             return
           }
@@ -526,7 +527,8 @@ export const useChatMessages =
 
           if (
             !state.sessionId ||
-            resolved
+            resolved ||
+            sessionTicketSubmitted
           ) {
 
             return
@@ -559,7 +561,7 @@ export const useChatMessages =
             )
           }
         },
-        [resolved, state]
+        [resolved, sessionTicketSubmitted, state]
       )
 
     /* ========================================
@@ -578,7 +580,8 @@ export const useChatMessages =
 
           if (
             !state.sessionId ||
-            resolved
+            resolved ||
+            sessionTicketSubmitted
           ) {
             return
           }
@@ -640,7 +643,7 @@ export const useChatMessages =
             )
           }
         },
-        [resolved, state]
+        [resolved, sessionTicketSubmitted, state]
       )
 
     /* ========================================
@@ -811,23 +814,6 @@ export const useChatMessages =
       )
 
     /* ========================================
-       MARK TICKET SUBMITTED
-       Locks escalation UI for the remainder
-       of this session.
-    ======================================== */
-
-    const markTicketSubmitted =
-      useCallback(
-        () => {
-
-          setSessionTicketSubmitted(
-            true
-          )
-        },
-        []
-      )
-
-    /* ========================================
        ADD MESSAGE
     ======================================== */
 
@@ -871,6 +857,29 @@ export const useChatMessages =
           )
         },
         []
+      )
+
+    /* ========================================
+       MARK TICKET SUBMITTED
+       Locks escalation UI for the remainder
+       of this session and appends a system
+       closure message to the conversation.
+    ======================================== */
+
+    const markTicketSubmitted =
+      useCallback(
+        () => {
+
+          setSessionTicketSubmitted(
+            true
+          )
+
+          addMessage(
+            "Ticket submitted successfully. This chat session is now closed.",
+            "agent"
+          )
+        },
+        [addMessage]
       )
 
     return {
