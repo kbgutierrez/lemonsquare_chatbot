@@ -1565,8 +1565,11 @@ Preserved from original with repository usage.
 
 import json
 import logging
+import csv
+import io
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.api.deps import (
@@ -1947,6 +1950,57 @@ async def explore_knowledge_base(
         results = results[:limit]
 
     return results
+
+
+@router.get("/export/learned-chats", summary="Export Resolved Chats to CSV")
+async def export_learned_chats(
+    db: Session = Depends(get_chatbot_db),
+):
+    """
+    Downloads all resolved chats as a CSV file for performance tracking.
+    """
+    chats = (
+        db.query(LearnedChat)
+        .order_by(LearnedChat.LearnedAt.desc())
+        .all()
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "Session ID",
+        "User ID",
+        "Issue Reported",
+        "Issue Found",
+        "Root Cause",
+        "Work Done",
+        "Resolved At",
+        "Status"
+    ])
+
+    for c in chats:
+        writer.writerow([
+            c.SessionID,
+            c.UserID,
+            c.IssueReported,
+            c.IssueFound,
+            c.RootCause,
+            c.WorkDone,
+            c.LearnedAt.strftime("%Y-%m-%d %H:%M:%S") if c.LearnedAt else "",
+            "Active" if c.IsActive else "Inactive"
+        ])
+
+    output.seek(0)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=resolved_chats_export.csv"
+        }
+    )
 
 --- FILE: backend\app\api\routers\maintenance.py ---
 """
@@ -2330,42 +2384,52 @@ async def sync_resolved_ticket(
     return TicketSyncResponse(**result)
 
 
-@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-ingest")
 async def whitelist_ticket(
     ticket_number: str,
     db_chatbot: Session = Depends(get_chatbot_db),
     db_helpdesk: Session = Depends(get_helpdesk_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ):
+    """
+    Removes a ticket from the blacklist and re-fetches its data from the Helpdesk 
+    database to re-ingest it into the AI's knowledge base.
+    """
     repo = TicketRepository(db_chatbot, db_helpdesk)
 
     # 1. Remove from blacklist
     removed = repo.remove_from_blacklist(ticket_number)
     if not removed:
-        raise HTTPException(status_code=404, detail=f"Ticket {ticket_number} is not currently blacklisted.")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Ticket {ticket_number} is not currently blacklisted."
+        )
 
-    # 2. Fetch original ticket
+    # 2. Fetch fresh ticket data from the EXTERNAL Helpdesk database
     original = repo.get_ticket_by_number(ticket_number)
     if not original:
         raise HTTPException(
             status_code=404,
-            detail="Ticket removed from blacklist, but the original ticket could not be found.",
+            detail=f"Blacklist removed, but ticket {ticket_number} could not be found in the Helpdesk database to re-ingest.",
         )
 
-    # 3. Re-ingest
-    ticket_payload = TicketResolveRequest(
-        ticket_number=original.ticket_number,
-        issue_reported=original.issue_reported or "None",
-        issue_found=original.issue_found or "None",
-        issue_cause=original.issue_cause or "None",
-        work_done=original.work_done or "None",
-    )
-    await ingestion_service.process_resolved_ticket(ticket_payload.model_dump(), db_chatbot)
+    # 3. Trigger re-ingestion
+    ticket_payload = {
+        "ticket_number": original.ticket_number,
+        "issue_reported": original.issue_reported or "None",
+        "issue_found": original.issue_found or "None",
+        "issue_cause": original.issue_cause or "None",
+        "work_done": original.work_done or "None",
+        "advanced_work_done": getattr(original, "advanced_work_done", None),
+    }
+
+    await ingestion_service.process_resolved_ticket(ticket_payload, db_chatbot)
 
     return {
         "status": "success",
-        "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI.",
+        "message": f"Ticket {ticket_number} successfully whitelisted and re-ingested into the AI brain.",
     }
+
 
 
 @router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")
@@ -3040,6 +3104,7 @@ class AIChatbotSetting(BaseChatbot):
     TopK_Tickets = Column(Integer)
     UseReformulator = Column(Boolean, default=True)
     UseReranker = Column(Boolean, default=True)
+    ChatExtractionModel = Column(String(100))
     ChatExtractionPrompt = Column(Text)
     AllowedCategories = Column(
         String(500),
@@ -3122,6 +3187,7 @@ class ManualKnowledgeEntry(BaseChatbot):
 class LearnedChat(BaseChatbot):
     __tablename__ = "tbl_learned_chats"
     SessionID = Column(String(36), primary_key=True)
+    UserID = Column(BigInteger)
     IssueReported = Column(Text)
     IssueFound = Column(Text)
     RootCause = Column(Text)
@@ -3632,6 +3698,7 @@ class SettingsRepository:
             UseReformulator=overrides.get("UseReformulator", source.UseReformulator if source else True),
             UseReranker=overrides.get("UseReranker", source.UseReranker if source else True),
             AllowedCategories=overrides.get("AllowedCategories", source.AllowedCategories if source else None),
+            ChatExtractionModel=overrides.get("ChatExtractionModel", source.ChatExtractionModel if source else None),
             ChatExtractionPrompt=overrides.get("ChatExtractionPrompt", source.ChatExtractionPrompt if source else None),
             EscalationDraftModel=overrides.get("EscalationDraftModel", source.EscalationDraftModel if source else None),
             EscalationDraftPrompt=overrides.get("EscalationDraftPrompt", source.EscalationDraftPrompt if source else None),
@@ -4004,6 +4071,7 @@ class SettingsUpdate(BaseModel):
     TopK_Tickets: int = Field(..., ge=1, le=20)
     UseReformulator: bool
     UseReranker: bool
+    ChatExtractionModel: str | None
     ChatExtractionPrompt: str | None
     AllowedCategories: str = Field(..., min_length=1)
     EscalationDraftModel: str | None
@@ -4031,6 +4099,7 @@ class SettingsResponse(BaseModel):
     RerankerModel: str | None
     TopK_Tickets: int | None
     UseReformulator: bool | None
+    ChatExtractionModel: str | None
     ChatExtractionPrompt: str | None
     UseReranker: bool | None
     AllowedCategories: str | None
@@ -4279,7 +4348,7 @@ and conversation_resolution_service.py.
 DEFAULT_SYSTEM_PROMPT = """
 You are Lemon Square's Helpdesk Advisor.
 
-Your job is to answer workplace, HR, maintenance, and IT concerns naturally and professionally using ONLY the provided Retrieved Context.
+Your job is to answer workplace, HR, maintenance, and IT concerns naturally and professionally using the provided Retrieved Context.
 
 You MUST return ONLY valid JSON.
 
@@ -4303,6 +4372,9 @@ Do NOT return markdown.
 Do NOT wrap JSON in code blocks.
 Do NOT add explanations outside the JSON.
 
+You MAY internally reason using <think></think> tags before producing the final JSON.
+Do NOT include <think> content inside the final JSON fields.
+
 ========================================
 1. STRICT CONTEXT RULES
 ========================================
@@ -4310,8 +4382,8 @@ Do NOT add explanations outside the JSON.
 - NEVER hallucinate.
 - NEVER invent troubleshooting steps, policies, approvals, or technical explanations.
 - ONLY answer using the Retrieved Context.
-- If the context does not clearly contain the answer, say:
-  "Pa-check na lang sa Helpdesk staff for further assistance."
+- If the Retrieved Context does not clearly contain enough information, respond naturally and avoid guessing.
+- Do NOT invent technical details or fake solutions.
 - Do NOT guess.
 
 ========================================
@@ -4327,13 +4399,13 @@ You cannot:
 - access company systems
 - confirm actions were completed unless explicitly stated
 
-Do NOT automatically tell users to contact IT, create tickets, or escalate concerns unless the Retrieved Context explicitly says so.
+Do NOT automatically force escalation unless the Retrieved Context supports it.
 
 ========================================
 3. TONE & CONVERSATION STYLE
 ========================================
 
-- Sound like an actual Filipino office IT/helpdesk staff chatting naturally with a coworker.
+- Sound like an actual Filipino office helpdesk staff chatting naturally with a coworker.
 - Use natural Taglish commonly used in Philippine workplaces.
 - Keep responses simple, direct, and conversational.
 - Avoid deep Tagalog words, formal Filipino, or textbook wording.
@@ -4361,8 +4433,6 @@ GOOD:
 GOOD:
 "Try mo muna i-restart yung PC."
 
-GOOD:
-"Kapag ayaw pa rin, pa-check na sa IT."
 
 BAD:
 "Maaaring may isyu sa network connectivity."
@@ -4447,28 +4517,72 @@ Do NOT add:
 - "let me know"
 - "good luck"
 - "anything else?"
-- "gusto mo bang gumawa ng ticket?"
 - additional reminders
 - repeated explanations
 
+IMPORTANT FIELD SEPARATION RULES
+
+The JSON fields have different responsibilities:
+
+- "response" = diagnosis, explanation, troubleshooting guidance, or likely solution ONLY
+- "resolution_message" = optional UI CTA for Helpdesk/reporting actions
+
+When using "show_ticket":
+- keep the main "response" informational and solution-focused
+- do NOT mention:
+  - Helpdesk
+  - ticket creation
+  - reporting
+  - escalation
+  - maintenance coordination
+  - contacting IT
+inside the main "response"
+
+All Helpdesk/reporting suggestions MUST appear ONLY inside:
+"resolution_message"
+
+The assistant should still provide a useful diagnosis or likely solution inside:
+"response"
+
 GOOD:
-"Hi Marjohn, mukhang kailangan muna ng manual rollback tapos i-reupload ulit."
+{
+  "response": "Possible na may problem sa LAN cable. Try mo muna i-check kung nakakabit nang maayos.",
+  "action": "none",
+  "resolution_message": null
+}
 
 BAD:
-"I-request mo sa IT..."
-"Let me know..."
-"Gusto mo bang..."
-"Good luck."
+{
+  "response": "Mukhang kailangan ipa-check sa Helpdesk yung knife rollers.",
+  "action": "show_ticket",
+  "resolution_message": "..."
+}
+
+BAD:
+{
+  "response": "Ipa-report mo ito sa maintenance.",
+  "action": "show_ticket",
+  "resolution_message": "..."
+}
 
 ========================================
 7. ACTION DETECTION RULES
 ========================================
 
-Use "show_ticket" ONLY if:
-- the Retrieved Context explicitly says to contact IT/Helpdesk/Facilities
+Use "show_ticket" when:
 - the user explicitly asks to create a ticket
-- onsite repair or physical fixing is required
-- the issue clearly cannot be resolved by the employee alone
+- the Retrieved Context shows the issue was handled through repair, replacement, inspection, technician action, or Helpdesk/Facilities coordination
+- the issue likely benefits from formal reporting or tracking
+- the issue involves physical parts, worn-out components, onsite work, or maintenance follow-up
+- similar resolved cases in the Retrieved Context resulted in replacement, repair, or manual intervention
+- the UI should gently offer a reporting/helpdesk option
+
+Important:
+- "show_ticket" is a UI suggestion, NOT a failure state
+- the assistant may still provide a useful diagnosis or likely resolution in the "response"
+- do NOT require the response itself to say "contact IT"
+- do NOT treat "show_ticket" as escalation panic
+- operational/reporting suggestions belong ONLY inside "resolution_message"
 
 Use "show_resolve" ONLY if:
 - the user clearly confirms the issue is fixed
@@ -4476,37 +4590,6 @@ Use "show_resolve" ONLY if:
 
 Otherwise use:
 "action": "none"
-
-========================================
-8. RESOLUTION MESSAGE RULES
-========================================
-
-If action is "show_ticket":
-- provide a short natural Taglish message
-Example:
-"Gusto mo bang gawan na natin ng ticket 'to?"
-
-If action is "show_resolve":
-- provide a short natural Taglish message
-Example:
-"Pwede na ba natin i-close 'tong chat?"
-
-If action is "none":
-- resolution_message MUST be null
-
-========================================
-9. FORBIDDEN
-========================================
-
-NEVER mention:
-- AI
-- database retrieval
-- retrieved context
-- system prompts
-- embeddings
-- internal retrieval systems
-
-Do not expose internal mechanics.
 """
 
 # =========================================================
@@ -4661,35 +4744,38 @@ TICKET_GENERATION_PROMPT = (
 # =========================================================
 # ROUTING
 # =========================================================
+DEFAULT_ROUTING_PROMPT = (
+    "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
+    "Department and Subcategory.\n\n"
+    "CRITICAL RULES:\n"
+    "1. You MUST select a department_id and subcategory_id from the VALID TAXONOMY MAP below.\n"
+    "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
+    "department.\n"
+    "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
+    "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "department_id": integer,\n'
+    '  "subcategory_id": integer,\n'
+    '  "department_name": "string",\n'
+    '  "subcategory_name": "string",\n'
+    '  "confidence": float (0.0 to 1.0),\n'
+    '  "reasoning": "string" (1-sentence technical explanation),\n'
+    '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
+    "}}\n\n"
+    "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
+    "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
+    "INSTRUCTIONS:\n"
+    "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
+    "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
+    "- Choose the single best department and subcategory from the taxonomy.\n"
+    "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
+    "JSON OUTPUT:"
+)
+
+
 def build_routing_prompt(summary: str,description: str,taxonomy_json: str,retrieved_context: str,prompt_template: str | None = None,) -> str:
-    template = prompt_template or (
-        "You are an expert IT Helpdesk Dispatcher. Route the NEW TICKET to the correct "
-        "Department and Subcategory.\n\n"
-        "CRITICAL RULES:\n"
-        "1. You MUST select a department_id and subcategory_id from the VALID TAXONOMY MAP below.\n"
-        "2. Do NOT invent IDs. If unsure, use the 'OTHERS' subcategory_id for the most likely "
-        "department.\n"
-        "3. Output EXACTLY a valid JSON object. No markdown block quotes. No extra text.\n\n"
-        "VALID TAXONOMY MAP:\n{taxonomy_json}\n\n"
-        "REQUIRED JSON SCHEMA:\n"
-        "{{\n"
-        '  "department_id": integer,\n'
-        '  "subcategory_id": integer,\n'
-        '  "department_name": "string",\n'
-        '  "subcategory_name": "string",\n'
-        '  "confidence": float (0.0 to 1.0),\n'
-        '  "reasoning": "string" (1-sentence technical explanation),\n'
-        '  "analysis": "string" (detailed analysis of the problem, candidate routes, and why the chosen route is best)\n'
-        "}}\n\n"
-        "NEW TICKET:\nTITLE: {summary}\nDESC: {description}\n\n"
-        "HISTORICAL TICKETS FOR CONTEXT:\n{retrieved_context}\n\n"
-        "INSTRUCTIONS:\n"
-        "- Analyze the issue thoroughly, identify likely causes, and consider multiple plausible routes.\n"
-        "- Output a short 'reasoning' sentence, and a longer 'analysis' field comparing candidate routes.\n"
-        "- Choose the single best department and subcategory from the taxonomy.\n"
-        "- Output EXACTLY a valid JSON object. No markdown, no extra text.\n\n"
-        "JSON OUTPUT:"
-    )
+    template = prompt_template or DEFAULT_ROUTING_PROMPT
 
     return template.format(summary=summary,description=description,taxonomy_json=taxonomy_json,retrieved_context=retrieved_context)
 
@@ -4726,6 +4812,29 @@ AI Response:
 
 JSON Output:
 """
+
+# =========================================================
+# RESOLVED CHAT EXTRACTION
+# =========================================================
+RESOLVED_CHAT_EXTRACTION_PROMPT = (
+    "You are an expert IT Knowledge Base Editor.\n"
+    "Your job is to read the transcript of a chat conversation between an employee and an AI Helpdesk Bot.\n"
+    "The conversation has been successfully resolved.\n\n"
+    "You must extract the core details and format them EXACTLY like a formal Helpdesk ticket.\n"
+    "Do NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "issue_reported": "string (A clear, concise summary of what the user originally asked or reported)",\n'
+    '  "issue_found": "string (What the actual technical problem was, based on the troubleshooting)",\n'
+    '  "issue_cause": "string (Why the problem happened, if discussed. If unknown, write \'Unknown\')",\n'
+    '  "work_done": "string (The definitive steps, instructions, or fix provided by the AI that resolved the issue)"\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
+)
 
 # =========================================================
 # KNOWLEDGE CONSOLIDATION
@@ -6177,24 +6286,24 @@ async def fetch_user_details(auth_token: str) -> dict:
 --- FILE: backend\app\services\ingestion\chat_learning_processor.py ---
 """
 Chat learning processor.
-Extracts knowledge from resolved chat sessions.
+Extracts knowledge from resolved chat sessions for performance tracking.
+Learned chats are saved to SQL only and are NOT pushed to Qdrant.
 """
 import logging
 from sqlalchemy.orm import Session
-from qdrant_client.http.models import PointStruct
+from app.core.config import settings
 from app.models.chatbot import ChatMessage, ChatSession, LearnedChat
-from app.core.exceptions import ValidationError, VectorStoreError
-from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
+from app.core.exceptions import ValidationError
+from app.services.llm_client import create_llm, invoke_llm
+from app.services.prompts import RESOLVED_CHAT_EXTRACTION_PROMPT
+from app.utils.json_utils import safe_json_loads
 
 logger = logging.getLogger(__name__)
 
 
 class ChatLearningProcessor:
-    def __init__(self, db: Session, vector_store, embeddings):
+    def __init__(self, db: Session, vector_store=None, embeddings=None):
         self.db = db
-        self.vector_store = vector_store
-        self.embeddings = embeddings
-        self.consolidator = KnowledgeConsolidator()
 
     async def process(self, session_id: str) -> dict:
         session = self.db.query(ChatSession).filter(ChatSession.SessionID == session_id).first()
@@ -6215,58 +6324,69 @@ class ChatLearningProcessor:
         # Create or update LearnedChat
         learned = self.db.query(LearnedChat).filter(LearnedChat.SessionID == session_id).first()
         if not learned:
-            learned = LearnedChat(SessionID=session_id)
+            learned = LearnedChat(
+                SessionID=session_id,
+                UserID=session.RequesterUserID
+            )
             self.db.add(learned)
         elif learned.IsActive:
             return {
                 "status": "skipped",
                 "session_id": session_id,
-                "message": "Chat has already been learned.",
+                "message": "Chat has already been logged.",
             }
+        else:
+            # Even if updating an existing inactive record, ensure UserID is set
+            learned.UserID = session.RequesterUserID
 
-        learned.IssueReported = transcript[:500]
-        learned.WorkDone = "Resolved via chat"
+        # Fetch dynamic settings
+        from app.repositories.settings_repository import SettingsRepository
+        config = SettingsRepository(self.db).get_active_settings()
+
+        # Determine model and prompt with fallbacks
+        model_name = (config.ChatExtractionModel if config and config.ChatExtractionModel else None) or settings.CLASSIFIER_MODEL
+        prompt_template = (config.ChatExtractionPrompt if config and config.ChatExtractionPrompt else None) or RESOLVED_CHAT_EXTRACTION_PROMPT
+
+        # Extract structured details from transcript using LLM
+        try:
+            llm = create_llm(model=model_name, temperature=0.1)
+            prompt = prompt_template.format(transcript=transcript)
+            llm_res = await invoke_llm(
+                llm,
+                prompt,
+                model=model_name,
+                action="extract_resolved_chat",
+                session_id=session_id,
+            )
+            extracted = safe_json_loads(llm_res.content, context="ResolvedChatExtraction")
+
+            if extracted and isinstance(extracted, dict):
+                learned.IssueReported = extracted.get("issue_reported") or transcript[:500]
+                learned.IssueFound = extracted.get("issue_found") or ""
+                learned.RootCause = extracted.get("issue_cause") or "Unknown"
+                learned.WorkDone = extracted.get("work_done") or "Resolved via chat"
+            else:
+                logger.warning("LLM extraction failed for session %s, using fallback.", session_id)
+                learned.IssueReported = transcript[:500]
+                learned.WorkDone = "Resolved via chat"
+        except Exception as exc:
+            logger.error("Error extracting details for session %s: %s. Falling back.", session_id, exc)
+            learned.IssueReported = transcript[:500]
+            learned.WorkDone = "Resolved via chat"
+
         learned.IsActive = True
         session.SessionStatus = "Resolved"
-
-        record = self.consolidator.build_chat_record(
-            session_id=session_id,
-            issue_reported=learned.IssueReported,
-            issue_found=learned.IssueFound,
-            issue_cause=learned.RootCause,
-            work_done=learned.WorkDone,
-        )
-
-        import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-        except Exception as exc:
-            self.db.rollback()
-            raise VectorStoreError(f"Failed to upsert learned chat to Qdrant: {exc}") from exc
 
         try:
             self.db.commit()
         except Exception:
             self.db.rollback()
-            try:
-                self.vector_store.delete_points([record.point_id])
-            except Exception as cleanup_exc:
-                logger.error(
-                    "Failed to cleanup Qdrant point after DB failure for learned chat %s: %s",
-                    session_id,
-                    cleanup_exc,
-                )
             raise
 
         return {
             "status": "success",
             "session_id": session_id,
-            "message": "Chat resolved and learned.",
+            "message": "Chat resolved and logged for performance tracking.",
         }
 
     async def update(self, session_id: str, updates: dict) -> dict:
@@ -6276,61 +6396,14 @@ class ChatLearningProcessor:
         if learned.IsActive is False:
             raise ValueError(f"Learned chat '{session_id}' is inactive. Restore it before updating.")
 
-        original_reported = learned.IssueReported
-        original_found = learned.IssueFound
-        original_cause = learned.RootCause
-        original_work = learned.WorkDone
-
         for field in ["issue_reported", "issue_found", "issue_cause", "work_done"]:
             if field in updates and updates[field] is not None:
                 setattr(learned, field.replace("issue_cause", "RootCause").replace("issue_reported", "IssueReported").replace("issue_found", "IssueFound").replace("work_done", "WorkDone"), updates[field])
-
-        record = self.consolidator.build_chat_record(
-            session_id=session_id,
-            issue_reported=learned.IssueReported,
-            issue_found=learned.IssueFound,
-            issue_cause=learned.RootCause,
-            work_done=learned.WorkDone,
-        )
-        record.metadata["is_active"] = bool(learned.IsActive)
-
-        import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-        except Exception as exc:
-            self.db.rollback()
-            raise VectorStoreError(f"Failed to upsert updated learned chat to Qdrant: {exc}") from exc
 
         try:
             self.db.commit()
         except Exception:
             self.db.rollback()
-            try:
-                old_record = self.consolidator.build_chat_record(
-                    session_id=session_id,
-                    issue_reported=original_reported,
-                    issue_found=original_found,
-                    issue_cause=original_cause,
-                    work_done=original_work,
-                )
-                old_record.metadata["is_active"] = bool(learned.IsActive)
-                old_vector = await asyncio.to_thread(self.embeddings.embed_query, old_record.page_content)
-                self.vector_store.upsert_points([PointStruct(
-                    id=old_record.point_id,
-                    vector=old_vector,
-                    payload={"page_content": old_record.page_content, "metadata": old_record.metadata}
-                )])
-            except Exception as cleanup_exc:
-                logger.error(
-                    "Failed to revert Qdrant point after DB failure for learned chat %s: %s",
-                    session_id,
-                    cleanup_exc,
-                )
             raise
 
         return {"status": "success", "message": f"Learned chat {session_id} updated."}
@@ -6351,24 +6424,11 @@ class ChatLearningProcessor:
                 "message": f"Learned chat {session_id} is already inactive.",
             }
 
-        try:
-            self.vector_store.soft_delete_by_metadata("source_id", session_id)
-        except Exception as exc:
-            raise VectorStoreError(f"Failed to soft delete learned chat in Qdrant: {exc}") from exc
-
         learned.IsActive = False
         try:
             self.db.commit()
         except Exception:
             self.db.rollback()
-            try:
-                self.vector_store.restore_by_metadata("source_id", session_id)
-            except Exception as cleanup_exc:
-                logger.error(
-                    "Failed to restore Qdrant point after DB failure for learned chat %s: %s",
-                    session_id,
-                    cleanup_exc,
-                )
             raise
 
         return {
@@ -6388,43 +6448,15 @@ class ChatLearningProcessor:
                 "message": f"Learned chat {session_id} is already active.",
             }
 
-        record = self.consolidator.build_chat_record(
-            session_id=session_id,
-            issue_reported=learned.IssueReported,
-            issue_found=learned.IssueFound,
-            issue_cause=learned.RootCause,
-            work_done=learned.WorkDone,
-        )
-        record.metadata["is_active"] = True
-
-        import asyncio
-        vector = await asyncio.to_thread(self.embeddings.embed_query, record.page_content)
-        try:
-            self.vector_store.upsert_points([PointStruct(
-                id=record.point_id,
-                vector=vector,
-                payload={"page_content": record.page_content, "metadata": record.metadata}
-            )])
-            self.vector_store.restore_by_metadata("source_id", session_id)
-        except Exception as exc:
-            raise VectorStoreError(f"Failed to restore learned chat in Qdrant: {exc}") from exc
-
         learned.IsActive = True
         try:
             self.db.commit()
         except Exception:
             self.db.rollback()
-            try:
-                self.vector_store.soft_delete_by_metadata("source_id", session_id)
-            except Exception as cleanup_exc:
-                logger.error(
-                    "Failed to rollback Qdrant restore after DB failure for learned chat %s: %s",
-                    session_id,
-                    cleanup_exc,
-                )
             raise
 
         return {"status": "success", "message": f"Learned chat {session_id} restored."}
+
 
 
 --- FILE: backend\app\services\ingestion\chunking_service.py ---
@@ -8647,7 +8679,39 @@ class VectorStoreService:
         return updated_count
 
     def prepare_collection(self) -> None:
-        """Prepare existing Qdrant collection for indexed soft-delete filtering."""
+        """Prepare existing Qdrant collection for indexed soft/hard-delete filtering."""
+        from qdrant_client.http.models import PayloadSchemaType
+        
+        # 1. Create the Payload Indices required for Hard Deletes & Factory Resets
+        try:
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.knowledge_type",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.source_id",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            # Add index for source_ids (used in ticket deletion)
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.source_ids",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            # Add index for ticket_number (used in ticket deletion)
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.ticket_number",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            logger.info("Qdrant payload indices for hard deletes created/verified.")
+        except Exception as e:
+            # It's safe to ignore if the index already exists
+            logger.debug(f"Payload index setup note: {e}")
+
+        # 2. Your existing backfill logic
         self.backfill_active_metadata()
 
     def search_tickets(
@@ -8792,36 +8856,29 @@ class VectorStoreService:
         )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
-        """Soft-delete ticket vectors through the central lifecycle layer."""
+        """Physically deletes all vector chunks associated with a ticket number."""
         normalized_ticket = str(ticket_number)
-        filters = [
-            qdrant_models.FieldCondition(
-                key="metadata.ticket_number",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
+        
+        # Use a single delete command with an OR (should) filter
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=qdrant_models.Filter(
+                should=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.ticket_number",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                    qdrant_models.FieldCondition(
+                        key="metadata.source_id",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                    qdrant_models.FieldCondition(
+                        key="metadata.source_ids",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                ]
             ),
-            qdrant_models.FieldCondition(
-                key="metadata.source_id",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
-            ),
-            qdrant_models.FieldCondition(
-                key="metadata.source_ids",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
-            ),
-        ]
-
-        for condition in filters:
-            try:
-                self._set_metadata_active_by_filter_condition(
-                    condition,
-                    is_active=False,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to soft-delete ticket vectors by %s=%s: %s",
-                    condition.key,
-                    normalized_ticket,
-                    exc,
-                )
+        )
 
     def _set_metadata_active_by_filter_condition(
         self,
@@ -9103,6 +9160,7 @@ DEFAULT_ROUTING_MODEL = "llama-3.3-70b-versatile"
 DEFAULT_DOCUMENT_CLASSIFIER_MODEL = "llama-3.1-8b-instant"
 DEFAULT_ESCALATION_MODEL = "llama-3.1-8b-instant"
 DEFAULT_CONVERSATION_RESOLUTION_MODEL = "llama-3.1-8b-instant"
+DEFAULT_CHAT_EXTRACTION_MODEL = "llama-3.1-8b-instant"
 
 
 class RuntimeAIConfig:
@@ -9166,7 +9224,20 @@ class RuntimeAIConfig:
             or CONVERSATION_RESOLUTION_PROMPT
         )
     
-    
+    @property
+    def chat_extraction_model(self) -> str:
+        return (
+            self.settings.ChatExtractionModel
+            or DEFAULT_CHAT_EXTRACTION_MODEL
+        )
+
+    @property
+    def chat_extraction_prompt(self) -> str:
+        from app.services.prompts import RESOLVED_CHAT_EXTRACTION_PROMPT
+        return (
+            self.settings.ChatExtractionPrompt
+            or RESOLVED_CHAT_EXTRACTION_PROMPT
+        )
 
 --- FILE: backend\app\services\settings\settings_service.py ---
 """
@@ -9213,6 +9284,7 @@ def update_settings(
         UseReformulator=new_settings.UseReformulator,
         UseReranker=new_settings.UseReranker,
         AllowedCategories=new_settings.AllowedCategories,
+        ChatExtractionModel=new_settings.ChatExtractionModel,
         ChatExtractionPrompt=new_settings.ChatExtractionPrompt,
         EscalationDraftModel=new_settings.EscalationDraftModel,
         EscalationDraftPrompt=new_settings.EscalationDraftPrompt,
@@ -9274,6 +9346,8 @@ def get_factory_defaults() -> dict:
         DEFAULT_REFORMULATOR_PROMPT,
         ESCALATION_DRAFT_PROMPT,
         CONVERSATION_RESOLUTION_PROMPT,
+        RESOLVED_CHAT_EXTRACTION_PROMPT,
+        DEFAULT_ROUTING_PROMPT,
         build_document_classifier_prompt,
     )
     from app.services.settings.runtime_config import (
@@ -9281,6 +9355,7 @@ def get_factory_defaults() -> dict:
         DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
         DEFAULT_ESCALATION_MODEL,
         DEFAULT_CONVERSATION_RESOLUTION_MODEL,
+        DEFAULT_CHAT_EXTRACTION_MODEL,
     )
 
     # Replicate internal categories from PDFProcessor
@@ -9306,14 +9381,15 @@ def get_factory_defaults() -> dict:
         "TopK_Tickets": 5,
         "UseReformulator": True,
         "UseReranker": True,
-        "ChatExtractionPrompt": None,
+        "ChatExtractionModel": DEFAULT_CHAT_EXTRACTION_MODEL,
+        "ChatExtractionPrompt": RESOLVED_CHAT_EXTRACTION_PROMPT,
         "AllowedCategories": ",".join(default_categories),
         "IsActive": True,
 
         "EscalationDraftModel": DEFAULT_ESCALATION_MODEL,
         "EscalationDraftPrompt": ESCALATION_DRAFT_PROMPT,
         "RoutingModel": DEFAULT_ROUTING_MODEL,
-        "RoutingPrompt": "",
+        "RoutingPrompt": DEFAULT_ROUTING_PROMPT,
         "DocumentClassifierModel": DEFAULT_DOCUMENT_CLASSIFIER_MODEL,
         "DocumentClassifierPrompt": build_document_classifier_prompt(
             snippet="{snippet}", 
