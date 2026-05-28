@@ -73,6 +73,7 @@ export const useChatMessages =
       conversationStatus: "active",
       resolutionAction: "active",
       resolutionMessage: null,
+      escalationId: null,
     })
 
     /* ========================================
@@ -84,6 +85,27 @@ export const useChatMessages =
       escalationDecision,
       setEscalationDecision,
     ] = useState(null)
+
+    /* ========================================
+       CONSUMED ESCALATION TRACKING
+       Prevents resurrected prompts from rendering.
+    ======================================== */
+
+    const [
+      consumedEscalationIds,
+      setConsumedEscalationIds,
+    ] = useState(new Set())
+
+    /* ========================================
+       SESSION TICKET SUBMITTED LOCK
+       Blocks all escalation UI after successful
+       ticket submission in this session.
+    ======================================== */
+
+    const [
+      sessionTicketSubmitted,
+      setSessionTicketSubmitted,
+    ] = useState(false)
 
     /* ========================================
        REFS
@@ -312,6 +334,11 @@ export const useChatMessages =
        chat message. The escalation prompt is a SEPARATE
        transient UI layer rendered by ResolutionPrompt
        using resolutionCheck.resolutionMessage.
+       
+       Each escalation prompt instance receives a unique
+       escalationId. Once consumed, it never renders again.
+       sessionTicketSubmitted blocks ALL escalation UI for
+       the remainder of the session.
     ======================================== */
 
     const sendMessage =
@@ -408,24 +435,66 @@ export const useChatMessages =
             ])
 
             /* ========================================
-               Set escalation flags separately.
-               The prompt text is rendered transiently
-               by ResolutionPrompt, NOT as a message.
+               Build resolution / escalation state.
+               Escalation prompts are ONLY generated here.
+               checkResolutionStatus is forbidden from
+               creating or resurrecting them.
             ======================================== */
 
             const hasEscalationFlags =
               Boolean(response?.showResolutionPrompt) ||
               Boolean(response?.allowTicketSubmission)
 
-            setResolutionCheck({
-              showResolutionPrompt: Boolean(response?.showResolutionPrompt),
-              allowTicketSubmission: Boolean(response?.allowTicketSubmission),
-              conversationStatus: response?.conversationStatus || "active",
-              resolutionAction: response?.resolutionAction || "active",
-              resolutionMessage: hasEscalationFlags
-                ? (response?.resolutionMessage || response?.message || null)
-                : null,
-            })
+            if (
+              hasEscalationFlags &&
+              sessionTicketSubmitted
+            ) {
+
+              /* ---- Session already has a submitted ticket.
+                 Suppress escalation UI entirely. Backend
+                 should return a conversational message.
+              ---- */
+
+              setResolutionCheck({
+                showResolutionPrompt: false,
+                allowTicketSubmission: false,
+                conversationStatus: response?.conversationStatus || "active",
+                resolutionAction: response?.resolutionAction || "active",
+                resolutionMessage: null,
+                escalationId: null,
+              })
+
+            } else if (
+              hasEscalationFlags
+            ) {
+
+              /* ---- Generate a unique ID for THIS prompt
+                 instance. Old consumed IDs never return.
+              ---- */
+
+              const escalationId =
+                `esc_${response.sessionId}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+              setResolutionCheck({
+                showResolutionPrompt: Boolean(response?.showResolutionPrompt),
+                allowTicketSubmission: Boolean(response?.allowTicketSubmission),
+                conversationStatus: response?.conversationStatus || "active",
+                resolutionAction: response?.resolutionAction || "active",
+                resolutionMessage: response?.resolutionMessage || response?.message || null,
+                escalationId,
+              })
+
+            } else {
+
+              setResolutionCheck({
+                showResolutionPrompt: false,
+                allowTicketSubmission: false,
+                conversationStatus: response?.conversationStatus || "active",
+                resolutionAction: response?.resolutionAction || "active",
+                resolutionMessage: null,
+                escalationId: null,
+              })
+            }
 
           } catch (error) {
 
@@ -444,7 +513,7 @@ export const useChatMessages =
               false
           }
         },
-        [resolved, state]
+        [resolved, state, sessionTicketSubmitted]
       )
 
     /* ========================================
@@ -495,6 +564,12 @@ export const useChatMessages =
 
     /* ========================================
        RESOLUTION CHECK
+       
+       WARNING: This is NOT an escalation prompt source.
+       It ONLY updates conversationStatus / resolutionAction
+       for auto-behaviors (e.g. open_draft). It must NEVER
+       overwrite showResolutionPrompt, allowTicketSubmission,
+       resolutionMessage, or escalationId.
     ======================================== */
 
     const checkResolutionStatus =
@@ -521,22 +596,41 @@ export const useChatMessages =
               return
             }
 
-            setResolutionCheck({
-              showResolutionPrompt:
-                Boolean(data?.show_resolution_prompt),
+            setResolutionCheck(
+              prev => ({
+                ...prev,
 
-              allowTicketSubmission:
-                Boolean(data?.allow_ticket_submission),
+                conversationStatus:
+                  data?.conversation_status ||
+                  prev?.conversationStatus ||
+                  "active",
 
-              conversationStatus:
-                data?.conversation_status || "active",
+                resolutionAction:
+                  data?.resolution_action ||
+                  prev?.resolutionAction ||
+                  "active",
 
-              resolutionAction:
-                data?.resolution_action || "active",
+                /* ---- Explicitly preserve escalation fields.
+                   Do NOT let the backend resurrect consumed
+                   prompts through this side-channel.
+                ---- */
+                showResolutionPrompt:
+                  prev?.showResolutionPrompt ||
+                  false,
 
-              resolutionMessage:
-                data?.resolution_message || null,
-            })
+                allowTicketSubmission:
+                  prev?.allowTicketSubmission ||
+                  false,
+
+                resolutionMessage:
+                  prev?.resolutionMessage ||
+                  null,
+
+                escalationId:
+                  prev?.escalationId ||
+                  null,
+              })
+            )
 
           } catch (error) {
 
@@ -548,6 +642,14 @@ export const useChatMessages =
         },
         [resolved, state]
       )
+
+    /* ========================================
+       RESOLUTION EFFECT
+       
+       CRITICAL FIX: messages.length removed from deps.
+       This stops the automatic resurrection of escalation
+       prompts after every new message.
+    ======================================== */
 
     useEffect(() => {
 
@@ -562,6 +664,7 @@ export const useChatMessages =
           conversationStatus: "active",
           resolutionAction: "active",
           resolutionMessage: null,
+          escalationId: null,
         })
 
         return
@@ -571,7 +674,6 @@ export const useChatMessages =
 
     }, [
       sessionId,
-      messages.length,
       resolved,
       checkResolutionStatus,
     ])
@@ -597,6 +699,8 @@ export const useChatMessages =
 
           setMessages([])
           setEscalationDecision(null)
+          setConsumedEscalationIds(new Set())
+          setSessionTicketSubmitted(false)
 
           state.sessionId =
             sessionId
@@ -629,6 +733,8 @@ export const useChatMessages =
           setSessionId(null)
           setResolved(false)
           setEscalationDecision(null)
+          setConsumedEscalationIds(new Set())
+          setSessionTicketSubmitted(false)
 
           console.log(
             "CONVERSATION_CLEARED"
@@ -646,6 +752,7 @@ export const useChatMessages =
             conversationStatus: "active",
             resolutionAction: "active",
             resolutionMessage: null,
+            escalationId: null,
           })
         },
         []
@@ -663,6 +770,58 @@ export const useChatMessages =
 
           setEscalationDecision(
             decision
+          )
+        },
+        []
+      )
+
+    /* ========================================
+       CONSUME ESCALATION
+       Marks a specific escalation prompt instance
+       as permanently handled.
+    ======================================== */
+
+    const consumeEscalation =
+      useCallback(
+        (
+          escalationId
+        ) => {
+
+          if (
+            !escalationId
+          ) {
+            return
+          }
+
+          setConsumedEscalationIds(
+            prev => {
+
+              const next =
+                new Set(prev)
+
+              next.add(
+                escalationId
+              )
+
+              return next
+            }
+          )
+        },
+        []
+      )
+
+    /* ========================================
+       MARK TICKET SUBMITTED
+       Locks escalation UI for the remainder
+       of this session.
+    ======================================== */
+
+    const markTicketSubmitted =
+      useCallback(
+        () => {
+
+          setSessionTicketSubmitted(
+            true
           )
         },
         []
@@ -748,5 +907,13 @@ export const useChatMessages =
       escalationDecision,
 
       makeEscalationDecision,
+
+      consumedEscalationIds,
+
+      consumeEscalation,
+
+      sessionTicketSubmitted,
+
+      markTicketSubmitted,
     }
   }
