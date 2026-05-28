@@ -239,7 +239,6 @@ class EscalationService:
         Submit an escalation ticket to BizPortal with conditional fields and optional attachment.
         Returns dict matching TicketEscalateResponse schema.
         """
-        logger.warning("DEBUG_SVC_SUBMIT_START: payload=%s", payload)
         session_id = str(payload["session_id"])
         session = self.repo.validate_session_for_escalation(session_id)
 
@@ -279,7 +278,6 @@ class EscalationService:
         # 4. Handle the File Upload (attachment)
         files_to_send = None
         if file:
-            logger.warning("DEBUG_SVC_FILE_READING: %s", file.filename)
             file_content = await file.read()
             # BizPortal expects the field name 'attachment'
             files_to_send = {'attachment': (file.filename, file_content, file.content_type)}
@@ -290,7 +288,6 @@ class EscalationService:
             "Accept": "application/json",
         }
         
-        logger.warning("DEBUG_SVC_POSTING: url=%s, payload=%s", BIZPORTAL_TICKET_URL, bizportal_payload)
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 BIZPORTAL_TICKET_URL,
@@ -299,7 +296,6 @@ class EscalationService:
                 headers=headers,
                 timeout=10.0,
             )
-            logger.warning("DEBUG_SVC_RESPONSE: status=%s, body=%s", response.status_code, response.text)
             response.raise_for_status()
 
             # Check for logical errors even if HTTP status is 200
