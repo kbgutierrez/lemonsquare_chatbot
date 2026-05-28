@@ -460,6 +460,29 @@ JSON Output:
 """
 
 # =========================================================
+# RESOLVED CHAT EXTRACTION
+# =========================================================
+RESOLVED_CHAT_EXTRACTION_PROMPT = (
+    "You are an expert IT Knowledge Base Editor.\n"
+    "Your job is to read the transcript of a chat conversation between an employee and an AI Helpdesk Bot.\n"
+    "The conversation has been successfully resolved.\n\n"
+    "You must extract the core details and format them EXACTLY like a formal Helpdesk ticket.\n"
+    "Do NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
+    "REQUIRED JSON SCHEMA:\n"
+    "{{\n"
+    '  "issue_reported": "string (A clear, concise summary of what the user originally asked or reported)",\n'
+    '  "issue_found": "string (What the actual technical problem was, based on the troubleshooting)",\n'
+    '  "issue_cause": "string (Why the problem happened, if discussed. If unknown, write \'Unknown\')",\n'
+    '  "work_done": "string (The definitive steps, instructions, or fix provided by the AI that resolved the issue)"\n'
+    "}}\n\n"
+    "CHAT TRANSCRIPT:\n"
+    "=================\n"
+    "{transcript}\n"
+    "=================\n\n"
+    "JSON OUTPUT:"
+)
+
+# =========================================================
 # KNOWLEDGE CONSOLIDATION
 # =========================================================
 def build_consolidation_prompt(cluster_payloads: list[str]) -> str:
