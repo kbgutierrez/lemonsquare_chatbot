@@ -5,8 +5,12 @@ Extracts knowledge from resolved chat sessions.
 import logging
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
+from app.core.config import settings
 from app.models.chatbot import ChatMessage, ChatSession, LearnedChat
 from app.core.exceptions import ValidationError, VectorStoreError
+from app.services.llm_client import create_llm, invoke_llm
+from app.services.prompts import RESOLVED_CHAT_EXTRACTION_PROMPT
+from app.utils.json_utils import safe_json_loads
 from app.services.consolidation.knowledge_consolidator import KnowledgeConsolidator
 
 logger = logging.getLogger(__name__)
@@ -47,8 +51,33 @@ class ChatLearningProcessor:
                 "message": "Chat has already been learned.",
             }
 
-        learned.IssueReported = transcript[:500]
-        learned.WorkDone = "Resolved via chat"
+        # Extract structured details from transcript using LLM
+        try:
+            llm = create_llm(model=settings.CLASSIFIER_MODEL, temperature=0.1)
+            prompt = RESOLVED_CHAT_EXTRACTION_PROMPT.format(transcript=transcript)
+            llm_res = await invoke_llm(
+                llm,
+                prompt,
+                model=settings.CLASSIFIER_MODEL,
+                action="extract_resolved_chat",
+                session_id=session_id,
+            )
+            extracted = safe_json_loads(llm_res.content, context="ResolvedChatExtraction")
+
+            if extracted and isinstance(extracted, dict):
+                learned.IssueReported = extracted.get("issue_reported") or transcript[:500]
+                learned.IssueFound = extracted.get("issue_found") or ""
+                learned.RootCause = extracted.get("issue_cause") or "Unknown"
+                learned.WorkDone = extracted.get("work_done") or "Resolved via chat"
+            else:
+                logger.warning("LLM extraction failed for session %s, using fallback.", session_id)
+                learned.IssueReported = transcript[:500]
+                learned.WorkDone = "Resolved via chat"
+        except Exception as exc:
+            logger.error("Error extracting details for session %s: %s. Falling back.", session_id, exc)
+            learned.IssueReported = transcript[:500]
+            learned.WorkDone = "Resolved via chat"
+
         learned.IsActive = True
         session.SessionStatus = "Resolved"
 
