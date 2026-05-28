@@ -278,8 +278,13 @@ def build_cluster_documents(
             raw_vector_id = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"raw_ticket_{ticket.ticket_number}"))
             raw_metadata = {
                 "doc_type": "raw_ticket",
+                "knowledge_type": "ticket",
                 "category": "Database Helpdesk Sync",
                 "ticket_number": stable_text(ticket.ticket_number),
+                "source_id": stable_text(ticket.ticket_number),
+                "source_ids": [stable_text(ticket.ticket_number)],
+                "cluster_key": raw_key,
+                "is_active": True,
                 "frequency": 1,
             }
             raw_doc = Document(page_content=raw_content, metadata=raw_metadata)
@@ -317,8 +322,12 @@ def build_cluster_documents(
 
         metadata = {
             "doc_type": "canonical_ticket_cluster",
+            "knowledge_type": "ticket",
             "category": "Database Helpdesk Sync",
             "cluster_key": cluster_key,
+            "source_id": stable_text(representative.ticket_number),
+            "source_ids": [stable_text(t) for t in related_ticket_numbers],
+            "is_active": True,
             "content_hash": content_hash,
             "frequency": len(cluster_tickets),
             "related_ticket_count": len(cluster_tickets),
