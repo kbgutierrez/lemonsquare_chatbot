@@ -34,23 +34,29 @@ const apiRequest = async ({
   body,
   headers = {},
 }) => {
+  const fetchOptions = {
+    method,
+    headers: {
+      ...API_CONFIG.HEADERS,
+      ...headers,
+    },
+  }
 
-  const response = await fetch(
-    endpoint,
-    {
-      method,
+  // If body is FormData, don't set Content-Type header manually.
+  // The browser will set it with the correct boundary.
+  if (body instanceof FormData) {
+    fetchOptions.body = body
+    // Strip Content-Type so browser generates correct multipart boundary
+    Object.keys(fetchOptions.headers).forEach(key => {
+      if (key.toLowerCase() === "content-type") {
+        delete fetchOptions.headers[key]
+      }
+    })
+  } else {
+    fetchOptions.body = body ? JSON.stringify(body) : undefined
+  }
 
-      headers: {
-        ...API_CONFIG.HEADERS,
-        ...headers,
-      },
-
-      body:
-        body
-          ? JSON.stringify(body)
-          : undefined,
-    }
-  )
+  const response = await fetch(endpoint, fetchOptions)
 
   const data =
     await parseJsonSafely(
@@ -301,16 +307,6 @@ const submitEscalation =
         "/chat/escalate/submit"
       )
 
-    /* ========================================
-       PRODUCTION FIX — Always send FormData.
-       The backend endpoint declares Form(...)
-       + File(...), so it ALWAYS expects
-       multipart/form-data.  Sending JSON when
-       no image is attached causes FastAPI to
-       consume the body stream trying to parse
-       form fields, then fail validation.
-       ======================================== */
-
     const formData = new FormData()
 
     formData.append("session_id", session_id)
@@ -337,19 +333,6 @@ const submitEscalation =
       formData.append("attachment", image)
     }
 
-    /*
-      Strip explicit Content-Type so the browser
-      generates the correct multipart boundary
-      automatically.  Never set it manually when
-      using FormData + fetch.
-    */
-    const headers = {}
-    for (const [key, value] of Object.entries(API_CONFIG.HEADERS)) {
-      if (key.toLowerCase() !== "content-type") {
-        headers[key] = value
-      }
-    }
-
     log(
       "ESCALATION_SUBMIT_ENDPOINT",
       endpoint
@@ -369,28 +352,19 @@ const submitEscalation =
       }
     )
 
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers,
-      body: formData,
-    })
-
-    const data = await parseJsonSafely(response)
-
-    if (!response.ok) {
-      throw new Error(
-        data?.detail ||
-        data?.message ||
-        "Request failed."
-      )
-    }
+    const response =
+      await apiRequest({
+        endpoint,
+        method: "POST",
+        body: formData,
+      })
 
     log(
       "ESCALATION_SUBMIT_RESPONSE",
-      data
+      response
     )
 
-    return data
+    return response
   }
 
 /* ========================================

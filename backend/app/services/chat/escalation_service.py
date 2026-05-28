@@ -283,11 +283,17 @@ class EscalationService:
             files_to_send = {'attachment': (file.filename, file_content, file.content_type)}
 
         # 5. Send to BizPortal
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "application/json",
+        }
+        
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 BIZPORTAL_TICKET_URL,
                 data=bizportal_payload, # Use data for multipart form data
                 files=files_to_send,
+                headers=headers,
                 timeout=10.0,
             )
             response.raise_for_status()

@@ -16,7 +16,7 @@ def setup_qdrant_indexes():
         api_key=settings.QDRANT_API_KEY
     )
     
-    collection_name = "LemonSquareQdrant" # Update if your routing collection also needs indexes
+    collection_name = settings.QDRANT_COLLECTION
     
     # Define the fields and their types
     indexes = [
