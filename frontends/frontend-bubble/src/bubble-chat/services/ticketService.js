@@ -297,19 +297,33 @@ const submitEscalation =
     location,
     equipment,
     user_token,
+    image,
   }) => {
 
     const formData = new FormData();
     formData.append("session_id", session_id);
     formData.append("requester_id", requester_id);
-    formData.append("company_id", company_id);
+    formData.append("company_id", company_id || 1);
     formData.append("summary", summary);
     formData.append("description", description);
     formData.append("department_id", department_id);
     formData.append("subcategory_id", subcategory_id);
-    formData.append("location", location || "");
-    formData.append("equipment", equipment || "");
-    formData.append("user_token", user_token || "");
+    
+    if (location) {
+        formData.append("location", location);
+    }
+    
+    if (equipment) {
+        formData.append("equipment", equipment);
+    }
+    
+    if (user_token) {
+        formData.append("user_token", user_token);
+    }
+    
+    if (image) {
+        formData.append("attachment", image);
+    }
 
     log(
       "ESCALATION_SUBMIT_FORMDATA",

@@ -283,10 +283,16 @@ async def submit_escalation(
     attachment: UploadFile | None = File(None),
     db: Session = Depends(get_chatbot_db),
 ):
+    logger.warning(
+        "DEBUG_ESC_START: session_id=%s, requester_id=%s, company_id=%s, summary=%s, dept=%s, subcat=%s",
+        session_id, requester_id, company_id, summary, department_id, subcategory_id
+    )
+
     if attachment:
+        logger.warning("DEBUG_ESC_FILE: filename=%s, content_type=%s, size=%s", 
+                       attachment.filename, attachment.content_type, getattr(attachment, "size", "unknown"))
         max_size = 10 * 1024 * 1024  # 10MB limit
         try:
-            # Check size if available (FastAPI/Starlette)
             file_size = getattr(attachment, "size", 0)
             if file_size > max_size:
                 raise HTTPException(
@@ -294,11 +300,11 @@ async def submit_escalation(
                     detail=f"Attachment too large. Maximum size allowed is 10MB."
                 )
         except AttributeError:
-            # Fallback for older Starlette: read a small chunk to verify
             pass
 
     if request.headers.get("content-type", "").startswith("application/json"):
         body = await request.json()
+        logger.warning("DEBUG_ESC_JSON_BODY: %s", body)
         session_id = body.get("session_id")
         requester_id = body.get("requester_id")
         company_id = body.get("company_id")
@@ -333,6 +339,7 @@ async def submit_escalation(
     }
     missing = [name for name, value in required_payload.items() if value in (None, "")]
     if missing:
+        logger.warning("DEBUG_ESC_MISSING_FIELDS: %s", missing)
         raise ValidationError(f"Missing required escalation fields: {', '.join(missing)}")
 
     payload = {
