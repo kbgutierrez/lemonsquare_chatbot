@@ -78,42 +78,52 @@ async def sync_resolved_ticket(
     return TicketSyncResponse(**result)
 
 
-@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-learn")
+@router.post("/{ticket_number}/whitelist", summary="Remove Blacklist and Re-ingest")
 async def whitelist_ticket(
     ticket_number: str,
     db_chatbot: Session = Depends(get_chatbot_db),
     db_helpdesk: Session = Depends(get_helpdesk_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ):
+    """
+    Removes a ticket from the blacklist and re-fetches its data from the Helpdesk 
+    database to re-ingest it into the AI's knowledge base.
+    """
     repo = TicketRepository(db_chatbot, db_helpdesk)
 
     # 1. Remove from blacklist
     removed = repo.remove_from_blacklist(ticket_number)
     if not removed:
-        raise HTTPException(status_code=404, detail=f"Ticket {ticket_number} is not currently blacklisted.")
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Ticket {ticket_number} is not currently blacklisted."
+        )
 
-    # 2. Fetch original ticket
+    # 2. Fetch fresh ticket data from the EXTERNAL Helpdesk database
     original = repo.get_ticket_by_number(ticket_number)
     if not original:
         raise HTTPException(
             status_code=404,
-            detail="Ticket removed from blacklist, but the original ticket could not be found.",
+            detail=f"Blacklist removed, but ticket {ticket_number} could not be found in the Helpdesk database to re-ingest.",
         )
 
-    # 3. Re-ingest
-    ticket_payload = TicketResolveRequest(
-        ticket_number=original.ticket_number,
-        issue_reported=original.issue_reported or "None",
-        issue_found=original.issue_found or "None",
-        issue_cause=original.issue_cause or "None",
-        work_done=original.work_done or "None",
-    )
-    await ingestion_service.process_resolved_ticket(ticket_payload.model_dump(), db_chatbot)
+    # 3. Trigger re-ingestion
+    ticket_payload = {
+        "ticket_number": original.ticket_number,
+        "issue_reported": original.issue_reported or "None",
+        "issue_found": original.issue_found or "None",
+        "issue_cause": original.issue_cause or "None",
+        "work_done": original.work_done or "None",
+        "advanced_work_done": getattr(original, "advanced_work_done", None),
+    }
+
+    await ingestion_service.process_resolved_ticket(ticket_payload, db_chatbot)
 
     return {
         "status": "success",
-        "message": f"Ticket {ticket_number} successfully whitelisted and re-learned by the AI.",
+        "message": f"Ticket {ticket_number} successfully whitelisted and re-ingested into the AI brain.",
     }
+
 
 
 @router.post("/bulk-sync", summary="Trigger a full Helpdesk sync in the background")

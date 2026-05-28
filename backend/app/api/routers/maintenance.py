@@ -13,6 +13,53 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
 
 
+from pydantic import BaseModel
+from fastapi import HTTPException
+from app.services.retrieval.vector_store import get_shared_vector_store
+from app.repositories.document_repository import DocumentRepository
+
+class WipeConfirmationRequest(BaseModel):
+    confirm_wipe: str
+
+@router.delete("/wipe-all", summary="Factory Reset AI Knowledge (Preserves Tickets)")
+async def factory_reset_ai_knowledge(
+    payload: WipeConfirmationRequest,
+    current_user: dict = Depends(require_admin_user),
+    db: Session = Depends(get_chatbot_db),
+    vector_store = Depends(get_shared_vector_store)
+):
+    """
+    Physically destroys all internally managed knowledge (Docs, Manual Rules, Learned Chats) 
+    from both SQL and Qdrant. Preserves Helpdesk tickets.
+    """
+    # 1. Safety Guard
+    if payload.confirm_wipe != "I_UNDERSTAND_THIS_IS_IRREVERSIBLE":
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid confirmation string. Please confirm you understand this is irreversible."
+        )
+
+    repo = DocumentRepository(db)
+
+    try:
+        # 2. SQL Truncation (Documents, Manual Rules, Learned Chats)
+        repo.truncate_owned_knowledge()
+        logger.warning(f"CRITICAL: Admin {current_user.get('id')} triggered factory reset of SQL knowledge.")
+
+        # 3. Filtered Vector Wipe
+        vector_store.wipe_all_except_tickets()
+        logger.warning("CRITICAL: Qdrant collection wiped (excluding tickets).")
+
+        return {
+            "status": "success",
+            "message": "Factory reset complete. Uploaded Documents, Manual Rules, and AI Chats were destroyed. Helpdesk tickets are preserved."
+        }
+
+    except Exception as e:
+        logger.error(f"Factory Reset failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Factory Reset encountered a critical error.")
+
+
 @router.post("/consolidate", summary="Run safe knowledge-base maintenance")
 async def trigger_knowledge_consolidation(
     background_tasks: BackgroundTasks,

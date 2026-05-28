@@ -22,6 +22,7 @@ def setup_qdrant_indexes():
     indexes = [
         ("metadata.is_active", "bool"),
         ("metadata.doc_type", "keyword"),
+        ("metadata.knowledge_type", "keyword"),
         ("metadata.source_id", "keyword"),
         ("metadata.document_id", "keyword"),
         ("metadata.ticket_number", "keyword")
