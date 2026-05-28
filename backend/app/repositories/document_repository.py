@@ -83,3 +83,28 @@ class DocumentRepository:
 
     def count_active_learned_chats(self) -> int:
         return self.db.query(LearnedChat).filter(LearnedChat.IsActive == True).count()
+
+    # ── Physical Deletion Operations ───────────────────────────
+
+    def hard_delete_document(self, document_id: str) -> bool:
+        """Physically removes the document record from SQL."""
+        result = self.db.query(UploadedDocument).filter(
+            UploadedDocument.DocumentID == document_id
+        ).delete()
+        self.db.commit()
+        return result > 0
+
+    def hard_delete_manual_entry(self, entry_id: str) -> bool:
+        """Physically removes the manual knowledge entry from SQL."""
+        result = self.db.query(ManualKnowledgeEntry).filter(
+            ManualKnowledgeEntry.EntryID == entry_id
+        ).delete()
+        self.db.commit()
+        return result > 0
+
+    def truncate_owned_knowledge(self) -> None:
+        """Wipes all documents, manual rules, and AI learned chats."""
+        self.db.query(UploadedDocument).delete()
+        self.db.query(ManualKnowledgeEntry).delete()
+        self.db.query(LearnedChat).delete()
+        self.db.commit()

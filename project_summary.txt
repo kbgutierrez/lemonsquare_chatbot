@@ -1283,6 +1283,57 @@ async def delete_document(
     )
 
 
+from app.services.retrieval.vector_store import get_shared_vector_store
+
+@router.delete("/hard/{document_id}", tags=["Documents", "Admin"])
+async def hard_delete_document_api(
+    document_id: str,
+    db: Session = Depends(get_chatbot_db),
+    current_user: dict = Depends(require_admin_user),
+    vector_store = Depends(get_shared_vector_store)
+):
+    from app.repositories.document_repository import DocumentRepository
+    repo = DocumentRepository(db)
+
+    # 1. Source of Truth Wipe
+    deleted = repo.hard_delete_document(document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found in SQL.")
+
+    # 2. Vector Wipe
+    try:
+        vector_store.hard_delete_by_source_id(document_id)
+    except Exception as e:
+        logger.error(f"SQL deleted but Qdrant failed for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail="Document wiped from SQL, but Vector wipe failed.")
+
+    return {"status": "success", "message": f"Document {document_id} permanently deleted."}
+
+
+@router.delete("/manual/hard/{entry_id}", tags=["Documents", "Admin"])
+async def hard_delete_manual_api(
+    entry_id: str,
+    db: Session = Depends(get_chatbot_db),
+    current_user: dict = Depends(require_admin_user),
+    vector_store = Depends(get_shared_vector_store)
+):
+    from app.repositories.document_repository import DocumentRepository
+    repo = DocumentRepository(db)
+
+    # 1. Source of Truth Wipe
+    deleted = repo.hard_delete_manual_entry(entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Manual entry not found in SQL.")
+
+    # 2. Vector Wipe
+    try:
+        vector_store.hard_delete_by_source_id(entry_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="SQL wiped, but Qdrant wipe failed.")
+
+    return {"status": "success", "message": f"Manual rule {entry_id} permanently deleted."}
+
+
 @router.post(
     "/{document_id}/restore",
     response_model=DocumentDeleteResponse,
@@ -1911,6 +1962,53 @@ from app.services.maintenance.maintenance_service import MaintenanceService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/maintenance", tags=["Maintenance"])
+
+
+from pydantic import BaseModel
+from fastapi import HTTPException
+from app.services.retrieval.vector_store import get_shared_vector_store
+from app.repositories.document_repository import DocumentRepository
+
+class WipeConfirmationRequest(BaseModel):
+    confirm_wipe: str
+
+@router.delete("/wipe-all", summary="Factory Reset AI Knowledge (Preserves Tickets)")
+async def factory_reset_ai_knowledge(
+    payload: WipeConfirmationRequest,
+    current_user: dict = Depends(require_admin_user),
+    db: Session = Depends(get_chatbot_db),
+    vector_store = Depends(get_shared_vector_store)
+):
+    """
+    Physically destroys all internally managed knowledge (Docs, Manual Rules, Learned Chats) 
+    from both SQL and Qdrant. Preserves Helpdesk tickets.
+    """
+    # 1. Safety Guard
+    if payload.confirm_wipe != "I_UNDERSTAND_THIS_IS_IRREVERSIBLE":
+        raise HTTPException(
+            status_code=400, 
+            detail="Invalid confirmation string. Please confirm you understand this is irreversible."
+        )
+
+    repo = DocumentRepository(db)
+
+    try:
+        # 2. SQL Truncation (Documents, Manual Rules, Learned Chats)
+        repo.truncate_owned_knowledge()
+        logger.warning(f"CRITICAL: Admin {current_user.get('id')} triggered factory reset of SQL knowledge.")
+
+        # 3. Filtered Vector Wipe
+        vector_store.wipe_all_except_tickets()
+        logger.warning("CRITICAL: Qdrant collection wiped (excluding tickets).")
+
+        return {
+            "status": "success",
+            "message": "Factory reset complete. Uploaded Documents, Manual Rules, and AI Chats were destroyed. Helpdesk tickets are preserved."
+        }
+
+    except Exception as e:
+        logger.error(f"Factory Reset failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Factory Reset encountered a critical error.")
 
 
 @router.post("/consolidate", summary="Run safe knowledge-base maintenance")
@@ -3424,6 +3522,31 @@ class DocumentRepository:
 
     def count_active_learned_chats(self) -> int:
         return self.db.query(LearnedChat).filter(LearnedChat.IsActive == True).count()
+
+    # ── Physical Deletion Operations ───────────────────────────
+
+    def hard_delete_document(self, document_id: str) -> bool:
+        """Physically removes the document record from SQL."""
+        result = self.db.query(UploadedDocument).filter(
+            UploadedDocument.DocumentID == document_id
+        ).delete()
+        self.db.commit()
+        return result > 0
+
+    def hard_delete_manual_entry(self, entry_id: str) -> bool:
+        """Physically removes the manual knowledge entry from SQL."""
+        result = self.db.query(ManualKnowledgeEntry).filter(
+            ManualKnowledgeEntry.EntryID == entry_id
+        ).delete()
+        self.db.commit()
+        return result > 0
+
+    def truncate_owned_knowledge(self) -> None:
+        """Wipes all documents, manual rules, and AI learned chats."""
+        self.db.query(UploadedDocument).delete()
+        self.db.query(ManualKnowledgeEntry).delete()
+        self.db.query(LearnedChat).delete()
+        self.db.commit()
 
 
 --- FILE: backend\app\repositories\settings_repository.py ---
@@ -8710,6 +8833,33 @@ class VectorStoreService:
             payload={"is_active": is_active},
             points=qdrant_models.Filter(must=[condition]),
             key="metadata",
+        )
+
+    # ── Physical Deletion Operations ───────────────────────────
+
+    def hard_delete_by_source_id(self, source_id: str) -> None:
+        """Permanently deletes all vector chunks belonging to a document/entry."""
+        self.delete_by_filter([
+            qdrant_models.FieldCondition(
+                key="metadata.source_id",
+                match=qdrant_models.MatchValue(value=source_id)
+            )
+        ])
+
+    def wipe_all_except_tickets(self) -> None:
+        """Deletes all vectors EXCEPT those originating from the Helpdesk Sync."""
+        from app.core.metadata_contract import KNOWLEDGE_TYPE_TICKET
+
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=qdrant_models.Filter(
+                must_not=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.knowledge_type",
+                        match=qdrant_models.MatchValue(value=KNOWLEDGE_TYPE_TICKET)
+                    )
+                ]
+            ),
         )
 
 

@@ -99,7 +99,39 @@ class VectorStoreService:
         return updated_count
 
     def prepare_collection(self) -> None:
-        """Prepare existing Qdrant collection for indexed soft-delete filtering."""
+        """Prepare existing Qdrant collection for indexed soft/hard-delete filtering."""
+        from qdrant_client.http.models import PayloadSchemaType
+        
+        # 1. Create the Payload Indices required for Hard Deletes & Factory Resets
+        try:
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.knowledge_type",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.source_id",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            # Add index for source_ids (used in ticket deletion)
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.source_ids",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            # Add index for ticket_number (used in ticket deletion)
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.ticket_number",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
+            logger.info("Qdrant payload indices for hard deletes created/verified.")
+        except Exception as e:
+            # It's safe to ignore if the index already exists
+            logger.debug(f"Payload index setup note: {e}")
+
+        # 2. Your existing backfill logic
         self.backfill_active_metadata()
 
     def search_tickets(
@@ -244,36 +276,29 @@ class VectorStoreService:
         )
 
     def delete_ticket_vectors(self, ticket_number: str) -> None:
-        """Soft-delete ticket vectors through the central lifecycle layer."""
+        """Physically deletes all vector chunks associated with a ticket number."""
         normalized_ticket = str(ticket_number)
-        filters = [
-            qdrant_models.FieldCondition(
-                key="metadata.ticket_number",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
+        
+        # Use a single delete command with an OR (should) filter
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=qdrant_models.Filter(
+                should=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.ticket_number",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                    qdrant_models.FieldCondition(
+                        key="metadata.source_id",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                    qdrant_models.FieldCondition(
+                        key="metadata.source_ids",
+                        match=qdrant_models.MatchValue(value=normalized_ticket),
+                    ),
+                ]
             ),
-            qdrant_models.FieldCondition(
-                key="metadata.source_id",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
-            ),
-            qdrant_models.FieldCondition(
-                key="metadata.source_ids",
-                match=qdrant_models.MatchValue(value=normalized_ticket),
-            ),
-        ]
-
-        for condition in filters:
-            try:
-                self._set_metadata_active_by_filter_condition(
-                    condition,
-                    is_active=False,
-                )
-            except Exception as exc:
-                logger.warning(
-                    "Failed to soft-delete ticket vectors by %s=%s: %s",
-                    condition.key,
-                    normalized_ticket,
-                    exc,
-                )
+        )
 
     def _set_metadata_active_by_filter_condition(
         self,
@@ -285,6 +310,33 @@ class VectorStoreService:
             payload={"is_active": is_active},
             points=qdrant_models.Filter(must=[condition]),
             key="metadata",
+        )
+
+    # ── Physical Deletion Operations ───────────────────────────
+
+    def hard_delete_by_source_id(self, source_id: str) -> None:
+        """Permanently deletes all vector chunks belonging to a document/entry."""
+        self.delete_by_filter([
+            qdrant_models.FieldCondition(
+                key="metadata.source_id",
+                match=qdrant_models.MatchValue(value=source_id)
+            )
+        ])
+
+    def wipe_all_except_tickets(self) -> None:
+        """Deletes all vectors EXCEPT those originating from the Helpdesk Sync."""
+        from app.core.metadata_contract import KNOWLEDGE_TYPE_TICKET
+
+        self.qdrant.delete(
+            collection_name=self.collection_name,
+            points_selector=qdrant_models.Filter(
+                must_not=[
+                    qdrant_models.FieldCondition(
+                        key="metadata.knowledge_type",
+                        match=qdrant_models.MatchValue(value=KNOWLEDGE_TYPE_TICKET)
+                    )
+                ]
+            ),
         )
 
 

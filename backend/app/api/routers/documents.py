@@ -304,6 +304,57 @@ async def delete_document(
     )
 
 
+from app.services.retrieval.vector_store import get_shared_vector_store
+
+@router.delete("/hard/{document_id}", tags=["Documents", "Admin"])
+async def hard_delete_document_api(
+    document_id: str,
+    db: Session = Depends(get_chatbot_db),
+    current_user: dict = Depends(require_admin_user),
+    vector_store = Depends(get_shared_vector_store)
+):
+    from app.repositories.document_repository import DocumentRepository
+    repo = DocumentRepository(db)
+
+    # 1. Source of Truth Wipe
+    deleted = repo.hard_delete_document(document_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Document not found in SQL.")
+
+    # 2. Vector Wipe
+    try:
+        vector_store.hard_delete_by_source_id(document_id)
+    except Exception as e:
+        logger.error(f"SQL deleted but Qdrant failed for {document_id}: {e}")
+        raise HTTPException(status_code=500, detail="Document wiped from SQL, but Vector wipe failed.")
+
+    return {"status": "success", "message": f"Document {document_id} permanently deleted."}
+
+
+@router.delete("/manual/hard/{entry_id}", tags=["Documents", "Admin"])
+async def hard_delete_manual_api(
+    entry_id: str,
+    db: Session = Depends(get_chatbot_db),
+    current_user: dict = Depends(require_admin_user),
+    vector_store = Depends(get_shared_vector_store)
+):
+    from app.repositories.document_repository import DocumentRepository
+    repo = DocumentRepository(db)
+
+    # 1. Source of Truth Wipe
+    deleted = repo.hard_delete_manual_entry(entry_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Manual entry not found in SQL.")
+
+    # 2. Vector Wipe
+    try:
+        vector_store.hard_delete_by_source_id(entry_id)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="SQL wiped, but Qdrant wipe failed.")
+
+    return {"status": "success", "message": f"Manual rule {entry_id} permanently deleted."}
+
+
 @router.post(
     "/{document_id}/restore",
     response_model=DocumentDeleteResponse,
