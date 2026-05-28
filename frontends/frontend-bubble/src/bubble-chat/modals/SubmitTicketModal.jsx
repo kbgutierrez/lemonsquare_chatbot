@@ -1,4 +1,5 @@
-import { Sparkles, SendHorizonal, BrainCircuit, MessageSquareWarning, CheckCircle2, ShieldAlert, LoaderCircle, AlertCircle } from "lucide-react"
+import { useRef, useCallback } from "react"
+import { Sparkles, SendHorizonal, BrainCircuit, MessageSquareWarning, CheckCircle2, ShieldAlert, LoaderCircle, AlertCircle, ImageIcon, X } from "lucide-react"
 import ModalShell from "../components/ModalShell.jsx"
 import { useTicketForm } from "../hooks/useTicketForm"
 import { useTheme } from "../context/ThemeContext.jsx"
@@ -26,11 +27,71 @@ const ActionButton = ({ children, disabled, onClick, variant = "primary", theme 
   )
 }
 
-const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [] }) => {
+/* ========================================
+   IMAGE UPLOAD BUTTON
+======================================== */
+
+const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
+  const inputRef = useRef(null)
+
+  const handleClick = useCallback(() => {
+    if (!disabled) {
+      inputRef.current?.click()
+    }
+  }, [disabled])
+
+  const handleChange = useCallback((e) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      onFileSelect(file)
+    }
+
+    // Reset input so same file can be selected again
+    e.target.value = ""
+  }, [onFileSelect])
+
+  return (
+    <div>
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={handleChange}
+        aria-label="Select image attachment"
+      />
+
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={disabled}
+        className={cn(
+          "flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs font-medium transition-all duration-200",
+          disabled && "cursor-not-allowed opacity-50"
+        )}
+        style={{
+          backgroundColor: theme.windowWrapperBg,
+          borderColor: theme.inputBorder,
+          color: theme.agentText,
+        }}
+      >
+        <ImageIcon
+          className="h-3.5 w-3.5"
+          style={{ color: theme.accent }}
+        />
+
+        {hasImage ? "Replace image" : "Attach image"}
+      </button>
+    </div>
+  )
+}
+
+const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages = [], initialDraftData = null }) => {
   const { theme } = useTheme()
-  const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading } = useTicketForm({
+  const { form, taxonomy, update, loading, success, submit, aiSummary, summaryLoading, imageFile, imagePreview, imageError } = useTicketForm({
     sessionId, requesterId, userData, messages,
     onSuccess: () => { setTimeout(() => onClose?.(), 1500) },
+    initialDraftData,
   })
 
   const selectedDept = taxonomy.find(d => String(d.department_id) === String(form.department_id))
@@ -108,6 +169,53 @@ const SubmitTicketModal = ({ onClose, sessionId, requesterId, userData, messages
                 {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
               </select>
             </div>
+          </div>
+
+          {/* ========================================
+             IMAGE ATTACHMENT SECTION
+          ======================================== */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Attachment</label>
+            <div className="flex items-center gap-3">
+              <ImageUploadButton
+                onFileSelect={(file) => update("image", file)}
+                disabled={isFrozen}
+                theme={theme}
+                hasImage={Boolean(imageFile)}
+              />
+              {imageFile && (
+                <span className="max-w-[180px] truncate text-xs" style={{ color: theme.agentTimestamp }}>
+                  {imageFile.name}
+                </span>
+              )}
+            </div>
+
+            {imagePreview && (
+              <div className="relative mt-3 inline-block max-w-full overflow-hidden rounded-xl border" style={{ borderColor: theme.inputBorder }}>
+                <img
+                  src={imagePreview}
+                  alt="Attachment preview"
+                  className="max-h-40 w-auto object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={() => update("image", null)}
+                  disabled={isFrozen}
+                  aria-label="Remove image attachment"
+                  className={cn(
+                    "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur-sm transition-all duration-200 hover:scale-105",
+                    isFrozen && "cursor-not-allowed opacity-50"
+                  )}
+                  style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText }}
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
+
+            {imageError && (
+              <p className="mt-1.5 text-xs font-medium text-red-500">{imageError}</p>
+            )}
           </div>
         </div>
         <div className="mt-6 rounded-2xl border p-3" style={{ backgroundColor: theme.agentBubbleBg, borderColor: theme.agentBubbleBorder }}>
