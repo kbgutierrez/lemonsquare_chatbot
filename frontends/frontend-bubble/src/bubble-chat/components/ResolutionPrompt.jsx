@@ -13,6 +13,8 @@ const ResolutionPrompt = ({
   allowTicketSubmission = false,
   resolutionMessage = null,
   escalationDecision = null,
+  escalationId,
+  onConsumeEscalation,
 }) => {
   const { theme } = useTheme()
   const [hasActed, setHasActed] = useState(false)
@@ -29,6 +31,9 @@ const ResolutionPrompt = ({
     if (hasActed) return
     setHasActed(true)
     onMakeDecision?.(decisionType)
+    if (escalationId && onConsumeEscalation) {
+      onConsumeEscalation(escalationId)
+    }
     requestAnimationFrame(() => {
       callback?.()
     })

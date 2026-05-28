@@ -366,7 +366,7 @@ const AnalyticsSection =
           />
 
           <StatCard
-            title="AI Learned Chats"
+            title="Reoslved Chats"
             value={
               knowledge.ai_learned_chats || 0
             }

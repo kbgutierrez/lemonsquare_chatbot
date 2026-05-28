@@ -56,12 +56,17 @@ const ChatMessages = ({
   resolutionCheck = {
     showResolutionPrompt: false,
     allowTicketSubmission: false,
+    resolutionMessage: null,
+    escalationId: null,
   },
   onResolve,
   onDismiss,
   onOpenTicket,
   onMakeEscalationDecision,
   escalationDecision,
+  consumedEscalationIds = new Set(),
+  onConsumeEscalation,
+  sessionTicketSubmitted = false,
 }) => {
 
   const messagesEndRef =
@@ -167,10 +172,26 @@ const ChatMessages = ({
 
   }, [normalizedMessages])
 
+  /* ========================================
+     ESCALATION PROMPT VISIBILITY
+     
+     Four gates must ALL be open:
+     1. Conversation is active (not resolved)
+     2. Not currently loading a message
+     3. No pending escalation decision
+     4. Session has not yet submitted a ticket
+     5. resolutionCheck has a valid escalationId
+     6. That escalationId has NOT been consumed
+     7. Backend signals escalation is appropriate
+  ======================================== */
+
   const shouldShowEscalationPrompt =
     !resolved &&
     !loading &&
     !escalationDecision &&
+    !sessionTicketSubmitted &&
+    Boolean(resolutionCheck.escalationId) &&
+    !consumedEscalationIds.has(resolutionCheck.escalationId) &&
     (
       resolutionCheck.showResolutionPrompt ||
       resolutionCheck.allowTicketSubmission
@@ -228,13 +249,15 @@ const ChatMessages = ({
         <AnimatePresence>
           {shouldShowEscalationPrompt && (
             <motion.div
-              key="resolution-prompt"
+              key={`resolution-prompt-${resolutionCheck.escalationId}`}
               initial={{ opacity: 0, y: 12, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: -8, scale: 0.95, height: 0, marginTop: 0 }}
               transition={{ duration: 0.25, ease: "easeOut" }}
             >
               <ResolutionPrompt
+                escalationId={resolutionCheck.escalationId}
+                onConsumeEscalation={onConsumeEscalation}
                 onResolve={onResolve}
                 onDismiss={onDismiss}
                 onOpenTicket={onOpenTicket}

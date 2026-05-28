@@ -27,6 +27,7 @@ const ChatWindow = ({
     showResolutionPrompt: false,
     allowTicketSubmission: false,
     resolutionMessage: null,
+    escalationId: null,
   },
   onSendMessage,
   onResolveConversation,
@@ -36,6 +37,9 @@ const ChatWindow = ({
   sessionKey,
   escalationDecision,
   onMakeEscalationDecision,
+  consumedEscalationIds,
+  onConsumeEscalation,
+  sessionTicketSubmitted,
 }) => {
 
   const { theme } = useTheme()
@@ -178,6 +182,9 @@ const ChatWindow = ({
               onOpenTicket={() => onOpenModal("ticket")}
               onMakeEscalationDecision={onMakeEscalationDecision}
               escalationDecision={escalationDecision}
+              consumedEscalationIds={consumedEscalationIds}
+              onConsumeEscalation={onConsumeEscalation}
+              sessionTicketSubmitted={sessionTicketSubmitted}
             />
           </div>
 
