@@ -65,7 +65,7 @@ const ManualEntriesSection = () => {
   }, [setEditingState])
 
   const handleRefresh = useCallback(async () => {
-    await reloadEntries()
+    await reloadEntries(true)
   }, [reloadEntries])
 
   const showSpinner = loading || isStatusStale

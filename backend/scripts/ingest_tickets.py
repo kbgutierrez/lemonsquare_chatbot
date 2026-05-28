@@ -237,14 +237,13 @@ def build_cluster_documents(
     tickets: list[TicketEvaluation],
     blacklisted_nums: set[Any],
     previous_state: dict[str, str],
-) -> tuple[list[ClusterDocument], list[ClusterDocument], dict[str, str], int, int, int]:
+) -> tuple[list[ClusterDocument], list[ClusterDocument], int, int, int]:
     """
     Build BOTH raw ticket documents AND canonical cluster documents.
 
     Returns:
       - raw_ticket_docs (one per ticket for exact lookup)
       - canonical_cluster_docs (consolidated for semantic memory)
-      - updated state map
       - skipped blacklisted count
       - skipped unchanged cluster count
       - skipped unchanged raw count
@@ -253,7 +252,6 @@ def build_cluster_documents(
     raw_docs: list[ClusterDocument] = []
     skipped_blacklisted = 0
     skipped_raw = 0
-    updated_state = dict(previous_state)
 
     for ticket in tickets:
         if ticket.ticket_number in blacklisted_nums:
@@ -297,7 +295,6 @@ def build_cluster_documents(
                     ticket_count=1,
                 )
             )
-            updated_state[raw_key] = raw_content_hash
 
         # Group for canonical clustering
         group_key = build_grouping_signature(ticket)
@@ -352,22 +349,22 @@ def build_cluster_documents(
             )
         )
 
-        updated_state[cluster_key] = content_hash
-
     logger.info("Skipped %d blacklisted tickets.", skipped_blacklisted)
     logger.info("Built %d new/updated raw ticket documents (skipped %d unchanged).", len(raw_docs), skipped_raw)
     logger.info("Built %d new/updated canonical clusters (skipped %d unchanged).", len(cluster_docs), skipped_unchanged)
 
-    return raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged, skipped_raw
+    return raw_docs, cluster_docs, skipped_blacklisted, skipped_unchanged, skipped_raw
 
 
 def upload_batches(
     cluster_docs: list[ClusterDocument],
     embeddings: HuggingFaceEmbeddings,
     batch_size: int,
+    state_path: Path,
+    current_state: dict[str, str],
 ) -> int:
     """
-    Upload canonical cluster documents to Qdrant in batches.
+    Upload canonical cluster documents to Qdrant in batches and update state incrementally.
     Returns the number of uploaded documents.
     """
     if not cluster_docs:
@@ -398,6 +395,12 @@ def upload_batches(
             force_recreate=False,
         )
 
+        # Incrementally update state after success
+        for item in batch:
+            current_state[item.cluster_key] = item.content_hash
+        
+        save_state(state_path, current_state)
+
         uploaded += len(batch)
 
     return uploaded
@@ -410,6 +413,7 @@ def run_ingestion(batch_size: int = 20) -> None:
     logger.info("Loading previous sync state from %s", STATE_PATH)
 
     previous_state = load_state(STATE_PATH)
+    active_state = dict(previous_state)
 
     db_helpdesk = SessionHelpdesk()
     db_chatbot = SessionChatbot()
@@ -424,7 +428,7 @@ def run_ingestion(batch_size: int = 20) -> None:
         logger.info("Fetched %d resolved tickets.", len(resolved_tickets))
 
         logger.info("Grouping tickets into canonical clusters...")
-        raw_docs, cluster_docs, updated_state, skipped_blacklisted, skipped_unchanged, skipped_raw = build_cluster_documents(
+        raw_docs, cluster_docs, skipped_blacklisted, skipped_unchanged, skipped_raw = build_cluster_documents(
             tickets=resolved_tickets,
             blacklisted_nums=blacklisted_nums,
             previous_state=previous_state,
@@ -451,6 +455,8 @@ def run_ingestion(batch_size: int = 20) -> None:
             cluster_docs=raw_docs,
             embeddings=embeddings,
             batch_size=batch_size,
+            state_path=STATE_PATH,
+            current_state=active_state,
         )
 
         # Then upload canonical clusters for semantic memory
@@ -459,9 +465,9 @@ def run_ingestion(batch_size: int = 20) -> None:
             cluster_docs=cluster_docs,
             embeddings=embeddings,
             batch_size=batch_size,
+            state_path=STATE_PATH,
+            current_state=active_state,
         )
-
-        save_state(STATE_PATH, updated_state)
 
         logger.info(
             "Qdrant sync complete. Uploaded %d raw tickets + %d canonical clusters into '%s'.",
