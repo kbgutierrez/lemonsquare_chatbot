@@ -411,6 +411,8 @@ class ManualEntryProcessor:
     async def delete(
         self,
         entry_id: str,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
     ) -> dict:
 
         entry = (
@@ -461,6 +463,8 @@ class ManualEntryProcessor:
             ) from exc
 
         entry.IsActive = False
+        entry.UpdatedBy = acting_user_id
+        entry.UpdatedByUsername = acting_username
 
         try:
 
@@ -507,6 +511,8 @@ class ManualEntryProcessor:
     async def restore(
         self,
         entry_id: str,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
     ) -> dict:
 
         entry = (
@@ -592,6 +598,8 @@ class ManualEntryProcessor:
             ) from exc
 
         entry.IsActive = True
+        entry.UpdatedBy = acting_user_id
+        entry.UpdatedByUsername = acting_username
 
         try:
 

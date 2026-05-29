@@ -93,16 +93,16 @@ class DocumentIngestionService:
             acting_username=acting_username,
         )
 
-    async def delete_manual_entry(self, entry_id: str, db) -> dict:
+    async def delete_manual_entry(self, entry_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).delete(
-            entry_id=entry_id
+            entry_id=entry_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
-    async def restore_manual_entry(self, entry_id: str, db) -> dict:
+    async def restore_manual_entry(self, entry_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).restore(
-            entry_id=entry_id
+            entry_id=entry_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
     # ── Resolved Ticket ────────────────────────────────────────
@@ -142,16 +142,16 @@ class DocumentIngestionService:
 
     # ── Document Management ────────────────────────────────────
 
-    async def delete_document(self, document_id: str, db) -> dict:
+    async def delete_document(self, document_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.document_processor import DocumentProcessor
         return await DocumentProcessor(db, self.vector_store, self.embeddings).delete(
-            document_id=document_id
+            document_id=document_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
-    async def restore_document(self, document_id: str, db) -> dict:
+    async def restore_document(self, document_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.document_processor import DocumentProcessor
         return await DocumentProcessor(db, self.vector_store, self.embeddings).restore(
-            document_id=document_id
+            document_id=document_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
     async def update_document(

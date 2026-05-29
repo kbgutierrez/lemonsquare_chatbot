@@ -17,7 +17,7 @@ class DocumentProcessor:
         self.embeddings = embeddings
         self.doc_repo = DocumentRepository(db)
 
-    async def delete(self, document_id: str) -> dict:
+    async def delete(self, document_id: str, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         doc = self.doc_repo.get_document_by_id(document_id)
         if not doc:
             return {"status": "error", "message": f"Document {document_id} not found."}
@@ -30,6 +30,8 @@ class DocumentProcessor:
             raise RuntimeError(f"Failed to soft delete document in Qdrant: {exc}") from exc
 
         doc.IsActive = False
+        doc.UpdatedBy = acting_user_id
+        doc.UpdatedByUsername = acting_username
         try:
             self.db.commit()
         except Exception:
@@ -46,7 +48,7 @@ class DocumentProcessor:
 
         return {"status": "success", "document_id": document_id}
 
-    async def restore(self, document_id: str) -> dict:
+    async def restore(self, document_id: str, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         doc = self.doc_repo.get_document_by_id(document_id)
         if not doc:
             raise ValueError(f"Document '{document_id}' not found.")
@@ -59,6 +61,8 @@ class DocumentProcessor:
             raise RuntimeError(f"Failed to restore document in Qdrant: {exc}") from exc
 
         doc.IsActive = True
+        doc.UpdatedBy = acting_user_id
+        doc.UpdatedByUsername = acting_username
         try:
             self.db.commit()
         except Exception:

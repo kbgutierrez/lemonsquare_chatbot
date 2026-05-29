@@ -305,10 +305,14 @@ async def delete_document(
       - SQL -> IsActive=False
       - Qdrant -> metadata.is_active=False
     """
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     result = await ingestion_service.delete_document(
         document_id,
         db,
+        acting_user_id=user_id,
+        acting_username=username,
     )
 
     return DocumentDeleteResponse(
@@ -380,10 +384,15 @@ async def restore_document(
     current_user: dict = Depends(require_admin_user),
 ) -> DocumentDeleteResponse:
 
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
+
     try:
         result = await ingestion_service.restore_document(
             document_id,
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         return DocumentDeleteResponse(
@@ -567,10 +576,14 @@ async def delete_manual_knowledge(
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
     current_user: dict = Depends(require_admin_user),
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     result = await ingestion_service.delete_manual_entry(
         entry_id,
         db,
+        acting_user_id=user_id,
+        acting_username=username,
     )
 
     return result
@@ -583,11 +596,15 @@ async def restore_manual_knowledge(
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
     current_user: dict = Depends(require_admin_user),
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     try:
         result = await ingestion_service.restore_manual_entry(
             entry_id,
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         return result
