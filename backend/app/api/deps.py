@@ -24,15 +24,9 @@ def get_ingestion_service(request: Request) -> DocumentIngestionService:
 
 
 def _is_admin_user(user_data: dict) -> bool:
-    role_values = [
-        user_data.get("role"),
-        user_data.get("user_role"),
-        user_data.get("user_type"),
-        user_data.get("type"),
-        user_data.get("is_admin"),
-        user_data.get("admin"),
-    ]
-    return any(str(value).strip().lower() in {"admin", "administrator", "true", "1"} for value in role_values)
+    # For this app, any authenticated user is treated as admin.
+    # BizPortal may return only an ID without explicit role flags.
+    return bool(user_data and user_data.get("id"))
 
 
 async def get_current_user(
