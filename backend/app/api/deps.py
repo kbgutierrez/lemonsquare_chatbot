@@ -24,8 +24,8 @@ def get_ingestion_service(request: Request) -> DocumentIngestionService:
 
 
 def _is_admin_user(user_data: dict) -> bool:
-    # For this app, any authenticated user is treated as admin.
-    # BizPortal may return only an ID without explicit role flags.
+    # since every user ay admin, we just check if the user data is valid and has an ID. 
+    # palitan if later if we have real roles
     return bool(user_data and user_data.get("id"))
 
 
@@ -41,15 +41,14 @@ async def get_current_user(
         token = request.headers.get("X-User-Token") or request.headers.get("X-User-ID")
     
     if not token:
-        # Temporary fallback for Admin UI until it sends tokens
         logger.warning("No credentials provided; using fallback admin user #9999")
         return {
             "id": 9999,
-            "username": "fallback_admin",
+            "username": "jzaru",
             "role": "admin",
             "firstname": "fall",
             "lastname": "back",
-            "is_admin": True
+            "is_admin": False
         }
     
     # Normalize token

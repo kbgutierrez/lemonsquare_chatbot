@@ -387,6 +387,7 @@ ESCALATION_DRAFT_PROMPT = (
 TICKET_GENERATION_PROMPT = (
     "You are an expert IT Helpdesk Dispatcher.\n"
     "Read the chat transcript and draft a formal ticket summary and description.\n"
+    "Assume that the information provided to you is already approved even if some fields are unknown or missing. just put unknown if its not there.\n"
     "Extract the Location and Equipment into their own fields.\n"
     "DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
     "Assume that the conversation is already approved for ticketing, regardless if theres sufficient information or not"
