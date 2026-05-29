@@ -38,6 +38,8 @@ const DEFAULT_SETTINGS = Object.freeze({
   SystemPrompt: "",
   ReformulatorPrompt: "",
   AllowedCategories: "",
+
+  ChatExtractionModel: "",
   ChatExtractionPrompt: "",
 
   /* ---- NEW: Pipeline model/prompt fields ---- */
@@ -80,7 +82,12 @@ const normalizeSettings = (data) => {
     SystemPrompt: d.SystemPrompt || "",
     ReformulatorPrompt: d.ReformulatorPrompt || "",
     AllowedCategories: d.AllowedCategories || "",
-    ChatExtractionPrompt: d.ChatExtractionPrompt || "",
+
+    ChatExtractionModel:
+      d.ChatExtractionModel || "",
+
+    ChatExtractionPrompt:
+      d.ChatExtractionPrompt || "",
 
     /* ---- NEW: Pipeline model/prompt fields ---- */
     EscalationDraftModel: d.EscalationDraftModel || "",
@@ -238,6 +245,9 @@ export const useAISettings = () => {
         SystemPrompt: safeSettings.SystemPrompt.trim(),
         ReformulatorPrompt: safeSettings.ReformulatorPrompt.trim(),
         AllowedCategories: safeSettings.AllowedCategories.trim(),
+        ChatExtractionModel:
+          safeSettings.ChatExtractionModel?.trim() || null,
+
         ChatExtractionPrompt:
           safeSettings.ChatExtractionPrompt?.trim() || null,
 
