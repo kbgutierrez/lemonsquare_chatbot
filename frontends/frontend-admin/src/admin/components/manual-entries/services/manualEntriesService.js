@@ -227,6 +227,50 @@ export const deleteManualEntry =
   }
 
 /* ========================================
+   HARD DELETE ENTRY
+======================================== */
+
+export const hardDeleteManualEntry =
+  async (entryId) => {
+
+    console.log(
+      "HARD_DELETE_MANUAL_ENTRY_ID",
+      entryId
+    )
+
+    if (
+      entryId === undefined ||
+      entryId === null ||
+      entryId === ""
+    ) {
+
+      throw new Error(
+        "Missing manual entry ID."
+      )
+    }
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.DOCUMENT_MANUAL_ENTRY_HARD_DELETE,
+        {
+          entryId,
+        }
+      )
+
+    const response =
+      await apiClient.delete(
+        endpoint
+      )
+
+    console.log(
+      "HARD_DELETE_MANUAL_ENTRY_RESPONSE",
+      response
+    )
+
+    return response
+  }
+
+/* ========================================
    RESTORE ENTRY
 ======================================== */
 
@@ -280,6 +324,7 @@ const manualEntriesService =
     createManualEntry,
     updateManualEntry,
     deleteManualEntry,
+    hardDeleteManualEntry,
     restoreManualEntry,
   }
 

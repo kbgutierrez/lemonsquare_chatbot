@@ -57,6 +57,7 @@ const menuTransitionClass = `
 
 const ChatMenu = ({
   resolved = false,
+  ticketSubmitted = false,
   onSelect,
 }) => {
 
@@ -65,6 +66,14 @@ const ChatMenu = ({
 
   const menuRef =
     useRef(null)
+
+  /* ========================================
+     GLOBAL LOCK
+  ======================================== */
+
+  const isLocked =
+    resolved ||
+    ticketSubmitted
 
   /* ========================================
      CLOSE HELPERS
@@ -130,8 +139,10 @@ const ChatMenu = ({
   const handleSelect =
     id => {
 
+      /* ---- Prevent resolve on locked chats ---- */
+
       if (
-        resolved &&
+        isLocked &&
         id === "resolve"
       ) {
 
@@ -157,8 +168,13 @@ const ChatMenu = ({
             icon: Icon,
           }) => {
 
+            /* ---- Disable resolve if:
+               - resolved
+               - ticket submitted
+            ---- */
+
             const isDisabled =
-              resolved &&
+              isLocked &&
               id === "resolve"
 
             const RenderIcon =
@@ -166,16 +182,28 @@ const ChatMenu = ({
                 ? Lock
                 : Icon
 
+            /* ---- Dynamic label ---- */
+
+            const finalLabel =
+              isDisabled
+                ? ticketSubmitted
+                  ? "Conversation Locked"
+                  : "Conversation Resolved"
+                : label
+
             return (
               <button
                 key={id}
                 type="button"
+
                 disabled={
                   isDisabled
                 }
+
                 onClick={() =>
                   handleSelect(id)
                 }
+
                 className={`
                   group
                   mb-1
@@ -238,7 +266,7 @@ const ChatMenu = ({
                     text-emerald-950
                   "
                 >
-                  {label}
+                  {finalLabel}
                 </span>
 
               </button>
@@ -246,7 +274,10 @@ const ChatMenu = ({
           }
         ),
 
-      [resolved]
+      [
+        isLocked,
+        ticketSubmitted,
+      ]
     )
 
   return (
@@ -262,11 +293,13 @@ const ChatMenu = ({
       <button
         type="button"
         aria-label="Chat menu"
+
         onClick={() =>
           setOpen(
             prev => !prev
           )
         }
+
         className={`
           flex
           h-8

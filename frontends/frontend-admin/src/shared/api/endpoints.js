@@ -47,8 +47,14 @@ export const API_ENDPOINTS = {
   DOCUMENT_MANUAL_ENTRY_DELETE:
     "/api/documents/manual/:entryId",
 
+  DOCUMENT_MANUAL_ENTRY_HARD_DELETE:
+    "/api/documents/manual/hard/:entryId",
+
   DOCUMENT_MANUAL_ENTRY_RESTORE:
     "/api/documents/manual/:entryId/restore",
+
+  DOCUMENT_HARD_DELETE:
+    "/api/documents/hard/:documentId",  
 
   /* ====================================
      KNOWLEDGE EXPLORER
