@@ -26,7 +26,6 @@ const ManualEntriesSection = () => {
     submitting,
     error,
     successMessage,
-    isStatusStale,
     search,
     setSearch,
     page,
@@ -69,8 +68,6 @@ const ManualEntriesSection = () => {
     await reloadEntries(true)
   }, [reloadEntries])
 
-  const showSpinner = loading || isStatusStale
-
   return (
     <div className="flex h-full flex-col gap-5">
       {/* HEADER + REFRESH */}
@@ -93,11 +90,15 @@ const ManualEntriesSection = () => {
               refreshing || loading ? "animate-spin" : "group-hover:rotate-180"
             }`}
           />
-          <span>{refreshing || loading ? "Refreshing..." : "Refresh Entries"}</span>
+          <span>
+            {refreshing || loading
+              ? "Refreshing..."
+              : "Refresh Entries"}
+          </span>
         </button>
       </div>
 
-      {/* STATUS TABS — flat text tabs, no card */}
+      {/* STATUS TABS */}
       <div className="flex items-center gap-8 border-b theme-border px-4">
         {STATUS_TABS.map((tab) => {
           const active = activityFilter === tab.id
@@ -155,11 +156,8 @@ const ManualEntriesSection = () => {
       )}
 
       {/* CONTENT */}
-      <div
-        key={activityFilter}
-        className="flex-1 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-      >
-        {showSpinner ? (
+      <div className="flex-1 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {loading ? (
           <div className="flex h-full items-center justify-center">
             <LoadingSpinner label="Loading manual entries..." />
           </div>
