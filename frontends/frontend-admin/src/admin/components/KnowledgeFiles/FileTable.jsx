@@ -9,14 +9,21 @@ const FileTable = ({
   files = [],
   categories = [],
   onDelete,
+  onHardDelete,
   onRestore,
   onUpdate,
 }) => {
   const [editingFile, setEditingFile] = useState(null)
-  const hasFiles = files.length > 0
 
-  const tableRef = useRef(null)
-  useHorizontalDragScroll(tableRef)
+  const hasFiles =
+    files.length > 0
+
+  const tableRef =
+    useRef(null)
+
+  useHorizontalDragScroll(
+    tableRef
+  )
 
   return (
     <>
@@ -26,17 +33,31 @@ const FileTable = ({
       >
         <table className="w-full min-w-[1050px] border-separate border-spacing-0">
           <FileTableHeader />
+
           {hasFiles && (
             <tbody>
-              {files.map((file) => (
-                <FileTableRow
-                  key={file.document_id}
-                  file={file}
-                  onEdit={setEditingFile}
-                  onDelete={onDelete}
-                  onRestore={onRestore}
-                />
-              ))}
+              {files.map(
+                (file) => (
+                  <FileTableRow
+                    key={
+                      file.document_id
+                    }
+                    file={file}
+                    onEdit={
+                      setEditingFile
+                    }
+                    onDelete={
+                      onDelete
+                    }
+                    onHardDelete={
+                      onHardDelete
+                    }
+                    onRestore={
+                      onRestore
+                    }
+                  />
+                )
+              )}
             </tbody>
           )}
         </table>
@@ -52,10 +73,18 @@ const FileTable = ({
       </div>
 
       <EditFileModal
-        open={Boolean(editingFile)}
+        open={Boolean(
+          editingFile
+        )}
         file={editingFile}
-        categories={categories}
-        onClose={() => setEditingFile(null)}
+        categories={
+          categories
+        }
+        onClose={() =>
+          setEditingFile(
+            null
+          )
+        }
         onSave={onUpdate}
       />
     </>

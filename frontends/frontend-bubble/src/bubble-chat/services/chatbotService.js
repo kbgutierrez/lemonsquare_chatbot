@@ -31,6 +31,19 @@ const DEV_USER_TOKEN =
   "11318"
 
 /* ========================================
+   LOCKED SESSION STATUSES
+======================================== */
+
+const LOCKED_SESSION_STATUSES =
+  new Set([
+    "resolved",
+    "escalated",
+    "drafting_ticket",
+    "closed",
+    "locked",
+  ])
+
+/* ========================================
    HELPERS
 ======================================== */
 
@@ -66,6 +79,18 @@ const isValidToken = (
   token &&
   token !== "null" &&
   token !== "undefined"
+
+const normalizeStatus =
+  status =>
+    String(status || "")
+      .trim()
+      .toLowerCase()
+
+const isLockedStatus =
+  status =>
+    LOCKED_SESSION_STATUSES.has(
+      normalizeStatus(status)
+    )
 
 /* ========================================
    API REQUEST
@@ -376,11 +401,25 @@ const normalizeSession =
         session?.created_at
       )
 
+    const normalizedStatus =
+      normalizeStatus(
+        session?.status
+      )
+
+    const locked =
+      isLockedStatus(
+        normalizedStatus
+      )
+
     const resolved =
-      String(
-        session?.status || ""
-      ).toLowerCase() ===
+      normalizedStatus ===
       "resolved"
+
+    const escalated =
+      normalizedStatus ===
+        "escalated" ||
+      normalizedStatus ===
+        "drafting_ticket"
 
     return {
       id:
@@ -402,7 +441,17 @@ const normalizeSession =
           0
         ),
 
+      status:
+        normalizedStatus,
+
+      locked,
+
       resolved,
+
+      escalated,
+
+      ticketSubmitted:
+        escalated,
 
       resolvedAt:
         resolved

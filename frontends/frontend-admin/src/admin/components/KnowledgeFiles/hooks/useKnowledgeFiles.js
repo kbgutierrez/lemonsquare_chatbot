@@ -2,12 +2,15 @@ import { useCallback, useMemo, useState } from "react"
 import { API_CONFIG } from "../../../../shared/config/sqlVariables"
 import useLiveQuery from "../../../../shared/hooks/useLiveQuery"
 import { setCachedData } from "../../../../shared/cache/liveQueryCache"
+
 import {
   deleteKnowledgeFile,
   getKnowledgeFiles,
   restoreKnowledgeFile,
   updateKnowledgeFile,
+  hardDeleteKnowledgeFile,
 } from "../services/knowledgeFilesService"
+
 import aiSettingsService from "../../../services/aiSettingsService"
 
 export const useKnowledgeFiles = () => {
@@ -26,7 +29,9 @@ export const useKnowledgeFiles = () => {
     ])
 
     return {
-      files: Array.isArray(documents) ? documents : [],
+      files: Array.isArray(documents)
+        ? documents
+        : [],
       categories:
         settings?.AllowedCategories
           ?.split(",")
@@ -49,169 +54,379 @@ export const useKnowledgeFiles = () => {
   })
 
   const files = data?.files || []
-  const allowedCategories = data?.categories || []
+  const allowedCategories =
+    data?.categories || []
 
   /* ========================================
      STATUS STALE GUARD
-     — true when files don't match the tab
   ======================================== */
 
   const isStatusStale = useMemo(() => {
-    if (files.length === 0) return false
-    const expectedActive = selectedStatus === "active"
-    return files.some((f) => Boolean(f.is_active) !== expectedActive)
-  }, [files, selectedStatus])
+    if (files.length === 0) {
+      return false
+    }
+
+    const expectedActive =
+      selectedStatus === "active"
+
+    return files.some(
+      (f) =>
+        Boolean(f.is_active) !==
+        expectedActive
+    )
+  }, [
+    files,
+    selectedStatus,
+  ])
 
   /* ========================================
-     DELETE
+     ARCHIVE / SOFT DELETE
   ======================================== */
 
-  const handleDelete = useCallback(
-    async (documentId) => {
-      const confirmed = window.confirm(
-        "Are you sure you want to deactivate this document?"
-      )
-      if (!confirmed) return
+  const handleDelete =
+    useCallback(
+      async (documentId) => {
+        const previous =
+          structuredClone(data)
 
-      const previous = structuredClone(data)
+        try {
+          const optimistic = {
+            ...data,
 
-      try {
-        const optimistic = {
-          ...data,
-          files: files.filter(
-            (file) => file.document_id !== documentId
-          ),
+            files: files.filter(
+              (file) =>
+                file.document_id !==
+                documentId
+            ),
+          }
+
+          setCachedData(
+            CACHE_KEY,
+            optimistic
+          )
+
+          await deleteKnowledgeFile(
+            documentId
+          )
+
+          await refresh()
+        } catch (error) {
+          console.error(
+            "DELETE_DOCUMENT_ERROR",
+            error
+          )
+
+          setCachedData(
+            CACHE_KEY,
+            previous
+          )
+
+          await refresh()
         }
-        setCachedData(CACHE_KEY, optimistic)
-        await deleteKnowledgeFile(documentId)
-        await refresh()
-      } catch (error) {
-        console.error("DELETE_DOCUMENT_ERROR", error)
-        setCachedData(CACHE_KEY, previous)
-        await refresh()
-      }
-    },
-    [CACHE_KEY, data, files, refresh]
-  )
+      },
+      [
+        CACHE_KEY,
+        data,
+        files,
+        refresh,
+      ]
+    )
+
+  /* ========================================
+     HARD DELETE
+  ======================================== */
+
+  const handleHardDelete =
+    useCallback(
+      async (documentId) => {
+        const previous =
+          structuredClone(data)
+
+        try {
+          const optimistic = {
+            ...data,
+
+            files:
+              files.filter(
+                (file) =>
+                  file.document_id !==
+                  documentId
+              ),
+          }
+
+          setCachedData(
+            CACHE_KEY,
+            optimistic
+          )
+
+          await hardDeleteKnowledgeFile(
+            documentId
+          )
+
+          await refresh()
+        } catch (error) {
+          console.error(
+            "HARD_DELETE_DOCUMENT_ERROR",
+            error
+          )
+
+          setCachedData(
+            CACHE_KEY,
+            previous
+          )
+
+          await refresh()
+        }
+      },
+      [
+        CACHE_KEY,
+        data,
+        files,
+        refresh,
+      ]
+    )
 
   /* ========================================
      RESTORE
   ======================================== */
 
-  const handleRestore = useCallback(
-    async (documentId) => {
-      const confirmed = window.confirm(
-        "Restore this document back into the active knowledge base?"
-      )
-      if (!confirmed) return
+  const handleRestore =
+    useCallback(
+      async (documentId) => {
+        const previous =
+          structuredClone(data)
 
-      const previous = structuredClone(data)
+        try {
+          const optimistic = {
+            ...data,
 
-      try {
-        const optimistic = {
-          ...data,
-          files: files.filter(
-            (file) => file.document_id !== documentId
-          ),
+            files: files.filter(
+              (file) =>
+                file.document_id !==
+                documentId
+            ),
+          }
+
+          setCachedData(
+            CACHE_KEY,
+            optimistic
+          )
+
+          await restoreKnowledgeFile(
+            documentId
+          )
+
+          await refresh()
+        } catch (error) {
+          console.error(
+            "RESTORE_DOCUMENT_ERROR",
+            error
+          )
+
+          setCachedData(
+            CACHE_KEY,
+            previous
+          )
+
+          await refresh()
         }
-        setCachedData(CACHE_KEY, optimistic)
-        await restoreKnowledgeFile(documentId)
-        await refresh()
-      } catch (error) {
-        console.error("RESTORE_DOCUMENT_ERROR", error)
-        setCachedData(CACHE_KEY, previous)
-        await refresh()
-      }
-    },
-    [CACHE_KEY, data, files, refresh]
-  )
+      },
+      [
+        CACHE_KEY,
+        data,
+        files,
+        refresh,
+      ]
+    )
 
   /* ========================================
      UPDATE
   ======================================== */
 
-  const handleUpdate = useCallback(
-    async (documentId, payload) => {
-      const previous = structuredClone(data)
+  const handleUpdate =
+    useCallback(
+      async (
+        documentId,
+        payload
+      ) => {
+        const previous =
+          structuredClone(data)
 
-      try {
-        const optimistic = {
-          ...data,
-          files: files.map((file) =>
-            file.document_id === documentId
-              ? { ...file, ...payload }
-              : file
-          ),
+        try {
+          const optimistic = {
+            ...data,
+
+            files: files.map(
+              (file) =>
+                file.document_id ===
+                documentId
+                  ? {
+                      ...file,
+                      ...payload,
+                    }
+                  : file
+            ),
+          }
+
+          setCachedData(
+            CACHE_KEY,
+            optimistic
+          )
+
+          await updateKnowledgeFile(
+            documentId,
+            payload
+          )
+
+          await refresh()
+        } catch (error) {
+          console.error(
+            "UPDATE_DOCUMENT_ERROR",
+            error
+          )
+
+          setCachedData(
+            CACHE_KEY,
+            previous
+          )
+
+          await refresh()
+
+          throw error
         }
-        setCachedData(CACHE_KEY, optimistic)
-        await updateKnowledgeFile(documentId, payload)
-        await refresh()
-      } catch (error) {
-        console.error("UPDATE_DOCUMENT_ERROR", error)
-        setCachedData(CACHE_KEY, previous)
-        await refresh()
-        throw error
-      }
-    },
-    [CACHE_KEY, data, files, refresh]
-  )
+      },
+      [
+        CACHE_KEY,
+        data,
+        files,
+        refresh,
+      ]
+    )
 
   /* ========================================
      CATEGORIES
   ======================================== */
 
-  const fileCategories = useMemo(() => {
-    return [...new Set(files.map((f) => f.category).filter(Boolean))]
-  }, [files])
+  const fileCategories =
+    useMemo(() => {
+      return [
+        ...new Set(
+          files
+            .map(
+              (f) =>
+                f.category
+            )
+            .filter(Boolean)
+        ),
+      ]
+    }, [files])
 
-  const allCategories = useMemo(() => {
-    const base = allowedCategories.length ? allowedCategories : fileCategories
-    return [...new Set(base)]
-  }, [allowedCategories, fileCategories])
+  const allCategories =
+    useMemo(() => {
+      const base =
+        allowedCategories.length
+          ? allowedCategories
+          : fileCategories
 
-  const dynamicCategories = useMemo(() => {
-    return allCategories.map((category) => ({
-      id: category,
-      name: category.replaceAll("_", " "),
-    }))
-  }, [allCategories])
+      return [
+        ...new Set(base),
+      ]
+    }, [
+      allowedCategories,
+      fileCategories,
+    ])
+
+  const dynamicCategories =
+    useMemo(() => {
+      return allCategories.map(
+        (category) => ({
+          id: category,
+          name:
+            category.replaceAll(
+              "_",
+              " "
+            ),
+        })
+      )
+    }, [allCategories])
 
   /* ========================================
      FILTERED FILES
-     — SAFETY: only show files matching the tab
   ======================================== */
 
-  const filteredFiles = useMemo(() => {
-    const query = search.toLowerCase()
-    const expectedActive = selectedStatus === "active"
+  const filteredFiles =
+    useMemo(() => {
+      const query =
+        search.toLowerCase()
 
-    return files.filter((file) => {
-      const name = file.file_name || file.name || ""
-      const matchesCategory =
-        selectedCategory === "all" || file.category === selectedCategory
-      const matchesSearch = name.toLowerCase().includes(query)
-      const matchesStatus = Boolean(file.is_active) === expectedActive
-      return matchesCategory && matchesSearch && matchesStatus
-    })
-  }, [files, selectedCategory, search, selectedStatus])
+      const expectedActive =
+        selectedStatus ===
+        "active"
+
+      return files.filter(
+        (file) => {
+          const name =
+            file.file_name ||
+            file.name ||
+            ""
+
+          const matchesCategory =
+            selectedCategory ===
+              "all" ||
+            file.category ===
+              selectedCategory
+
+          const matchesSearch =
+            name
+              .toLowerCase()
+              .includes(query)
+
+          const matchesStatus =
+            Boolean(
+              file.is_active
+            ) ===
+            expectedActive
+
+          return (
+            matchesCategory &&
+            matchesSearch &&
+            matchesStatus
+          )
+        }
+      )
+    }, [
+      files,
+      selectedCategory,
+      search,
+      selectedStatus,
+    ])
 
   return {
     files,
     loading,
     refreshing,
     error,
+
     isStatusStale,
+
     search,
     setSearch,
+
     selectedCategory,
     setSelectedCategory,
+
     selectedStatus,
     setSelectedStatus,
+
     dynamicCategories,
     allCategories,
+
     filteredFiles,
+
     loadFiles: refresh,
+
     handleDelete,
+    handleHardDelete,
     handleRestore,
     handleUpdate,
   }

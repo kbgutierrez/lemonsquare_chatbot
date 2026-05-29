@@ -17,6 +17,7 @@ const ChatFooterInput = ({
   setMessage,
   loading,
   resolved,
+  sessionTicketSubmitted,
   onKeyDown,
   onSend,
 }) => {
@@ -26,14 +27,17 @@ const ChatFooterInput = ({
   const canSend =
     !loading &&
     !resolved &&
+    !sessionTicketSubmitted &&
     !!message?.trim()
 
   const placeholder =
-    resolved
-      ? "Resolved conversations are read-only."
-      : loading
-        ? "AI is replying..."
-        : "Ask LemonSquare AI..."
+    sessionTicketSubmitted
+      ? "This chat session is now closed."
+      : resolved
+        ? "Resolved conversations are read-only."
+        : loading
+          ? "AI is replying..."
+          : "Ask LemonSquare AI..."
 
   const handleSend =
     () => canSend && onSend?.()
@@ -123,7 +127,7 @@ const ChatFooterInput = ({
 
         value={message}
 
-        disabled={resolved}
+        disabled={resolved || sessionTicketSubmitted}
 
         maxLength={MAX_MESSAGE_LENGTH}
 
@@ -305,7 +309,7 @@ const ChatFooterInput = ({
               color: theme.sendButtonIcon,
             }}
           />
-        ) : resolved ? (
+        ) : resolved || sessionTicketSubmitted ? (
           <Lock
             className="
               relative

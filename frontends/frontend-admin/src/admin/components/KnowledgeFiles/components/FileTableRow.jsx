@@ -6,6 +6,7 @@ const FileTableRow = ({
   file,
   onEdit,
   onDelete,
+  onHardDelete,
   onRestore,
   deleting,
 }) => {
@@ -14,7 +15,8 @@ const FileTableRow = ({
     return new Date(date).toLocaleString()
   }
 
-  const cellClass = "border-b theme-border px-5 py-3.5"
+  const cellClass =
+    "border-b theme-border px-5 py-3.5"
 
   return (
     <tr className="group transition-colors duration-200 hover:bg-[var(--panel-light)]">
@@ -22,10 +24,12 @@ const FileTableRow = ({
       <td className={cellClass}>
         <div className="flex items-center gap-3">
           <FileText className="h-5 w-5 shrink-0 text-[var(--accent)]" />
+
           <div className="min-w-0">
             <p className="truncate text-[13px] font-medium text-[var(--text-primary)]">
               {file.file_name}
             </p>
+
             <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
               PDF Document
             </p>
@@ -35,17 +39,25 @@ const FileTableRow = ({
 
       {/* CATEGORY */}
       <td className={cellClass}>
-        <CategoryBadge category={file.category} />
+        <CategoryBadge
+          category={file.category}
+        />
       </td>
 
       {/* CHUNKS */}
-      <td className={`${cellClass} text-[13px] font-medium text-[var(--text-primary)]`}>
+      <td
+        className={`${cellClass} text-[13px] font-medium text-[var(--text-primary)]`}
+      >
         {file.chunk_count}
       </td>
 
       {/* DATE */}
-      <td className={`${cellClass} text-[13px] text-[var(--text-secondary)]`}>
-        {formatDate(file.uploaded_at)}
+      <td
+        className={`${cellClass} text-[13px] text-[var(--text-secondary)]`}
+      >
+        {formatDate(
+          file.uploaded_at
+        )}
       </td>
 
       {/* ACTIONS */}
@@ -55,6 +67,9 @@ const FileTableRow = ({
           deleting={deleting}
           onEdit={onEdit}
           onDelete={onDelete}
+          onHardDelete={
+            onHardDelete
+          }
           onRestore={onRestore}
         />
       </td>

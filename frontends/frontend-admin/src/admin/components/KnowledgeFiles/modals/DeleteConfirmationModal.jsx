@@ -18,11 +18,11 @@ const DeleteConfirmationModal = ({
   open,
   file,
   deleting,
+  mode = "archive",
 
   onClose,
   onConfirm,
 }) => {
-
   const modalRef =
     useRef(null)
 
@@ -30,6 +30,9 @@ const DeleteConfirmationModal = ({
     mounted,
     setMounted,
   ] = useState(false)
+
+  const isHardDelete =
+    mode === "hard-delete"
 
   /* ========================================
      MOUNT
@@ -44,7 +47,6 @@ const DeleteConfirmationModal = ({
   ======================================== */
 
   useEffect(() => {
-
     if (!open) {
       return
     }
@@ -60,7 +62,6 @@ const DeleteConfirmationModal = ({
       document.body.style.overflow =
         originalOverflow
     }
-
   }, [open])
 
   /* ========================================
@@ -68,14 +69,12 @@ const DeleteConfirmationModal = ({
   ======================================== */
 
   useEffect(() => {
-
     if (!open) {
       return
     }
 
     const handleEscape =
       (event) => {
-
         if (
           event.key ===
           "Escape"
@@ -95,7 +94,6 @@ const DeleteConfirmationModal = ({
         handleEscape
       )
     }
-
   }, [
     open,
     onClose,
@@ -106,14 +104,12 @@ const DeleteConfirmationModal = ({
   ======================================== */
 
   useEffect(() => {
-
     if (!open) {
       return
     }
 
     const handleOutsideClick =
       (event) => {
-
         if (
           modalRef.current &&
           !modalRef.current.contains(
@@ -135,7 +131,6 @@ const DeleteConfirmationModal = ({
         handleOutsideClick
       )
     }
-
   }, [
     open,
     onClose,
@@ -164,12 +159,14 @@ const DeleteConfirmationModal = ({
       "
     >
       {/* BACKDROP */}
+
       <div
         className="
           absolute
           inset-0
 
           backdrop-blur-md
+          animate-fade-in
         "
         style={{
           background:
@@ -177,10 +174,10 @@ const DeleteConfirmationModal = ({
         }}
       />
 
-      {/* MODAL CARD */}
+      {/* MODAL */}
+
       <div
         ref={modalRef}
-
         className="
           modal-surface
 
@@ -191,11 +188,13 @@ const DeleteConfirmationModal = ({
           max-w-[500px]
 
           overflow-hidden
-
           rounded-[32px]
+
+          animate-slide-in
         "
       >
         {/* HEADER */}
+
         <div
           className="
             flex
@@ -214,7 +213,6 @@ const DeleteConfirmationModal = ({
               gap-4
             "
           >
-            {/* ICON */}
             <div
               className="
                 flex
@@ -246,7 +244,6 @@ const DeleteConfirmationModal = ({
               />
             </div>
 
-            {/* TEXT */}
             <div>
               <h2
                 className="
@@ -258,13 +255,14 @@ const DeleteConfirmationModal = ({
                     "var(--text-primary)",
                 }}
               >
-                Archive Document
+                {isHardDelete
+                  ? "Permanently Delete Document"
+                  : "Archive Document"}
               </h2>
 
               <p
                 className="
                   mt-2
-
                   text-sm
                   leading-relaxed
                 "
@@ -273,17 +271,15 @@ const DeleteConfirmationModal = ({
                     "var(--text-secondary)",
                 }}
               >
-                Are you sure you want
-                to archive this knowledge
-                file?
+                {isHardDelete
+                  ? "This will permanently remove the document from the database and AI Brain. This action cannot be undone."
+                  : "Are you sure you want to archive this knowledge file?"}
               </p>
             </div>
           </div>
 
-          {/* CLOSE */}
           <button
             onClick={onClose}
-
             className="
               hover-surface
 
@@ -296,6 +292,12 @@ const DeleteConfirmationModal = ({
 
               rounded-xl
               border
+
+              transition-all
+              duration-200
+
+              hover:scale-105
+              active:scale-95
             "
             style={{
               borderColor:
@@ -312,13 +314,13 @@ const DeleteConfirmationModal = ({
           </button>
         </div>
 
-        {/* FILE CARD */}
+        {/* FILE */}
+
         <div className="px-6 pt-5">
           <div
             className="
               rounded-2xl
               border
-
               p-4
             "
             style={{
@@ -347,9 +349,7 @@ const DeleteConfirmationModal = ({
             <p
               className="
                 mt-2
-
                 break-all
-
                 text-sm
                 font-semibold
               "
@@ -364,6 +364,7 @@ const DeleteConfirmationModal = ({
         </div>
 
         {/* ACTIONS */}
+
         <div
           className="
             flex
@@ -373,10 +374,8 @@ const DeleteConfirmationModal = ({
             py-6
           "
         >
-          {/* CANCEL */}
           <button
             onClick={onClose}
-
             className="
               hover-surface
 
@@ -388,6 +387,12 @@ const DeleteConfirmationModal = ({
               py-3
 
               font-medium
+
+              transition-all
+              duration-200
+
+              hover:scale-[1.02]
+              active:scale-[0.98]
             "
             style={{
               borderColor:
@@ -403,16 +408,13 @@ const DeleteConfirmationModal = ({
             Cancel
           </button>
 
-          {/* ARCHIVE */}
           <button
             disabled={deleting}
-
             onClick={() =>
               onConfirm?.(
                 file.document_id
               )
             }
-
             className="
               flex
               w-full
@@ -428,6 +430,9 @@ const DeleteConfirmationModal = ({
 
               transition-all
               duration-200
+
+              hover:scale-[1.02]
+              active:scale-[0.98]
 
               disabled:cursor-not-allowed
               disabled:opacity-70
@@ -448,8 +453,16 @@ const DeleteConfirmationModal = ({
             />
 
             {deleting
-              ? "Archiving..."
-              : "Archive File"}
+              ? (
+                  isHardDelete
+                    ? "Deleting..."
+                    : "Archiving..."
+                )
+              : (
+                  isHardDelete
+                    ? "Delete Permanently"
+                    : "Archive File"
+                )}
           </button>
         </div>
       </div>
