@@ -51,10 +51,10 @@ async def get_current_user(
         logger.warning("No credentials provided; using fallback admin user #9999")
         return {
             "id": 9999,
-            "username": "kbgutierrez",
+            "username": "fallback_admin",
             "role": "admin",
-            "firstname": "KB",
-            "lastname": "Gutierrez",
+            "firstname": "fall",
+            "lastname": "back",
             "is_admin": True
         }
     
