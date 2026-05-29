@@ -86,20 +86,7 @@ const useManualEntries = () => {
     return Array.isArray(data?.allowedCategories) ? data.allowedCategories : []
   }, [data])
 
-  /* ========================================
-     STATUS STALE GUARD
-  ======================================== */
-
-  const isStatusStale = useMemo(() => {
-    if (safeItems.length === 0) return false
-    const first = safeItems[0]
-    if (first?.is_active !== undefined) {
-      const expected = activityFilter === "active"
-      return Boolean(first.is_active) !== expected
-    }
-    return false
-  }, [safeItems, activityFilter])
-
+ 
   /* ========================================
      SUCCESS AUTO CLEAR
   ======================================== */
@@ -585,7 +572,6 @@ const useManualEntries = () => {
     submitting,
     error,
     successMessage,
-    isStatusStale,
     search,
     setSearch,
     page,

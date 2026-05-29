@@ -119,8 +119,20 @@ export const pollUploadStatus = async (jobId, onStatusChange, intervalMs = 3000,
         throw new Error(response.error || "Upload processing failed.")
       }
 
-      if (onStatusChange && typeof onStatusChange === "function") {
-        onStatusChange(response.status)
+      if (
+        onStatusChange &&
+        typeof onStatusChange === "function"
+      ) {
+        onStatusChange({
+          status:
+            response.status,
+
+          progress:
+            response.progress_percent,
+
+          message:
+            response.message,
+        })
       }
 
       // If queued or running, wait and try again

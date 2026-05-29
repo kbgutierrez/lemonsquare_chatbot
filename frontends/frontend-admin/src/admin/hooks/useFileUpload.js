@@ -407,88 +407,113 @@ export const useFileUpload =
                 }
               )
 
-              const details = await pollUploadStatus(data.job_id, (status) => {
-                const displayStatus = status === "queued" ? "Queued..." : "Processing...";
+              const details = await pollUploadStatus(
+                data.job_id,
+                ({
+                  status,
+                  progress,
+                  message,
+                }) => {
+
+                  setUploadProgress(
+                    Math.round(
+                      progress || 0
+                    )
+                  )
+
+                 
+                  updateFile(
+                  localId,
+                  {
+                    status:
+                      message ||
+                      (
+                        status === "queued"
+                          ? "Queued..."
+                          : "Processing..."
+                      ),
+
+                    statusType:
+                      "loading",
+                  }
+                )
+                }
+                )
+
+                setUploadProgress(100)
+
                 updateFile(
                   localId,
                   {
-                    status: displayStatus,
-                    statusType: "loading",
+                    status:
+                      "Uploaded",
+
+                    statusType:
+                      "success",
+
+                    response:
+                      details,
+
+                    category:
+                      details?.category || file.category,
                   }
                 )
-              })
-              
-              updateFile(
-                localId,
-                {
-                  status:
-                    "Uploaded",
+                } else {
+                  setUploadProgress(100)
 
-                  statusType:
-                    "success",
+                  updateFile(
+                    localId,
+                    {
+                      status:
+                        "Uploaded",
 
-                  response:
-                    details,
-                    
-                  category:
-                    details?.category || file.category,
+                      statusType:
+                        "success",
+
+                      response:
+                        data,
+                    }
+                  )
                 }
-              )
-            } else {
-              updateFile(
-                localId,
-                {
-                  status:
-                    "Uploaded",
 
-                  statusType:
-                    "success",
+                } catch (error) {
 
-                  response:
-                    data,
+                  const msg =
+                    String(
+                      error?.message ||
+                        ""
+                    ).toLowerCase()
+
+                  const duplicate =
+                    msg.includes(
+                      "already"
+                    ) ||
+                    msg.includes(
+                      "exists"
+                    ) ||
+                    msg.includes(
+                      "duplicate"
+                    )
+
+                  updateFile(
+                    localId,
+                    {
+                      status:
+                        duplicate
+                          ? "Already Exists"
+                          : error.message ||
+                            "Upload Failed",
+
+                      statusType:
+                        duplicate
+                          ? "warning"
+                          : "error",
+                    }
+                  )
                 }
-              )
-            }
-
-          } catch (error) {
-
-            const msg =
-              String(
-                error?.message ||
-                  ""
-              ).toLowerCase()
-
-            const duplicate =
-              msg.includes(
-                "already"
-              ) ||
-              msg.includes(
-                "exists"
-              ) ||
-              msg.includes(
-                "duplicate"
-              )
-
-            updateFile(
-              localId,
-              {
-                status:
-                  duplicate
-                    ? "Already Exists"
-                    : error.message ||
-                      "Upload Failed",
-
-                statusType:
-                  duplicate
-                    ? "warning"
-                    : "error",
-              }
-            )
-          }
-        },
-        [updateFile]
-      )
-
+                },
+                [updateFile]
+                )
     /* ========================================
        CONFIRM UPLOAD
     ======================================== */
@@ -563,16 +588,6 @@ export const useFileUpload =
                   )
 
                   completed += 1
-
-                  setUploadProgress(
-                    Math.round(
-                      (
-                        completed /
-                        pending.length
-                      ) *
-                        100
-                    )
-                  )
                 }
               )
             )
