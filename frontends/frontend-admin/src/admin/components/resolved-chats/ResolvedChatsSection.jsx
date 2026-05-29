@@ -8,6 +8,9 @@ import ResolvedChatsPagination from "./components/ResolvedChatsPagination"
 import ResolvedChatCard from "./components/ResolvedChatCard"
 import LoadingSpinner from "../../../shared/components/LoadingSpinner"
 
+import ExportResolvedChatsModal
+  from "./modals/ExportResolvedChatsModal"
+
 const ITEMS_PER_PAGE = 6
 
 const FILTERS = [
@@ -19,6 +22,12 @@ const ResolvedChatsSection = () => {
   const [lifecycleFilter, setLifecycleFilter] = useState("active")
   const [search, setSearch] = useState("")
   const [page, setPage] = useState(1)
+
+
+  const [
+    exportModalOpen,
+    setExportModalOpen,
+  ] = useState(false)
 
   const {
     items,
@@ -77,6 +86,8 @@ const ResolvedChatsSection = () => {
     }
   }, [totalPages, page])
 
+
+  
   /* ========================================
      HANDLERS
   ======================================== */
@@ -102,7 +113,13 @@ const ResolvedChatsSection = () => {
   return (
     <div className="flex h-full flex-col gap-5">
       {/* HEADER */}
-      <ResolvedChatsHeader search={search} setSearch={setSearch} />
+      <ResolvedChatsHeader
+        search={search}
+        setSearch={setSearch}
+        onExport={() =>
+          setExportModalOpen(true)
+        }
+      />
 
       {/* FILTERS — flat text tabs, no card */}
       <div className="flex items-center gap-8 border-b theme-border px-4">
@@ -164,6 +181,16 @@ const ResolvedChatsSection = () => {
           </div>
         )}
       </div>
+
+      {
+        exportModalOpen && (
+          <ExportResolvedChatsModal
+            onClose={() =>
+              setExportModalOpen(false)
+            }
+          />
+        )
+      }  
 
       {/* PAGINATION */}
       <ResolvedChatsPagination page={page} setPage={setPage} totalPages={totalPages} />

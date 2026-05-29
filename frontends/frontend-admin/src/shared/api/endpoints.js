@@ -65,6 +65,12 @@ export const API_ENDPOINTS = {
 
   KNOWLEDGE_EXPLORE:
     "/api/knowledge/explore",
+  
+  KNOWLEDGE_EXPORT_LEARNED_CHATS:
+  "/api/knowledge/export/learned-chats",  
+
+  KNOWLEDGE_EXPORT_LEARNED_CHATS:
+    "/api/knowledge/export/learned-chats",  
 
   /* ====================================
      CHAT
