@@ -82,6 +82,28 @@ const UploadTableRow = ({
             >
               {file.type}
             </p>
+
+            {file.created_by_username && (
+              <p
+                className="mt-1 text-[11px]"
+                style={{
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Created By: {file.created_by_username}
+              </p>
+            )}
+
+            {file.updated_by_username && (
+              <p
+                className="text-[11px]"
+                style={{
+                  color: "var(--text-secondary)",
+                }}
+              >
+                Updated By: {file.updated_by_username}
+              </p>
+            )}
           </div>
         </div>
       </td>

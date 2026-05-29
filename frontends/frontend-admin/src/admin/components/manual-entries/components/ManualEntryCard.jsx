@@ -302,6 +302,42 @@ const ManualEntryCard = ({
                     />
 
                     <FieldBlock
+                      title="Created By"
+                      value={item.created_by_username}
+                      color="text-emerald-400"
+                    />
+
+                    <FieldBlock
+                      title="Updated By"
+                      value={item.updated_by_username}
+                      color="text-sky-400"
+                    />
+
+                    <FieldBlock
+                      title="Created By"
+                      value={item.created_by_username}
+                      color="text-emerald-400"
+                    />
+
+                    <FieldBlock
+                      title="Updated By"
+                      value={item.updated_by_username}
+                      color="text-sky-400"
+                    />
+
+                    <FieldBlock
+                      title="Last Modified"
+                      value={
+                        item.updated_at
+                          ? new Date(
+                              item.updated_at
+                            ).toLocaleString()
+                          : "-"
+                      }
+                      color="text-amber-400"
+                    />
+
+                    <FieldBlock
                       title="Knowledge Content"
                       value={form.content}
                       color="text-[var(--accent)]"

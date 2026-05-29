@@ -33,6 +33,30 @@ const FileTableRow = ({
             <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
               PDF Document
             </p>
+
+            {file.created_by_username && (
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Created By: {file.created_by_username}
+              </p>
+            )}
+
+            {file.updated_by_username && (
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Updated By: {file.updated_by_username}
+              </p>
+            )}
+
+            {file.uploaded_by_username && (
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Uploaded By: {file.uploaded_by_username}
+              </p>
+            )}
+
+            {file.updated_at && (
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                Last Modified: {formatDate(file.updated_at)}
+              </p>
+            )}
           </div>
         </div>
       </td>

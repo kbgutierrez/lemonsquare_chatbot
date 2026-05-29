@@ -44,6 +44,26 @@ const normalizeManualEntry = (
       item.updated_at ??
       null,
 
+    created_by:
+      item.CreatedBy ??
+      item.created_by ??
+      null,
+
+    created_by_username:
+      item.CreatedByUsername ??
+      item.created_by_username ??
+      null,
+
+    updated_by:
+      item.UpdatedBy ??
+      item.updated_by ??
+      null,
+
+    updated_by_username:
+      item.UpdatedByUsername ??
+      item.updated_by_username ??
+      null,
+
     is_active:
       item.IsActive ??
       item.is_active ??

@@ -165,14 +165,31 @@ const request = async ({
        HEADER SAFETY LAYER
     ======================================== */
 
+    const auditToken =
+  localStorage.getItem(
+    "admin_user_token"
+  )
+
+const authorizationHeaders =
+  auditToken
+    ? {
+        Authorization:
+          `Bearer ${auditToken}`,
+      }
+    : {}
+
     const finalHeaders =
       isFormData
-        ? headers
+        ? {
+            ...authorizationHeaders,
+            ...headers,
+          }
         : {
             "Content-Type":
               "application/json",
 
             ...API_CONFIG.HEADERS,
+            ...authorizationHeaders,
             ...headers,
           }
 
@@ -197,6 +214,28 @@ const request = async ({
       : null
 
     if (!response.ok) {
+
+      if (
+        response.status === 401
+      ) {
+
+        localStorage.removeItem(
+          "admin_auth"
+        )
+
+        localStorage.removeItem(
+          "admin_user"
+        )
+
+        localStorage.removeItem(
+          "admin_user_token"
+        )
+
+        setTimeout(() => {
+          window.location.reload()
+        }, 50)
+      }
+
       throw new Error(
         extractErrorMessage(
           data,

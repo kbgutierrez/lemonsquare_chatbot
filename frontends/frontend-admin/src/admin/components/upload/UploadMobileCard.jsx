@@ -230,9 +230,6 @@ const UploadMobileCard = ({
       {/* FOOTER */}
       <div
         className="
-          flex
-          items-center
-          justify-between
           px-4
           py-3
         "
@@ -240,31 +237,59 @@ const UploadMobileCard = ({
           borderTop: "1px solid var(--border)",
         }}
       >
-        <span
-          className="
-            text-[10px]
-            font-semibold
-            uppercase
-            tracking-[0.18em]
-          "
-          style={{
-            color: "var(--text-muted)",
-          }}
-        >
-          Uploaded
-        </span>
+        <div className="space-y-2">
 
-        <span
-          className="
-            text-xs
-            font-medium
-          "
-          style={{
-            color: "var(--text-secondary)",
-          }}
-        >
-          {file.uploadedAt}
-        </span>
+          <div className="flex items-center justify-between">
+            <span
+              className="
+                text-[10px]
+                font-semibold
+                uppercase
+                tracking-[0.18em]
+              "
+              style={{
+                color: "var(--text-muted)",
+              }}
+            >
+              Uploaded
+            </span>
+
+            <span
+              className="
+                text-xs
+                font-medium
+              "
+              style={{
+                color: "var(--text-secondary)",
+              }}
+            >
+              {file.uploadedAt}
+            </span>
+          </div>
+
+          {file.created_by_username && (
+            <div
+              className="text-xs"
+              style={{
+                color: "var(--text-secondary)",
+              }}
+            >
+              Created By: {file.created_by_username}
+            </div>
+          )}
+
+          {file.updated_by_username && (
+            <div
+              className="text-xs"
+              style={{
+                color: "var(--text-secondary)",
+              }}
+            >
+              Updated By: {file.updated_by_username}
+            </div>
+          )}
+
+        </div>
       </div>
     </div>
   )
