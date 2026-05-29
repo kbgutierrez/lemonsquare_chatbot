@@ -290,26 +290,8 @@ const ManualEntryCard = ({
                 {!editing ? (
                   <div className="divide-y theme-border">
                     <FieldBlock
-                      title="Title"
-                      value={form.title}
-                      color="text-[var(--accent-green)]"
-                    />
-
-                    <FieldBlock
                       title="Category"
                       value={form.category}
-                      color="text-sky-400"
-                    />
-
-                    <FieldBlock
-                      title="Created By"
-                      value={item.created_by_username}
-                      color="text-emerald-400"
-                    />
-
-                    <FieldBlock
-                      title="Updated By"
-                      value={item.updated_by_username}
                       color="text-sky-400"
                     />
 
