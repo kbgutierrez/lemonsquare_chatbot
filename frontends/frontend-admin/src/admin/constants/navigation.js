@@ -7,6 +7,7 @@ import {
   MessagesSquare,
   Bug,
   LayoutDashboard,
+  TriangleAlert,
 } from "lucide-react"
 
 export const navigationItems = [
@@ -56,6 +57,13 @@ export const navigationItems = [
     id: "ai",
     label: "AI Configuration",
     icon: BrainCircuit,
+  },
+
+  {
+    id: "danger_zone",
+    label: "Danger Zone",
+    icon: TriangleAlert,
+    danger: true,
   },
 ]
 

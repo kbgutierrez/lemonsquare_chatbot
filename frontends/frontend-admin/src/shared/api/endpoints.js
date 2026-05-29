@@ -55,6 +55,9 @@ export const API_ENDPOINTS = {
 
   DOCUMENT_HARD_DELETE:
     "/api/documents/hard/:documentId",  
+    
+  MAINTENANCE_WIPE_ALL:
+    "/api/maintenance/wipe-all",  
 
   /* ====================================
      KNOWLEDGE EXPLORER

@@ -22,6 +22,9 @@ import AISettingsPanel
 import AnalyticsSection
   from "../components/analytics/AnalyticsSection"
 
+import DangerZoneSection
+  from "../components/danger-zone/DangerZoneSection"
+
 export const adminSections = {
   analytics:
     AnalyticsSection,
@@ -46,6 +49,9 @@ export const adminSections = {
 
   ai:
     AISettingsPanel,
+
+  danger_zone:
+    DangerZoneSection,
 }
 
 export default adminSections
