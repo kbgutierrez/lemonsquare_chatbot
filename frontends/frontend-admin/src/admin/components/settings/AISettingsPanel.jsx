@@ -99,16 +99,14 @@ const AISettingsPanel = () => {
         />
         <div className="grid gap-5 xl:grid-cols-2">
           <SettingsSelect
-            label="Conversation Resolution Model"
-            value={settings.ConversationResolutionModel}
-            onChange={(e) => bind("ConversationResolutionModel")(e.target.value)}
-            options={[
-              {
-                value: "",
-                label: "Use Primary LLM",
-              },
-              ...llmOptions,
-            ]}
+            label="Active Model"
+            value={settings.ActiveModel}
+            onChange={(e) =>
+              bind("ActiveModel")(
+                e.target.value
+              )
+            }
+            options={llmOptions}
           />
         </div>
       </div>
@@ -120,22 +118,7 @@ const AISettingsPanel = () => {
           description="Manage retrieval, reranking, embeddings, and response behavior."
         />
         <div className="grid gap-5 xl:grid-cols-2">
-          <SettingsSelect
-            label="Chat Extraction Model"
-            value={settings.ChatExtractionModel}
-            onChange={(e) =>
-              bind("ChatExtractionModel")(
-                e.target.value
-              )
-            }
-            options={[
-              {
-                value: "",
-                label: "Use Primary LLM",
-              },
-              ...llmOptions,
-            ]}
-          />
+          
 
           <SettingsSelect
             label="Reformulator Model"
@@ -197,6 +180,22 @@ const AISettingsPanel = () => {
           description="Dedicated LLMs for specific pipeline stages. Leave empty to use the Primary LLM as fallback."
         />
         <div className="grid gap-5 xl:grid-cols-2">
+          <SettingsSelect
+            label="Chat Extraction Model"
+            value={settings.ChatExtractionModel}
+            onChange={(e) =>
+              bind("ChatExtractionModel")(
+                e.target.value
+              )
+            }
+            options={[
+              {
+                value: "",
+                label: "Use Primary LLM",
+              },
+              ...llmOptions,
+            ]}
+          />
           <SettingsSelect
             label="Escalation Draft Model"
             value={settings.EscalationDraftModel}
