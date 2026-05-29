@@ -42,6 +42,7 @@ const ManualEntriesSection = () => {
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleHardDeleteEntry,
     handleRestoreEntry,
     reloadEntries,
     setEditingState,
@@ -101,6 +102,7 @@ const ManualEntriesSection = () => {
         {STATUS_TABS.map((tab) => {
           const active = activityFilter === tab.id
           const Icon = tab.icon
+
           return (
             <button
               key={tab.id}
@@ -111,8 +113,16 @@ const ManualEntriesSection = () => {
                   : "text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
               }`}
             >
-              <Icon className={`h-4 w-4 ${active ? "text-[var(--accent)]" : "text-[var(--text-muted)]"}`} />
+              <Icon
+                className={`h-4 w-4 ${
+                  active
+                    ? "text-[var(--accent)]"
+                    : "text-[var(--text-muted)]"
+                }`}
+              />
+
               {tab.label}
+
               {active && (
                 <div className="absolute bottom-0 left-0 h-[2px] w-full bg-[var(--accent)]" />
               )}
@@ -138,10 +148,13 @@ const ManualEntriesSection = () => {
 
       {/* ERROR */}
       {error && !loading && (
-        <ErrorState title="Manual Entries Error" message={error} />
+        <ErrorState
+          title="Manual Entries Error"
+          message={error}
+        />
       )}
 
-      {/* CONTENT — no card, blends into page */}
+      {/* CONTENT */}
       <div
         key={activityFilter}
         className="flex-1 overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
@@ -165,6 +178,7 @@ const ManualEntriesSection = () => {
                 allowedCategories={allowedCategories}
                 handleUpdateEntry={handleUpdateEntry}
                 handleDeleteEntry={handleDeleteEntry}
+                handleHardDeleteEntry={handleHardDeleteEntry}
                 handleRestoreEntry={handleRestoreEntry}
                 openEditModal={openEditModal}
               />
@@ -174,7 +188,11 @@ const ManualEntriesSection = () => {
       </div>
 
       {/* PAGINATION */}
-      <ManualEntriesPagination page={page} setPage={setPage} totalPages={totalPages} />
+      <ManualEntriesPagination
+        page={page}
+        setPage={setPage}
+        totalPages={totalPages}
+      />
 
       {/* MODAL */}
       <ManualEntryModal

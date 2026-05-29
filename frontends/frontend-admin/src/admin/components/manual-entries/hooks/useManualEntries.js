@@ -7,6 +7,7 @@ import {
   createManualEntry,
   updateManualEntry,
   deleteManualEntry,
+  hardDeleteManualEntry,
   restoreManualEntry,
 } from "../services/manualEntriesService"
 import aiSettingsService from "../../../services/aiSettingsService"
@@ -149,28 +150,52 @@ const useManualEntries = () => {
         .filter(Boolean)
         .join(" ")
         .toLowerCase()
+
       const matchesSearch = text.includes(query)
-      const matchesCategory = activeCategory === "All" || item.category === activeCategory
+
+      const matchesCategory =
+        activeCategory === "All" ||
+        item.category === activeCategory
+
       const matchesActivity =
         activityFilter === "all"
           ? true
           : activityFilter === "active"
             ? item.is_active === true
             : item.is_active === false
-      return matchesSearch && matchesCategory && matchesActivity
+
+      return (
+        matchesSearch &&
+        matchesCategory &&
+        matchesActivity
+      )
     })
-  }, [safeItems, search, activeCategory, activityFilter])
+  }, [
+    safeItems,
+    search,
+    activeCategory,
+    activityFilter,
+  ])
 
   /* ========================================
      PAGINATION
   ======================================== */
 
   const totalPages = useMemo(() => {
-    return Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+    return Math.max(
+      1,
+      Math.ceil(
+        filtered.length /
+        ITEMS_PER_PAGE
+      )
+    )
   }, [filtered])
 
   const paginatedItems = useMemo(() => {
-    return filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+    return filtered.slice(
+      (page - 1) * ITEMS_PER_PAGE,
+      page * ITEMS_PER_PAGE
+    )
   }, [filtered, page])
 
   /* ========================================
@@ -198,13 +223,20 @@ const useManualEntries = () => {
   const handleCreateEntry = useCallback(
     async (form, resetForm, closeModal) => {
       setError("")
-      if (!form.title?.trim() || !form.content?.trim()) {
-        setError("Title and content are required.")
+
+      if (
+        !form.title?.trim() ||
+        !form.content?.trim()
+      ) {
+        setError(
+          "Title and content are required."
+        )
         return
       }
 
       try {
         setSubmitting(true)
+
         const optimistic = {
           id: `temp-${Date.now()}`,
           title: form.title,
@@ -212,36 +244,54 @@ const useManualEntries = () => {
           category: form.category || "General",
           is_active: true,
         }
+
         setCachedData(CACHE_KEY, {
           ...data,
           items: [optimistic, ...safeItems],
         })
-        const response = await createManualEntry(form)
-        
-        // CRITICAL: Exit editing state BEFORE reloading
-        // so the guard in reloadEntries doesn't block the sync
+
+        const response =
+          await createManualEntry(form)
+
         setEditingState(false)
+
         await reloadEntries(true)
-        
+
         if (mountedRef.current) {
           setSuccessMessage(
             `AI categorized entry as ${response?.category || form?.category || "General"}`
           )
+
           resetForm?.()
           closeModal?.()
         }
+
       } catch (error) {
-        // Even on error, we should reload to clear the optimistic temp ID
+
         setEditingState(false)
+
         await reloadEntries(true)
+
         if (mountedRef.current) {
-          setError(error.message || "Failed to create entry.")
+          setError(
+            error.message ||
+            "Failed to create entry."
+          )
         }
+
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (mountedRef.current) {
+          setSubmitting(false)
+        }
       }
     },
-    [data, safeItems, reloadEntries, setEditingState]
+    [
+      data,
+      safeItems,
+      reloadEntries,
+      setEditingState,
+    ]
   )
 
   /* ========================================
@@ -251,34 +301,70 @@ const useManualEntries = () => {
   const handleUpdateEntry = useCallback(
     async (entryId, form, onFinish) => {
       setError("")
+
       const previous = data
 
       try {
         setSubmitting(true)
-        const optimistic = safeItems.map((item) =>
-          item.id === entryId ? { ...item, ...form } : item
+
+        const optimistic =
+          safeItems.map((item) =>
+            item.id === entryId
+              ? { ...item, ...form }
+              : item
+          )
+
+        setCachedData(CACHE_KEY, {
+          ...data,
+          items: optimistic,
+        })
+
+        await updateManualEntry(
+          entryId,
+          form
         )
-        setCachedData(CACHE_KEY, { ...data, items: optimistic })
-        await updateManualEntry(entryId, form)
-        
+
         setEditingState(false)
+
         await reloadEntries(true)
-        
+
         if (mountedRef.current) {
-          setSuccessMessage("Entry updated successfully")
+          setSuccessMessage(
+            "Entry updated successfully"
+          )
+
           onFinish?.()
         }
+
       } catch (error) {
+
         setEditingState(false)
-        setCachedData(CACHE_KEY, previous)
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
         if (mountedRef.current) {
-          setError(error.message || "Failed to update entry.")
+          setError(
+            error.message ||
+            "Failed to update entry."
+          )
         }
+
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (mountedRef.current) {
+          setSubmitting(false)
+        }
       }
     },
-    [data, safeItems, reloadEntries, setEditingState]
+    [
+      data,
+      safeItems,
+      reloadEntries,
+      setEditingState,
+    ]
   )
 
   /* ========================================
@@ -288,27 +374,140 @@ const useManualEntries = () => {
   const handleDeleteEntry = useCallback(
     async (entryId) => {
       setError("")
+
       const previous = data
 
       try {
         setSubmitting(true)
-        const optimistic = safeItems.map((item) =>
-          item.id === entryId ? { ...item, is_active: false } : item
+
+        const optimistic =
+          safeItems.map((item) =>
+            item.id === entryId
+              ? {
+                  ...item,
+                  is_active: false,
+                }
+              : item
+          )
+
+        setCachedData(CACHE_KEY, {
+          ...data,
+          items: optimistic,
+        })
+
+        await deleteManualEntry(
+          entryId
         )
-        setCachedData(CACHE_KEY, { ...data, items: optimistic })
-        await deleteManualEntry(entryId)
+
         await reloadEntries()
-        if (mountedRef.current) setSuccessMessage("Entry moved to inactive")
-      } catch (error) {
-        setCachedData(CACHE_KEY, previous)
+
         if (mountedRef.current) {
-          setError(error.message || "Failed to deactivate entry.")
+          setSuccessMessage(
+            "Entry moved to inactive"
+          )
         }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (mountedRef.current) {
+          setError(
+            error.message ||
+            "Failed to deactivate entry."
+          )
+        }
+
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (mountedRef.current) {
+          setSubmitting(false)
+        }
       }
     },
-    [data, safeItems, reloadEntries]
+    [
+      data,
+      safeItems,
+      reloadEntries,
+    ]
+  )
+
+  /* ========================================
+     HARD DELETE
+  ======================================== */
+
+  const handleHardDeleteEntry = useCallback(
+    async (entryId) => {
+      setError("")
+
+      const previous = data
+
+      try {
+        setSubmitting(true)
+
+        const optimistic =
+          safeItems.filter(
+            (item) =>
+              item.id !== entryId
+          )
+
+        setCachedData(CACHE_KEY, {
+          ...data,
+          items: optimistic,
+        })
+
+        await hardDeleteManualEntry(
+          entryId
+        )
+
+        if (
+          mountedRef.current &&
+          optimistic.length > 0 &&
+          page > Math.ceil(
+            optimistic.length /
+            ITEMS_PER_PAGE
+          )
+        ) {
+          setPage((prev) =>
+            Math.max(1, prev - 1)
+          )
+        }
+
+        if (mountedRef.current) {
+          setSuccessMessage(
+            "Manual entry permanently deleted from AI Brain"
+          )
+        }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (mountedRef.current) {
+          setError(
+            error.message ||
+            "Failed to permanently delete entry."
+          )
+        }
+
+      } finally {
+
+        if (mountedRef.current) {
+          setSubmitting(false)
+        }
+      }
+    },
+    [
+      data,
+      safeItems,
+      page,
+    ]
   )
 
   /* ========================================
@@ -318,27 +517,65 @@ const useManualEntries = () => {
   const handleRestoreEntry = useCallback(
     async (entryId) => {
       setError("")
+
       const previous = data
 
       try {
         setSubmitting(true)
-        const optimistic = safeItems.map((item) =>
-          item.id === entryId ? { ...item, is_active: true } : item
+
+        const optimistic =
+          safeItems.map((item) =>
+            item.id === entryId
+              ? {
+                  ...item,
+                  is_active: true,
+                }
+              : item
+          )
+
+        setCachedData(CACHE_KEY, {
+          ...data,
+          items: optimistic,
+        })
+
+        await restoreManualEntry(
+          entryId
         )
-        setCachedData(CACHE_KEY, { ...data, items: optimistic })
-        await restoreManualEntry(entryId)
+
         await reloadEntries()
-        if (mountedRef.current) setSuccessMessage("Entry restored successfully")
-      } catch (error) {
-        setCachedData(CACHE_KEY, previous)
+
         if (mountedRef.current) {
-          setError(error.message || "Failed to restore entry.")
+          setSuccessMessage(
+            "Entry restored successfully"
+          )
         }
+
+      } catch (error) {
+
+        setCachedData(
+          CACHE_KEY,
+          previous
+        )
+
+        if (mountedRef.current) {
+          setError(
+            error.message ||
+            "Failed to restore entry."
+          )
+        }
+
       } finally {
-        if (mountedRef.current) setSubmitting(false)
+
+        if (mountedRef.current) {
+          setSubmitting(false)
+        }
       }
     },
-    [data, safeItems, reloadEntries]
+    [
+      data,
+      safeItems,
+      reloadEntries,
+    ]
   )
 
   return {
@@ -364,6 +601,7 @@ const useManualEntries = () => {
     handleCreateEntry,
     handleUpdateEntry,
     handleDeleteEntry,
+    handleHardDeleteEntry,
     handleRestoreEntry,
     setError,
     reloadEntries,

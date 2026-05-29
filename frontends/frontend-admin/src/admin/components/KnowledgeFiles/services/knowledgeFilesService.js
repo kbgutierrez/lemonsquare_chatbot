@@ -61,7 +61,7 @@ export const updateKnowledgeFile =
   }
 
 /* ========================================
-   DELETE FILE
+   ARCHIVE FILE
 ======================================== */
 
 export const deleteKnowledgeFile =
@@ -79,6 +79,35 @@ export const deleteKnowledgeFile =
     const endpoint =
       buildApiUrl(
         API_ENDPOINTS.DOCUMENT_DELETE,
+        {
+          documentId,
+        }
+      )
+
+    return apiClient.delete(
+      endpoint
+    )
+  }
+
+/* ========================================
+   HARD DELETE FILE
+======================================== */
+
+export const hardDeleteKnowledgeFile =
+  async (
+    documentId
+  ) => {
+
+    if (!documentId) {
+
+      throw new Error(
+        "Document ID is required."
+      )
+    }
+
+    const endpoint =
+      buildApiUrl(
+        API_ENDPOINTS.DOCUMENT_HARD_DELETE,
         {
           documentId,
         }
@@ -126,6 +155,7 @@ const knowledgeFilesService = {
   getKnowledgeFiles,
   updateKnowledgeFile,
   deleteKnowledgeFile,
+  hardDeleteKnowledgeFile,
   restoreKnowledgeFile,
 }
 
