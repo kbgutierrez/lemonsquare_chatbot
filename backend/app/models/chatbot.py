@@ -23,7 +23,7 @@ BaseChatbot = declarative_base()
 class ChatSession(BaseChatbot):
     __tablename__ = "ChatSession"
     SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    RequesterUserID = Column(BigInteger, nullable=False, default=1)
+    RequesterUserID = Column(BigInteger, nullable=False)
     ChatTitle = Column(String(255))
     StartTime = Column(DateTime, default=datetime.utcnow)
     LastActive = Column(DateTime)
@@ -124,7 +124,11 @@ class UploadedDocument(BaseChatbot):
     Category = Column(String(100), nullable=False)
     ChunkCount = Column(Integer, nullable=False)
     UploadedAt = Column(DateTime, default=datetime.utcnow)
-    UploadedBy = Column(BigInteger, default=1)
+    UploadedBy = Column(BigInteger)
+    UploadedByUsername = Column(String(150))
+    UpdatedAt = Column(DateTime, onupdate=datetime.utcnow)
+    UpdatedBy = Column(BigInteger)
+    UpdatedByUsername = Column(String(150))
     IsActive = Column(Boolean, default=True)
 
 
@@ -132,7 +136,7 @@ class BlacklistedTicket(BaseChatbot):
     __tablename__ = "tbl_blacklisted_tickets"
     TicketNumber = Column(String(15), primary_key=True)
     BlacklistedAt = Column(DateTime, default=datetime.utcnow)
-    BlacklistedBy = Column(BigInteger, default=1)
+    BlacklistedBy = Column(BigInteger)
 
 
 class ManualKnowledgeEntry(BaseChatbot):
@@ -143,7 +147,10 @@ class ManualKnowledgeEntry(BaseChatbot):
     Category = Column(String(100), nullable=False)
     CreatedAt = Column(DateTime, default=datetime.utcnow)
     UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    CreatedBy = Column(BigInteger, default=1)
+    CreatedBy = Column(BigInteger)
+    CreatedByUsername = Column(String(150))
+    UpdatedBy = Column(BigInteger)
+    UpdatedByUsername = Column(String(150))
     IsActive = Column(Boolean, default=True)
 
 

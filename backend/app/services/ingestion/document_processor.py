@@ -75,7 +75,7 @@ class DocumentProcessor:
 
         return {"status": "success", "document_id": document_id}
 
-    async def update(self, document_id: str, updates: dict) -> None:
+    async def update(self, document_id: str, updates: dict, acting_user_id: int = 1, acting_username: str = "System") -> None:
         doc = self.doc_repo.get_document_by_id(document_id)
         if not doc:
             raise ValueError(f"Document '{document_id}' not found.")
@@ -93,6 +93,10 @@ class DocumentProcessor:
         if "category" in updates and updates["category"]:
             doc.Category = updates["category"]
             payload_updates["category"] = updates["category"]
+
+        # Stamp modifier — never touch UploadedBy/UploadedByUsername
+        doc.UpdatedBy = acting_user_id
+        doc.UpdatedByUsername = acting_username
 
         if payload_updates:
             from qdrant_client.http import models as qdrant_models

@@ -58,7 +58,7 @@ async def handle_chat(
 ) -> ChatResponse:
     try:
         user_data = await fetch_user_details(chat_request.user_token)
-        user_id = int(user_data.get("id") or 1)
+        user_id = int(user_data.get("id"))
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
             f"{user_data.get('lastname', 'User')}"

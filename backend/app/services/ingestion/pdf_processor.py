@@ -105,7 +105,7 @@ class PDFProcessor:
         pdf_reader = PdfReader(filepath)
         return "\n".join(filter(None, (page.extract_text() for page in pdf_reader.pages)))
 
-    async def process(self, file: UploadFile | None = None, manual_category: str | None = None, job_id: str | None = None, file_path: str | None = None, original_filename: str | None = None) -> dict:
+    async def process(self, file: UploadFile | None = None, manual_category: str | None = None, job_id: str | None = None, file_path: str | None = None, original_filename: str | None = None, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.maintenance.job_manager import job_manager
 
         def _update(prog: float, msg: str):
@@ -191,6 +191,10 @@ class PDFProcessor:
                     Category=category,
                     ChunkCount=len(chunks),
                     IsActive=True,
+                    UploadedBy=acting_user_id,
+                    UploadedByUsername=acting_username,
+                    UpdatedBy=None,
+                    UpdatedByUsername=None,
                 ))
                 self.db.commit()
             except IntegrityError as exc:

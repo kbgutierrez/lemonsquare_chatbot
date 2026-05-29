@@ -5,7 +5,7 @@ Uses TicketRepository for DB operations.
 import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service, require_admin_user
 from app.core.exceptions import VectorStoreError
 from app.models.chatbot import BlacklistedTicket
 from app.models.helpdesk import TicketEvaluation
@@ -48,13 +48,15 @@ def get_tickets(
 @router.delete("/{ticket_number}", response_model=TicketDeleteResponse, summary="Remove a ticket from the AI knowledge base")
 def delete_ticket_from_ai(
     ticket_number: str,
+    current_user: dict = Depends(require_admin_user),
     db_chatbot: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> TicketDeleteResponse:
     logger.info("Blacklisting ticket %s...", ticket_number)
 
+    user_id = int(current_user.get("id", 1))
     repo = TicketRepository(db_chatbot, None)
-    repo.add_to_blacklist(ticket_number)
+    repo.add_to_blacklist(ticket_number, blacklisted_by=user_id)
 
     try:
         ingestion_service.delete_ticket_vectors(ticket_number)

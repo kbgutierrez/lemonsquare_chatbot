@@ -33,14 +33,17 @@ class TicketRepository:
             is not None
         )
 
-    def add_to_blacklist(self, ticket_number: str) -> None:
+    def add_to_blacklist(self, ticket_number: str, blacklisted_by: int = 1) -> None:
         existing = (
             self.db_chatbot.query(BlacklistedTicket)
             .filter(BlacklistedTicket.TicketNumber == ticket_number)
             .first()
         )
         if not existing:
-            self.db_chatbot.add(BlacklistedTicket(TicketNumber=ticket_number))
+            self.db_chatbot.add(BlacklistedTicket(
+                TicketNumber=ticket_number,
+                BlacklistedBy=blacklisted_by
+            ))
             self.db_chatbot.commit()
 
     def remove_from_blacklist(self, ticket_number: str) -> bool:

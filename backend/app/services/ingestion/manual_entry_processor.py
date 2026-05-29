@@ -5,6 +5,7 @@ Handles create, update, delete, restore for manual KB rules.
 
 import logging
 import uuid
+import asyncio
 
 from sqlalchemy.orm import Session
 from qdrant_client.http.models import PointStruct
@@ -71,6 +72,8 @@ class ManualEntryProcessor:
         title: str,
         content: str,
         category: str | None,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
     ) -> dict:
 
         resolved_category = (
@@ -87,6 +90,10 @@ class ManualEntryProcessor:
             Content=content,
             Category=resolved_category,
             IsActive=True,
+            CreatedBy=acting_user_id,
+            CreatedByUsername=acting_username,
+            UpdatedBy=None,
+            UpdatedByUsername=None,
         )
 
         record = (
@@ -98,8 +105,6 @@ class ManualEntryProcessor:
                 category=resolved_category,
             )
         )
-
-        import asyncio
 
         vector = (
             await asyncio.to_thread(
@@ -188,6 +193,8 @@ class ManualEntryProcessor:
         self,
         entry_id: str,
         updates: dict,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
     ) -> dict:
 
         entry = (
@@ -259,6 +266,10 @@ class ManualEntryProcessor:
                 )
             )
 
+        # Stamp who last modified — never touch CreatedBy/CreatedByUsername
+        entry.UpdatedBy = acting_user_id
+        entry.UpdatedByUsername = acting_username
+
         record = (
             self.consolidator
             .build_manual_record(
@@ -272,8 +283,6 @@ class ManualEntryProcessor:
         record.metadata[
             "is_active"
         ] = bool(entry.IsActive)
-
-        import asyncio
 
         vector = (
             await asyncio.to_thread(
@@ -544,8 +553,6 @@ class ManualEntryProcessor:
         record.metadata[
             "is_active"
         ] = True
-
-        import asyncio
 
         vector = (
             await asyncio.to_thread(
