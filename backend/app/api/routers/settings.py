@@ -56,8 +56,9 @@ def update_active_settings(
     current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
-    config = update_settings(db, new_settings, updated_by=_PLACEHOLDER_ADMIN_ID)
-    logger.info("Settings updated: model=%s", new_settings.ActiveModel)
+    user_id = int(current_user.get("id", 1))
+    config = update_settings(db, new_settings, updated_by=user_id)
+    logger.info("Settings updated by user #%d: model=%s", user_id, new_settings.ActiveModel)
     return SettingsResponse.model_validate(config)
 
 
@@ -66,7 +67,8 @@ def restore_settings_to_default(
     current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
-    config = restore_default_settings(db, updated_by=_PLACEHOLDER_ADMIN_ID)
+    user_id = int(current_user.get("id", 1))
+    config = restore_default_settings(db, updated_by=user_id)
     return SettingsResponse.model_validate(config)
 
 

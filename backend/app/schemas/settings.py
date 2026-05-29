@@ -59,6 +59,7 @@ class SettingsResponse(BaseModel):
 
     ConversationResolutionModel: str | None
     ConversationResolutionPrompt: str | None
+    UpdatedBy: int | None = None
 
     class Config:
         from_attributes = True

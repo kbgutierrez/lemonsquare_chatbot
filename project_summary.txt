@@ -323,6 +323,7 @@ if __name__ == "__main__":
 FastAPI dependency providers.
 All injectable dependencies declared here. Routes import from this module.
 """
+import logging
 from fastapi import Depends, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -333,6 +334,7 @@ from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 def get_orchestrator(request: Request) -> SupportOrchestrator:
     return request.app.state.orchestrator
@@ -357,6 +359,7 @@ def _is_admin_user(user_data: dict) -> bool:
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
     if not credentials:
         # Temporary fallback for Admin UI until it sends Bearer tokens
+        logger.warning("No credentials provided; using fallback admin user #9999")
         return {
             "id": 9999,
             "username": "kbgutierrez",
@@ -365,7 +368,15 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
             "lastname": "Gutierrez",
             "is_admin": True
         }
-    return await fetch_user_details(credentials.credentials)
+    
+    user_data = await fetch_user_details(credentials.credentials)
+    
+    # Ensure ID is present and numeric
+    if "id" not in user_data:
+        logger.error("User data from BizPortal missing 'id': %s", user_data)
+        raise AuthorizationError("Invalid user data returned from authentication service.")
+        
+    return user_data
 
 
 async def require_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
@@ -582,7 +593,7 @@ async def handle_chat(
 ) -> ChatResponse:
     try:
         user_data = await fetch_user_details(chat_request.user_token)
-        user_id = int(user_data.get("id") or 1)
+        user_id = int(user_data.get("id"))
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
             f"{user_data.get('lastname', 'User')}"
@@ -1031,16 +1042,15 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     category: str | None = Form(None),
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentUploadResponse:
     """
     Upload a PDF, categorise it (Admin-provided or AI auto-guessed), embed and store in Qdrant,
     and save metadata to SQL.
-
-    File validation (PDF magic bytes) is handled inside the service.
-    The category must be one of the allowed categories from AIChatbotSettings.
     """
+    user_id = int(current_user.get("id", 1))
     max_upload_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
     content_length = request.headers.get("content-length")
     if (
@@ -1366,14 +1376,17 @@ async def restore_document(
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service)
 ):
+    user_id = int(current_user.get("id", 1))
     result = await ingestion_service.process_manual_entry(
         title=request.title,
         content=request.content,
         manual_category=request.category,
-        db=db
+        db=db,
+        acting_user_id=user_id
     )
 
     return result
@@ -2258,8 +2271,9 @@ def update_active_settings(
     current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
-    config = update_settings(db, new_settings, updated_by=_PLACEHOLDER_ADMIN_ID)
-    logger.info("Settings updated: model=%s", new_settings.ActiveModel)
+    user_id = int(current_user.get("id", 1))
+    config = update_settings(db, new_settings, updated_by=user_id)
+    logger.info("Settings updated by user #%d: model=%s", user_id, new_settings.ActiveModel)
     return SettingsResponse.model_validate(config)
 
 
@@ -2268,7 +2282,8 @@ def restore_settings_to_default(
     current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
-    config = restore_default_settings(db, updated_by=_PLACEHOLDER_ADMIN_ID)
+    user_id = int(current_user.get("id", 1))
+    config = restore_default_settings(db, updated_by=user_id)
     return SettingsResponse.model_validate(config)
 
 
@@ -2311,7 +2326,7 @@ Uses TicketRepository for DB operations.
 import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service
+from app.api.deps import get_chatbot_db, get_helpdesk_db, get_ingestion_service, require_admin_user
 from app.core.exceptions import VectorStoreError
 from app.models.chatbot import BlacklistedTicket
 from app.models.helpdesk import TicketEvaluation
@@ -2354,13 +2369,15 @@ def get_tickets(
 @router.delete("/{ticket_number}", response_model=TicketDeleteResponse, summary="Remove a ticket from the AI knowledge base")
 def delete_ticket_from_ai(
     ticket_number: str,
+    current_user: dict = Depends(require_admin_user),
     db_chatbot: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> TicketDeleteResponse:
     logger.info("Blacklisting ticket %s...", ticket_number)
 
+    user_id = int(current_user.get("id", 1))
     repo = TicketRepository(db_chatbot, None)
-    repo.add_to_blacklist(ticket_number)
+    repo.add_to_blacklist(ticket_number, blacklisted_by=user_id)
 
     try:
         ingestion_service.delete_ticket_vectors(ticket_number)
@@ -3060,7 +3077,7 @@ BaseChatbot = declarative_base()
 class ChatSession(BaseChatbot):
     __tablename__ = "ChatSession"
     SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    RequesterUserID = Column(BigInteger, nullable=False, default=1)
+    RequesterUserID = Column(BigInteger, nullable=False)
     ChatTitle = Column(String(255))
     StartTime = Column(DateTime, default=datetime.utcnow)
     LastActive = Column(DateTime)
@@ -3161,7 +3178,7 @@ class UploadedDocument(BaseChatbot):
     Category = Column(String(100), nullable=False)
     ChunkCount = Column(Integer, nullable=False)
     UploadedAt = Column(DateTime, default=datetime.utcnow)
-    UploadedBy = Column(BigInteger, default=1)
+    UploadedBy = Column(BigInteger)
     IsActive = Column(Boolean, default=True)
 
 
@@ -3169,7 +3186,7 @@ class BlacklistedTicket(BaseChatbot):
     __tablename__ = "tbl_blacklisted_tickets"
     TicketNumber = Column(String(15), primary_key=True)
     BlacklistedAt = Column(DateTime, default=datetime.utcnow)
-    BlacklistedBy = Column(BigInteger, default=1)
+    BlacklistedBy = Column(BigInteger)
 
 
 class ManualKnowledgeEntry(BaseChatbot):
@@ -3180,7 +3197,7 @@ class ManualKnowledgeEntry(BaseChatbot):
     Category = Column(String(100), nullable=False)
     CreatedAt = Column(DateTime, default=datetime.utcnow)
     UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    CreatedBy = Column(BigInteger, default=1)
+    CreatedBy = Column(BigInteger)
     IsActive = Column(Boolean, default=True)
 
 
@@ -3755,14 +3772,17 @@ class TicketRepository:
             is not None
         )
 
-    def add_to_blacklist(self, ticket_number: str) -> None:
+    def add_to_blacklist(self, ticket_number: str, blacklisted_by: int = 1) -> None:
         existing = (
             self.db_chatbot.query(BlacklistedTicket)
             .filter(BlacklistedTicket.TicketNumber == ticket_number)
             .first()
         )
         if not existing:
-            self.db_chatbot.add(BlacklistedTicket(TicketNumber=ticket_number))
+            self.db_chatbot.add(BlacklistedTicket(
+                TicketNumber=ticket_number,
+                BlacklistedBy=blacklisted_by
+            ))
             self.db_chatbot.commit()
 
     def remove_from_blacklist(self, ticket_number: str) -> bool:
@@ -6689,7 +6709,7 @@ class DocumentIngestionService:
 
     # ── PDF Upload ─────────────────────────────────────────────
 
-    async def process_pdf_upload(self, file=None, db=None, manual_category=None, job_id=None, file_path=None, original_filename=None) -> dict:
+    async def process_pdf_upload(self, file=None, db=None, manual_category=None, job_id=None, file_path=None, original_filename=None, acting_user_id: int = 1) -> dict:
         from app.services.ingestion.pdf_processor import PDFProcessor
         return await PDFProcessor(db, self.vector_store, self.embeddings).process(
             file=file,
@@ -6697,14 +6717,15 @@ class DocumentIngestionService:
             job_id=job_id,
             file_path=file_path,
             original_filename=original_filename,
+            acting_user_id=acting_user_id,
         )
 
     # ── Manual Entry ───────────────────────────────────────────
 
-    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db) -> dict:
+    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db, acting_user_id: int = 1) -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).process(
-            title=title, content=content, category=manual_category
+            title=title, content=content, category=manual_category, acting_user_id=acting_user_id
         )
 
     async def update_manual_entry(self, entry_id: str, updates: dict, db) -> dict:
@@ -6855,6 +6876,7 @@ class ManualEntryProcessor:
         title: str,
         content: str,
         category: str | None,
+        acting_user_id: int = 1,
     ) -> dict:
 
         resolved_category = (
@@ -6871,6 +6893,7 @@ class ManualEntryProcessor:
             Content=content,
             Category=resolved_category,
             IsActive=True,
+            CreatedBy=acting_user_id,
         )
 
         record = (
@@ -7605,6 +7628,7 @@ class PDFProcessor:
                     Category=category,
                     ChunkCount=len(chunks),
                     IsActive=True,
+                    UploadedBy=acting_user_id,
                 ))
                 self.db.commit()
             except IntegrityError as exc:

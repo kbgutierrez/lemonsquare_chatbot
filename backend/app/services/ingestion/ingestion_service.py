@@ -50,7 +50,12 @@ class DocumentIngestionService:
 
     # ── PDF Upload ─────────────────────────────────────────────
 
-    async def process_pdf_upload(self, file=None, db=None, manual_category=None, job_id=None, file_path=None, original_filename=None) -> dict:
+    async def process_pdf_upload(
+        self, file=None, db=None, manual_category=None,
+        job_id=None, file_path=None, original_filename=None,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
+    ) -> dict:
         from app.services.ingestion.pdf_processor import PDFProcessor
         return await PDFProcessor(db, self.vector_store, self.embeddings).process(
             file=file,
@@ -58,32 +63,46 @@ class DocumentIngestionService:
             job_id=job_id,
             file_path=file_path,
             original_filename=original_filename,
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
         )
 
     # ── Manual Entry ───────────────────────────────────────────
 
-    async def process_manual_entry(self, title: str, content: str, manual_category: str | None, db) -> dict:
+    async def process_manual_entry(
+        self, title: str, content: str, manual_category: str | None,
+        db, acting_user_id: int = 1,
+        acting_username: str = "System",
+    ) -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).process(
-            title=title, content=content, category=manual_category
+            title=title, content=content, category=manual_category,
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
         )
 
-    async def update_manual_entry(self, entry_id: str, updates: dict, db) -> dict:
+    async def update_manual_entry(
+        self, entry_id: str, updates: dict, db,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
+    ) -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).update(
-            entry_id=entry_id, updates=updates
+            entry_id=entry_id, updates=updates,
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
         )
 
-    async def delete_manual_entry(self, entry_id: str, db) -> dict:
+    async def delete_manual_entry(self, entry_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).delete(
-            entry_id=entry_id
+            entry_id=entry_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
-    async def restore_manual_entry(self, entry_id: str, db) -> dict:
+    async def restore_manual_entry(self, entry_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.manual_entry_processor import ManualEntryProcessor
         return await ManualEntryProcessor(db, self.vector_store, self.embeddings).restore(
-            entry_id=entry_id
+            entry_id=entry_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
     # ── Resolved Ticket ────────────────────────────────────────
@@ -123,20 +142,26 @@ class DocumentIngestionService:
 
     # ── Document Management ────────────────────────────────────
 
-    async def delete_document(self, document_id: str, db) -> dict:
+    async def delete_document(self, document_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.document_processor import DocumentProcessor
         return await DocumentProcessor(db, self.vector_store, self.embeddings).delete(
-            document_id=document_id
+            document_id=document_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
-    async def restore_document(self, document_id: str, db) -> dict:
+    async def restore_document(self, document_id: str, db, acting_user_id: int = 1, acting_username: str = "System") -> dict:
         from app.services.ingestion.document_processor import DocumentProcessor
         return await DocumentProcessor(db, self.vector_store, self.embeddings).restore(
-            document_id=document_id
+            document_id=document_id, acting_user_id=acting_user_id, acting_username=acting_username
         )
 
-    async def update_document(self, document_id: str, updates: dict, db) -> None:
+    async def update_document(
+        self, document_id: str, updates: dict, db,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
+    ) -> None:
         from app.services.ingestion.document_processor import DocumentProcessor
         await DocumentProcessor(db, self.vector_store, self.embeddings).update(
-            document_id=document_id, updates=updates
+            document_id=document_id, updates=updates,
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
         )

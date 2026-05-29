@@ -2,6 +2,7 @@
 FastAPI dependency providers.
 All injectable dependencies declared here. Routes import from this module.
 """
+import logging
 from fastapi import Depends, Query, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
@@ -12,6 +13,7 @@ from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 
 security = HTTPBearer(auto_error=False)
+logger = logging.getLogger(__name__)
 
 def get_orchestrator(request: Request) -> SupportOrchestrator:
     return request.app.state.orchestrator
@@ -33,24 +35,55 @@ def _is_admin_user(user_data: dict) -> bool:
     return any(str(value).strip().lower() in {"admin", "administrator", "true", "1"} for value in role_values)
 
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    if not credentials:
-        # Temporary fallback for Admin UI until it sends Bearer tokens
+async def get_current_user(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+) -> dict:
+    # 1. Try Bearer Token from security dependency
+    token = credentials.credentials if credentials else None
+    
+    # 2. Fallback to common custom headers if Bearer is missing
+    if not token:
+        token = request.headers.get("X-User-Token") or request.headers.get("X-User-ID")
+    
+    if not token:
+        # Temporary fallback for Admin UI until it sends tokens
+        logger.warning("No credentials provided; using fallback admin user #9999")
         return {
             "id": 9999,
-            "username": "kbgutierrez",
+            "username": "fallback_admin",
             "role": "admin",
-            "firstname": "KB",
-            "lastname": "Gutierrez",
+            "firstname": "fall",
+            "lastname": "back",
             "is_admin": True
         }
-    return await fetch_user_details(credentials.credentials)
+    
+    # Normalize token
+    token = str(token).strip()
+    
+    # Resolve user details via the service (which handles IDs and real tokens)
+    user_data = await fetch_user_details(token)
+    
+    # Ensure ID is present and numeric
+    if "id" not in user_data:
+        logger.error("User data from BizPortal missing 'id': %s", user_data)
+        raise AuthorizationError("Invalid user data returned from authentication service.")
+        
+    return user_data
 
 
 async def require_admin_user(current_user: dict = Depends(get_current_user)) -> dict:
     if not _is_admin_user(current_user):
         raise AuthorizationError("Admin access is required.")
     return current_user
+
+
+def get_display_name(user: dict) -> str:
+    firstname = (user.get("firstname") or "").strip()
+    lastname = (user.get("lastname") or "").strip()
+    if firstname or lastname:
+        return f"{firstname} {lastname}".strip()
+    return user.get("username") or str(user.get("id", "Unknown"))
 
 
 __all__ = [
@@ -60,4 +93,5 @@ __all__ = [
     "get_ingestion_service",
     "get_current_user",
     "require_admin_user",
+    "get_display_name",
 ]

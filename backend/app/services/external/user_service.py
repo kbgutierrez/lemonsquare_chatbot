@@ -106,6 +106,11 @@ async def fetch_user_details(auth_token: str) -> dict:
         ):
             logger.info("BizPortal authentication successful.")
             resolved_user = user_data["response"]
+            
+            # Map numeric ID to 'id' if 'user_id' is returned instead
+            if "id" not in resolved_user and "user_id" in resolved_user:
+                resolved_user["id"] = resolved_user["user_id"]
+                
             async with _token_cache_lock:
                 _cache_user(auth_token, resolved_user, now + _TOKEN_CACHE_TTL_SECONDS)
             return resolved_user

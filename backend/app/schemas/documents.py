@@ -10,6 +10,11 @@ class DocumentResponse(BaseModel):
     chunk_count: int
     uploaded_at: datetime
     is_active: bool = True
+    uploaded_by: int | None = None
+    uploaded_by_username: str | None = None
+    updated_at: datetime | None = None
+    updated_by: int | None = None
+    updated_by_username: str | None = None
 
     class Config:
         from_attributes = True

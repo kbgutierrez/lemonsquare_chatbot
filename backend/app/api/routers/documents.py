@@ -11,12 +11,21 @@ endpoints. Extracting each feature into its own router module means:
 import asyncio
 import logging
 import uuid
+import tempfile
+import aiofiles
+import os
 
 from fastapi import APIRouter, Depends, File, UploadFile, Form, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_chatbot_db, get_ingestion_service, get_orchestrator, require_admin_user
+from app.api.deps import (
+    get_chatbot_db,
+    get_ingestion_service,
+    get_orchestrator,
+    require_admin_user,
+    get_display_name
+)
 from app.core.rate_limit import limiter
 from app.core.config import settings
 from app.models.chatbot import UploadedDocument, ManualKnowledgeEntry
@@ -52,16 +61,16 @@ async def upload_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     category: str | None = Form(None),
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
 ) -> DocumentUploadResponse:
     """
     Upload a PDF, categorise it (Admin-provided or AI auto-guessed), embed and store in Qdrant,
     and save metadata to SQL.
-
-    File validation (PDF magic bytes) is handled inside the service.
-    The category must be one of the allowed categories from AIChatbotSettings.
     """
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
     max_upload_bytes = settings.MAX_UPLOAD_MB * 1024 * 1024
     content_length = request.headers.get("content-length")
     if (
@@ -84,10 +93,6 @@ async def upload_document(
         )
 
     job_id = job_manager.create_job(f"upload_{filename}")
-
-    import tempfile
-    import aiofiles
-    import os
 
     tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     temp_file_path = tmp_file.name
@@ -124,7 +129,9 @@ async def upload_document(
                     manual_category=category,
                     job_id=job_id,
                     file_path=temp_file_path,
-                    original_filename=filename
+                    original_filename=filename,
+                    acting_user_id=user_id,
+                    acting_username=username
                 )
 
                 logger.info(
@@ -272,6 +279,11 @@ def get_documents(
             chunk_count=doc.ChunkCount,
             uploaded_at=doc.UploadedAt,
             is_active=bool(doc.IsActive),
+            uploaded_by=doc.UploadedBy,
+            uploaded_by_username=doc.UploadedByUsername,
+            updated_at=doc.UpdatedAt,
+            updated_by=doc.UpdatedBy,
+            updated_by_username=doc.UpdatedByUsername,
         )
         for doc in documents
     ]
@@ -286,16 +298,21 @@ async def delete_document(
     document_id: str,
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ) -> DocumentDeleteResponse:
     """
     Soft-delete a document:
       - SQL -> IsActive=False
       - Qdrant -> metadata.is_active=False
     """
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     result = await ingestion_service.delete_document(
         document_id,
         db,
+        acting_user_id=user_id,
+        acting_username=username,
     )
 
     return DocumentDeleteResponse(
@@ -364,12 +381,18 @@ async def restore_document(
     document_id: str,
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ) -> DocumentDeleteResponse:
+
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     try:
         result = await ingestion_service.restore_document(
             document_id,
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         return DocumentDeleteResponse(
@@ -387,14 +410,19 @@ async def restore_document(
 @router.post("/manual", summary="Add manual text to KB")
 async def add_manual_knowledge(
     request: ManualEntryRequest,
+    current_user: dict = Depends(require_admin_user),
     db: Session = Depends(get_chatbot_db),
     ingestion_service=Depends(get_ingestion_service)
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
     result = await ingestion_service.process_manual_entry(
         title=request.title,
         content=request.content,
         manual_category=request.category,
-        db=db
+        db=db,
+        acting_user_id=user_id,
+        acting_username=username
     )
 
     return result
@@ -410,16 +438,19 @@ async def update_document_metadata(
     request: DocumentUpdateRequest,
     db: Session = Depends(get_chatbot_db),
     ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ) -> DocumentResponse:
 
-    from fastapi import HTTPException
-    from app.models.chatbot import UploadedDocument
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     try:
         await ingestion_service.update_document(
             document_id,
             request.model_dump(exclude_unset=True),
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         updated_doc = (
@@ -437,6 +468,11 @@ async def update_document_metadata(
             chunk_count=updated_doc.ChunkCount,
             uploaded_at=updated_doc.UploadedAt,
             is_active=bool(updated_doc.IsActive),
+            uploaded_by=updated_doc.UploadedBy,
+            uploaded_by_username=updated_doc.UploadedByUsername,
+            updated_at=updated_doc.UpdatedAt,
+            updated_by=updated_doc.UpdatedBy,
+            updated_by_username=updated_doc.UpdatedByUsername,
         )
 
     except ValueError as exc:
@@ -444,9 +480,6 @@ async def update_document_metadata(
             status_code=400,
             detail=str(exc),
         )
-
-
-from app.schemas.documents import ManualEntryResponse, ManualEntryUpdateRequest
 
 
 @router.get(
@@ -461,11 +494,7 @@ def get_manual_entries(
     db: Session = Depends(get_chatbot_db),
 ):
 
-    from app.models.chatbot import ManualKnowledgeEntry
-
-    query = db.query(
-        ManualKnowledgeEntry
-    )
+    query = db.query(ManualKnowledgeEntry)
 
     normalized_status = (
         status
@@ -474,13 +503,11 @@ def get_manual_entries(
     )
 
     if normalized_status == "active":
-
         query = query.filter(
             ManualKnowledgeEntry.IsActive == True
         )
 
     elif normalized_status == "inactive":
-
         query = query.filter(
             ManualKnowledgeEntry.IsActive == False
         )
@@ -495,25 +522,22 @@ def get_manual_entries(
         .all()
     )
 
-    mapped_results = []
-
-    for entry in entries:
-
-        mapped_results.append(
-            ManualEntryResponse(
-                entry_id=entry.EntryID,
-                title=entry.Title,
-                content=entry.Content,
-                category=entry.Category,
-                created_at=entry.CreatedAt,
-                updated_at=entry.UpdatedAt,
-                is_active=bool(
-                    entry.IsActive
-                ),
-            )
+    return [
+        ManualEntryResponse(
+            entry_id=entry.EntryID,
+            title=entry.Title,
+            content=entry.Content,
+            category=entry.Category,
+            created_at=entry.CreatedAt,
+            updated_at=entry.UpdatedAt,
+            is_active=bool(entry.IsActive),
+            created_by=entry.CreatedBy,
+            created_by_username=entry.CreatedByUsername,
+            updated_by=entry.UpdatedBy,
+            updated_by_username=entry.UpdatedByUsername,
         )
-
-    return mapped_results
+        for entry in entries
+    ]
 
 
 @router.put("/manual/{entry_id}", summary="Update a manual rule")
@@ -521,14 +545,19 @@ async def update_manual_knowledge(
     entry_id: str,
     request: ManualEntryUpdateRequest,
     db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     try:
         result = await ingestion_service.update_manual_entry(
             entry_id,
             request.model_dump(exclude_unset=True),
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         return result
@@ -544,12 +573,17 @@ async def update_manual_knowledge(
 async def delete_manual_knowledge(
     entry_id: str,
     db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     result = await ingestion_service.delete_manual_entry(
         entry_id,
         db,
+        acting_user_id=user_id,
+        acting_username=username,
     )
 
     return result
@@ -559,13 +593,18 @@ async def delete_manual_knowledge(
 async def restore_manual_knowledge(
     entry_id: str,
     db: Session = Depends(get_chatbot_db),
-    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service)
+    ingestion_service: DocumentIngestionService = Depends(get_ingestion_service),
+    current_user: dict = Depends(require_admin_user),
 ):
+    user_id = int(current_user.get("id", 1))
+    username = get_display_name(current_user)
 
     try:
         result = await ingestion_service.restore_manual_entry(
             entry_id,
             db,
+            acting_user_id=user_id,
+            acting_username=username,
         )
 
         return result

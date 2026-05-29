@@ -65,6 +65,7 @@ async def admin_login(payload: AdminLoginRequest):
             "success": True,
             "message": "Login successful",
             "data": possible_user,
+            "token": str(possible_user.get("id")),  # ADDED: the ID is the token
         }
 
     except HTTPException:
