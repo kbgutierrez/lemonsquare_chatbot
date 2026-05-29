@@ -44,9 +44,17 @@ class ManualEntryResponse(BaseModel):
     title: str
     content: str
     category: str
+
     created_at: datetime
     updated_at: datetime
+
     is_active: bool | None = None
+
+    created_by: int | None = None
+    created_by_username: str | None = None
+
+    updated_by: int | None = None
+    updated_by_username: str | None = None
 
     class Config:
         from_attributes = True

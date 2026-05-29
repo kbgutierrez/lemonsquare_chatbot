@@ -143,6 +143,13 @@ const LoginPage = ({
         )
       )
 
+      if (response?.token) {
+        localStorage.setItem(
+          "admin_user_token",
+          String(response.token)
+        )
+      }
+
       onLogin(
         normalizedUser
       )

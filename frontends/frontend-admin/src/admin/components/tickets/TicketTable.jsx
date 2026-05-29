@@ -228,7 +228,60 @@ const TicketRow = memo(({ ticket, blockTicket }) => {
       {expanded && (
         <tr className="border-b theme-border bg-[var(--panel-light)]/30">
           <td colSpan={4} className="px-6 py-4">
-            <DetailBlock value={ticket.work_done || ticket.advanced_work_done} />
+
+            <div className="mb-4 grid gap-2 text-xs text-[var(--text-secondary)]">
+
+              {ticket.created_by_username && (
+                <p>
+                  Created By:
+                  {" "}
+                  {ticket.created_by_username}
+                </p>
+              )}
+
+              {ticket.updated_by_username && (
+                <p>
+                  Updated By:
+                  {" "}
+                  {ticket.updated_by_username}
+                </p>
+              )}
+
+              {ticket.updated_at && (
+                <p>
+                  Last Modified:
+                  {" "}
+                  {new Date(
+                    ticket.updated_at
+                  ).toLocaleString()}
+                </p>
+              )}
+
+            </div>
+
+            <div className="mb-4 grid gap-2 text-xs text-[var(--text-secondary)]">
+
+              {ticket.created_by_username && (
+                <p>
+                  Created By: {ticket.created_by_username}
+                </p>
+              )}
+
+              {ticket.updated_by_username && (
+                <p>
+                  Updated By: {ticket.updated_by_username}
+                </p>
+              )}
+
+            </div>
+
+            <DetailBlock
+              value={
+                ticket.work_done ||
+                ticket.advanced_work_done
+              }
+            />
+
           </td>
         </tr>
       )}
