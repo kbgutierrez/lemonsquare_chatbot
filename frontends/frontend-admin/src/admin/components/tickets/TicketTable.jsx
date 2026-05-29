@@ -261,19 +261,24 @@ const TicketTable = ({ tickets, blockTicket }) => {
 
   return (
     <div className="h-full overflow-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <table className="min-w-full border-separate border-spacing-0">
+      <table className="min-w-full table-fixed border-separate border-spacing-0">
         <thead className="sticky top-0 z-10 bg-[var(--background)]">
           <tr>
-            {["Ticket", "Issue", "Status", "Actions"].map((label) => (
-              <th
-                key={label}
-                className={`border-b theme-border px-6 py-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)] ${
-                  label === "Actions" ? "text-right" : "text-left"
-                }`}
-              >
-                {label}
-              </th>
-            ))}
+            <th className="w-[260px] border-b theme-border px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Ticket
+            </th>
+
+            <th className="border-b theme-border px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Issue
+            </th>
+
+            <th className="w-[180px] border-b theme-border px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Status
+            </th>
+
+            <th className="w-[180px] border-b theme-border px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--text-secondary)]">
+              Actions
+            </th>
           </tr>
         </thead>
         <tbody>
