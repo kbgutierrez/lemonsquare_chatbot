@@ -9,7 +9,7 @@ import chatWindowBackground
 
 import { useTheme } from "../../context/ThemeContext.jsx"
 
-const MAX_MESSAGE_LENGTH = 4000
+const MAX_MESSAGE_LENGTH = 100
 
 const ChatFooterInput = ({
   textareaRef,
@@ -29,15 +29,6 @@ const ChatFooterInput = ({
     !resolved &&
     !sessionTicketSubmitted &&
     !!message?.trim()
-
-  const placeholder =
-    sessionTicketSubmitted
-      ? "This chat session is now closed."
-      : resolved
-        ? "Resolved conversations are read-only."
-        : loading
-          ? "AI is replying..."
-          : "Ask LemonSquare AI..."
 
   const handleSend =
     () => canSend && onSend?.()
@@ -119,66 +110,95 @@ const ChatFooterInput = ({
         </div>
       )}
 
-      {/* INPUT */}
-      <textarea
-        ref={textareaRef}
-
-        rows={1}
-
-        value={message}
-
-        disabled={resolved || sessionTicketSubmitted}
-
-        maxLength={MAX_MESSAGE_LENGTH}
-
-        enterKeyHint="send"
-
-        aria-label="Chat input"
-
-        placeholder={placeholder}
-
-        onKeyDown={onKeyDown}
-
-        onChange={(event) =>
-          setMessage(
-            event.target.value
-          )
-        }
-
+      {/* INPUT AREA */}
+      <div
         className="
           relative
           z-10
 
           flex-1
-
-          max-h-32
-          min-h-[22px]
-
-          resize-none
-
-          overflow-y-auto
-
-          bg-transparent
-
-          pt-[2px]
-
-          text-[13px]
-          leading-[1.45]
-
-          outline-none
-
-          placeholder:text-[#8ca193]
-
-          [scrollbar-width:none]
-          [&::-webkit-scrollbar]:hidden
-
-          disabled:cursor-not-allowed
-          disabled:opacity-70
         "
-        style={{
-          color: theme.inputText,
-        }}
-      />
+      >
+
+        {/* CHARACTER COUNT */}
+        <div
+          className="
+            mb-1
+
+            text-[10px]
+            leading-none
+            font-medium
+          "
+          style={{
+            color:
+              message.length >= MAX_MESSAGE_LENGTH
+                ? "#ef4444"
+                : message.length >= 80
+                  ? "#f59e0b"
+                  : theme.inputText,
+            opacity: 0.7,
+          }}
+        >
+          {message.length}/{MAX_MESSAGE_LENGTH}
+        </div>
+
+        <textarea
+          ref={textareaRef}
+
+          rows={1}
+
+          value={message}
+
+          disabled={resolved || sessionTicketSubmitted}
+
+          maxLength={MAX_MESSAGE_LENGTH}
+
+          enterKeyHint="send"
+
+          aria-label="Chat input"
+
+          onKeyDown={onKeyDown}
+
+          onChange={(event) =>
+            setMessage(
+              event.target.value
+            )
+          }
+
+          className="
+            relative
+            z-10
+
+            flex-1
+
+            max-h-32
+            min-h-[28px]
+
+            resize-none
+
+            overflow-y-auto
+
+            bg-transparent
+
+            pt-[2px]
+
+            text-[13px]
+            leading-[1.45]
+
+            outline-none
+
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+
+            disabled:cursor-not-allowed
+            disabled:opacity-70
+          "
+          style={{
+            color: theme.inputText,
+          }}
+        />
+
+      </div>
 
       {/* SEND BUTTON */}
       <button
