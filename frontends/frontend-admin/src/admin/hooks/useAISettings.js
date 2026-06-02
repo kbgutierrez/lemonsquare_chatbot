@@ -51,6 +51,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   DocumentClassifierPrompt: "",
   ConversationResolutionModel: "",
   ConversationResolutionPrompt: "",
+
+  SettingID: null,
+  UpdatedBy: null,
+  IsActive: false,
 })
 
 /* ========================================
@@ -98,6 +102,10 @@ const normalizeSettings = (data) => {
     DocumentClassifierPrompt: d.DocumentClassifierPrompt || "",
     ConversationResolutionModel: d.ConversationResolutionModel || "",
     ConversationResolutionPrompt: d.ConversationResolutionPrompt || "",
+
+    SettingID: d.SettingID ?? null,
+    UpdatedBy: d.UpdatedBy ?? null,
+    IsActive: Boolean(d.IsActive),
   }
 }
 
