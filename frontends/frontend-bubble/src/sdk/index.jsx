@@ -10,7 +10,6 @@ import { updateRuntimeConfig } from "../config/sqlVariables"
 const widgetRoots = new Map()
 
 const DEFAULT_ROOT_ID = "lemonsquare-chat-root"
-const DEFAULT_FALLBACK_USER = "11318"
 
 const STORAGE_KEYS = [
   "userToken",
@@ -53,6 +52,7 @@ const resolveFromStorage = (storage) => {
 const resolveUserToken = (
   incomingConfig = {}
 ) =>
+  safeString(incomingConfig?.userId) ||
   safeString(incomingConfig?.userToken) ||
   safeString(window?.CURRENT_USER_ID) ||
   safeString(window?.currentUser?.id) ||
@@ -65,7 +65,7 @@ const resolveUserToken = (
       'meta[name="user-id"]'
     )?.content
   ) ||
-  DEFAULT_FALLBACK_USER
+  null
 
 /* ========================================
    ROOT MANAGEMENT
@@ -120,12 +120,27 @@ const destroy = (
 const updateConfig = (
   nextConfig = {}
 ) => {
+  const resolvedUserId =
+    resolveUserToken(
+      nextConfig
+    )
+
   const finalConfig = {
     ...nextConfig,
+
+    userId:
+      resolvedUserId,
+
+    /*
+      Backward compatibility.
+
+      Internal services still read:
+      getRuntimeConfig().userToken
+
+      until we complete a full migration.
+    */
     userToken:
-      resolveUserToken(
-        nextConfig
-      ),
+      resolvedUserId,
   }
 
   window.LemonSquareChatConfig = {
