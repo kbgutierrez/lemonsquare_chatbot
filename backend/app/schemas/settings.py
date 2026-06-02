@@ -47,6 +47,7 @@ class SettingsResponse(BaseModel):
     UseReranker: bool | None
     AllowedCategories: str | None
     IsActive: bool
+    UpdatedByUsername: str | None = None
 
     EscalationDraftModel: str | None
     EscalationDraftPrompt: str | None

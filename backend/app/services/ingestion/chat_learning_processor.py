@@ -86,7 +86,7 @@ class ChatLearningProcessor:
             if extracted and isinstance(extracted, dict):
                 learned.IssueReported = extracted.get("issue_reported") or transcript[:500]
                 learned.IssueFound = extracted.get("issue_found") or ""
-                learned.RootCause = extracted.get("issue_cause") or "Unknown"
+                learned.RootCause = extracted.get("issue_cause") or ""
                 learned.WorkDone = extracted.get("work_done") or "Resolved via chat"
             else:
                 logger.warning("LLM extraction failed for session %s, using fallback.", session_id)

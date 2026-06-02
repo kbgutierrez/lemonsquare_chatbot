@@ -98,7 +98,7 @@ const AISettingsPanel = () => {
               Updated By
             </p>
             <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
-              {settings.UpdatedBy ?? "Unknown"}
+              {settings.UpdatedByUsername || (settings.UpdatedBy ? `#${settings.UpdatedBy}` : "System")}
             </p>
           </div>
 

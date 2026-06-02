@@ -80,6 +80,7 @@ class AIChatbotSetting(BaseChatbot):
     IsActive = Column(Boolean, default=True)
     CreatedDate = Column(DateTime, default=datetime.utcnow)
     UpdatedBy = Column(BigInteger)
+    UpdatedByUsername = Column(String(150))
 
     EscalationDraftModel = Column(String(100))
     EscalationDraftPrompt = Column(Text)

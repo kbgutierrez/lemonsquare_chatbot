@@ -21,6 +21,7 @@ def update_settings(
     db: Session,
     new_settings: SettingsUpdate,
     updated_by: int,
+    updated_by_username: str | None = None,
 ) -> AIChatbotSetting:
     """
     Archive current settings and create a new active row.
@@ -30,6 +31,7 @@ def update_settings(
     return repo.create_new_active_settings(
         source=None,
         updated_by=updated_by,
+        updated_by_username=updated_by_username,
         ActiveModel=new_settings.ActiveModel,
         ReformulatorModel=new_settings.ReformulatorModel,
         SystemPrompt=new_settings.SystemPrompt,
@@ -58,13 +60,13 @@ def update_settings(
     )
 
 
-def restore_default_settings(db: Session, updated_by: int) -> AIChatbotSetting:
+def restore_default_settings(db: Session, updated_by: int, updated_by_username: str | None = None) -> AIChatbotSetting:
     """Restore settings from system defaults (SettingID = 2)."""
     repo = SettingsRepository(db)
     default_config = repo.get_settings_by_id(2)
     if not default_config:
         raise NotFoundError("System default settings (ID 2) not found.")
-    return repo.create_new_active_settings(source=default_config, updated_by=updated_by)
+    return repo.create_new_active_settings(source=default_config, updated_by=updated_by, updated_by_username=updated_by_username)
 
 
 def get_user_theme(db: Session, user_id: int) -> UserThemePreference:

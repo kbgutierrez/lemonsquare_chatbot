@@ -5,7 +5,7 @@ Thin HTTP layer — business logic in settings_service.
 import logging
 from fastapi import APIRouter, Depends, Header
 from sqlalchemy.orm import Session
-from app.api.deps import get_chatbot_db, require_admin_user
+from app.api.deps import get_chatbot_db, require_admin_user, get_display_name
 from app.schemas.settings import (
     SettingsResponse,
     SettingsUpdate,
@@ -57,8 +57,9 @@ def update_active_settings(
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
     user_id = int(current_user.get("id", 1))
-    config = update_settings(db, new_settings, updated_by=user_id)
-    logger.info("Settings updated by user #%d: model=%s", user_id, new_settings.ActiveModel)
+    username = get_display_name(current_user)
+    config = update_settings(db, new_settings, updated_by=user_id, updated_by_username=username)
+    logger.info("Settings updated by user %s: model=%s", username, new_settings.ActiveModel)
     return SettingsResponse.model_validate(config)
 
 
@@ -68,7 +69,8 @@ def restore_settings_to_default(
     db: Session = Depends(get_chatbot_db),
 ) -> SettingsResponse:
     user_id = int(current_user.get("id", 1))
-    config = restore_default_settings(db, updated_by=user_id)
+    username = get_display_name(current_user)
+    config = restore_default_settings(db, updated_by=user_id, updated_by_username=username)
     return SettingsResponse.model_validate(config)
 
 

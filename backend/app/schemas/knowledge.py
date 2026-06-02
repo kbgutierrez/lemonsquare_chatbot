@@ -7,8 +7,10 @@ class KnowledgeExplorerResponse(BaseModel):
     id: str
     doc_type: str
     source: str | None = None
+    requester_name: str | None = None
     category: str | None = None
     content: str | dict[str, Any]
+    is_active: bool = True
 
 
 class SemanticFaqResponse(BaseModel):

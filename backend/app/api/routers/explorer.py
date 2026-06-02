@@ -457,26 +457,24 @@ async def export_learned_chats(
 
     # Header
     writer.writerow([
-        "Session ID",
-        "User ID",
-        "Issue Reported",
-        "Issue Found",
-        "Root Cause",
-        "Work Done",
-        "Resolved At",
-        "Status"
+        "session_id",
+        "user_id",
+        "username",
+        "issue_reported",
+        "issue_found",
+        "issue_cause",
+        "work_done"
     ])
 
     for c in chats:
         writer.writerow([
             c.SessionID,
             c.UserID,
+            c.RequesterName or "",
             c.IssueReported,
             c.IssueFound,
             c.RootCause,
-            c.WorkDone,
-            c.LearnedAt.strftime("%Y-%m-%d %H:%M:%S") if c.LearnedAt else "",
-            "Active" if c.IsActive else "Inactive"
+            c.WorkDone
         ])
 
     output.seek(0)

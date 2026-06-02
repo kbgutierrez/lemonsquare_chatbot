@@ -59,6 +59,7 @@ class SettingsRepository:
         self,
         source: AIChatbotSetting | None = None,
         updated_by: int = 1,
+        updated_by_username: str | None = None,
         **overrides,
     ) -> AIChatbotSetting:
         """
@@ -96,6 +97,7 @@ class SettingsRepository:
                         
             IsActive=True,
             UpdatedBy=updated_by,
+            UpdatedByUsername=updated_by_username,
         )
         self.add_settings(new_config)
         return new_config
