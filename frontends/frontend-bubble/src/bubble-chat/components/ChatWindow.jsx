@@ -71,23 +71,22 @@ const ChatWindow = ({
   ======================================== */
 
   const lockLabel =
-  lockReason ===
-  "escalated"
-    ? "This conversation is locked because it was escalated."
+  sessionTicketSubmitted
+    ? "This conversation is locked because a ticket was submitted."
 
-    : lockReason ===
-      "archived"
-      ? "This conversation has been archived."
+    : lockReason === "escalated"
+      ? "This conversation is locked because it was escalated."
 
-      : lockReason ===
-        "ticket"
-        ? "This conversation is locked because a ticket was submitted."
+      : lockReason === "archived"
+        ? "This conversation has been archived."
 
-        : lockReason ===
-          "drafting_ticket"
-          ? "This conversation is currently being escalated."
+        : lockReason === "ticket"
+          ? "This conversation is locked because a ticket was submitted."
 
-          : "This conversation has been resolved."
+          : lockReason === "drafting_ticket"
+            ? "This conversation is currently being escalated."
+
+            : "This conversation has been resolved."
 
   return (
     <section

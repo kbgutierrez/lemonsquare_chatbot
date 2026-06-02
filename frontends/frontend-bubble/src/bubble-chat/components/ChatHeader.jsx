@@ -30,15 +30,18 @@ const resolvedBadgeClass = `
 
 const ChatHeader = ({
   resolved = false,
+  ticketSubmitted = false,
   onOpenModal,
 }) => {
 
   const { theme } = useTheme()
 
   const title =
-    resolved
-      ? "Resolved Conversation"
-      : "AI Assistance"
+    ticketSubmitted
+      ? "Ticket Submitted"
+      : resolved
+        ? "Resolved Conversation"
+        : "CheeseCake Chatbot"
 
   return (
     <header
@@ -153,7 +156,9 @@ const ChatHeader = ({
                 "
               />
 
-              Resolved
+            {ticketSubmitted
+              ? "Ticket Submitted"
+              : "Resolved"}
             </span>
           )}
 

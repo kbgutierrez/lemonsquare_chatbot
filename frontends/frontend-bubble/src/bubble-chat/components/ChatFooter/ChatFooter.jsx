@@ -209,7 +209,11 @@ const ChatFooter = ({
 
         {/* LOCKED */}
         {isLocked && (
-          <ChatFooterResolved />
+          <ChatFooterResolved
+            ticketSubmitted={
+              sessionTicketSubmitted
+            }
+          />
         )}
 
         {/* FAQ */}
@@ -242,9 +246,8 @@ const ChatFooter = ({
           loading={loading}
 
           resolved={isLocked}
-
           sessionTicketSubmitted={
-            isLocked
+            sessionTicketSubmitted
           }
 
           onKeyDown={

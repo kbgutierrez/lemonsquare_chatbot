@@ -1,7 +1,9 @@
 import { Lock } from "lucide-react"
 import { useTheme } from "../../context/ThemeContext.jsx"
 
-const ChatFooterResolved = () => {
+const ChatFooterResolved = ({
+  ticketSubmitted = false,
+}) => {
   const { theme } = useTheme()
 
   return (
@@ -63,7 +65,9 @@ const ChatFooterResolved = () => {
             color: theme.resolvedBannerText,
           }}
         >
-          Conversation Resolved
+          {ticketSubmitted
+            ? "Ticket Submitted"
+            : "Conversation Resolved"}
         </p>
 
         <p
@@ -76,7 +80,9 @@ const ChatFooterResolved = () => {
             opacity: 0.8,
           }}
         >
-          This chat is now read-only.
+          {ticketSubmitted
+            ? "Your support ticket has been submitted. This chat is now read-only."
+            : "This conversation has been resolved and is now read-only."}
         </p>
       </div>
     </div>

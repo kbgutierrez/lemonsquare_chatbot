@@ -1,6 +1,15 @@
-import { Search } from "lucide-react"
+import {
+  Search,
+  Download,
+} from "lucide-react"
 
-const ResolvedChatsHeader = ({ search, setSearch }) => {
+
+
+  const ResolvedChatsHeader = ({
+    search,
+    setSearch,
+    onExport,
+  }) => {
   return (
     <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -13,7 +22,9 @@ const ResolvedChatsHeader = ({ search, setSearch }) => {
       </div>
 
       {/* SEARCH — underline style, no card */}
-      <div className="flex h-10 w-full items-center gap-2 border-b theme-border px-1 lg:w-[360px]">
+      <div className="flex h-10 w-full items-center gap-2 border-b theme-border px-1 lg:flex-1 lg:max-w-[360px]">
+        
+
         <Search className="h-4 w-4 shrink-0 text-[var(--text-muted)]" />
         <input
           value={search}
@@ -21,7 +32,29 @@ const ResolvedChatsHeader = ({ search, setSearch }) => {
           placeholder="Search resolved chats..."
           className="w-full bg-transparent text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--placeholder)]"
         />
+      
+
       </div>
+      <button
+        onClick={onExport}
+        className="
+          flex
+          h-10
+          items-center
+          gap-2
+          rounded-lg
+          border
+          theme-border
+          px-4
+          text-sm
+          transition
+          hover:bg-[var(--hover)]
+        "
+      >
+        <Download className="h-4 w-4" />
+        Export CSV
+      </button>
+     
     </div>
   )
 }
