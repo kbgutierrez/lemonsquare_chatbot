@@ -54,6 +54,7 @@ const DEFAULT_SETTINGS = Object.freeze({
 
   SettingID: null,
   UpdatedBy: null,
+  UpdatedByUsername: null,
   IsActive: false,
 })
 
@@ -105,6 +106,7 @@ const normalizeSettings = (data) => {
 
     SettingID: d.SettingID ?? null,
     UpdatedBy: d.UpdatedBy ?? null,
+    UpdatedByUsername: d.UpdatedByUsername ?? null,
     IsActive: Boolean(d.IsActive),
   }
 }
