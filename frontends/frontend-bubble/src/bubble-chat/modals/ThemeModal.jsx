@@ -289,6 +289,14 @@ const ColorRow = ({
     setHexValue,
   ] = useState(value)
 
+  const [
+    showMobileEditor,
+    setShowMobileEditor,
+  ] = useState(false)
+
+  const isMobile =
+    window.innerWidth < 768
+
   const handleHexChange =
     e => {
 
@@ -352,13 +360,23 @@ const ColorRow = ({
 
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+
+              if (isMobile) {
+
+                setShowMobileEditor(
+                  prev => !prev
+                )
+
+                return
+              }
+
               document
                 .getElementById(
                   `picker-${label.replace(/\s+/g, "-")}`
                 )
                 ?.click()
-            }
+            }}
             className="h-8 w-8 rounded-lg border border-slate-200 shadow-sm overflow-hidden relative shrink-0"
             style={{
               backgroundColor: value,
@@ -385,6 +403,36 @@ const ColorRow = ({
           className="w-[72px] rounded-lg border border-slate-200 px-2 py-1 text-[10px] font-mono uppercase text-slate-600 focus:outline-none focus:ring-1 focus:ring-violet-300 transition-all"
         />
       </div>
+
+      {showMobileEditor && isMobile && (
+        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+
+          <label className="mb-2 block text-xs font-semibold text-slate-600">
+            Enter HEX Color
+          </label>
+
+          <input
+            type="text"
+            value={hexValue}
+            onChange={handleHexChange}
+            placeholder="#7BE38E"
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono uppercase"
+          />
+
+          <div className="mt-3 flex justify-end">
+            <button
+              type="button"
+              onClick={() =>
+                setShowMobileEditor(false)
+              }
+              className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white"
+            >
+              Done
+            </button>
+          </div>
+
+        </div>
+      )}
     </div>
   )
 }
