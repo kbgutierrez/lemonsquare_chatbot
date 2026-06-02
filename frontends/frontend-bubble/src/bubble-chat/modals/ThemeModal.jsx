@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react"
@@ -474,8 +475,87 @@ const ThemeModal = ({
     setTheme,
   } = useTheme()
 
+  const [
+    draftThemeId,
+    setDraftThemeId,
+  ] = useState(activeThemeId)
+
+  const [
+    draftColors,
+    setDraftColors,
+  ] = useState(customColors)
+
+  const [
+    draftGradientEnabled,
+    setDraftGradientEnabled,
+  ] = useState(headerGradientEnabled)
+
+  useEffect(() => {
+
+    if (!isOpen) {
+      return
+    }
+
+    setDraftThemeId(
+      activeThemeId
+    )
+
+    setDraftColors(
+      customColors
+    )
+
+    setDraftGradientEnabled(
+      headerGradientEnabled
+    )
+
+  }, [
+    isOpen,
+    activeThemeId,
+    customColors,
+    headerGradientEnabled,
+  ])
+
   const isCustom =
-    activeThemeId === "custom"
+    draftThemeId === "custom"
+
+  const handleSaveTheme = () => {
+
+    if (
+      draftThemeId !==
+      activeThemeId
+    ) {
+      setTheme(
+        draftThemeId
+      )
+    }
+
+    Object.entries(
+      draftColors
+    ).forEach(
+      ([key, value]) => {
+
+        if (
+          customColors[key] !==
+          value
+        ) {
+
+          setCustomColor(
+            key,
+            value
+          )
+        }
+      }
+    )
+
+    if (
+      draftGradientEnabled !==
+      headerGradientEnabled
+    ) {
+      toggleHeaderGradient()
+    }
+
+    onClose()
+  }
 
   const preview = useMemo(() => {
 
@@ -483,9 +563,9 @@ const ThemeModal = ({
       isCustom
     ) {
 
-      return headerGradientEnabled
-        ? `linear-gradient(135deg, ${customColors.headerGradientStart}, ${customColors.headerGradientEnd})`
-        : customColors.headerGradientStart
+      return draftGradientEnabled
+        ? `linear-gradient(135deg, ${draftColors.headerGradientStart}, ${draftColors.headerGradientEnd})`
+        : draftColors.headerGradientStart
     }
 
     const found =
@@ -496,7 +576,7 @@ const ThemeModal = ({
           "linear-gradient(135deg, #f8fafc, #e2e8f0)",
         "dark":
           "linear-gradient(135deg, #1e293b, #0f172a)",
-      }[activeThemeId]
+      }[draftThemeId]
 
     return (
       found ||
@@ -504,9 +584,9 @@ const ThemeModal = ({
     )
 
   }, [
-    activeThemeId,
-    customColors,
-    headerGradientEnabled,
+    draftThemeId,
+    draftColors,
+    draftGradientEnabled,
     isCustom,
   ])
 
@@ -542,8 +622,12 @@ const ThemeModal = ({
         {/* HEADER GRADIENT TOGGLE */}
         <Toggle
           label="Header Gradient"
-          value={headerGradientEnabled}
-          onChange={toggleHeaderGradient}
+          value={draftGradientEnabled}
+          onChange={() =>
+            setDraftGradientEnabled(
+              prev => !prev
+            )
+          }
           activeColor={
             theme.accent ||
             "#008b3e"
@@ -562,11 +646,11 @@ const ThemeModal = ({
               preview={lemonLogo}
               isImage
               active={
-                activeThemeId ===
+                draftThemeId ===
                 "lemon-square"
               }
               onClick={() =>
-                setTheme(
+                setDraftThemeId(
                   "lemon-square"
                 )
               }
@@ -577,11 +661,11 @@ const ThemeModal = ({
               preview="linear-gradient(135deg, #f8fafc, #e2e8f0)"
               icon={Sun}
               active={
-                activeThemeId ===
+                draftThemeId ===
                 "light"
               }
               onClick={() =>
-                setTheme(
+                setDraftThemeId(
                   "light"
                 )
               }
@@ -592,11 +676,11 @@ const ThemeModal = ({
               preview="linear-gradient(135deg, #1e293b, #0f172a)"
               icon={Moon}
               active={
-                activeThemeId ===
+                draftThemeId ===
                 "dark"
               }
               onClick={() =>
-                setTheme(
+                setDraftThemeId(
                   "dark"
                 )
               }
@@ -617,49 +701,49 @@ const ThemeModal = ({
             <ColorRow
               label="Gradient Start"
               value={
-                customColors.headerGradientStart
+                draftColors.headerGradientStart
               }
               onChange={v =>
-                setCustomColor(
-                  "headerGradientStart",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  headerGradientStart: v,
+                }))
               }
               desc="Left side of header"
               previewType="gradient"
               previewProps={{
-                gradient: `linear-gradient(90deg, ${customColors.headerGradientStart}, ${customColors.headerGradientEnd})`,
+                gradient: `linear-gradient(90deg, ${draftColors.headerGradientStart}, ${draftColors.headerGradientEnd})`,
               }}
             />
 
             <ColorRow
               label="Gradient End"
               value={
-                customColors.headerGradientEnd
+                draftColors.headerGradientEnd
               }
               onChange={v =>
-                setCustomColor(
-                  "headerGradientEnd",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  headerGradientEnd: v,
+                }))
               }
               desc="Right side of header"
               previewType="gradient"
               previewProps={{
-                gradient: `linear-gradient(90deg, ${customColors.headerGradientEnd}, ${customColors.headerGradientStart})`,
+                gradient: `linear-gradient(90deg, ${draftColors.headerGradientEnd}, ${draftColors.headerGradientStart})`,
               }}
             />
 
             <ColorRow
               label="Header Text"
               value={
-                customColors.headerText
+                draftColors.headerText
               }
               onChange={v =>
-                setCustomColor(
-                  "headerText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  headerText: v,
+                }))
               }
               desc="Title & icon color"
               previewType="text"
@@ -668,13 +752,13 @@ const ThemeModal = ({
             <ColorRow
               label="Header Icon"
               value={
-                customColors.headerIcon
+                draftColors.headerIcon
               }
               onChange={v =>
-                setCustomColor(
-                  "headerIcon",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  headerIcon: v,
+                }))
               }
               desc="Status & menu icons"
               previewType="text"
@@ -688,50 +772,50 @@ const ThemeModal = ({
             <ColorRow
               label="Agent Bubble BG"
               value={
-                customColors.agentBubbleBg
+                draftColors.agentBubbleBg
               }
               onChange={v =>
-                setCustomColor(
-                  "agentBubbleBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentBubbleBg: v,
+                }))
               }
               desc="AI message background"
               previewType="bubble"
               previewProps={{
-                borderColor: customColors.agentBubbleBorder,
+                borderColor: draftColors.agentBubbleBorder,
               }}
             />
 
             <ColorRow
               label="Agent Bubble Border"
               value={
-                customColors.agentBubbleBorder
+                draftColors.agentBubbleBorder
               }
               onChange={v =>
-                setCustomColor(
-                  "agentBubbleBorder",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentBubbleBorder: v,
+                }))
               }
               desc="AI message border"
               previewType="bubble"
               previewProps={{
-                borderColor: customColors.agentBubbleBorder,
-                color: customColors.agentBubbleBg,
+                borderColor: draftColors.agentBubbleBorder,
+                color: draftColors.agentBubbleBg,
               }}
             />
 
             <ColorRow
               label="Agent Text"
               value={
-                customColors.agentText
+                draftColors.agentText
               }
               onChange={v =>
-                setCustomColor(
-                  "agentText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentText: v,
+                }))
               }
               desc="AI message text"
               previewType="text"
@@ -740,13 +824,13 @@ const ThemeModal = ({
             <ColorRow
               label="Agent Timestamp"
               value={
-                customColors.agentTimestamp
+                draftColors.agentTimestamp
               }
               onChange={v =>
-                setCustomColor(
-                  "agentTimestamp",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentTimestamp: v,
+                }))
               }
               desc="AI message time"
               previewType="text"
@@ -755,50 +839,50 @@ const ThemeModal = ({
             <ColorRow
               label="User Bubble BG"
               value={
-                customColors.userBubbleBg
+                draftColors.userBubbleBg
               }
               onChange={v =>
-                setCustomColor(
-                  "userBubbleBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userBubbleBg: v,
+                }))
               }
               desc="Your message background"
               previewType="bubble"
               previewProps={{
-                borderColor: customColors.userBubbleBorder,
+                borderColor: draftColors.userBubbleBorder,
               }}
             />
 
             <ColorRow
               label="User Bubble Border"
               value={
-                customColors.userBubbleBorder
+                draftColors.userBubbleBorder
               }
               onChange={v =>
-                setCustomColor(
-                  "userBubbleBorder",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userBubbleBorder: v,
+                }))
               }
               desc="Your message border"
               previewType="bubble"
               previewProps={{
-                borderColor: customColors.userBubbleBorder,
-                color: customColors.userBubbleBg,
+                borderColor: draftColors.userBubbleBorder,
+                color: draftColors.userBubbleBg,
               }}
             />
 
             <ColorRow
               label="User Text"
               value={
-                customColors.userText
+                draftColors.userText
               }
               onChange={v =>
-                setCustomColor(
-                  "userText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userText: v,
+                }))
               }
               desc="Your message text"
               previewType="text"
@@ -807,13 +891,13 @@ const ThemeModal = ({
             <ColorRow
               label="User Timestamp"
               value={
-                customColors.userTimestamp
+                draftColors.userTimestamp
               }
               onChange={v =>
-                setCustomColor(
-                  "userTimestamp",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userTimestamp: v,
+                }))
               }
               desc="Your message time"
               previewType="text"
@@ -827,13 +911,13 @@ const ThemeModal = ({
             <ColorRow
               label="Agent Avatar BG"
               value={
-                customColors.agentAvatarBg
+                draftColors.agentAvatarBg
               }
               onChange={v =>
-                setCustomColor(
-                  "agentAvatarBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentAvatarBg: v,
+                }))
               }
               desc="AI avatar circle"
               previewType="circle"
@@ -842,32 +926,32 @@ const ThemeModal = ({
             <ColorRow
               label="Agent Avatar Text"
               value={
-                customColors.agentAvatarText
+                draftColors.agentAvatarText
               }
               onChange={v =>
-                setCustomColor(
-                  "agentAvatarText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  agentAvatarText: v,
+                }))
               }
               desc="AI avatar icon"
               previewType="circle"
               previewProps={{
-                textColor: customColors.agentAvatarText,
-                color: customColors.agentAvatarBg,
+                textColor: draftColors.agentAvatarText,
+                color: draftColors.agentAvatarBg,
               }}
             />
 
             <ColorRow
               label="User Avatar BG"
               value={
-                customColors.userAvatarBg
+                draftColors.userAvatarBg
               }
               onChange={v =>
-                setCustomColor(
-                  "userAvatarBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userAvatarBg: v,
+                }))
               }
               desc="Your avatar circle"
               previewType="circle"
@@ -876,19 +960,19 @@ const ThemeModal = ({
             <ColorRow
               label="User Avatar Text"
               value={
-                customColors.userAvatarText
+                draftColors.userAvatarText
               }
               onChange={v =>
-                setCustomColor(
-                  "userAvatarText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  userAvatarText: v,
+                }))
               }
               desc="Your avatar icon"
               previewType="circle"
               previewProps={{
-                textColor: customColors.userAvatarText,
-                color: customColors.userAvatarBg,
+                textColor: draftColors.userAvatarText,
+                color: draftColors.userAvatarBg,
               }}
             />
           </Section>
@@ -900,13 +984,13 @@ const ThemeModal = ({
             <ColorRow
               label="Input Background"
               value={
-                customColors.inputBg
+                draftColors.inputBg
               }
               onChange={v =>
-                setCustomColor(
-                  "inputBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  inputBg: v,
+                }))
               }
               desc="Text field background"
               previewType="input"
@@ -915,13 +999,13 @@ const ThemeModal = ({
             <ColorRow
               label="Input Text"
               value={
-                customColors.inputText
+                draftColors.inputText
               }
               onChange={v =>
-                setCustomColor(
-                  "inputText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  inputText: v,
+                }))
               }
               desc="Typed text color"
               previewType="text"
@@ -930,13 +1014,13 @@ const ThemeModal = ({
             <ColorRow
               label="Input Placeholder"
               value={
-                customColors.inputPlaceholder
+                draftColors.inputPlaceholder
               }
               onChange={v =>
-                setCustomColor(
-                  "inputPlaceholder",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  inputPlaceholder: v,
+                }))
               }
               desc="Hint text color"
               previewType="text"
@@ -945,32 +1029,32 @@ const ThemeModal = ({
             <ColorRow
               label="Input Border"
               value={
-                customColors.inputBorder
+                draftColors.inputBorder
               }
               onChange={v =>
-                setCustomColor(
-                  "inputBorder",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  inputBorder: v,
+                }))
               }
               desc="Field outline color"
               previewType="input"
               previewProps={{
-                color: customColors.inputBg,
-                borderColor: customColors.inputBorder,
+                color: draftColors.inputBg,
+                borderColor: draftColors.inputBorder,
               }}
             />
 
             <ColorRow
               label="Send Button BG"
               value={
-                customColors.sendButtonBg
+                draftColors.sendButtonBg
               }
               onChange={v =>
-                setCustomColor(
-                  "sendButtonBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  sendButtonBg: v,
+                }))
               }
               desc="Submit button color"
               previewType="button"
@@ -979,19 +1063,19 @@ const ThemeModal = ({
             <ColorRow
               label="Send Button Icon"
               value={
-                customColors.sendButtonIcon
+                draftColors.sendButtonIcon
               }
               onChange={v =>
-                setCustomColor(
-                  "sendButtonIcon",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  sendButtonIcon: v,
+                }))
               }
               desc="Arrow icon color"
               previewType="button"
               previewProps={{
-                color: customColors.sendButtonBg,
-                textColor: customColors.sendButtonIcon,
+                color: draftColors.sendButtonBg,
+                textColor: draftColors.sendButtonIcon,
               }}
             />
           </Section>
@@ -1003,13 +1087,13 @@ const ThemeModal = ({
             <ColorRow
               label="Window Background"
               value={
-                customColors.windowBg
+                draftColors.windowBg
               }
               onChange={v =>
-                setCustomColor(
-                  "windowBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  windowBg: v,
+                }))
               }
               desc="Chat window base"
               previewType="rect"
@@ -1018,13 +1102,13 @@ const ThemeModal = ({
             <ColorRow
               label="Accent"
               value={
-                customColors.accent
+                draftColors.accent
               }
               onChange={v =>
-                setCustomColor(
-                  "accent",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  accent: v,
+                }))
               }
               desc="Highlights & glows"
               previewType="circle"
@@ -1033,13 +1117,13 @@ const ThemeModal = ({
             <ColorRow
               label="Typing Dot"
               value={
-                customColors.typingDot
+                draftColors.typingDot
               }
               onChange={v =>
-                setCustomColor(
-                  "typingDot",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  typingDot: v,
+                }))
               }
               desc="Typing indicator"
               previewType="circle"
@@ -1048,13 +1132,13 @@ const ThemeModal = ({
             <ColorRow
               label="Online Status"
               value={
-                customColors.statusOnline
+                draftColors.statusOnline
               }
               onChange={v =>
-                setCustomColor(
-                  "statusOnline",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  statusOnline: v,
+                }))
               }
               desc="Header status dot"
               previewType="circle"
@@ -1068,13 +1152,13 @@ const ThemeModal = ({
             <ColorRow
               label="Menu Background"
               value={
-                customColors.menuBg
+                draftColors.menuBg
               }
               onChange={v =>
-                setCustomColor(
-                  "menuBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  menuBg: v,
+                }))
               }
               desc="Dropdown panel"
               previewType="rect"
@@ -1083,13 +1167,13 @@ const ThemeModal = ({
             <ColorRow
               label="Menu Text"
               value={
-                customColors.menuText
+                draftColors.menuText
               }
               onChange={v =>
-                setCustomColor(
-                  "menuText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  menuText: v,
+                }))
               }
               desc="Option labels"
               previewType="text"
@@ -1098,13 +1182,13 @@ const ThemeModal = ({
             <ColorRow
               label="Menu Hover"
               value={
-                customColors.menuHoverBg
+                draftColors.menuHoverBg
               }
               onChange={v =>
-                setCustomColor(
-                  "menuHoverBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  menuHoverBg: v,
+                }))
               }
               desc="Hover state"
               previewType="rect"
@@ -1113,13 +1197,13 @@ const ThemeModal = ({
             <ColorRow
               label="Resolved Banner BG"
               value={
-                customColors.resolvedBannerBg
+                draftColors.resolvedBannerBg
               }
               onChange={v =>
-                setCustomColor(
-                  "resolvedBannerBg",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  resolvedBannerBg: v,
+                }))
               }
               desc="Resolved notice"
               previewType="rect"
@@ -1128,18 +1212,38 @@ const ThemeModal = ({
             <ColorRow
               label="Resolved Banner Text"
               value={
-                customColors.resolvedBannerText
+                draftColors.resolvedBannerText
               }
               onChange={v =>
-                setCustomColor(
-                  "resolvedBannerText",
-                  v
-                )
+                setDraftColors(prev => ({
+                  ...prev,
+                  resolvedBannerText: v,
+                }))
               }
               desc="Notice text"
               previewType="text"
             />
           </Section>
+        </div>
+
+        <div className="border-t border-slate-100 pt-4 mt-4">
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSaveTheme}
+              className="rounded-xl bg-violet-600 px-4 py-2 text-sm font-semibold text-white"
+            >
+              Save Theme
+            </button>
+          </div>
         </div>
       </div>
     </ModalShell>
