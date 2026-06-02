@@ -1,7 +1,9 @@
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { FileText, Edit3 } from "lucide-react"
 import PromptEditorModal from "./PromptEditorModal"
+
+const HOVER_DELAY_MS = 500
 
 const SettingsTextarea = ({
   label,
@@ -12,12 +14,39 @@ const SettingsTextarea = ({
   const [showPreview, setShowPreview] = useState(false)
   const [open, setOpen] = useState(false)
 
+  const hoverTimeoutRef = useRef(null)
+
+  const handleMouseEnter = () => {
+    if (!value?.trim()) return
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      setShowPreview(true)
+    }, HOVER_DELAY_MS)
+  }
+
+  const handleMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current)
+      hoverTimeoutRef.current = null
+    }
+
+    setShowPreview(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current) {
+        clearTimeout(hoverTimeoutRef.current)
+      }
+    }
+  }, [])
+
   return (
     <>
       <div
         className="group relative"
-        onMouseEnter={() => setShowPreview(true)}
-        onMouseLeave={() => setShowPreview(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         <button
           type="button"
