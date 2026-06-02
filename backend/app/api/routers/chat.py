@@ -41,7 +41,6 @@ from app.services.external.user_service import fetch_user_details
 from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
-from app.services.resolution.conversation_resolver import ConversationResolutionService
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -382,9 +381,6 @@ def clear_all_user_chats(
     }
 
 
-
-from app.services.resolution.conversation_resolver import ConversationResolutionService
-
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
 
 @router.get("/taxonomy")
@@ -415,38 +411,14 @@ async def check_chat_resolution(
             resolution_message=None
         )
 
-    msg_svc = MessageService(db)
-    
-    # 2. Grab the latest history
-    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
-    messages = msg_svc.get_all_messages(session_id)
-    
-    if not messages:
-        return ResolutionCheckResponse(
-            show_resolution_prompt=False,
-            allow_ticket_submission=True,
-            conversation_status="active",
-            resolution_action="active",
-            resolution_confidence=0.0,
-        )
-
-    # 3. Get the very last user message and AI response
-    user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
-    ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
-
-    # 4. Run the LLM Analyzer
-    resolver = ConversationResolutionService(db)
-    resolution_data = await resolver.analyze_conversation(
-        user_query=user_query,
-        ai_response=ai_response,
-        chat_history=history_text
-    )
-
+    # This endpoint is intentionally lightweight and does not invoke the LLM.
+    # It is used only to keep the frontend resolution prompt workflow safe
+    # while avoiding additional AI calls.
     return ResolutionCheckResponse(
-        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", False),
-        conversation_status=resolution_data.get("conversation_status", "active"),
-        resolution_action=resolution_data.get("resolution_action", "active"),
-        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
-        resolution_message=resolution_data.get("resolution_message")
+        show_resolution_prompt=False,
+        allow_ticket_submission=False,
+        conversation_status="active",
+        resolution_action="active",
+        resolution_confidence=0.0,
+        resolution_message=None,
     )
