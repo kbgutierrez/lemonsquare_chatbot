@@ -17,8 +17,8 @@ class SessionManager:
     def __init__(self, db: Session):
         self.repo = ChatRepository(db)
 
-    def get_or_create(self, session_id, user_id: int) -> str:
-        return self.repo.get_or_create_session(session_id, user_id)
+    def get_or_create(self, session_id, user_id: int, user_name: str | None = None) -> str:
+        return self.repo.get_or_create_session(session_id, user_id, requester_name=user_name)
 
     def archive(self, session_id: str) -> None:
         self.repo.archive_session(session_id)

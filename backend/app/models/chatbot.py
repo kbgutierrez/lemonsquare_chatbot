@@ -24,6 +24,7 @@ class ChatSession(BaseChatbot):
     __tablename__ = "ChatSession"
     SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     RequesterUserID = Column(BigInteger, nullable=False)
+    RequesterName = Column(String(150))
     ChatTitle = Column(String(255))
     StartTime = Column(DateTime, default=datetime.utcnow)
     LastActive = Column(DateTime)
@@ -48,6 +49,7 @@ class ChatMessage(BaseChatbot):
         nullable=False,
     )
     SenderRole = Column(String(10), nullable=False)
+    SenderName = Column(String(150))
     MessageContent = Column(Text, nullable=False)
     CreatedAt = Column(DateTime, default=datetime.utcnow)
     session = relationship("ChatSession", back_populates="messages")
@@ -66,14 +68,13 @@ class AIChatbotSetting(BaseChatbot):
     RerankerModel = Column(String(100))
     TopK_Tickets = Column(Integer)
     UseReformulator = Column(Boolean, default=True)
-    UseReranker = Column(Boolean, default=True)
+    UseReranker = Column(Boolean, default=False)
     ChatExtractionModel = Column(String(100))
     ChatExtractionPrompt = Column(Text)
     AllowedCategories = Column(
         String(500),
         default=(
-            "Network_Infrastructure,Hardware_Guide,Software_Documentation,"
-            "HR_IT_Policy,Troubleshooting_Manual,General_IT"
+            "General, Policies, Procedures, Software, Hardware, Network"
         ),
     )
     IsActive = Column(Boolean, default=True)
@@ -158,6 +159,7 @@ class LearnedChat(BaseChatbot):
     __tablename__ = "tbl_learned_chats"
     SessionID = Column(String(36), primary_key=True)
     UserID = Column(BigInteger)
+    RequesterName = Column(String(150))
     IssueReported = Column(Text)
     IssueFound = Column(Text)
     RootCause = Column(Text)

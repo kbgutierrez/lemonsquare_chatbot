@@ -64,6 +64,11 @@ const ResolvedChatCard = ({ item, lifecycle = "active", onDelete, onRestore }) =
             <span className="truncate text-sm font-semibold text-[var(--text-primary)]">
               {item.source}
             </span>
+            {item.requester_name && (
+              <span className="text-[10px] text-[var(--text-secondary)] bg-[var(--panel-light)] px-2 py-0.5 rounded-full border theme-border font-medium">
+                {item.requester_name}
+              </span>
+            )}
           </div>
           <p className="mt-1 line-clamp-1 text-sm text-[var(--text-secondary)]">
             {parsed["Issue Reported"] || "No issue summary available."}
@@ -102,6 +107,11 @@ const ResolvedChatCard = ({ item, lifecycle = "active", onDelete, onRestore }) =
                       {isInactive ? "Inactive Chat" : "Resolved Chat"}
                     </span>
                     <span className="text-sm text-[var(--text-secondary)]">{item.source}</span>
+                    {item.requester_name && (
+                      <span className="text-sm text-[var(--text-secondary)]">
+                        • {item.requester_name}
+                      </span>
+                    )}
                   </div>
                   <h2 className="mt-2 text-xl font-bold text-[var(--text-primary)]">
                     AI Learned Conversation

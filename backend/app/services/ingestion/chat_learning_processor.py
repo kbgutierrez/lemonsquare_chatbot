@@ -40,18 +40,27 @@ class ChatLearningProcessor:
         if not learned:
             learned = LearnedChat(
                 SessionID=session_id,
-                UserID=session.RequesterUserID
+                UserID=session.RequesterUserID,
+                RequesterName=session.RequesterName,
             )
             self.db.add(learned)
         elif learned.IsActive:
+            if not learned.RequesterName and session.RequesterName:
+                learned.RequesterName = session.RequesterName
+                try:
+                    self.db.commit()
+                except Exception:
+                    self.db.rollback()
+                    raise
             return {
                 "status": "skipped",
                 "session_id": session_id,
                 "message": "Chat has already been logged.",
             }
         else:
-            # Even if updating an existing inactive record, ensure UserID is set
+            # Even if updating an existing inactive record, ensure UserID and RequesterName are set
             learned.UserID = session.RequesterUserID
+            learned.RequesterName = session.RequesterName
 
         # Fetch dynamic settings
         from app.repositories.settings_repository import SettingsRepository

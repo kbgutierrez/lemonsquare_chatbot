@@ -7,6 +7,7 @@ Fixes:
 - prevents full backend shutdown on AI/Qdrant failure
 - keeps auth + health routes alive during partial failures
 """
+import asyncio
 import logging
 import time
 import uuid
@@ -78,9 +79,16 @@ async def lifespan(app: FastAPI):
             logger.error("Qdrant collection missing: %s", app_settings.QDRANT_COLLECTION)
         else:
             logger.info("Qdrant OK - collection exists")
-            logger.info("Preparing shared Qdrant vector store...")
-            get_shared_vector_store().prepare_collection()
-            logger.info("Shared Qdrant vector store ready")
+            logger.info("Starting shared Qdrant vector store preparation in background...")
+
+            async def prepare_qdrant_store() -> None:
+                try:
+                    await asyncio.to_thread(get_shared_vector_store().prepare_collection)
+                    logger.info("Shared Qdrant vector store ready")
+                except Exception as exc:
+                    logger.error("Shared Qdrant vector store preparation failed: %s", exc, exc_info=True)
+
+            app.state.qdrant_prepare_task = asyncio.create_task(prepare_qdrant_store())
     except Exception as exc:
         logger.error("Qdrant connection failed: %s", exc, exc_info=True)
 
