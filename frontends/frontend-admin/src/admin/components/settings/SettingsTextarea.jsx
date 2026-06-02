@@ -63,10 +63,6 @@ const SettingsTextarea = ({
                 <FileText className="h-4 w-4" />
                 <span>{value?.length || 0} characters</span>
               </div>
-
-              <p className="mt-3 text-sm font-medium text-[var(--accent)]">
-                Click to Edit
-              </p>
             </div>
 
             <Edit3 className="h-5 w-5 text-[var(--text-secondary)] transition-all duration-300 group-hover:text-[var(--accent)]" />
