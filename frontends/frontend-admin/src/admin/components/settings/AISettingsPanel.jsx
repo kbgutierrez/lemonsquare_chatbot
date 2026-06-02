@@ -58,37 +58,84 @@ const AISettingsPanel = () => {
 
   return (
     <div className="mx-auto flex h-full w-full max-w-[1700px] flex-col gap-8 overflow-y-auto pr-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {/* THEME SETTINGS */}
-      <div>
-        <SectionHeader
-          title="Appearance"
-          description="Control the admin dashboard visual theme."
-        />
-        <ConfigRow>
+
+      {/* AI CONFIGURATION STATUS */}
+      <div className="rounded-2xl border theme-border bg-[var(--card-bg)] p-5 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-[var(--accent)]" />
           <div>
-            <p className="text-sm font-semibold text-[var(--text-primary)]">Current Theme</p>
-            <p className="mt-1 text-xs text-[var(--text-secondary)]">
-              {isDark ? "Dark mode is currently active." : "Light mode is currently active."}
+            <h2 className="text-lg font-semibold text-[var(--text-primary)]">
+              AI Configuration Status
+            </h2>
+
+            <p className="text-xs text-[var(--text-secondary)]">
+              Current deployed AI configuration
             </p>
           </div>
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="flex items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#111917] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
-          >
-            {isDark ? (
-              <>
-                <Sun className="h-4 w-4" />
-                Switch to Light Mode
-              </>
-            ) : (
-              <>
-                <Moon className="h-4 w-4" />
-                Switch to Dark Mode
-              </>
-            )}
-          </button>
-        </ConfigRow>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-4">
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Configuration Version
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+              #{settings.SettingID ?? "—"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Active Model
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+              {settings.ActiveModel || "Not Configured"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Updated By
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+              {settings.UpdatedBy ?? "Unknown"}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium uppercase tracking-wide text-[var(--text-secondary)]">
+              Status
+            </p>
+            <p className="mt-1 text-sm font-semibold text-[var(--text-primary)]">
+              {settings.IsActive ? "Active" : "Inactive"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* THEME SETTINGS */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+          Appearance
+        </h3>
+
+        <button
+          type="button"
+          onClick={toggleTheme}
+          className="flex items-center justify-center gap-2 rounded-md bg-[var(--accent)] px-5 py-2.5 text-sm font-semibold text-[#111917] transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+        >
+          {isDark ? (
+            <>
+              <Sun className="h-4 w-4" />
+              Light Mode
+            </>
+          ) : (
+            <>
+              <Moon className="h-4 w-4" />
+              Dark Mode
+            </>
+          )}
+        </button>
       </div>
 
       {/* PRIMARY LLM */}
