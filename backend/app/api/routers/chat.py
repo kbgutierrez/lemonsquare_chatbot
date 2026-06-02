@@ -121,6 +121,11 @@ async def handle_chat(
         allow_ticket_submission = False
         conversation_status = "resolved_candidate"
         resolution_action = "resolved_chat"
+        # If the orchestrator did not provide a short UI message, default
+        # to a concise confirmation prompt instead of duplicating the
+        # assistant's response text in the resolution bubble.
+        if not resolution_message:
+            resolution_message = "Did i help?"
     elif str(action).lower() == "open_draft":
         show_resolution_prompt = False
         allow_ticket_submission = False
