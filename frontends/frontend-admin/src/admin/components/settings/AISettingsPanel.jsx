@@ -267,7 +267,7 @@ const AISettingsPanel = () => {
           title="Prompt Engineering"
           description="Configure system prompts and retrieval behavior."
         />
-        <div className="space-y-5">
+        <div className="grid gap-5 md:grid-cols-2">
           <SettingsTextarea
             rows={7}
             label="System Prompt"
@@ -305,7 +305,7 @@ const AISettingsPanel = () => {
           title="Pipeline Prompts"
           description="Stage-specific prompts for escalation drafting, ticket routing, document classification, and conversation resolution."
         />
-        <div className="space-y-5">
+        <div className="grid gap-5 md:grid-cols-2">
           <SettingsTextarea
             rows={5}
             label="Escalation Draft Prompt"

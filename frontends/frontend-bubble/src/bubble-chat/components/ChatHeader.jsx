@@ -41,7 +41,7 @@ const ChatHeader = ({
       ? "Ticket Submitted"
       : resolved
         ? "Resolved Conversation"
-        : "AI Assistance"
+        : "CheeseCake Chatbot"
 
   return (
     <header

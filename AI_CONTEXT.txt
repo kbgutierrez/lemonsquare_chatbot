@@ -1,0 +1,1157 @@
+
+================================================================================
+AI PROJECT CONTEXT
+================================================================================
+
+This file is generated automatically.
+Purpose: Give an LLM enough context to understand the project.
+
+
+================================================================================
+PROJECT: frontend-admin
+================================================================================
+
+
+================================================================================
+DEPENDENCIES
+================================================================================
+
+- framer-motion: ^12.38.0
+- lucide-react: ^1.14.0
+- react: ^19.2.5
+- react-dom: ^19.2.5
+
+================================================================================
+PAGES
+================================================================================
+
+- src\admin\pages\AdminDashboard.jsx
+- src\admin\pages\LoginPage.jsx
+
+================================================================================
+SERVICES
+================================================================================
+
+- src\admin\components\KnowledgeFiles\services\knowledgeFilesService.js
+- src\admin\components\manual-entries\services\manualEntriesService.js
+- src\admin\services\aiSettingsService.js
+- src\admin\services\dangerZoneService.js
+- src\admin\services\modelsService.js
+- src\admin\services\pipelineDebugService.js
+- src\admin\services\ticketAdminService.js
+- src\admin\services\uploadService.js
+
+================================================================================
+COMPONENTS
+================================================================================
+
+
+src\App.jsx
+  └─ App
+
+src\admin\components\KnowledgeFiles\FileTable.jsx
+  └─ FileTable
+
+src\admin\components\KnowledgeFiles\KnowledgeFilesSection.jsx
+  └─ KnowledgeFilesSection
+
+src\admin\components\KnowledgeFiles\components\ActionButtons.jsx
+  └─ ActionButtons
+
+src\admin\components\KnowledgeFiles\components\CategoryBadge.jsx
+  └─ CategoryBadge
+
+src\admin\components\KnowledgeFiles\components\FileTableEmpty.jsx
+  └─ FileTableEmpty
+
+src\admin\components\KnowledgeFiles\components\FileTableHeader.jsx
+  └─ FileTableHeader
+
+src\admin\components\KnowledgeFiles\components\FileTableRow.jsx
+  └─ FileTableRow
+
+src\admin\components\KnowledgeFiles\modals\DeleteConfirmationModal.jsx
+  └─ DeleteConfirmationModal
+
+src\admin\components\KnowledgeFiles\modals\EditFileModal.jsx
+  └─ EditFileModal
+
+src\admin\components\MobileSidebar.jsx
+  └─ MobileSidebar
+
+src\admin\components\SidebarMenu.jsx
+  └─ SidebarMenu
+
+src\admin\components\analytics\AnalyticsSection.jsx
+  └─ AnalyticsSection
+  └─ StatCard
+
+src\admin\components\danger-zone\DangerZoneSection.jsx
+  └─ DangerZoneSection
+
+src\admin\components\danger-zone\modals\FactoryResetModal.jsx
+  └─ FactoryResetModal
+
+src\admin\components\manual-entries\ManualEntriesSection.jsx
+  └─ ManualEntriesSection
+
+src\admin\components\manual-entries\components\ManualEntriesHeader.jsx
+  └─ ManualEntriesHeader
+
+src\admin\components\manual-entries\components\ManualEntriesPagination.jsx
+  └─ ManualEntriesPagination
+
+src\admin\components\manual-entries\components\ManualEntryCard.jsx
+  └─ FieldBlock
+  └─ ManualEntryCard
+
+src\admin\components\manual-entries\components\ManualEntryModal.jsx
+  └─ ManualEntryModal
+
+src\admin\components\manual-entries\components\ManualEntryTabs.jsx
+  └─ ManualEntryTabs
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalActions.jsx
+  └─ ManualEntryModalActions
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalContainer.jsx
+  └─ ManualEntryModalContainer
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalHeader.jsx
+  └─ ManualEntryModalHeader
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryModal.jsx
+  └─ ManualEntryCategoryModal
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryOption.jsx
+  └─ ManualEntryCategoryOption
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryTrigger.jsx
+  └─ ManualEntryCategoryTrigger
+
+src\admin\components\manual-entries\components\modal\form\ManualEntryContentTextarea.jsx
+  └─ ManualEntryContentTextarea
+
+src\admin\components\manual-entries\components\modal\form\ManualEntryTitleInput.jsx
+  └─ ManualEntryTitleInput
+
+src\admin\components\manual-entries\components\modal\layout\ManualEntryModalBackdrop.jsx
+  └─ ManualEntryModalBackdrop
+
+src\admin\components\manual-entries\components\modal\layout\ManualEntryModalShell.jsx
+  └─ ManualEntryModalShell
+
+src\admin\components\pipeline-debug\PipelineDebugSection.jsx
+  └─ PipelineDebugSection
+
+src\admin\components\pipeline-debug\components\ContextItem.jsx
+  └─ ContextItem
+
+src\admin\components\pipeline-debug\components\DebugCard.jsx
+  └─ DebugCard
+
+src\admin\components\pipeline-debug\components\DropdownCard.jsx
+  └─ DropdownCard
+
+src\admin\components\pipeline-debug\components\PipelineControls.jsx
+  └─ PipelineControls
+
+src\admin\components\pipeline-debug\components\PipelinePromptBox.jsx
+  └─ PipelinePromptBox
+
+src\admin\components\pipeline-debug\components\PipelineResults.jsx
+  └─ PipelineResults
+
+src\admin\components\resolved-chats\ResolvedChatsSection.jsx
+  └─ ResolvedChatsSection
+
+src\admin\components\resolved-chats\components\ResolvedChatCard.jsx
+  └─ FieldBlock
+  └─ ResolvedChatCard
+
+src\admin\components\resolved-chats\components\ResolvedChatsEmpty.jsx
+  └─ ResolvedChatsEmpty
+
+src\admin\components\resolved-chats\components\ResolvedChatsHeader.jsx
+  └─ ResolvedChatsHeader
+
+src\admin\components\resolved-chats\components\ResolvedChatsPagination.jsx
+  └─ ResolvedChatsPagination
+
+src\admin\components\resolved-chats\modals\ExportResolvedChatsModal.jsx
+  └─ ExportResolvedChatsModal
+
+src\admin\components\settings\AISettingsPanel.jsx
+  └─ AISettingsPanel
+  └─ ConfigRow
+  └─ SectionHeader
+
+src\admin\components\settings\SettingsActions.jsx
+  └─ SettingsActions
+
+src\admin\components\settings\SettingsHeader.jsx
+  └─ SettingsHeader
+
+src\admin\components\settings\SettingsInput.jsx
+  └─ SettingsInput
+
+src\admin\components\settings\SettingsSelect.jsx
+  └─ SettingsSelect
+
+src\admin\components\settings\SettingsTextarea.jsx
+  └─ SettingsTextarea
+
+src\admin\components\settings\SettingsToggle.jsx
+  └─ SettingsToggle
+
+src\admin\components\tickets\TicketPagination.jsx
+  └─ TicketPagination
+
+src\admin\components\tickets\TicketSearch.jsx
+  └─ TicketSearch
+
+src\admin\components\tickets\TicketStatusBadge.jsx
+  └─ TicketStatusBadge
+
+src\admin\components\tickets\TicketTable.jsx
+  └─ ConfirmationModal
+  └─ DetailBlock
+  └─ ModalPortal
+  └─ TicketTable
+
+src\admin\components\tickets\TicketsSection.jsx
+  └─ TicketsSection
+
+src\admin\components\upload\UploadDropzone.jsx
+  └─ UploadDropzone
+
+src\admin\components\upload\UploadMobileCard.jsx
+  └─ UploadMobileCard
+
+src\admin\components\upload\UploadPagination.jsx
+  └─ UploadPagination
+
+src\admin\components\upload\UploadSection.jsx
+  └─ UploadSection
+
+src\admin\components\upload\UploadStatusBadge.jsx
+  └─ UploadStatusBadge
+
+src\admin\components\upload\UploadTable.jsx
+  └─ UploadTable
+
+src\admin\components\upload\UploadTableRow.jsx
+  └─ UploadTableRow
+
+src\admin\components\upload\components\UploadActionPanel.jsx
+  └─ UploadActionPanel
+
+src\admin\components\upload\components\UploadCategorySelector.jsx
+  └─ UploadCategorySelector
+
+src\admin\layouts\AdminLayout.jsx
+  └─ AdminLayout
+
+src\admin\pages\AdminDashboard.jsx
+  └─ AdminDashboard
+
+src\admin\pages\LoginPage.jsx
+  └─ LoginPage
+
+src\shared\components\EmptyState.jsx
+  └─ EmptyState
+
+src\shared\components\ErrorState.jsx
+  └─ ErrorState
+
+src\shared\components\LoadingSpinner.jsx
+  └─ LoadingSpinner
+
+================================================================================
+HOOKS
+================================================================================
+
+- useAISettings
+- useAdminTheme
+- useCallback
+- useDown
+- useEffect
+- useEnter
+- useFileUpload
+- useHorizontalDragScroll
+- useKnowledgeFiles
+- useLeave
+- useLiveQuery
+- useManualEntries
+- useMemo
+- useMove
+- useRef
+- useResolvedChats
+- useState
+- useTickets
+- useUp
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+AI_FACTORY_DEFAULTS
+  /api/settings/factory-defaults
+
+AI_SETTINGS
+  /api/settings
+
+ANALYTICS_SUMMARY
+  /api/analytics/summary
+
+AUTH_VERIFY
+  /api/auth/verify
+
+CHAT_HISTORY
+  /api/chat/history/:sessionId
+
+CHAT_RESOLVE
+  /api/chat/resolve/:sessionId
+
+CHAT_SEND
+  /api/chat
+
+CHAT_USER_SESSIONS
+  /api/chat/user-sessions/:requesterId
+
+DOCUMENTS
+  /api/documents
+
+DOCUMENT_DEBUG_PIPELINE
+  /api/documents/debug/full-pipeline
+
+DOCUMENT_DELETE
+  /api/documents/:documentId
+
+DOCUMENT_HARD_DELETE
+  /api/documents/hard/:documentId
+
+DOCUMENT_MANUAL_ENTRY
+  /api/documents/manual
+
+DOCUMENT_MANUAL_ENTRY_DELETE
+  /api/documents/manual/:entryId
+
+DOCUMENT_MANUAL_ENTRY_HARD_DELETE
+  /api/documents/manual/hard/:entryId
+
+DOCUMENT_MANUAL_ENTRY_RESTORE
+  /api/documents/manual/:entryId/restore
+
+DOCUMENT_MANUAL_ENTRY_UPDATE
+  /api/documents/manual/:entryId
+
+DOCUMENT_RESTORE
+  /api/documents/:documentId/restore
+
+DOCUMENT_UPLOAD
+  /api/documents/upload
+
+DOCUMENT_UPLOAD_STATUS
+  /api/documents/upload/status/:jobId
+
+KNOWLEDGE_EXPLORE
+  /api/knowledge/explore
+
+KNOWLEDGE_EXPORT_LEARNED_CHATS
+  /api/knowledge/export/learned-chats
+
+LSBIZPORTAL_LOGIN
+  /api/admin/login
+
+MAINTENANCE_WIPE_ALL
+  /api/maintenance/wipe-all
+
+MODELS_GROQ
+  /api/models/groq
+
+SELF_KNOWLEDGE_DELETE
+  /api/self_knowledge/chats/:sessionId
+
+SELF_KNOWLEDGE_RESTORE
+  /api/self_knowledge/chats/:sessionId/restore
+
+SELF_KNOWLEDGE_UPDATE
+  /api/self_knowledge/chats/:sessionId
+
+TICKETS
+  /api/tickets
+
+TICKET_DELETE
+  /api/tickets/:ticketNumber
+
+TICKET_SYNC
+  /api/tickets/sync
+
+TICKET_WHITELIST
+  /api/tickets/:ticketNumber/whitelist
+
+
+================================================================================
+FASTAPI ROUTERS
+================================================================================
+
+
+================================================================================
+DATABASE TABLES
+================================================================================
+
+
+================================================================================
+IMPORT RELATIONSHIPS
+================================================================================
+
+
+eslint.config.js
+  └─ @eslint/js
+  └─ eslint-plugin-react-hooks
+  └─ eslint-plugin-react-refresh
+  └─ eslint/config
+  └─ globals
+
+src\App.jsx
+  └─ ./admin/pages/AdminDashboard.jsx
+
+src\admin\components\KnowledgeFiles\FileTable.jsx
+  └─ ../../../shared/components/EmptyState
+  └─ ../../../shared/hooks/useHorizontalDragScroll
+  └─ ./components/FileTableHeader
+  └─ ./components/FileTableRow
+  └─ ./modals/EditFileModal
+  └─ react
+
+src\admin\components\KnowledgeFiles\KnowledgeFilesSection.jsx
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ../../../shared/hooks/useHorizontalDragScroll
+  └─ ./FileTable
+  └─ ./hooks/useKnowledgeFiles
+  └─ react
+
+src\admin\components\KnowledgeFiles\components\ActionButtons.jsx
+  └─ ../modals/DeleteConfirmationModal
+  └─ react
+
+src\admin\components\KnowledgeFiles\components\FileTableEmpty.jsx
+  └─ lucide-react
+
+src\admin\components\KnowledgeFiles\components\FileTableRow.jsx
+  └─ ./ActionButtons
+  └─ ./CategoryBadge
+  └─ lucide-react
+
+src\admin\components\KnowledgeFiles\hooks\useKnowledgeFiles.js
+  └─ ../../../../shared/cache/liveQueryCache
+  └─ ../../../../shared/config/sqlVariables
+  └─ ../../../../shared/hooks/useLiveQuery
+  └─ ../../../services/aiSettingsService
+  └─ react
+
+src\admin\components\MobileSidebar.jsx
+  └─ ./SidebarMenu.jsx
+  └─ framer-motion
+  └─ lucide-react
+
+src\admin\components\SidebarMenu.jsx
+  └─ ../../assets/Lemon_logo_With_CatchPhrase.jpg
+  └─ ../constants/navigation
+  └─ lucide-react
+
+src\admin\components\analytics\AnalyticsSection.jsx
+  └─ ../../../shared/api/endpoints
+  └─ ../../../shared/components/ErrorState
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ../../../shared/hooks/useLiveQuery
+
+src\admin\components\danger-zone\DangerZoneSection.jsx
+  └─ ./modals/FactoryResetModal
+  └─ react
+
+src\admin\components\danger-zone\modals\FactoryResetModal.jsx
+  └─ ../../../services/dangerZoneService
+  └─ react-dom
+
+src\admin\components\manual-entries\ManualEntriesSection.jsx
+  └─ ../../../shared/components/EmptyState
+  └─ ../../../shared/components/ErrorState
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ./components/ManualEntriesHeader
+  └─ ./components/ManualEntriesPagination
+  └─ ./components/ManualEntryCard
+  └─ ./components/ManualEntryModal
+  └─ ./components/ManualEntryTabs
+  └─ ./hooks/useManualEntries
+  └─ lucide-react
+  └─ react
+
+src\admin\components\manual-entries\components\ManualEntriesHeader.jsx
+  └─ lucide-react
+
+src\admin\components\manual-entries\components\ManualEntryCard.jsx
+  └─ framer-motion
+  └─ react
+
+src\admin\components\manual-entries\components\ManualEntryModal.jsx
+  └─ ./modal/ManualEntryModalContainer
+  └─ ./modal/category-selector/ManualEntryCategoryModal
+  └─ ./modal/layout/ManualEntryModalBackdrop
+  └─ react-dom
+
+src\admin\components\manual-entries\components\ManualEntryTabs.jsx
+  └─ lucide-react
+  └─ react
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalActions.jsx
+  └─ lucide-react
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalContainer.jsx
+  └─ ./ManualEntryModalActions
+  └─ ./ManualEntryModalHeader
+  └─ ./category-selector/ManualEntryCategoryTrigger
+  └─ ./form/ManualEntryContentTextarea
+  └─ ./form/ManualEntryTitleInput
+
+src\admin\components\manual-entries\components\modal\ManualEntryModalHeader.jsx
+  └─ lucide-react
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryModal.jsx
+  └─ ./ManualEntryCategoryOption
+  └─ lucide-react
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryOption.jsx
+  └─ lucide-react
+
+src\admin\components\manual-entries\components\modal\category-selector\ManualEntryCategoryTrigger.jsx
+  └─ lucide-react
+
+src\admin\components\manual-entries\hooks\useManualEntries.js
+  └─ ../../../../shared/cache/liveQueryCache
+  └─ ../../../../shared/config/sqlVariables
+  └─ ../../../../shared/hooks/useLiveQuery
+  └─ ../../../services/aiSettingsService
+  └─ react
+
+src\admin\components\manual-entries\services\manualEntriesService.js
+  └─ ../utils/normalizeManualEntry
+
+src\admin\components\pipeline-debug\PipelineDebugSection.jsx
+  └─ ../../../shared/cache/liveQueryCache
+  └─ ../../../shared/components/ErrorState
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ../../services/pipelineDebugService
+  └─ ./components/PipelineControls
+  └─ ./components/PipelinePromptBox
+  └─ ./components/PipelineResults
+  └─ react
+
+src\admin\components\pipeline-debug\components\DropdownCard.jsx
+  └─ lucide-react
+  └─ react
+
+src\admin\components\pipeline-debug\components\PipelineControls.jsx
+  └─ lucide-react
+
+src\admin\components\pipeline-debug\components\PipelinePromptBox.jsx
+  └─ framer-motion
+
+src\admin\components\pipeline-debug\components\PipelineResults.jsx
+  └─ ./ContextItem
+  └─ ./DebugCard
+  └─ ./DropdownCard
+  └─ lucide-react
+
+src\admin\components\resolved-chats\ResolvedChatsSection.jsx
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ./components/ResolvedChatCard
+  └─ ./components/ResolvedChatsEmpty
+  └─ ./components/ResolvedChatsHeader
+  └─ ./components/ResolvedChatsPagination
+  └─ ./hooks/useResolvedChats
+  └─ ./modals/ExportResolvedChatsModal
+  └─ framer-motion
+  └─ lucide-react
+  └─ react
+
+src\admin\components\resolved-chats\components\ResolvedChatCard.jsx
+  └─ ../utils/parseResolvedChat
+  └─ framer-motion
+  └─ lucide-react
+  └─ react
+
+src\admin\components\resolved-chats\components\ResolvedChatsEmpty.jsx
+  └─ lucide-react
+
+src\admin\components\resolved-chats\hooks\useResolvedChats.js
+  └─ ../../../../shared/hooks/useLiveQuery
+
+src\admin\components\resolved-chats\modals\ExportResolvedChatsModal.jsx
+  └─ ../../../../shared/components/LoadingSpinner
+
+src\admin\components\settings\AISettingsPanel.jsx
+  └─ ../../../shared/hooks/useAdminTheme
+  └─ ../../data/aiModels
+  └─ ../../hooks/useAISettings
+  └─ ./SettingsActions
+  └─ ./SettingsInput
+  └─ ./SettingsSelect
+  └─ ./SettingsTextarea
+  └─ ./SettingsToggle
+  └─ lucide-react
+
+src\admin\components\settings\SettingsActions.jsx
+  └─ lucide-react
+
+src\admin\components\settings\SettingsHeader.jsx
+  └─ lucide-react
+
+src\admin\components\settings\SettingsSelect.jsx
+  └─ framer-motion
+  └─ lucide-react
+  └─ react
+
+src\admin\components\tickets\TicketSearch.jsx
+  └─ lucide-react
+
+src\admin\components\tickets\TicketTable.jsx
+  └─ ../../../shared/components/EmptyState
+  └─ ./TicketStatusBadge
+  └─ framer-motion
+  └─ react
+  └─ react-dom
+
+src\admin\components\tickets\TicketsSection.jsx
+  └─ ../../../shared/components/EmptyState
+  └─ ../../../shared/components/LoadingSpinner
+  └─ ../../hooks/useTickets
+  └─ ./TicketPagination
+  └─ ./TicketSearch
+  └─ ./TicketTable
+
+src\admin\components\upload\UploadDropzone.jsx
+  └─ ./components/UploadCategorySelector
+  └─ react
+
+src\admin\components\upload\UploadMobileCard.jsx
+  └─ ./UploadStatusBadge
+
+src\admin\components\upload\UploadSection.jsx
+  └─ ../../hooks/useFileUpload.js
+  └─ ./UploadDropzone.jsx
+  └─ ./UploadTable.jsx
+  └─ react
+
+src\admin\components\upload\UploadTable.jsx
+  └─ ../../../shared/components/EmptyState
+  └─ ./UploadMobileCard
+  └─ ./UploadPagination
+  └─ ./UploadTableRow
+
+src\admin\components\upload\UploadTableRow.jsx
+  └─ ./UploadStatusBadge
+
+src\admin\components\upload\components\UploadActionPanel.jsx
+  └─ ./UploadCategorySelector
+
+src\admin\constants\adminSections.js
+  └─ ../components/KnowledgeFiles/KnowledgeFilesSection
+  └─ ../components/analytics/AnalyticsSection
+  └─ ../components/danger-zone/DangerZoneSection
+  └─ ../components/manual-entries/ManualEntriesSection
+  └─ ../components/pipeline-debug/PipelineDebugSection
+  └─ ../components/resolved-chats/ResolvedChatsSection
+  └─ ../components/settings/AISettingsPanel
+  └─ ../components/tickets/TicketsSection
+  └─ ../components/upload/UploadSection
+
+src\admin\hooks\useAISettings.js
+  └─ ../../shared/config/sqlVariables
+  └─ ../../shared/hooks/useLiveQuery
+  └─ ../data/aiModels
+  └─ ../services/aiSettingsService
+  └─ ../services/modelsService
+
+src\admin\hooks\useFileUpload.js
+  └─ ../components/KnowledgeFiles/services/knowledgeFilesService.js
+  └─ ../services/aiSettingsService
+  └─ ../services/uploadService
+
+src\admin\hooks\useTickets.js
+  └─ ../../shared/cache/liveQueryCache
+  └─ ../../shared/hooks/useLiveQuery
+  └─ ../services/ticketAdminService
+  └─ react
+
+src\admin\pages\AdminDashboard.jsx
+  └─ ../components/MobileSidebar.jsx
+  └─ ../components/SidebarMenu.jsx
+  └─ ../constants/adminSections
+  └─ ../layouts/AdminLayout.jsx
+  └─ ./LoginPage.jsx
+  └─ react
+
+src\admin\pages\LoginPage.jsx
+  └─ ../../assets/Lemon_logo_With_CatchPhrase.jpg
+  └─ ../../shared/api/client
+  └─ ../../shared/api/endpoints
+  └─ react
+
+src\admin\services\modelsService.js
+  └─ ../../shared/api/client
+  └─ ../../shared/api/endpoints
+
+src\main.jsx
+  └─ ./App.jsx
+
+src\shared\api\client.js
+  └─ ../config/sqlVariables
+
+vite.config.js
+  └─ @vitejs/plugin-react
+  └─ vite
+
+================================================================================
+PROJECT: frontend-bubble
+================================================================================
+
+
+================================================================================
+DEPENDENCIES
+================================================================================
+
+- class-variance-authority: ^0.7.1
+- clsx: ^2.1.1
+- framer-motion: ^12.38.0
+- lucide-react: ^1.14.0
+- react: ^19.2.5
+- react-dom: ^19.2.5
+- tailwind-merge: ^3.6.0
+
+================================================================================
+PAGES
+================================================================================
+
+
+================================================================================
+SERVICES
+================================================================================
+
+- src\bubble-chat\services\chatbotService.js
+- src\bubble-chat\services\themeService.js
+- src\bubble-chat\services\ticketService.js
+
+================================================================================
+COMPONENTS
+================================================================================
+
+
+src\App.jsx
+  └─ App
+
+src\bubble-chat\BubbleChat.jsx
+  └─ BubbleChat
+  └─ BubbleChatContent
+
+src\bubble-chat\components\ChatBubble.jsx
+  └─ ChatBubble
+
+src\bubble-chat\components\ChatFooter\ChatFooter.jsx
+  └─ ChatFooter
+
+src\bubble-chat\components\ChatFooter\ChatFooterFAQ.jsx
+  └─ ChatFooterFAQ
+
+src\bubble-chat\components\ChatFooter\ChatFooterInput.jsx
+  └─ ChatFooterInput
+
+src\bubble-chat\components\ChatFooter\ChatFooterResolved.jsx
+  └─ ChatFooterResolved
+
+src\bubble-chat\components\ChatHeader.jsx
+  └─ ChatHeader
+
+src\bubble-chat\components\ChatMenu.jsx
+  └─ ChatMenu
+
+src\bubble-chat\components\ChatMessage.jsx
+  └─ Avatar
+  └─ ChatMessage
+
+src\bubble-chat\components\ChatMessages.jsx
+  └─ ChatMessages
+
+src\bubble-chat\components\ChatWindow.jsx
+  └─ ChatWindow
+
+src\bubble-chat\components\ModalShell.jsx
+  └─ ModalShell
+
+src\bubble-chat\components\ResolutionPrompt.jsx
+  └─ ResolutionPrompt
+
+src\bubble-chat\components\TicketDropdown.jsx
+  └─ TicketDropdown
+
+src\bubble-chat\components\TicketField.jsx
+  └─ TicketField
+
+src\bubble-chat\components\TicketTextarea.jsx
+  └─ TicketTextarea
+
+src\bubble-chat\context\ThemeContext.jsx
+  └─ ThemeProvider
+
+src\bubble-chat\modals\AboutHelpDeskModal.jsx
+  └─ AboutHelpDeskModal
+
+src\bubble-chat\modals\CallAgentModal.jsx
+  └─ CallAgentModal
+
+src\bubble-chat\modals\ChatHistoryModal.jsx
+  └─ ChatHistoryModal
+  └─ ClearAllConfirmModal
+  └─ ConversationCard
+  └─ DeleteConfirmModal
+  └─ EmptyState
+  └─ LoadingState
+  └─ PaginationButton
+
+src\bubble-chat\modals\ClearConversationModal.jsx
+  └─ ClearConversationModal
+
+src\bubble-chat\modals\ResolveConversationModal.jsx
+  └─ ResolveConversationModal
+
+src\bubble-chat\modals\SubmitTicketModal.jsx
+  └─ ActionButton
+  └─ ImageUploadButton
+  └─ LoadingLines
+  └─ SubmitTicketModal
+
+src\bubble-chat\modals\ThemeModal.jsx
+  └─ ColorRow
+  └─ PreviewBox
+  └─ Section
+  └─ ThemeCard
+  └─ ThemeModal
+  └─ Toggle
+
+================================================================================
+HOOKS
+================================================================================
+
+- useBubbleDrag
+- useCallback
+- useChatMessages
+- useContext
+- useConversationHistory
+- useEffect
+- useHorizontalDragScroll
+- useMemo
+- useRef
+- useState
+- useTheme
+- useTicketForm
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+
+================================================================================
+FASTAPI ROUTERS
+================================================================================
+
+
+================================================================================
+DATABASE TABLES
+================================================================================
+
+
+================================================================================
+IMPORT RELATIONSHIPS
+================================================================================
+
+
+eslint.config.js
+  └─ @eslint/js
+  └─ eslint-plugin-react-hooks
+  └─ eslint-plugin-react-refresh
+  └─ eslint/config
+  └─ globals
+
+src\App.jsx
+  └─ ./bubble-chat/BubbleChat.jsx
+
+src\bubble-chat\BubbleChat.jsx
+  └─ ./components/ChatBubble.jsx
+  └─ ./components/ChatWindow.jsx
+  └─ ./hooks/useBubbleDrag
+  └─ ./hooks/useChatMessages
+  └─ ./modals/AboutHelpDeskModal.jsx
+  └─ ./modals/ChatHistoryModal.jsx
+  └─ ./modals/ResolveConversationModal.jsx
+  └─ ./modals/SubmitTicketModal.jsx
+  └─ ./modals/ThemeModal.jsx
+  └─ ./services/chatbotService
+  └─ ./services/ticketService
+  └─ ./utils/cn
+
+src\bubble-chat\components\ChatBubble.jsx
+  └─ ../../assets/bubble-pill-icon.png
+  └─ ../../assets/expanded-pill-icon.png
+  └─ framer-motion
+
+src\bubble-chat\components\ChatFooter\ChatFooter.jsx
+  └─ ./ChatFooterFAQ.jsx
+  └─ ./ChatFooterInput.jsx
+  └─ ./ChatFooterResolved.jsx
+
+src\bubble-chat\components\ChatFooter\ChatFooterFAQ.jsx
+  └─ ../../hooks/useHorizontalDragScroll
+
+src\bubble-chat\components\ChatFooter\ChatFooterInput.jsx
+  └─ ../../../assets/Chatwindow-background.png
+  └─ ../../context/ThemeContext.jsx
+
+src\bubble-chat\components\ChatFooter\ChatFooterResolved.jsx
+  └─ ../../context/ThemeContext.jsx
+  └─ lucide-react
+
+src\bubble-chat\components\ChatHeader.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ ./ChatMenu.jsx
+
+src\bubble-chat\components\ChatMenu.jsx
+  └─ ../../assets/menubar-background.png
+
+src\bubble-chat\components\ChatMessage.jsx
+  └─ ../context/ThemeContext.jsx
+
+src\bubble-chat\components\ChatMessages.jsx
+  └─ ./ChatMessage.jsx
+  └─ ./ResolutionPrompt.jsx
+  └─ framer-motion
+
+src\bubble-chat\components\ChatWindow.jsx
+  └─ ../../assets/Chatwindow-background.png
+  └─ ../context/ThemeContext.jsx
+  └─ ./ChatFooter/ChatFooter.jsx
+  └─ ./ChatHeader.jsx
+  └─ ./ChatMessages.jsx
+
+src\bubble-chat\components\ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ framer-motion
+  └─ lucide-react
+  └─ react
+
+src\bubble-chat\components\ResolutionPrompt.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ ../utils/cn
+  └─ framer-motion
+  └─ lucide-react
+  └─ react
+
+src\bubble-chat\components\TicketDropdown.jsx
+  └─ lucide-react
+  └─ react
+
+src\bubble-chat\context\ThemeContext.jsx
+  └─ ../services/themeService
+
+src\bubble-chat\hooks\useChatMessages.js
+  └─ ../services/chatbotService
+
+src\bubble-chat\hooks\useConversationHistory.js
+  └─ ../services/chatbotService
+
+src\bubble-chat\hooks\useTicketForm.js
+  └─ ../services/chatbotService
+  └─ ../services/ticketService
+
+src\bubble-chat\modals\AboutHelpDeskModal.jsx
+  └─ ../components/ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ lucide-react
+
+src\bubble-chat\modals\CallAgentModal.jsx
+  └─ ../components/ModalShell.jsx
+
+src\bubble-chat\modals\ChatHistoryModal.jsx
+  └─ ../components/ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ ../hooks/useConversationHistory
+  └─ ../utils/cn
+  └─ react
+
+src\bubble-chat\modals\ClearConversationModal.jsx
+  └─ ../../utils/cn
+  └─ react
+
+src\bubble-chat\modals\ResolveConversationModal.jsx
+  └─ ../components/ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ ../utils/cn
+  └─ lucide-react
+  └─ react
+
+src\bubble-chat\modals\SubmitTicketModal.jsx
+  └─ ../components/ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+  └─ ../hooks/useTicketForm
+  └─ ../utils/cn
+  └─ lucide-react
+  └─ react
+
+src\bubble-chat\modals\ThemeModal.jsx
+  └─ ../../assets/Lemon_Logo_small.jpg
+  └─ ../components/ModalShell.jsx
+  └─ ../context/ThemeContext.jsx
+
+src\bubble-chat\utils\cn.js
+  └─ clsx
+  └─ tailwind-merge
+
+src\bubble-chat\utils\snapPosition.js
+  └─ ../constants/chatConfig
+
+src\main.jsx
+  └─ ./App.jsx
+  └─ react
+  └─ react-dom/client
+
+src\sdk\index.jsx
+  └─ ../bubble-chat/BubbleChat.jsx
+  └─ ../config/sqlVariables
+  └─ react
+  └─ react-dom/client
+
+vite.config.js
+  └─ @vitejs/plugin-react
+  └─ vite
+
+================================================================================
+PROJECT: backend
+================================================================================
+
+
+================================================================================
+PAGES
+================================================================================
+
+
+================================================================================
+SERVICES
+================================================================================
+
+- app\services\__init__.py
+- app\services\analytics\__init__.py
+- app\services\analytics\analytics_service.py
+- app\services\chat\__init__.py
+- app\services\chat\escalation_manager.py
+- app\services\chat\escalation_service.py
+- app\services\chat\message_service.py
+- app\services\chat\session_manager.py
+- app\services\consolidation\__init__.py
+- app\services\consolidation\knowledge_consolidator.py
+- app\services\external\__init__.py
+- app\services\external\bizportal_client.py
+- app\services\external\groq_service.py
+- app\services\external\user_service.py
+- app\services\ingestion\__init__.py
+- app\services\ingestion\chat_learning_processor.py
+- app\services\ingestion\chunking_service.py
+- app\services\ingestion\document_processor.py
+- app\services\ingestion\embedding_service.py
+- app\services\ingestion\ingestion_service.py
+- app\services\ingestion\manual_entry_processor.py
+- app\services\ingestion\pdf_processor.py
+- app\services\ingestion\ticket_processor.py
+- app\services\llm_client.py
+- app\services\maintenance\__init__.py
+- app\services\maintenance\consolidation_task.py
+- app\services\maintenance\job_manager.py
+- app\services\maintenance\maintenance_service.py
+- app\services\prompts.py
+- app\services\rag\__init__.py
+- app\services\rag\answer_generator.py
+- app\services\rag\query_reformulator.py
+- app\services\rag\support_orchestrator.py
+- app\services\resolution\__init__.py
+- app\services\resolution\conversation_resolver.py
+- app\services\retrieval\__init__.py
+- app\services\retrieval\embedding_provider.py
+- app\services\retrieval\reranker_service.py
+- app\services\retrieval\vector_store.py
+- app\services\routing\__init__.py
+- app\services\routing\routing_engine.py
+- app\services\settings\__init__.py
+- app\services\settings\runtime_config.py
+- app\services\settings\settings_service.py
+- app\services\taxonomy\__init__.py
+- app\services\taxonomy\taxonomy_service.py
+- app\services\telemetry_service.py
+
+================================================================================
+COMPONENTS
+================================================================================
+
+
+================================================================================
+HOOKS
+================================================================================
+
+
+================================================================================
+API ENDPOINTS
+================================================================================
+
+
+================================================================================
+FASTAPI ROUTERS
+================================================================================
+
+- /admin
+- /analytics
+- /auth
+- /chat
+- /documents
+- /knowledge
+- /maintenance
+- /models
+- /routing
+- /self_knowledge
+- /settings
+- /tickets
+
+================================================================================
+DATABASE TABLES
+================================================================================
+
+- AIChatbot_Settings
+- ChatMessage
+- ChatSession
+- UserThemePreferences
+- tbl_blacklisted_tickets
+- tbl_knowledge_cluster_map
+- tbl_learned_chats
+- tbl_manual_knowledge
+- tbl_ticket_evaluation
+- tbl_ticket_header
+- tbl_ticket_routing_log
+- tbl_uploaded_documents
+
+================================================================================
+IMPORT RELATIONSHIPS
+================================================================================
+
+
+================================================================================
+AI SUMMARY
+================================================================================
+
+Use the information above to understand architecture, dependencies, data flow, APIs, services, components, and backend structure.
