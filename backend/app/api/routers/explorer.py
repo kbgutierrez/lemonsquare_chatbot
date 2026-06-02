@@ -224,6 +224,9 @@ async def explore_knowledge_base(
                 "source":
                     f"Chat Session {c.SessionID[:8]}",
 
+                "requester_name":
+                    c.RequesterName,
+
                 "category":
                     "AI Extraction",
 

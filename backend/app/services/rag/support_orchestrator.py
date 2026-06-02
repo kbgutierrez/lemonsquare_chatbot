@@ -7,6 +7,7 @@ Previously a 350-line monolith with all logic inlined.
 import asyncio
 import logging
 import time
+from typing import Any
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.exceptions import AIProcessingError
@@ -72,8 +73,8 @@ class SupportOrchestrator:
         chat_history: str,
         user_name: str,
         db: Session,
-    ) -> tuple[str, str, str | None, list[int]]:
-        """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids)."""
+    ) -> tuple[str, str, str | None, list[int], dict[str, Any] | None]:
+        """Run the full RAG pipeline. Returns (display_text, action, resolution_message, ticket_ids, debug_info)."""
         try:
             return await self._run_pipeline(session_id, user_query, chat_history, user_name, db, debug=False)
         except Exception as exc:
@@ -130,19 +131,34 @@ class SupportOrchestrator:
                 draft_result = await EscalationService(db).draft_escalation(session_id)
 
                 if draft_result.get("status") == "needs_info":
-                    return draft_result.get("pushback_message", ""), "none", None, []
+                    return draft_result.get("pushback_message", ""), "none", None, [], None
 
                 return (
                     "I will now create your ticket draft for review...",
                     "open_draft",
                     None,
                     [],
+                    None,
                 )
 
         # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
+
+        debug_info: dict[str, Any] = {
+            "original_query": user_query,
+            "chat_history": chat_history,
+            "use_reformulator": bool(config.UseReformulator if config and config.UseReformulator is not None else True),
+            "use_reranker": bool(config.UseReranker if config and config.UseReranker is not None else False),
+            "top_k": None,
+            "confidence_threshold": None,
+            "reformulated_query": None,
+            "retrieval_count": 0,
+            "valid_hit_count": 0,
+            "retrieved_documents": [],
+            "final_hits": [],
+        }
 
         use_reformulator = bool(config.UseReformulator if config and config.UseReformulator is not None else True)
         use_reranker = bool(config.UseReranker if config and config.UseReranker is not None else False)
@@ -182,6 +198,7 @@ class SupportOrchestrator:
             except Exception as exc:
                 logger.warning("Reformulator failed; using original query. Error: %s", exc)
                 search_query = user_query
+        debug_info["reformulated_query"] = search_query
 
         # ── 3. Vector Search (CPU-bound --- run in thread) ─────────
         started = time.perf_counter()
@@ -202,6 +219,7 @@ class SupportOrchestrator:
         )
 
         retrieval_docs = [RetrievalDocument.from_qdrant(hit) for hit in raw_results]
+        debug_info["retrieval_count"] = len(retrieval_docs)
 
         if not retrieval_docs:
             fallback_msg = "I couldn't find any related tickets or documents in the knowledge base."
@@ -213,8 +231,8 @@ class SupportOrchestrator:
                     "final_answer": fallback_msg,
                     "ticket_ids_used": [],
                 }
-            # Non-debug: return standardized 4-tuple
-            return fallback_msg, "none", None, []
+            debug_info["final_answer"] = fallback_msg
+            return fallback_msg, "none", None, [], debug_info
 
         # ── 4. Reranking ──────────────────────────────────────────
         if use_reranker:
@@ -233,6 +251,16 @@ class SupportOrchestrator:
                 reverse=True,
             )
 
+        def summarize_doc(doc: RetrievalDocument) -> dict[str, Any]:
+            return {
+                "score": doc.score,
+                "type": doc.doc_type,
+                "source": doc.source_name,
+                "snippet": (doc.page_content or "")[:180].replace("\n", " ").strip(),
+            }
+
+        debug_info["retrieved_documents"] = [summarize_doc(doc) for doc in retrieval_docs]
+
         # ── 5. Observability Logging ──────────────────────────────
         logger.debug("Original query : %s", user_query)
         logger.debug("Search query   : %s", search_query)
@@ -248,12 +276,15 @@ class SupportOrchestrator:
 
         # ── 6. Confidence Filtering & Slot Allocation ─────────────
         valid_hits = [doc for score, doc in scored_results if score > confidence_threshold]
+        debug_info["valid_hit_count"] = len(valid_hits)
+        debug_info["confidence_threshold"] = confidence_threshold
 
         # Survival of the Fittest: Just take the absolute best items up to top_k, 
         # regardless of whether they are docs or tickets. This preserves the LLM's
         # ability to answer simple acknowledgments or greetings even when no
         # relevant documents were found.
         final_hits = valid_hits[:top_k]
+        debug_info["final_hits"] = [summarize_doc(hit) for hit in final_hits]
 
         ticket_ids = []
         for hit in final_hits:
@@ -293,6 +324,8 @@ class SupportOrchestrator:
                 "ticket_ids_used": ticket_ids,
             }
 
+        debug_info["final_answer"] = answer
+
         # Try to parse the final answer as the new JSON schema. If the LLM
         # followed instructions, we'll get a dict with `response`, `action`,
         # and `resolution_message`. Otherwise fall back to the plain text
@@ -308,4 +341,4 @@ class SupportOrchestrator:
             action = "none"
             resolution_message = None
 
-        return display_text, action, resolution_message, ticket_ids
+        return display_text, action, resolution_message, ticket_ids, debug_info

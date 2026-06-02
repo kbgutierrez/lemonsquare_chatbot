@@ -62,35 +62,71 @@ class VectorStoreService:
         """
         Ensure existing vectors have metadata.is_active=True.
         This preserves old vectors after moving retrieval to strict active filtering.
+        Quick-exits if collection is already compatible.
         """
+        # Quick compatibility check: sample first 10 points
+        logger.info("Checking collection compatibility for is_active field...")
+        sample_points, _ = self.qdrant.scroll(
+            collection_name=self.collection_name,
+            limit=10,
+            offset=None,
+            with_payload=True,
+            with_vectors=False,
+        )
+        
+        needs_backfill = False
+        for point in sample_points:
+            payload = dict(getattr(point, "payload", {}) or {})
+            raw_metadata = payload.get("metadata", {})
+            if not (isinstance(raw_metadata, dict) and "is_active" in raw_metadata):
+                needs_backfill = True
+                break
+        
+        if not needs_backfill:
+            logger.info("Collection is already compatible (all sampled points have is_active). Skipping backfill.")
+            return 0
+        
+        logger.info("Collection needs backfill. Starting full scan with batch_size=%d", batch_size)
         updated_count = 0
         offset = None
+        page_index = 0
         while True:
             points, offset = self.qdrant.scroll(
                 collection_name=self.collection_name,
                 limit=batch_size,
                 offset=offset,
                 with_payload=True,
-                with_vectors=True,
+                with_vectors=False,
             )
             if not points:
+                logger.info("Backfill active metadata complete after %d pages", page_index)
                 break
 
-            updated = []
+            page_index += 1
+            logger.info(
+                "Backfill active metadata page=%d point_count=%d offset=%s",
+                page_index,
+                len(points),
+                str(offset),
+            )
+
+            point_ids_to_update = []
             for point in points:
                 payload = dict(getattr(point, "payload", {}) or {})
                 raw_metadata = payload.get("metadata", {})
                 raw_metadata = raw_metadata if isinstance(raw_metadata, dict) else {}
                 if "is_active" in raw_metadata:
                     continue
-                metadata = normalize_metadata(raw_metadata)
-                metadata["is_active"] = True
-                payload["metadata"] = metadata
-                updated.append(PointStruct(id=point.id, vector=point.vector, payload=payload))
+                point_ids_to_update.append(point.id)
 
-            if updated:
-                self.upsert_points(updated)
-                updated_count += len(updated)
+            if point_ids_to_update:
+                self.qdrant.set_payload(
+                    collection_name=self.collection_name,
+                    payload={"is_active": True},
+                    points=point_ids_to_update,
+                    key="metadata",
+                )
+                updated_count += len(point_ids_to_update)
 
             if offset is None:
                 break
@@ -109,35 +145,41 @@ class VectorStoreService:
                 collection_name=self.collection_name,
                 field_name="metadata.knowledge_type",
                 field_schema=PayloadSchemaType.KEYWORD,
+                wait=False,
             )
             self.qdrant.create_payload_index(
                 collection_name=self.collection_name,
                 field_name="metadata.source_id",
                 field_schema=PayloadSchemaType.KEYWORD,
+                wait=False,
             )
             # Add index for source_ids (used in ticket deletion)
             self.qdrant.create_payload_index(
                 collection_name=self.collection_name,
                 field_name="metadata.source_ids",
                 field_schema=PayloadSchemaType.KEYWORD,
+                wait=False,
             )
             # Add index for ticket_number (used in ticket deletion)
             self.qdrant.create_payload_index(
                 collection_name=self.collection_name,
                 field_name="metadata.ticket_number",
                 field_schema=PayloadSchemaType.KEYWORD,
+                wait=False,
             )
             self.qdrant.create_payload_index(
                 collection_name=self.collection_name,
                 field_name="metadata.is_active",
                 field_schema=PayloadSchemaType.BOOLEAN,
+                wait=False,
             )
-            logger.info("Qdrant payload indices for hard deletes and active filtering created/verified.")
+            logger.info("Qdrant payload indices for hard deletes and active filtering scheduled (non-blocking).")
         except Exception as e:
             # It's safe to ignore if the index already exists
             logger.debug(f"Payload index setup note: {e}")
 
         # 2. Your existing backfill logic
+        logger.info("Preparing Qdrant active metadata backfill...")
         self.backfill_active_metadata()
 
     def _ticket_cluster_filter(self) -> qdrant_models.Filter:

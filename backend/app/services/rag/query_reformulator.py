@@ -36,7 +36,7 @@ class QueryReformulator:
             The reformulated search query string (merged if multiple variations).
         """
         template = prompt_template or DEFAULT_REFORMULATOR_PROMPT
-        safe_history = chat_history.strip() or "No previous history. This is the first message."
+        safe_history = chat_history.strip() or "None"
 
         llm = create_llm(model=model, temperature=0.0)
         

@@ -159,6 +159,7 @@ class LearnedChat(BaseChatbot):
     __tablename__ = "tbl_learned_chats"
     SessionID = Column(String(36), primary_key=True)
     UserID = Column(BigInteger)
+    RequesterName = Column(String(150))
     IssueReported = Column(Text)
     IssueFound = Column(Text)
     RootCause = Column(Text)

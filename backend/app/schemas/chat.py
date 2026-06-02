@@ -1,5 +1,6 @@
 """Pydantic schemas for the /chat endpoints."""
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 from pydantic import BaseModel, Field
 
@@ -20,6 +21,7 @@ class ChatResponse(BaseModel):
     resolution_action: str = "active"
     resolution_confidence: float = 0.0
     resolution_message: str | None = None
+    debug_info: dict[str, Any] | None = None
 
 
 class MessageRecord(BaseModel):

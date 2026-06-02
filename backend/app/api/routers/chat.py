@@ -90,7 +90,7 @@ async def handle_chat(
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
 
     started = time.perf_counter()
-    display_text, action, resolution_message, ticket_ids = await orchestrator.orchestrate(
+    display_text, action, resolution_message, ticket_ids, debug_info = await orchestrator.orchestrate(
         session_id=session_id,
         user_query=chat_request.message,
         chat_history=history_text,
@@ -148,6 +148,7 @@ async def handle_chat(
         resolution_action=resolution_action,
         resolution_confidence=1.0,
         resolution_message=resolution_message,
+        debug_info=debug_info,
     )
 
 
