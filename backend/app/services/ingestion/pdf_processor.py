@@ -24,12 +24,12 @@ from app.utils.text_utils import normalize_text, sha256_hash
 logger = logging.getLogger(__name__)
 
 _DEFAULT_CATEGORIES = [
-    "Network_Infrastructure",
-    "Hardware_Guide",
-    "Software_Documentation",
-    "HR_IT_Policy",
-    "Troubleshooting_Manual",
-    "General_IT",
+    "General", 
+    "Policies", 
+    "Procedures", 
+    "Software", 
+    "Hardware",  
+    "Network"
 ]
 _PDF_MAGIC = b"%PDF-"
 
@@ -97,7 +97,7 @@ class PDFProcessor:
         except Exception as exc:
             logger.error("Document classification failed: %s", exc)
             
-        return "General_IT"
+        return "General"
 
     @staticmethod
     def _extract_pdf_text(filepath: str) -> str:

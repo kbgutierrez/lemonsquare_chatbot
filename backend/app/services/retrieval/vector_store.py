@@ -139,31 +139,77 @@ class VectorStoreService:
         # 2. Your existing backfill logic
         self.backfill_active_metadata()
 
-    def search_tickets(
+    def _ticket_cluster_filter(self) -> qdrant_models.Filter:
+        return qdrant_models.Filter(
+            must=[
+                qdrant_models.FieldCondition(
+                    key="metadata.doc_type",
+                    match=qdrant_models.MatchValue(value=DOC_TYPE_CANONICAL_TICKET),
+                ),
+                self._active_condition(),
+            ],
+        )
+
+    def search_ticket_clusters(
         self,
         query_vector: list[float],
         limit: int = 5,
     ) -> list:
-        """Search ticket-like vectors (raw, canonical, resolved chats)."""
+        """Search canonical ticket cluster vectors."""
         started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
             query=query_vector,
-            query_filter=self._typed_active_filter([
-                "raw_ticket",
-                DOC_TYPE_CANONICAL_TICKET,
-                DOC_TYPE_RESOLVED_CHAT,
-            ]),
+            query_filter=self._ticket_cluster_filter(),
             with_payload=True,
             limit=limit,
         )
         logger.info(
-            "qdrant.search collection=%s kind=tickets latency_ms=%d result_count=%d",
+            "qdrant.search collection=%s kind=ticket_clusters latency_ms=%d result_count=%d",
             self.collection_name,
             int((time.perf_counter() - started) * 1000),
             len(response.points),
         )
         return response.points
+
+    def list_top_ticket_clusters(
+        self,
+        limit: int = 5,
+    ) -> list:
+        """List the most frequent ticket clusters for FAQ-style browsing."""
+        started = time.perf_counter()
+        points = []
+        offset = None
+
+        while len(points) < limit * 5:
+            page, offset = self.qdrant.scroll(
+                collection_name=self.collection_name,
+                with_payload=True,
+                with_vectors=False,
+                scroll_filter=self._ticket_cluster_filter(),
+                limit=min(limit * 10, 200),
+                offset=offset,
+            )
+            if not page:
+                break
+            points.extend(page)
+            if offset is None:
+                break
+
+        def frequency_of(point):
+            metadata = dict(getattr(point, "payload", {}) or {}).get("metadata", {})
+            return int(metadata.get("frequency", 1) or 1)
+
+        points.sort(key=frequency_of, reverse=True)
+
+        logger.info(
+            "qdrant.list_top_ticket_clusters collection=%s latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(points[:limit]),
+        )
+
+        return points[:limit]
 
     def search_documents(
         self,

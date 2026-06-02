@@ -118,12 +118,12 @@ def get_factory_defaults() -> dict:
 
     # Replicate internal categories from PDFProcessor
     default_categories = [
-        "Network_Infrastructure",
-        "Hardware_Guide",
-        "Software_Documentation",
-        "HR_IT_Policy",
-        "Troubleshooting_Manual",
-        "General_IT",
+        "General", 
+        "Policies", 
+        "Procedures", 
+        "Software", 
+        "Hardware",  
+        "Network"
     ]
 
     return {
@@ -138,7 +138,7 @@ def get_factory_defaults() -> dict:
         "RerankerModel": settings.RERANKER_MODEL,
         "TopK_Tickets": 5,
         "UseReformulator": True,
-        "UseReranker": True,
+        "UseReranker": False,
         "ChatExtractionModel": DEFAULT_CHAT_EXTRACTION_MODEL,
         "ChatExtractionPrompt": RESOLVED_CHAT_EXTRACTION_PROMPT,
         "AllowedCategories": ",".join(default_categories),

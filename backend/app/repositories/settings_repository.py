@@ -78,7 +78,7 @@ class SettingsRepository:
             RerankerModel=overrides.get("RerankerModel", source.RerankerModel if source else None),
             TopK_Tickets=overrides.get("TopK_Tickets", source.TopK_Tickets if source else 5),
             UseReformulator=overrides.get("UseReformulator", source.UseReformulator if source else True),
-            UseReranker=overrides.get("UseReranker", source.UseReranker if source else True),
+            UseReranker=overrides.get("UseReranker", source.UseReranker if source else False),
             AllowedCategories=overrides.get("AllowedCategories", source.AllowedCategories if source else None),
             ChatExtractionModel=overrides.get("ChatExtractionModel", source.ChatExtractionModel if source else None),
             ChatExtractionPrompt=overrides.get("ChatExtractionPrompt", source.ChatExtractionPrompt if source else None),

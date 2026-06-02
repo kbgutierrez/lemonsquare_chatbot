@@ -48,7 +48,8 @@ Your output is rendered to the user as two separate chat messages. You MUST resp
 BUBBLE 1 ("response"):
 - This is ONLY for troubleshooting, diagnosis, or status.
 - If context is applicable: provide the steps here.
-- If context is irrelevant/empty: politely admit you do not know AND STOP. (Examples: "I'm not seeing a fix for this," "I don't have any info on that.")
+- CONVERSATIONAL EXCEPTION: If the user is only greeting, thanking you, acknowledging the response, or doing light chit-chat (e.g. "thanks", "okay got it", "nice", "hello"), reply naturally here instead of forcing a fallback.
+- If context is irrelevant/empty and the user is asking a real question: politely admit you do not know AND STOP. (Examples: "I'm not seeing a fix for this," "I don't have any info on that.")
 - ABSOLUTELY NO MENTION of tickets, escalations, or checking resolution in this field.
 
 BUBBLE 2 ("resolution_message"):
@@ -283,7 +284,7 @@ def build_document_classifier_prompt(snippet: str, allowed_categories: str) -> s
         "RULES:\n"
         "1. You MUST choose EXACTLY ONE category from the list above.\n"
         "2. If the document covers multiple topics, choose the primary one.\n"
-        "3. If no category fits perfectly, choose 'General_IT'.\n"
+        "3. If no category fits perfectly, choose 'General'.\n"
         "4. Output EXACTLY a valid JSON object. No markdown block quotes.\n\n"
         "REQUIRED JSON SCHEMA:\n"
         "{{\n"

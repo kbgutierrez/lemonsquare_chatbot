@@ -8,6 +8,7 @@ import json
 import logging
 import csv
 import io
+import asyncio
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
@@ -30,11 +31,14 @@ from app.models.helpdesk import (
 
 from app.schemas.knowledge import (
     KnowledgeExplorerResponse,
+    SemanticFaqResponse,
 )
 
 from app.repositories.ticket_repository import (
     TicketRepository,
 )
+from app.services.retrieval.vector_store import VectorStoreService
+from app.services.retrieval.embedding_provider import get_embedding_model
 
 logger = logging.getLogger(__name__)
 
@@ -391,6 +395,45 @@ async def explore_knowledge_base(
         results = results[:limit]
 
     return results
+
+
+def _format_faq_cluster(point) -> dict:
+    payload = dict(getattr(point, "payload", {}) or {})
+    metadata = dict(payload.get("metadata", {}) or {})
+
+    return {
+        "id": metadata.get("cluster_key") or metadata.get("source_id") or str(point.id),
+        "source": metadata.get("sample_ticket_number") or metadata.get("related_ticket_numbers_sample", [None])[0] or "Ticket cluster",
+        "content": payload.get("page_content", ""),
+        "frequency": int(metadata.get("frequency", 1) or 1),
+        "ticket_count": int(metadata.get("related_ticket_count", metadata.get("frequency", 1)) or 1),
+        "sample_ticket_number": metadata.get("sample_ticket_number"),
+    }
+
+
+@router.get(
+    "/faqs",
+    response_model=list[SemanticFaqResponse],
+    summary="Search semantic FAQ ticket clusters",
+)
+async def semantic_faq_clusters(
+    q: str | None = None,
+    limit: int = 5,
+):
+    """Return semantically relevant FAQ clusters from ticket knowledge."""
+    if limit < 1:
+        limit = 1
+
+    vector_store = VectorStoreService()
+
+    if q:
+        embed_model = get_embedding_model()
+        query_vector = await asyncio.to_thread(embed_model.embed_query, q)
+        points = vector_store.search_ticket_clusters(query_vector, limit)
+    else:
+        points = vector_store.list_top_ticket_clusters(limit)
+
+    return [_format_faq_cluster(point) for point in points]
 
 
 @router.get("/export/learned-chats", summary="Export Resolved Chats to CSV")

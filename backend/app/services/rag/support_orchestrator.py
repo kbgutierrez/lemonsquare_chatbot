@@ -133,7 +133,7 @@ class SupportOrchestrator:
                     return draft_result.get("pushback_message", ""), "none", None, []
 
                 return (
-                    "Sige, kumpleto na ang detalye. Binubuksan ko na ang ticket draft...",
+                    "I will now create your ticket draft for review...",
                     "open_draft",
                     None,
                     [],
@@ -145,7 +145,7 @@ class SupportOrchestrator:
         config = settings_repo.get_active_settings()
 
         use_reformulator = bool(config.UseReformulator if config and config.UseReformulator is not None else True)
-        use_reranker = bool(config.UseReranker if config and config.UseReranker is not None else True)
+        use_reranker = bool(config.UseReranker if config and config.UseReranker is not None else False)
         top_k = limit or (config.TopK_Tickets if config and config.TopK_Tickets else 5)
         top_k = max(1, min(int(top_k), 20))
         main_model = config.ActiveModel if config else _DEFAULT_MAIN_MODEL
@@ -249,22 +249,10 @@ class SupportOrchestrator:
         # ── 6. Confidence Filtering & Slot Allocation ─────────────
         valid_hits = [doc for score, doc in scored_results if score > confidence_threshold]
 
-        if not valid_hits:
-            fallback_msg = "I'm sorry, that doesn't match any IT issues or solutions in my knowledge base."
-            if debug:
-                return {
-                    "original_query": user_query,
-                    "reformulated_query": search_query,
-                    "retrieval_results": [],
-                    "final_answer": fallback_msg,
-                    "ticket_ids_used": [],
-                }
-            # Non-debug: return standardized 4-tuple
-            return fallback_msg, "none", None, []
-
         # Survival of the Fittest: Just take the absolute best items up to top_k, 
-        # regardless of whether they are docs or tickets. This prevents "context starvation"
-        # when answering deep policy questions from PDFs.
+        # regardless of whether they are docs or tickets. This preserves the LLM's
+        # ability to answer simple acknowledgments or greetings even when no
+        # relevant documents were found.
         final_hits = valid_hits[:top_k]
 
         ticket_ids = []

@@ -66,14 +66,13 @@ class AIChatbotSetting(BaseChatbot):
     RerankerModel = Column(String(100))
     TopK_Tickets = Column(Integer)
     UseReformulator = Column(Boolean, default=True)
-    UseReranker = Column(Boolean, default=True)
+    UseReranker = Column(Boolean, default=False)
     ChatExtractionModel = Column(String(100))
     ChatExtractionPrompt = Column(Text)
     AllowedCategories = Column(
         String(500),
         default=(
-            "Network_Infrastructure,Hardware_Guide,Software_Documentation,"
-            "HR_IT_Policy,Troubleshooting_Manual,General_IT"
+            "General, Policies, Procedures, Software, Hardware, Network"
         ),
     )
     IsActive = Column(Boolean, default=True)

@@ -42,6 +42,7 @@ backend\app/
 │   ├── __init__.py
 │   ├── chat_repository.py
 │   ├── document_repository.py
+│   ├── ingestion_state_repository.py
 │   ├── settings_repository.py
 │   └── ticket_repository.py
 ├── schemas
@@ -593,7 +594,6 @@ from app.services.external.user_service import fetch_user_details
 from app.core.rate_limit import limiter
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
-from app.services.resolution.conversation_resolver import ConversationResolutionService
 from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
@@ -674,6 +674,11 @@ async def handle_chat(
         allow_ticket_submission = False
         conversation_status = "resolved_candidate"
         resolution_action = "resolved_chat"
+        # If the orchestrator did not provide a short UI message, default
+        # to a concise confirmation prompt instead of duplicating the
+        # assistant's response text in the resolution bubble.
+        if not resolution_message:
+            resolution_message = "Did i help?"
     elif str(action).lower() == "open_draft":
         show_resolution_prompt = False
         allow_ticket_submission = False
@@ -934,9 +939,6 @@ def clear_all_user_chats(
     }
 
 
-
-from app.services.resolution.conversation_resolver import ConversationResolutionService
-
 from app.services.taxonomy.taxonomy_service import get_live_taxonomy
 
 @router.get("/taxonomy")
@@ -967,40 +969,16 @@ async def check_chat_resolution(
             resolution_message=None
         )
 
-    msg_svc = MessageService(db)
-    
-    # 2. Grab the latest history
-    history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
-    messages = msg_svc.get_all_messages(session_id)
-    
-    if not messages:
-        return ResolutionCheckResponse(
-            show_resolution_prompt=False,
-            allow_ticket_submission=True,
-            conversation_status="active",
-            resolution_action="active",
-            resolution_confidence=0.0,
-        )
-
-    # 3. Get the very last user message and AI response
-    user_query = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "user"), "")
-    ai_response = next((m.MessageContent for m in reversed(messages) if m.SenderRole == "ai"), "")
-
-    # 4. Run the LLM Analyzer
-    resolver = ConversationResolutionService(db)
-    resolution_data = await resolver.analyze_conversation(
-        user_query=user_query,
-        ai_response=ai_response,
-        chat_history=history_text
-    )
-
+    # This endpoint is intentionally lightweight and does not invoke the LLM.
+    # It is used only to keep the frontend resolution prompt workflow safe
+    # while avoiding additional AI calls.
     return ResolutionCheckResponse(
-        show_resolution_prompt=resolution_data.get("show_resolution_prompt", False),
-        allow_ticket_submission=resolution_data.get("allow_ticket_submission", False),
-        conversation_status=resolution_data.get("conversation_status", "active"),
-        resolution_action=resolution_data.get("resolution_action", "active"),
-        resolution_confidence=float(resolution_data.get("resolution_confidence", 0.0)),
-        resolution_message=resolution_data.get("resolution_message")
+        show_resolution_prompt=False,
+        allow_ticket_submission=False,
+        conversation_status="active",
+        resolution_action="active",
+        resolution_confidence=0.0,
+        resolution_message=None,
     )
 
 
@@ -3301,6 +3279,14 @@ class TicketRoutingLog(BaseChatbot):
     CreatedAt = Column(DateTime, default=datetime.utcnow)
 
 
+class IngestionSyncState(BaseChatbot):
+    __tablename__ = "tbl_ingestion_sync_state"
+    EntityKey = Column(String(256), primary_key=True)
+    EntityType = Column(String(50), nullable=False)
+    ContentHash = Column(String(64), nullable=False)  # CHAR(64) effectively
+    LastSyncedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 --- FILE: backend\app\models\helpdesk.py ---
 """
 SQLAlchemy ORM models for the Helpdesk (read-only) database.
@@ -3692,6 +3678,151 @@ class DocumentRepository:
         self.db.query(ManualKnowledgeEntry).delete()
         self.db.query(LearnedChat).delete()
         self.db.commit()
+
+
+--- FILE: backend\app\repositories\ingestion_state_repository.py ---
+"""
+Repository for tracking ticket and cluster ingestion state in SQL.
+Replaces the local .ticket_cluster_state.json file.
+"""
+import logging
+import time
+from datetime import datetime
+from sqlalchemy.orm import Session
+from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
+from app.models.chatbot import IngestionSyncState
+
+logger = logging.getLogger(__name__)
+
+
+class IngestionStateRepository:
+    """Handles persistence of ingestion hashes to prevent redundant processing."""
+
+    def __init__(self, db: Session):
+        self.db = db
+
+    def get_all_state(self) -> dict[str, str]:
+        """
+        Fetches all stored entity keys and hashes.
+        Returns a dict of {EntityKey: ContentHash} for fast O(1) lookups.
+        """
+        results = self.db.execute(
+            select(IngestionSyncState.EntityKey, IngestionSyncState.ContentHash)
+        ).all()
+        return {row.EntityKey: row.ContentHash for row in results}
+
+    def bulk_upsert_state(self, records: list[dict], max_retries: int = 3) -> None:
+        """
+        Atomically updates or inserts multiple state records.
+        Uses SQL Server MERGE for atomic upserts when possible, and falls back
+        to a safe retry loop for other dialects.
+        """
+        records = self._dedupe_records(records)
+        if not records:
+            return
+
+        if self.db.bind and self.db.bind.dialect.name == "mssql":
+            self._sql_server_merge_upsert(records)
+            return
+
+        for attempt in range(max_retries):
+            try:
+                keys = [r["EntityKey"] for r in records]
+                existing = self.db.query(IngestionSyncState).filter(
+                    IngestionSyncState.EntityKey.in_(keys)
+                ).all()
+
+                existing_map = {obj.EntityKey: obj for obj in existing}
+
+                for data in records:
+                    key = data["EntityKey"]
+                    if key in existing_map:
+                        obj = existing_map[key]
+                        obj.ContentHash = data["ContentHash"]
+                        obj.EntityType = data["EntityType"]
+                        obj.LastSyncedAt = datetime.utcnow()
+                    else:
+                        new_state = IngestionSyncState(
+                            EntityKey=data["EntityKey"],
+                            EntityType=data["EntityType"],
+                            ContentHash=data["ContentHash"],
+                            LastSyncedAt=datetime.utcnow(),
+                        )
+                        self.db.add(new_state)
+
+                self.db.commit()
+                logger.info("Successfully upserted %d ingestion state records to SQL.", len(records))
+                return
+
+            except IntegrityError:
+                self.db.rollback()
+                logger.warning(
+                    "IntegrityError during bulk upsert (attempt %d/%d). Likely a concurrent insert race condition. Retrying...",
+                    attempt + 1,
+                    max_retries,
+                )
+                time.sleep(0.5)
+            except Exception as exc:
+                self.db.rollback()
+                logger.error("Failed to bulk upsert ingestion state: %s", exc)
+                raise
+
+        logger.error(
+            "Failed to bulk upsert ingestion state after %d attempts due to concurrent conflicts.",
+            max_retries,
+        )
+        raise RuntimeError(f"Could not upsert state after {max_retries} attempts.")
+
+    def _dedupe_records(self, records: list[dict]) -> list[dict]:
+        normalized: dict[str, dict] = {}
+        for record in records:
+            normalized[record["EntityKey"]] = {
+                "EntityKey": record["EntityKey"],
+                "EntityType": record["EntityType"],
+                "ContentHash": record["ContentHash"],
+            }
+        return list(normalized.values())
+
+    def _sql_server_merge_upsert(self, records: list[dict]) -> None:
+        table = IngestionSyncState.__table__
+        schema = f"[{table.schema}]" if table.schema else ""
+        table_name = f"{schema}.[{table.name}]" if schema else f"[{table.name}]"
+
+        values_list = []
+        params: dict[str, object] = {}
+        now = datetime.utcnow()
+
+        for idx, record in enumerate(records):
+            values_list.append(
+                f"(:EntityKey{idx}, :EntityType{idx}, :ContentHash{idx}, :LastSyncedAt{idx})"
+            )
+            params[f"EntityKey{idx}"] = record["EntityKey"]
+            params[f"EntityType{idx}"] = record["EntityType"]
+            params[f"ContentHash{idx}"] = record["ContentHash"]
+            params[f"LastSyncedAt{idx}"] = now
+
+        values_sql = ",\n    ".join(values_list)
+
+        sql = f"""
+MERGE INTO {table_name} AS target
+USING (VALUES
+    {values_sql}
+) AS source (EntityKey, EntityType, ContentHash, LastSyncedAt)
+ON target.EntityKey = source.EntityKey
+WHEN MATCHED THEN
+    UPDATE SET
+        ContentHash = source.ContentHash,
+        EntityType = source.EntityType,
+        LastSyncedAt = source.LastSyncedAt
+WHEN NOT MATCHED BY TARGET THEN
+    INSERT (EntityKey, EntityType, ContentHash, LastSyncedAt)
+    VALUES (source.EntityKey, source.EntityType, source.ContentHash, source.LastSyncedAt);
+"""
+
+        self.db.execute(text(sql), params)
+        self.db.commit()
+        logger.info("Successfully merged %d ingestion state records into SQL.", len(records))
 
 
 --- FILE: backend\app\repositories\settings_repository.py ---
@@ -4319,7 +4450,9 @@ Ensures consistent timeout, API key, and model configuration.
 """
 import logging
 import time
+import asyncio
 from functools import lru_cache
+from random import uniform
 from typing import Any
 from langchain_groq import ChatGroq
 from app.core.config import settings
@@ -4396,38 +4529,59 @@ async def invoke_llm(
     """Invoke Groq with consistent latency/error logging and telemetry."""
     started = time.perf_counter()
     status_code = 200
-    try:
-        result = await llm.ainvoke(prompt)
-        return result
-    except Exception as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", 500)
-        logger.warning(
-            "groq.invoke_failed action=%s model=%s status_code=%s latency_ms=%d error=%s",
-            action,
-            model,
-            status_code,
-            int((time.perf_counter() - started) * 1000),
-            exc,
-        )
-        raise
-    finally:
-        latency_ms = int((time.perf_counter() - started) * 1000)
-        TelemetryService.log(
-            model=model,
-            action=action,
-            prompt_tokens=0,
-            completion_tokens=0,
-            latency_ms=latency_ms,
-            status_code=status_code,
-            session_id=session_id,
-        )
-        logger.info(
-            "groq.latency_ms=%d action=%s model=%s status_code=%s",
-            latency_ms,
-            action,
-            model,
-            status_code,
-        )
+    retries = _GROQ_MAX_RETRIES
+    delay = 0.5
+    retryable_statuses = {429, 502, 503, 504}
+
+    while True:
+        try:
+            result = await llm.ainvoke(prompt)
+            return result
+        except Exception as exc:
+            status_code = getattr(getattr(exc, "response", None), "status_code", 500)
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            logger.warning(
+                "groq.invoke_failed action=%s model=%s status_code=%s latency_ms=%d error=%s",
+                action,
+                model,
+                status_code,
+                latency_ms,
+                exc,
+            )
+
+            if retries <= 1 or status_code not in retryable_statuses:
+                raise
+
+            retries -= 1
+            sleep_time = min(delay, 8.0) + uniform(0, 0.1)
+            logger.info(
+                "groq.retrying action=%s model=%s status_code=%s retry=%d delay=%.2fs",
+                action,
+                model,
+                status_code,
+                _GROQ_MAX_RETRIES - retries,
+                sleep_time,
+            )
+            await asyncio.sleep(sleep_time)
+            delay *= 2
+        finally:
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            TelemetryService.log(
+                model=model,
+                action=action,
+                prompt_tokens=0,
+                completion_tokens=0,
+                latency_ms=latency_ms,
+                status_code=status_code,
+                session_id=session_id,
+            )
+            logger.info(
+                "groq.latency_ms=%d action=%s model=%s status_code=%s",
+                latency_ms,
+                action,
+                model,
+                status_code,
+            )
 
 
 --- FILE: backend\app\services\prompts.py ---
@@ -4442,250 +4596,57 @@ and conversation_resolution_service.py.
 # SYSTEM PROMPT
 # =========================================================
 DEFAULT_SYSTEM_PROMPT = """
-You are Lemon Square's Helpdesk Advisor.
-
-Your job is to answer workplace, HR, maintenance, and IT concerns naturally and professionally using the provided Retrieved Context.
-
-You MUST return ONLY valid JSON.
+You are Lemon Square's Helpdesk Advisor (HR, IT, and Maintenance).
+Your job is to assist employees using ONLY the provided Retrieved Context.
 
 ========================================
 OUTPUT FORMAT
 ========================================
-
-Return EXACTLY this JSON schema:
+You must output strictly in this JSON schema:
 
 {
-  "response": string,
+  "reasoning": "1. Is context applicable? 2. Is the fix temporary/permanent? 3. What is the action?",
+  "response": "Chat Bubble 1: The diagnosis, troubleshooting steps, or polite fallback.",
   "action": "show_ticket" | "show_resolve" | "none",
-  "resolution_message": string | null
-}
-
-- "response" = the actual assistant reply shown to the user
-- "action" = determines UI behavior
-- "resolution_message" = optional UI message
-
-Do NOT return markdown.
-Do NOT wrap JSON in code blocks.
-Do NOT add explanations outside the JSON.
-
-You MAY internally reason using <think></think> tags before producing the final JSON.
-Do NOT include <think> content inside the final JSON fields.
-
-========================================
-1. STRICT CONTEXT RULES
-========================================
-
-- NEVER hallucinate.
-- NEVER invent troubleshooting steps, policies, approvals, or technical explanations.
-- ONLY answer using the Retrieved Context.
-- If the Retrieved Context does not clearly contain enough information, respond naturally and avoid guessing.
-- Do NOT invent technical details or fake solutions.
-- Do NOT guess.
-
-========================================
-2. ROLE LIMITATIONS
-========================================
-
-You are only a virtual helpdesk advisor.
-
-You cannot:
-- physically repair devices
-- dispatch technicians
-- reset passwords yourself
-- access company systems
-- confirm actions were completed unless explicitly stated
-
-Do NOT automatically force escalation unless the Retrieved Context supports it.
-
-========================================
-3. TONE & CONVERSATION STYLE
-========================================
-
-- Sound like an actual Filipino office helpdesk staff chatting naturally with a coworker.
-- Use natural Taglish commonly used in Philippine workplaces.
-- Keep responses simple, direct, and conversational.
-- Avoid deep Tagalog words, formal Filipino, or textbook wording.
-
-Avoid words like:
-- "maaaring"
-- "mangyaring"
-- "isyu"
-- "dulot"
-- "sumusunod na hakbang"
-
-Prefer natural workplace wording like:
-- "baka"
-- "parang"
-- "check mo"
-- "try mo"
-- "possible na"
-- "pa-check"
-- "di pa rin"
-- "ayaw gumana"
-
-GOOD:
-"Baka may problem sa LAN cable."
-
-GOOD:
-"Try mo muna i-restart yung PC."
-
-
-BAD:
-"Maaaring may isyu sa network connectivity."
-
-BAD:
-"Mangyaring sundin ang mga sumusunod na hakbang."
-
-- Responses should feel like:
-  - internal company chat
-  - Filipino coworker conversation
-  - actual PH helpdesk support
-
-NOT:
-  - translated English
-  - customer service script
-  - government office memo
-  - textbook Filipino
-
-- Keep sentences short and natural.
-- Do not overexplain unless necessary.
-- Sound confident but casual.
-
-========================================
-4. LANGUAGE MATCHING
-========================================
-
-- English question → English response
-- Tagalog question → Tagalog/Taglish response
-- Match the user's communication style naturally.
-
-========================================
-5. CONVERSATION CONTINUITY
-========================================
-
-Before responding, silently determine:
-
-- Is the user reporting a new issue?
-- Following up on a previous issue?
-- Answering a previous question?
-- Greeting/chatting?
-- Confirming if something worked?
-
-If the assistant previously asked a question, treat short replies as answers to that question.
-
-Examples:
-- "Samsung A14"
-- "yes"
-- "no"
-- "di gumana"
-- "still not working"
-- "okay na"
-
-These are usually continuation replies.
-
-Do NOT restart troubleshooting from zero unless the conversation clearly changed topic.
-
-Do NOT repeat the same advice unnecessarily.
-
-If the user provides:
-- device model
-- serial number
-- branch
-- ticket number
-- error code
-- confirmation reply
-
-Treat it as contextual information related to the ongoing issue.
-
-Continue the troubleshooting flow naturally.
-
-========================================
-6. RESPONSE FORMAT RULES
-========================================
-
-- Keep responses short and readable.
-- Go straight to the point.
-- Give ONLY the direct answer based on the Retrieved Context.
-- Stop the response once the answer is complete.
-- Do NOT add unnecessary follow-ups or extra conversation.
-
-Do NOT add:
-- "let me know"
-- "good luck"
-- "anything else?"
-- additional reminders
-- repeated explanations
-
-IMPORTANT FIELD SEPARATION RULES
-
-The JSON fields have different responsibilities:
-
-- "response" = diagnosis, explanation, troubleshooting guidance, or likely solution ONLY
-- "resolution_message" = optional UI CTA for Helpdesk/reporting actions
-
-When using "show_ticket":
-- keep the main "response" informational and solution-focused
-- do NOT mention:
-  - Helpdesk
-  - ticket creation
-  - reporting
-  - escalation
-  - maintenance coordination
-  - contacting IT
-inside the main "response"
-
-All Helpdesk/reporting suggestions MUST appear ONLY inside:
-"resolution_message"
-
-The assistant should still provide a useful diagnosis or likely solution inside:
-"response"
-
-GOOD:
-{
-  "response": "Possible na may problem sa LAN cable. Try mo muna i-check kung nakakabit nang maayos.",
-  "action": "none",
-  "resolution_message": null
-}
-
-BAD:
-{
-  "response": "Mukhang kailangan ipa-check sa Helpdesk yung knife rollers.",
-  "action": "show_ticket",
-  "resolution_message": "..."
-}
-
-BAD:
-{
-  "response": "Ipa-report mo ito sa maintenance.",
-  "action": "show_ticket",
-  "resolution_message": "..."
+  "resolution_message": "Chat Bubble 2: The call-to-action for tickets, escalation, OR asking if the issue is resolved. Null ONLY if inappropriate."
 }
 
 ========================================
-7. ACTION DETECTION RULES
+1. RAG & HALLUCINATION RULES
 ========================================
+- RELEVANCE CHECK: You CAN use solutions from similar historical tickets if the underlying problem is highly applicable. However, do not force a totally irrelevant document just because it shares keywords.
+- ZERO-SHOT TROUBLESHOOTING BAN: You are strictly forbidden from using your general internet knowledge to invent troubleshooting steps. If a step is not in the Retrieved Context, you CANNOT suggest it.
+- NO HALLUCINATIONS: If the context is completely irrelevant/empty, you must immediately give up and trigger "show_ticket".
+- CAPABILITY BOUNDARIES: You are a chat interface. You CANNOT check statuses, order supplies, or contact other departments. NEVER say "I will check" or "I will follow up." 
+- FILTER NOISE: Ignore unprofessional or irrelevant remarks in historical ticket resolutions.
 
-Use "show_ticket" when:
-- the user explicitly asks to create a ticket
-- the Retrieved Context shows the issue was handled through repair, replacement, inspection, technician action, or Helpdesk/Facilities coordination
-- the issue likely benefits from formal reporting or tracking
-- the issue involves physical parts, worn-out components, onsite work, or maintenance follow-up
-- similar resolved cases in the Retrieved Context resulted in replacement, repair, or manual intervention
-- the UI should gently offer a reporting/helpdesk option
+========================================
+2. TONE & STYLE (CONVERSATIONAL ENGLISH)
+========================================
+- Speak in natural, casual English like a helpful coworker chatting on Teams/Slack.
+- Keep it brief and direct. 
+- NATURAL VARIATION: Do not use the exact same phrasing every time. Vary your responses naturally.
 
-Important:
-- "show_ticket" is a UI suggestion, NOT a failure state
-- the assistant may still provide a useful diagnosis or likely resolution in the "response"
-- do NOT require the response itself to say "contact IT"
-- do NOT treat "show_ticket" as escalation panic
-- operational/reporting suggestions belong ONLY inside "resolution_message"
+========================================
+3. UI LAYOUT & FIELD LOGIC (DOUBLE CHAT BUBBLE)
+========================================
+Your output is rendered to the user as two separate chat messages. You MUST respect this separation:
 
-Use "show_resolve" ONLY if:
-- the user clearly confirms the issue is fixed
-- the assistant explicitly asks if the issue can be closed
+BUBBLE 1 ("response"):
+- This is ONLY for troubleshooting, diagnosis, or status.
+- If context is applicable: provide the steps here.
+- If context is irrelevant/empty: politely admit you do not know AND STOP. (Examples: "I'm not seeing a fix for this," "I don't have any info on that.")
+- ABSOLUTELY NO MENTION of tickets, escalations, or checking resolution in this field.
 
-Otherwise use:
-"action": "none"
+BUBBLE 2 ("resolution_message"):
+- This is ONLY for operational next steps.
+- IF action is "show_ticket": offer the ticket (e.g., "I can help you create a ticket so they can check. Proceed?").
+- IF action is "show_resolve": PROACTIVELY ask if the solution helped to encourage logging (e.g., "Did this fix the issue?", "Let me know if that worked for you!").
+
+ACTION TRIGGERS:
+- "show_ticket": Use immediately if the context is irrelevant/empty. Also use when the user asks to create a ticket, the context requires physical repair/supplies, or the context only provides a temporary workaround.
+- "show_resolve": Use whenever you provide a viable solution or troubleshooting steps from the context, OR when the user explicitly confirms the issue is fixed.
+- "none": Use ONLY for general greetings, acknowledgments, or chit-chat where no actual solution is needed regardless if it has retrieved context.
 """
 
 # =========================================================
@@ -4714,94 +4675,37 @@ DEFAULT_REFORMULATOR_PROMPT = (
 # ESCALATION DRAFTING (For Main AI - 70B)
 # =========================================================
 ESCALATION_DRAFT_PROMPT = (
-    "You are a friendly Filipino IT Helpdesk Agent assisting a user in an ongoing live chat conversation.\n"
-    "The user already clicked submit ticket before this conversation started.\n\n"
+    "You are a friendly IT Helpdesk Agent assisting a user in an ongoing live chat.\n"
+    "The user has ALREADY initiated the ticket creation process.\n\n"
 
-    "Because of this:\n"
-    "- NEVER ask if they want to create a ticket.\n"
-    "- The ticket process is already ongoing.\n"
-    "- Your role is to naturally gather missing details so the ticket can be endorsed properly.\n\n"
+    "YOUR OBJECTIVE:\n"
+    "Read the chat transcript, extract the known ticket details, and determine if enough info exists to proceed.\n\n"
 
-    "Your job is to read the chat transcript and determine if enough information exists to proceed with ticket drafting.\n\n"
+    "REQUIRED TICKET DETAILS:\n"
+    "1. issue (The problem or error)\n"
+    "2. location (Branch, floor, or area)\n"
+    "3. equipment (Specific unit number, model, or device name)\n\n"
 
-    "A complete ticket ideally includes:\n"
-    "1. Issue or Error\n"
-    "2. Location\n"
-    "3. Specific Equipment or Affected Unit\n\n"
+    "RULES OF ENGAGEMENT:\n"
+    "- NEVER ask if they want to create a ticket. The process is already ongoing.\n"
+    "- TALK NATURALLY: Use casual, conversational English (e.g., 'Got it', 'Let's get this sorted', 'I can help with that'). Avoid robotic or textbook formatting.\n"
+    "- ONE AT A TIME: If multiple details are missing, ask for ONLY ONE missing detail in your chat_message.\n"
+    "- TOLERANCE: If the user says they don't know a detail ('I don't know', 'not sure', 'no idea'), accept it. Treat that field as explicitly 'unknown' and move on to the next missing detail. Do NOT ask for it again.\n\n"
 
-    "PERSONALITY AND TONE:\n"
-    "- Talk naturally like a real Filipino IT helpdesk staff in casual professional Taglish.\n"
-    "- Sound friendly, conversational, and human.\n"
-    "- Avoid robotic or form-style wording.\n"
-    "- Keep replies concise and natural.\n"
-    "- Sound like the SAME agent continuously assisting the user.\n\n"
+    "JSON SCHEMA LOGIC:\n"
+    "1. Extract the current state of the required details. If a detail is missing, set it to null. If the user explicitly doesn't know it, set it to 'unknown'.\n"
+    "2. If ANY required detail is null, set 'is_ready' to false and write a 'chat_message' asking for ONE missing detail.\n"
+    "3. If ALL required details are either filled OR marked as 'unknown', set 'is_ready' to true and set 'chat_message' to null.\n\n"
 
-    "RESPONSE START VARIETY RULE:\n"
-    "- Vary the opening naturally across conversations.\n"
-    "- Avoid repeating the same starter every time.\n\n"
+    "OUTPUT FORMAT:\n"
+    "Return ONLY valid JSON. No markdown, no explanations outside the JSON.\n\n"
 
-    "Possible opening styles:\n"
-    "1. Assistance-focused\n"
-    "- 'Tutulungan kitang...'\n"
-    "- 'Tulungan kita...'\n"
-    "- 'Sige ayusin natin...'\n"
-    "- 'Gagawan natin yan ng ticket...'\n\n"
-
-    "2. Endorsement-focused\n"
-    "- 'Para maipasa ko agad...'\n"
-    "- 'Para ma-endorse natin agad...'\n"
-    "- 'Diretso natin yan sa Facilities...'\n"
-    "- 'Para mabilis ma-check...'\n\n"
-
-    "3. Clarification-focused\n"
-    "- 'Need ko lang ng konting details...'\n"
-    "- 'Ask ko lang sana...'\n"
-    "- 'May details ka pa ba tungkol sa...'\n\n"
-
-    "4. Follow-up acknowledgement-focused\n"
-    "- 'Noted!'\n"
-    "- 'Okay noted!'\n"
-    "- 'Sige noted!'\n"
-    "- 'Ayos noted!'\n\n"
-
-    "FIRST MESSAGE RULE:\n"
-    "- The first missing-detail question should feel welcoming and onboarding-like.\n"
-    "- Use a reassure → clarify flow.\n"
-    "- Example:\n"
-    "  'Tutulungan kitang maipasa yung ticket. Need ko lang muna kung saang branch o area itong issue.'\n\n"
-
-    "FOLLOW-UP RULE:\n"
-    "- Follow-up questions should feel lighter and conversational.\n"
-    "- Example:\n"
-    "  'Okay noted! May specific unit number ba yung aircon?'\n\n"
-
-    "MISSING DETAIL RULES:\n"
-    "- If ANY required detail is missing, set 'is_ready' to false.\n"
-    "- Ask for ONLY ONE missing detail at a time.\n"
-    "- Avoid enumerating missing fields.\n"
-    "- Continue the conversation naturally.\n\n"
-
-    "TOLERANCE RULE:\n"
-    "- If the user says they do not know a detail, accept it immediately.\n"
-    "- Examples:\n"
-    "  'ewan'\n"
-    "  'di ko alam'\n"
-    "  'not sure'\n"
-    "  'unknown'\n"
-    "- Do NOT repeatedly ask for the same detail.\n\n"
-
-    "READY RULES:\n"
-    "- If all required details are gathered OR acknowledged as unknown, set 'is_ready' to true.\n"
-    "- If 'is_ready' is true, set 'chat_message' to null.\n\n"
-
-    "OUTPUT RULES:\n"
-    "- RAW JSON ONLY.\n"
-    "- NO markdown.\n"
-    "- NO explanations.\n"
-    "- DO NOT output conversational text outside the JSON.\n\n"
-
-    "REQUIRED JSON SCHEMA:\n"
     "{{\n"
+    '  "extracted_state": {{\n'
+    '    "issue": "string | null | unknown",\n'
+    '    "location": "string | null | unknown",\n'
+    '    "equipment": "string | null | unknown"\n'
+    '  }},\n'
     '  "is_ready": boolean,\n'
     '  "chat_message": "string | null"\n'
     "}}\n\n"
@@ -4818,19 +4722,27 @@ ESCALATION_DRAFT_PROMPT = (
 # TICKET GENERATION (For Instant AI - 8B)
 # =========================================================
 TICKET_GENERATION_PROMPT = (
-    "You are an expert IT Helpdesk Dispatcher.\n"
-    "Read the chat transcript and draft a formal ticket summary and description.\n"
-    "Assume that the information provided to you is already approved even if some fields are unknown or missing. just put unknown if its not there.\n"
-    "Extract the Location and Equipment into their own fields.\n"
-    "DO NOT output any conversational text. RAW JSON ONLY. NO PREAMBLE.\n\n"
-    "Assume that the conversation is already approved for ticketing, regardless if theres sufficient information or not"
+    "You are an IT Support Assistant.\n"
+    "Read the chat transcript and generate a ticket summary and description written strictly from the USER'S first-person perspective (using 'I', 'me', 'my', or 'we').\n\n"
+
+    "EXTRACTION RULES:\n"
+    "- Write the description exactly as if the user were submitting the form themselves (e.g., 'I have a problem with my aircon', 'Our printer is broken').\n"
+    "- Assume this issue is already approved for ticketing. Do not add warnings about missing information.\n"
+    "- If Location or Equipment is not mentioned, use 'Unknown'.\n\n"
+
+    "OUTPUT FORMAT:\n"
+    "- RAW JSON ONLY.\n"
+    "- NO markdown formatting (do not use ```json).\n"
+    "- NO conversational text.\n\n"
+
     "REQUIRED JSON SCHEMA:\n"
     "{{\n"
-    '  "summary": "string (Short operational title)",\n'
-    '  "description": "string (Concise technician-style summary of the ISSUE)",\n'
-    '  "location": "string (e.g., HR Department, Branch A, or \'Unknown\')",\n'
-    '  "equipment": "string (e.g., PC #123, Printer, or \'Unknown\')"\n'
+    "  \"summary\": \"string (A short title from the user perspective, e.g., 'My monitor won't turn on')\",\n"
+    "  \"description\": \"string (The full issue described from the user's point of view)\",\n"
+    "  \"location\": \"string (e.g., HR Department, Branch A, or 'Unknown')\",\n"
+    "  \"equipment\": \"string (e.g., PC #123, Printer, or 'Unknown')\"\n"
     "}}\n\n"
+
     "CHAT TRANSCRIPT:\n"
     "=================\n"
     "{transcript}\n"
@@ -7718,7 +7630,7 @@ class PDFProcessor:
             document_id = self._document_id(filename_to_use, raw_text, category)
             
             _update(60.0, "Chunking document text...")
-            chunks = self.chunker.split_text(raw_text)
+            chunks = await asyncio.to_thread(self.chunker.split_text, raw_text)
             if not chunks:
                 raise ValidationError("Could not split extracted PDF text into chunks.")
 
@@ -7744,7 +7656,7 @@ class PDFProcessor:
 
             _update(90.0, "Saving to vector database...")
             try:
-                self.vector_store.upsert_points(points)
+                await asyncio.to_thread(self.vector_store.upsert_points, points)
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 
@@ -8218,18 +8130,6 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MAIN_MODEL = "llama-3.3-70b-versatile"
 _DEFAULT_REFORMULATOR_MODEL = "llama-3.1-8b-instant"
-LOW_SIGNAL_QUERIES = {
-    "hi",
-    "hello",
-    "hey",
-    "thanks",
-    "thank you",
-    "ok",
-    "okay",
-    "good morning",
-    "good afternoon",
-    "good evening",
-}
 
 
 class SupportOrchestrator:
@@ -8347,19 +8247,6 @@ class SupportOrchestrator:
 
         # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
-        if normalized_query in LOW_SIGNAL_QUERIES:
-            greeting_response = "Hello! How can I help you with your IT issue today?"
-            if debug:
-                return {
-                    "original_query": user_query,
-                    "reformulated_query": user_query,
-                    "retrieval_results": [],
-                    "final_answer": greeting_response,
-                    "ticket_ids_used": [],
-                }
-            # Non-debug: return standardized 4-tuple
-            return greeting_response, "none", None, []
-
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
 
@@ -8861,7 +8748,12 @@ class VectorStoreService:
                 field_name="metadata.ticket_number",
                 field_schema=PayloadSchemaType.KEYWORD,
             )
-            logger.info("Qdrant payload indices for hard deletes created/verified.")
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.is_active",
+                field_schema=PayloadSchemaType.BOOLEAN,
+            )
+            logger.info("Qdrant payload indices for hard deletes and active filtering created/verified.")
         except Exception as e:
             # It's safe to ignore if the index already exists
             logger.debug(f"Payload index setup note: {e}")
