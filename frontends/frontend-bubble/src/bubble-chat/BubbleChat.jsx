@@ -753,10 +753,10 @@ const BubbleChatContent =
                       : "auto",
 
                   width:
-                    "min(96vw,390px)",
+                    "var(--ls-chat-width, min(96vw, 390px))",
 
                   height:
-                    "min(680px,calc(100dvh - 110px))",
+                    "var(--ls-chat-height, min(680px, calc(100dvh - 110px)))",
 
                   backgroundColor:
                     theme.windowWrapperBg,
