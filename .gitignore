@@ -282,6 +282,9 @@ Thumbs.db
 Thumbs.db
 .DS_Store
 
+# Legacy State Files
+.ticket_cluster_state.json
+
 # Temporary files
 *.tmp
 *.temp

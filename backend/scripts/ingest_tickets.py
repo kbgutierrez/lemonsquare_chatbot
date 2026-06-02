@@ -14,17 +14,13 @@ What this does:
 - Groups near-identical tickets into canonical clusters
 - Builds one vector per cluster instead of one vector per raw ticket
 - Uploads in batches to Qdrant
-- Saves a local sync state file to skip unchanged clusters on later runs
-
-This is Phase 1: deterministic consolidation based on normalized content.
-It is intentionally simple and safe before moving to embedding-based clustering.
+- Uses SQL-based sync state to skip unchanged clusters on later runs
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import logging
 import re
 import sys
@@ -46,11 +42,10 @@ from app.core.database import SessionChatbot, SessionHelpdesk
 from app.core.logging import configure_logging
 from app.models.chatbot import BlacklistedTicket
 from app.models.helpdesk import TicketEvaluation
+from app.repositories.ingestion_state_repository import IngestionStateRepository
 
 configure_logging()
 logger = logging.getLogger(__name__)
-
-STATE_PATH = Path(__file__).resolve().parent.parent / ".ticket_cluster_state.json"
 
 
 @dataclass(frozen=True)
@@ -106,32 +101,6 @@ def build_content_hash(content: str) -> str:
 def make_vector_id(cluster_key: str) -> str:
     """Deterministic UUID5 so reruns overwrite the same Qdrant point."""
     return str(uuid.uuid5(uuid.NAMESPACE_DNS, f"cluster_{cluster_key}"))
-
-
-def load_state(path: Path) -> dict[str, str]:
-    """Load previous canonical cluster hashes from disk."""
-    if not path.exists():
-        return {}
-
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            return {str(k): str(v) for k, v in data.items()}
-    except Exception as exc:
-        logger.warning("Could not read state file %s: %s", path, exc)
-
-    return {}
-
-
-def save_state(path: Path, state: dict[str, str]) -> None:
-    """Persist canonical cluster hashes to disk."""
-    try:
-        path.write_text(
-            json.dumps(state, indent=2, sort_keys=True),
-            encoding="utf-8",
-        )
-    except Exception as exc:
-        logger.warning("Could not write state file %s: %s", path, exc)
 
 
 def chunked(items: list[Any], batch_size: int) -> list[list[Any]]:
@@ -360,11 +329,10 @@ def upload_batches(
     cluster_docs: list[ClusterDocument],
     embeddings: HuggingFaceEmbeddings,
     batch_size: int,
-    state_path: Path,
-    current_state: dict[str, str],
+    repo: IngestionStateRepository,
 ) -> int:
     """
-    Upload canonical cluster documents to Qdrant in batches and update state incrementally.
+    Upload documents to Qdrant in batches and update state atomically in SQL.
     Returns the number of uploaded documents.
     """
     if not cluster_docs:
@@ -378,28 +346,44 @@ def upload_batches(
         ids = [item.vector_id for item in batch]
 
         logger.info(
-            "Uploading batch %d/%d (%d canonical documents) to Qdrant collection '%s'...",
+            "Uploading batch %d/%d (%d documents) to Qdrant collection '%s'...",
             index,
             len(batches),
             len(batch),
             settings.QDRANT_COLLECTION,
         )
 
-        QdrantVectorStore.from_documents(
-            documents=docs,
-            embedding=embeddings,
-            ids=ids,
-            url=settings.QDRANT_URL,
-            api_key=settings.QDRANT_API_KEY,
-            collection_name=settings.QDRANT_COLLECTION,
-            force_recreate=False,
-        )
+        try:
+            QdrantVectorStore.from_documents(
+                documents=docs,
+                embedding=embeddings,
+                ids=ids,
+                url=settings.QDRANT_URL,
+                api_key=settings.QDRANT_API_KEY,
+                collection_name=settings.QDRANT_COLLECTION,
+                force_recreate=False,
+            )
+        except Exception as exc:
+            logger.error("Failed to upload batch to Qdrant: %s", exc)
+            # We don't update SQL if Qdrant failed
+            raise
 
-        # Incrementally update state after success
-        for item in batch:
-            current_state[item.cluster_key] = item.content_hash
+        # Atomically update SQL state after Qdrant success
+        records = [
+            {
+                "EntityKey": item.cluster_key,
+                "EntityType": item.document.metadata.get("doc_type", "unknown"),
+                "ContentHash": item.content_hash,
+            }
+            for item in batch
+        ]
         
-        save_state(state_path, current_state)
+        try:
+            repo.bulk_upsert_state(records)
+        except Exception as exc:
+            logger.error("Qdrant succeeded but SQL state update failed: %s", exc)
+            # This is the "split-brain" risk handled by the reconciler in the plan
+            raise
 
         uploaded += len(batch)
 
@@ -410,24 +394,25 @@ def run_ingestion(batch_size: int = 20) -> None:
     """Fetch tickets, consolidate them into canonical clusters, and push to Qdrant."""
     logger.info("Starting canonical ticket ingestion...")
     logger.info("Using batch size: %d", batch_size)
-    logger.info("Loading previous sync state from %s", STATE_PATH)
-
-    previous_state = load_state(STATE_PATH)
-    active_state = dict(previous_state)
 
     db_helpdesk = SessionHelpdesk()
     db_chatbot = SessionChatbot()
+    repo = IngestionStateRepository(db_chatbot)
 
     try:
+        logger.info("Loading previous sync state from SQL...")
+        previous_state = repo.get_all_state()
+        logger.info("Loaded %d state records from SQL.", len(previous_state))
+
         logger.info("Loading blacklist...")
         blacklisted_nums = fetch_blacklisted_ticket_numbers(db_chatbot)
         logger.info("Loaded %d blacklisted ticket numbers.", len(blacklisted_nums))
 
-        logger.info("Fetching resolved tickets...")
+        logger.info("Fetching resolved tickets from Helpdesk...")
         resolved_tickets = fetch_resolved_tickets(db_helpdesk)
         logger.info("Fetched %d resolved tickets.", len(resolved_tickets))
 
-        logger.info("Grouping tickets into canonical clusters...")
+        logger.info("Grouping tickets and diffing against state...")
         raw_docs, cluster_docs, skipped_blacklisted, skipped_unchanged, skipped_raw = build_cluster_documents(
             tickets=resolved_tickets,
             blacklisted_nums=blacklisted_nums,
@@ -450,31 +435,28 @@ def run_ingestion(batch_size: int = 20) -> None:
         embeddings = HuggingFaceEmbeddings(model_name=settings.EMBEDDING_MODEL)
 
         # Upload raw tickets first for exact lookup coverage
-        logger.info("Uploading %d raw ticket vectors...", len(raw_docs))
-        uploaded_raw = upload_batches(
-            cluster_docs=raw_docs,
-            embeddings=embeddings,
-            batch_size=batch_size,
-            state_path=STATE_PATH,
-            current_state=active_state,
-        )
+        if raw_docs:
+            logger.info("Uploading %d raw ticket vectors...", len(raw_docs))
+            uploaded_raw = upload_batches(
+                cluster_docs=raw_docs,
+                embeddings=embeddings,
+                batch_size=batch_size,
+                repo=repo,
+            )
+            logger.info("Uploaded %d raw tickets.", uploaded_raw)
 
         # Then upload canonical clusters for semantic memory
-        logger.info("Uploading %d canonical cluster vectors...", len(cluster_docs))
-        uploaded_canonical = upload_batches(
-            cluster_docs=cluster_docs,
-            embeddings=embeddings,
-            batch_size=batch_size,
-            state_path=STATE_PATH,
-            current_state=active_state,
-        )
+        if cluster_docs:
+            logger.info("Uploading %d canonical cluster vectors...", len(cluster_docs))
+            uploaded_canonical = upload_batches(
+                cluster_docs=cluster_docs,
+                embeddings=embeddings,
+                batch_size=batch_size,
+                repo=repo,
+            )
+            logger.info("Uploaded %d canonical clusters.", uploaded_canonical)
 
-        logger.info(
-            "Qdrant sync complete. Uploaded %d raw tickets + %d canonical clusters into '%s'.",
-            uploaded_raw,
-            uploaded_canonical,
-            settings.QDRANT_COLLECTION,
-        )
+        logger.info("Qdrant sync complete.")
 
     finally:
         db_helpdesk.close()

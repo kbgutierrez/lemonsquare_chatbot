@@ -5,7 +5,9 @@ Ensures consistent timeout, API key, and model configuration.
 """
 import logging
 import time
+import asyncio
 from functools import lru_cache
+from random import uniform
 from typing import Any
 from langchain_groq import ChatGroq
 from app.core.config import settings
@@ -82,35 +84,56 @@ async def invoke_llm(
     """Invoke Groq with consistent latency/error logging and telemetry."""
     started = time.perf_counter()
     status_code = 200
-    try:
-        result = await llm.ainvoke(prompt)
-        return result
-    except Exception as exc:
-        status_code = getattr(getattr(exc, "response", None), "status_code", 500)
-        logger.warning(
-            "groq.invoke_failed action=%s model=%s status_code=%s latency_ms=%d error=%s",
-            action,
-            model,
-            status_code,
-            int((time.perf_counter() - started) * 1000),
-            exc,
-        )
-        raise
-    finally:
-        latency_ms = int((time.perf_counter() - started) * 1000)
-        TelemetryService.log(
-            model=model,
-            action=action,
-            prompt_tokens=0,
-            completion_tokens=0,
-            latency_ms=latency_ms,
-            status_code=status_code,
-            session_id=session_id,
-        )
-        logger.info(
-            "groq.latency_ms=%d action=%s model=%s status_code=%s",
-            latency_ms,
-            action,
-            model,
-            status_code,
-        )
+    retries = _GROQ_MAX_RETRIES
+    delay = 0.5
+    retryable_statuses = {429, 502, 503, 504}
+
+    while True:
+        try:
+            result = await llm.ainvoke(prompt)
+            return result
+        except Exception as exc:
+            status_code = getattr(getattr(exc, "response", None), "status_code", 500)
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            logger.warning(
+                "groq.invoke_failed action=%s model=%s status_code=%s latency_ms=%d error=%s",
+                action,
+                model,
+                status_code,
+                latency_ms,
+                exc,
+            )
+
+            if retries <= 1 or status_code not in retryable_statuses:
+                raise
+
+            retries -= 1
+            sleep_time = min(delay, 8.0) + uniform(0, 0.1)
+            logger.info(
+                "groq.retrying action=%s model=%s status_code=%s retry=%d delay=%.2fs",
+                action,
+                model,
+                status_code,
+                _GROQ_MAX_RETRIES - retries,
+                sleep_time,
+            )
+            await asyncio.sleep(sleep_time)
+            delay *= 2
+        finally:
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            TelemetryService.log(
+                model=model,
+                action=action,
+                prompt_tokens=0,
+                completion_tokens=0,
+                latency_ms=latency_ms,
+                status_code=status_code,
+                session_id=session_id,
+            )
+            logger.info(
+                "groq.latency_ms=%d action=%s model=%s status_code=%s",
+                latency_ms,
+                action,
+                model,
+                status_code,
+            )

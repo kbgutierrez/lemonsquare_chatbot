@@ -153,7 +153,7 @@ class PDFProcessor:
             document_id = self._document_id(filename_to_use, raw_text, category)
             
             _update(60.0, "Chunking document text...")
-            chunks = self.chunker.split_text(raw_text)
+            chunks = await asyncio.to_thread(self.chunker.split_text, raw_text)
             if not chunks:
                 raise ValidationError("Could not split extracted PDF text into chunks.")
 
@@ -179,7 +179,7 @@ class PDFProcessor:
 
             _update(90.0, "Saving to vector database...")
             try:
-                self.vector_store.upsert_points(points)
+                await asyncio.to_thread(self.vector_store.upsert_points, points)
             except Exception as exc:
                 raise VectorStoreError(f"Failed to upsert document to Qdrant: {exc}") from exc
 

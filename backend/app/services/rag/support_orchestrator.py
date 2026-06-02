@@ -24,18 +24,6 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_MAIN_MODEL = "llama-3.3-70b-versatile"
 _DEFAULT_REFORMULATOR_MODEL = "llama-3.1-8b-instant"
-LOW_SIGNAL_QUERIES = {
-    "hi",
-    "hello",
-    "hey",
-    "thanks",
-    "thank you",
-    "ok",
-    "okay",
-    "good morning",
-    "good afternoon",
-    "good evening",
-}
 
 
 class SupportOrchestrator:
@@ -153,19 +141,6 @@ class SupportOrchestrator:
 
         # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
-        if normalized_query in LOW_SIGNAL_QUERIES:
-            greeting_response = "Hello! How can I help you with your IT issue today?"
-            if debug:
-                return {
-                    "original_query": user_query,
-                    "reformulated_query": user_query,
-                    "retrieval_results": [],
-                    "final_answer": greeting_response,
-                    "ticket_ids_used": [],
-                }
-            # Non-debug: return standardized 4-tuple
-            return greeting_response, "none", None, []
-
         settings_repo = SettingsRepository(db)
         config = settings_repo.get_active_settings()
 

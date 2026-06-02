@@ -126,7 +126,12 @@ class VectorStoreService:
                 field_name="metadata.ticket_number",
                 field_schema=PayloadSchemaType.KEYWORD,
             )
-            logger.info("Qdrant payload indices for hard deletes created/verified.")
+            self.qdrant.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="metadata.is_active",
+                field_schema=PayloadSchemaType.BOOLEAN,
+            )
+            logger.info("Qdrant payload indices for hard deletes and active filtering created/verified.")
         except Exception as e:
             # It's safe to ignore if the index already exists
             logger.debug(f"Payload index setup note: {e}")

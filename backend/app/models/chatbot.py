@@ -191,3 +191,11 @@ class TicketRoutingLog(BaseChatbot):
     FinalDepartment = Column(String(100))
     FinalSubcategory = Column(String(100))
     CreatedAt = Column(DateTime, default=datetime.utcnow)
+
+
+class IngestionSyncState(BaseChatbot):
+    __tablename__ = "tbl_ingestion_sync_state"
+    EntityKey = Column(String(256), primary_key=True)
+    EntityType = Column(String(50), nullable=False)
+    ContentHash = Column(String(64), nullable=False)  # CHAR(64) effectively
+    LastSyncedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
