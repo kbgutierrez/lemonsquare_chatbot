@@ -73,12 +73,18 @@ async def handle_chat(
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)
 
-    session_id = await asyncio.to_thread(session_mgr.get_or_create, chat_request.session_id, user_id)
+    session_id = await asyncio.to_thread(
+        session_mgr.get_or_create,
+        chat_request.session_id,
+        user_id,
+        user_name,
+    )
 
     await asyncio.to_thread(
         msg_svc.save_user_message,
         session_id=session_id,
         content=chat_request.message,
+        user_name=user_name,
     )
 
     history_text = await asyncio.to_thread(msg_svc.get_history_text, session_id)
@@ -167,6 +173,7 @@ async def get_chat_history(
                 MessageID=msg.MessageID,
                 SessionID=msg.SessionID,
                 SenderRole=msg.SenderRole,
+                SenderName=getattr(msg, "SenderName", None),
                 MessageContent=msg.MessageContent,
                 CreatedAt=(
                     msg.CreatedAt.isoformat()

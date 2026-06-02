@@ -13,6 +13,7 @@ from qdrant_client.http.models import PayloadSchemaType, PointStruct
 from app.core.config import settings
 from app.core.metadata_contract import (
     DOC_TYPE_CANONICAL_TICKET,
+    DOC_TYPE_RAW_TICKET,
     DOC_TYPE_GENERAL_TEXT,
     DOC_TYPE_OFFICIAL_DOCUMENT,
     DOC_TYPE_RESOLVED_CHAT,
@@ -166,6 +167,32 @@ class VectorStoreService:
         )
         logger.info(
             "qdrant.search collection=%s kind=ticket_clusters latency_ms=%d result_count=%d",
+            self.collection_name,
+            int((time.perf_counter() - started) * 1000),
+            len(response.points),
+        )
+        return response.points
+
+    def search_tickets(
+        self,
+        query_vector: list[float],
+        limit: int = 5,
+    ) -> list:
+        """Search raw tickets, resolved chats, and canonical ticket vectors."""
+        started = time.perf_counter()
+        response = self.qdrant.query_points(
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=self._typed_active_filter([
+                    "raw_ticket",
+                DOC_TYPE_CANONICAL_TICKET,
+                DOC_TYPE_RESOLVED_CHAT,
+            ]),
+            with_payload=True,
+            limit=limit,
+        )
+        logger.info(
+            "qdrant.search collection=%s kind=tickets latency_ms=%d result_count=%d",
             self.collection_name,
             int((time.perf_counter() - started) * 1000),
             len(response.points),

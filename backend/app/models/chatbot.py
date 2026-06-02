@@ -24,6 +24,7 @@ class ChatSession(BaseChatbot):
     __tablename__ = "ChatSession"
     SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     RequesterUserID = Column(BigInteger, nullable=False)
+    RequesterName = Column(String(150))
     ChatTitle = Column(String(255))
     StartTime = Column(DateTime, default=datetime.utcnow)
     LastActive = Column(DateTime)
@@ -48,6 +49,7 @@ class ChatMessage(BaseChatbot):
         nullable=False,
     )
     SenderRole = Column(String(10), nullable=False)
+    SenderName = Column(String(150))
     MessageContent = Column(Text, nullable=False)
     CreatedAt = Column(DateTime, default=datetime.utcnow)
     session = relationship("ChatSession", back_populates="messages")

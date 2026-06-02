@@ -23,12 +23,13 @@ class ChatRepository:
 
     # ── Session Operations ─────────────────────────────────────
 
-    def create_session(self, user_id: int) -> str:
-        """Create a new active chat session for a user."""
+    def create_session(self, user_id: int, requester_name: str | None = None) -> str:
+        """Create a new active chat session for a user. Optionally store the requester name."""
         new_id = str(uuid.uuid4())
         session = ChatSession(
             SessionID=new_id,
             RequesterUserID=user_id,
+            RequesterName=requester_name,
             SessionStatus="Active",
             IsActive=True,
         )
@@ -60,7 +61,7 @@ class ChatRepository:
             raise NotFoundError(f"Chat session '{session_id}' not found.")
         return session
 
-    def get_or_create_session(self, session_id, user_id: int) -> str:
+    def get_or_create_session(self, session_id, user_id: int, requester_name: str | None = None) -> str:
         """Get existing session or create new one. Returns session ID string."""
         is_new = (
             not session_id
@@ -68,7 +69,7 @@ class ChatRepository:
             or str(session_id).strip() == ""
         )
         if is_new:
-            return self.create_session(user_id)
+            return self.create_session(user_id, requester_name=requester_name)
 
         normalized = str(session_id)
         existing = self.get_session_by_id(normalized)
@@ -130,11 +131,12 @@ class ChatRepository:
 
     # ── Message Operations ─────────────────────────────────────
 
-    def save_message(self, session_id: str, role: str, content: str) -> None:
-        """Save a chat message and update session last active."""
+    def save_message(self, session_id: str, role: str, content: str, sender_name: str | None = None) -> None:
+        """Save a chat message and update session last active. Optionally store sender name."""
         self.db.add(ChatMessage(
             SessionID=session_id,
             SenderRole=role,
+            SenderName=sender_name,
             MessageContent=content,
         ))
         self.db.execute(

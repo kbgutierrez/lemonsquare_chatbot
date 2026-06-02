@@ -12,11 +12,11 @@ class MessageService:
     def __init__(self, db: Session):
         self.repo = ChatRepository(db)
 
-    def save_user_message(self, session_id: str, content: str) -> None:
-        self.repo.save_message(session_id, "user", content)
+    def save_user_message(self, session_id: str, content: str, user_name: str | None = None) -> None:
+        self.repo.save_message(session_id, "user", content, sender_name=user_name)
 
     def save_ai_message(self, session_id: str, content: str) -> None:
-        self.repo.save_message(session_id, "ai", content)
+        self.repo.save_message(session_id, "ai", content, sender_name="Assistant")
 
     def get_history_text(self, session_id: str) -> str:
         return self.repo.get_recent_history_text(session_id)

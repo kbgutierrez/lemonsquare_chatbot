@@ -26,6 +26,7 @@ class MessageRecord(BaseModel):
     MessageID: int
     SessionID: str
     SenderRole: str
+    SenderName: str | None = None
     MessageContent: str
     CreatedAt: str
 
@@ -44,6 +45,7 @@ class ChatSessionMetaResponse(BaseModel):
     created_at: datetime | None
     message_count: int
     user_id: str | None = None
+    requester_name: str | None = None
 
 
 class ResolveChatResponse(BaseModel):
