@@ -685,8 +685,6 @@ const BubbleChatContent =
         className={cn(
           "lemonsquare-chat-root",
           "pointer-events-none",
-          "fixed inset-0",
-          "z-[9999]",
           "flex items-center justify-center"
         )}
       >
