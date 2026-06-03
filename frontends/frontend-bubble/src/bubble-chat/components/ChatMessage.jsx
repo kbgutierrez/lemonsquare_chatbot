@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatMessage.jsx
 import {
   memo,
   useMemo,
@@ -105,12 +106,14 @@ const ChatMessage = ({
         borderColor: theme.agentBubbleBorder,
         color: theme.agentText,
         boxShadow: `0 3px 10px ${theme.agentBubbleShadow}`,
+        borderRadius: "12px 12px 12px 4px",
       }
     : {
         backgroundColor: theme.userBubbleBg,
         borderColor: theme.userBubbleBorder,
         color: theme.userText,
         boxShadow: `0 3px 10px ${theme.userBubbleShadow}`,
+        borderRadius: "12px 12px 4px 12px",
       }
 
   const avatarProps = isAgent
@@ -160,8 +163,6 @@ const ChatMessage = ({
       <div
         className="
           max-w-[75%]
-
-          rounded-xl
 
           px-3
           py-2

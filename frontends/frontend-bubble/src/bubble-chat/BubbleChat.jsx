@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/BubbleChat.jsx
 import {
   useEffect,
   useRef,
@@ -684,9 +685,9 @@ const BubbleChatContent =
         className={cn(
           "lemonsquare-chat-root",
           "pointer-events-none",
-          "fixed bottom-0 left-0",
-          "h-0 w-0",
-          "z-[9999]"
+          "fixed inset-0",
+          "z-[9999]",
+          "flex items-center justify-center"
         )}
       >
 
@@ -765,7 +766,7 @@ const BubbleChatContent =
                 className={cn(
                   "absolute z-10",
                   "overflow-hidden",
-                  "rounded-[28px] sm:rounded-[32px]",
+                  "rounded-[16px]",
                   "backdrop-blur-2xl"
                 )}
 

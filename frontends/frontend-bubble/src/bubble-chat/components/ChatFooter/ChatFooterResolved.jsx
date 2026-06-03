@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatFooter/ChatFooterResolved.jsx
 import { Lock } from "lucide-react"
 import { useTheme } from "../../context/ThemeContext.jsx"
 
@@ -15,7 +16,7 @@ const ChatFooterResolved = ({
         items-start
         gap-3
 
-        rounded-2xl
+        rounded-[14px]
 
         border
 
@@ -38,7 +39,7 @@ const ChatFooterResolved = ({
           items-center
           justify-center
 
-          rounded-xl
+          rounded-[12px]
         "
         style={{
           backgroundColor: theme.agentAvatarBg,

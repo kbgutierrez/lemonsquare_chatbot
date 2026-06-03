@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatFooter/ChatFooterInput.jsx
 import {
   LoaderCircle,
   Lock,
@@ -46,7 +47,7 @@ const ChatFooterInput = ({
 
         overflow-hidden
 
-        rounded-[22px]
+        rounded-[14px]
 
         border
 
@@ -66,7 +67,7 @@ const ChatFooterInput = ({
       }}
     >
 
-      {/* BACKGROUND — Lemon Square brand texture only */}
+      {/* BACKGROUND � Lemon Square brand texture only */}
       {theme.id === "lemon-square" && (
         <div
           className="
@@ -308,7 +309,7 @@ const ChatFooterInput = ({
 
           overflow-hidden
 
-          rounded-[18px]
+          rounded-[14px]
 
           border
 

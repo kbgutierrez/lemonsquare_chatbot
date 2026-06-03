@@ -10,7 +10,7 @@ import {
 } from "framer-motion"
 
 import {
-  Palette,
+  Sparkles,
   Check,
   ChevronDown,
   Sun,
@@ -19,8 +19,6 @@ import {
 
 import ModalShell from "../components/ModalShell.jsx"
 import { useTheme } from "../context/ThemeContext.jsx"
-
-import lemonLogo from "../../assets/Lemon_Logo_small.jpg"
 
 /* ========================================
    PREVIEW COMPONENTS
@@ -227,7 +225,7 @@ const ThemeCard = ({
     type="button"
     onClick={onClick}
     className={`
-      group relative flex flex-col items-center gap-2.5 rounded-2xl p-3 text-center transition-all duration-200
+      group relative flex flex-col items-center gap-2.5 rounded-xl p-3 text-center transition-all duration-200
       ${active
         ? "bg-violet-50 ring-2 ring-violet-400 shadow-sm"
         : "bg-slate-50 hover:bg-slate-100 border border-slate-100"
@@ -619,7 +617,7 @@ const ThemeModal = ({
     const found =
       {
         "lemon-square":
-          "linear-gradient(135deg, #f7c625, #008b3e)",
+          "#6FD27A",
         "light":
           "linear-gradient(135deg, #f8fafc, #e2e8f0)",
         "dark":
@@ -628,7 +626,7 @@ const ThemeModal = ({
 
     return (
       found ||
-      "linear-gradient(135deg, #f7c625, #008b3e)"
+      "#6FD27A"
     )
 
   }, [
@@ -643,9 +641,8 @@ const ThemeModal = ({
       open={isOpen}
       onClose={onClose}
       title="Theme Color"
-      subtitle="Appearance"
       icon={
-        <Palette
+        <Sparkles
           className="h-5 w-5"
           style={{
             color:
@@ -691,8 +688,8 @@ const ThemeModal = ({
           <div className="grid grid-cols-3 gap-3">
             <ThemeCard
               name="Lemon Square"
-              preview={lemonLogo}
-              isImage
+              preview="#6FD27A"
+              icon={Sparkles}
               active={
                 draftThemeId ===
                 "lemon-square"

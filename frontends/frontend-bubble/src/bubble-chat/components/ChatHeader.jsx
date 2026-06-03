@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatHeader.jsx
 import {
   CheckCircle2,
   Lock,
@@ -65,18 +66,6 @@ const ChatHeader = ({
         color: theme.headerText,
       }}
     >
-
-      {/* SOFT OVERLAY */}
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
-
-          bg-white/[0.04]
-        "
-      />
 
       {/* LEFT */}
       <div
@@ -182,7 +171,7 @@ const ChatHeader = ({
         {/* MENU */}
         <div
           className="
-            rounded-xl
+            rounded-[12px]
 
             border
 
