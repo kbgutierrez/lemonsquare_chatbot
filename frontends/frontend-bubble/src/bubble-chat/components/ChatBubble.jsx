@@ -164,7 +164,7 @@ const ChatBubble = ({
             drop-shadow-[0_10px_25px_rgba(139,92,246,0.28)]
           "
 
-          {...imageAnimation}
+         
         />
 
       </motion.button>
