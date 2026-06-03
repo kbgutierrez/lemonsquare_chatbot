@@ -618,6 +618,19 @@ export const useChatMessages =
               error
             )
 
+            // Surface error to user and remove typing indicator
+            const errorMessage =
+              createMessage({
+                sender: "agent",
+                text: `⚠️ ${error.message || "An unexpected error occurred."}`,
+              })
+
+            setMessages([
+              ...current,
+              userMessage,
+              errorMessage,
+            ])
+
           } finally {
 
             setIsSendingMessage(
