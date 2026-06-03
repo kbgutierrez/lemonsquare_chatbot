@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ModalShell.jsx
 import { useEffect, useMemo } from "react"
 import { AnimatePresence, motion } from "framer-motion"
 import { X } from "lucide-react"
@@ -25,16 +26,13 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
           className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 p-3 sm:p-4 backdrop-blur-[6px]">
           <button type="button" aria-label="Close modal overlay" onClick={onClose} className="absolute inset-0 cursor-default" />
           <motion.div initial="hidden" animate="visible" exit="exit" variants={modalVariants} transition={{ duration: 0.24, ease: "easeOut" }}
-            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[28px] border backdrop-blur-2xl sm:rounded-[32px] ${sizeClass}`}
+            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border backdrop-blur-2xl ${sizeClass}`}
             style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.windowBorder, boxShadow: `0 30px 90px ${theme.windowShadow}` }}>
-            <div className="pointer-events-none absolute inset-0 overflow-hidden">
-              <div className="absolute right-[-60px] top-[-60px] h-48 w-48 rounded-full blur-3xl" style={{ backgroundColor: theme.accent, opacity: 0.15 }} />
-            </div>
             <div className="relative z-10 flex items-start justify-between gap-4 border-b px-4 py-4 sm:px-5"
               style={{ background: theme.headerGradient, borderColor: theme.headerBorder, color: theme.headerText }}>
               <div className="flex min-w-0 items-start gap-3">
                 {icon && (
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
                     style={{ backgroundColor: theme.headerBadgeBg, color: theme.headerText }}>
                     {icon}
                   </div>
@@ -47,7 +45,7 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
               <div className="flex items-center gap-2">
                 {headerActions}
                 <button type="button" onClick={onClose} aria-label="Close modal"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition-all duration-200"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border transition-all duration-200"
                   style={{ backgroundColor: theme.headerBadgeBg, borderColor: theme.headerBadgeBorder, color: theme.headerText }}>
                   <X className="h-5 w-5" />
                 </button>
@@ -64,4 +62,4 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
   )
 }
 
-export default ModalShell
+export default ModalShell 

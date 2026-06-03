@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ResolutionPrompt.jsx
 import { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Check, X, Send, Bot } from "lucide-react"
@@ -44,6 +45,7 @@ const ResolutionPrompt = ({
     borderColor: theme.agentBubbleBorder,
     color: theme.agentText,
     boxShadow: `0 3px 10px ${theme.agentBubbleShadow}`,
+    borderRadius: "12px 12px 12px 4px",
   }
 
   const avatarStyle = {
@@ -62,7 +64,7 @@ const ResolutionPrompt = ({
       </div>
 
       <div
-        className="max-w-[75%] rounded-xl px-3 py-2 backdrop-blur-md transition-all duration-150 border"
+        className="max-w-[75%] px-3 py-2 backdrop-blur-md transition-all duration-150 border"
         style={bubbleStyle}
       >
         <p className="whitespace-pre-wrap break-words text-[12px] leading-snug">
@@ -85,7 +87,7 @@ const ResolutionPrompt = ({
                     disabled={hasActed}
                     className={cn(
                       "flex items-center gap-1.5",
-                      "rounded-lg px-2.5 py-1.5",
+                      "rounded-[10px] px-2.5 py-1.5",
                       "text-[11px] font-semibold text-white shadow-sm",
                       "transition-all hover:scale-[1.02] active:scale-95",
                       "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -102,7 +104,7 @@ const ResolutionPrompt = ({
                     disabled={hasActed}
                     className={cn(
                       "flex items-center gap-1.5",
-                      "rounded-lg px-2.5 py-1.5",
+                      "rounded-[10px] px-2.5 py-1.5",
                       "text-[11px] font-semibold border shadow-sm",
                       "transition-all hover:opacity-80 active:scale-95",
                       "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
@@ -126,7 +128,7 @@ const ResolutionPrompt = ({
                     disabled={hasActed}
                     className={cn(
                       "flex items-center gap-1.5",
-                      "rounded-lg px-2.5 py-1.5",
+                      "rounded-[10px] px-2.5 py-1.5",
                       "text-[11px] font-semibold border shadow-sm",
                       "transition-all hover:opacity-80 active:scale-95",
                       "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"
@@ -145,7 +147,7 @@ const ResolutionPrompt = ({
                     disabled={hasActed}
                     className={cn(
                       "flex items-center gap-1.5",
-                      "rounded-lg px-2.5 py-1.5",
+                      "rounded-[10px] px-2.5 py-1.5",
                       "text-[11px] font-semibold border shadow-sm",
                       "transition-all hover:opacity-80 active:scale-95",
                       "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:opacity-100"

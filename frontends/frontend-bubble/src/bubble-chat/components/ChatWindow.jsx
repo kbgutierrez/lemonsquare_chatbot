@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatWindow.jsx
 import ChatHeader from "./ChatHeader.jsx"
 import ChatMessages from "./ChatMessages.jsx"
 import ChatFooter from "./ChatFooter/ChatFooter.jsx"
@@ -20,6 +21,8 @@ const glowClass = `
 `
 
 const ChatWindow = ({
+  aiName = "Cheesecake AI",
+
   messages = [],
 
   loading = false,
@@ -107,7 +110,7 @@ const ChatWindow = ({
 
         overflow-hidden
 
-        rounded-[28px]
+        rounded-[16px]
 
         shadow-[0_10px_40px_rgba(0,0,0,0.08)]
       "
@@ -181,6 +184,8 @@ const ChatWindow = ({
         {/* HEADER */}
         <div className="relative z-[5000]">
           <ChatHeader
+            aiName={aiName}
+
             resolved={
               isLocked
             }
@@ -239,7 +244,7 @@ const ChatWindow = ({
               width: "13rem",
 
               borderRadius:
-                "9999px",
+                "16px",
 
               filter:
                 "blur(64px)",

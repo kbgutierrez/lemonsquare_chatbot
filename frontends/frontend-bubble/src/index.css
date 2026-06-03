@@ -1,3 +1,4 @@
+/* frontends/frontend-bubble/src/index.css */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -184,10 +185,10 @@
 }
 
 /* =========================================
-   BUBBLE DRAG SYSTEM — MOBILE FIXES
+   BUBBLE DRAG SYSTEM � MOBILE FIXES
    ========================================= */
 
-/* The drag-active body class — applied only during drag */
+/* The drag-active body class � applied only during drag */
 body.bubble-drag-active {
   overscroll-behavior: none;
   touch-action: none;
@@ -233,7 +234,7 @@ body.bubble-drag-active {
    CHAT WINDOW RESPONSIVE SIZING
 ========================================= */
 
-/* Mobile: compact floating card — NOT a full panel */
+/* Mobile: compact floating card � NOT a full panel */
 @media (max-width: 640px) {
   .lemonsquare-chat-root {
     --ls-chat-width:  clamp(290px, 88vw, 360px);
@@ -247,6 +248,16 @@ body.bubble-drag-active {
     --ls-chat-width:  min(92vw, 380px);
     --ls-chat-height: min(600px, calc(85dvh - 120px));
   }
+}
+
+/* =========================================
+   CENTERED CHAT UTILITIES
+========================================= */
+
+.centered-chat {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* =========================================

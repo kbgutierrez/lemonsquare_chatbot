@@ -16,15 +16,15 @@ import themeService from "../services/themeService"
 
 const LEMON_SQUARE_THEME = {
   windowBg: "#f6fff7",
-  windowWrapperBg: "rgba(255,255,255,0.95)",
+  windowWrapperBg: "#ffffff",
   windowOverlayStart: "rgba(243,255,244,0.90)",
   windowOverlayMiddle: "rgba(247,255,248,0.88)",
   windowOverlayEnd: "rgba(255,255,255,0.96)",
-  windowBorder: "rgba(221,214,254,0.70)",
+  windowBorder: "#e5e7eb",
   windowShadow: "rgba(139,92,246,0.22)",
   windowBgImageOpacity: 1,
-  headerGradientStart: "#7BE38E",
-  headerGradientEnd: "#5dd87a",
+  headerGradientStart: "#6FD27A",
+  headerGradientEnd: "#6FD27A",
   headerText: "#ffffff",
   headerIcon: "#ffffff",
   headerBorder: "rgba(16,185,129,0.15)",
@@ -47,16 +47,16 @@ const LEMON_SQUARE_THEME = {
   userAvatarBg: "#22c55e",
   userAvatarText: "#ffffff",
   userAvatarRing: "rgba(16,185,129,0.12)",
-  inputBg: "rgba(255,255,255,0.55)",
-  inputBorder: "#d7f5dc",
+  inputBg: "#ffffff",
+  inputBorder: "#d1d5db",
   inputText: "#3c4a3f",
   inputPlaceholder: "#8ca193",
   inputFocusBorder: "#9be7a7",
-  sendButtonBg: "rgba(142,232,154,0.42)",
+  sendButtonBg: "#6FD27A",
   sendButtonIcon: "#ffffff",
-  sendButtonHoverBg: "rgba(255,255,255,0.12)",
+  sendButtonHoverBg: "#5CC768",
   sendButtonBorder: "rgba(255,255,255,0.20)",
-  menuBg: "rgba(255,255,255,0.12)",
+  menuBg: "#ffffff",
   menuText: "#064e3b",
   menuHoverBg: "rgba(255,255,255,0.20)",
   menuHeaderText: "#064e3b",
@@ -271,7 +271,7 @@ export const ThemeProvider = ({
     setHeaderGradientEnabled,
   ] = useState(
     localSnapshot?.headerGradientEnabled ??
-      true
+      false
   )
 
   const [

@@ -6,10 +6,21 @@ export default {
       colors: {
         'purple-25': '#f5f3ff',
       },
+
+      borderRadius: {
+        button: '10px',
+        input: '12px',
+        bubble: '14px',
+        card: '16px',
+        modal: '16px',
+        panel: '18px',
+      },
+
       animation: {
         'fade-in': 'fadeIn 0.5s ease-in-out',
         'slide-in': 'slideIn 0.4s ease-out',
       },
+
       keyframes: {
         fadeIn: {
           '0%': { opacity: '0' },
@@ -24,4 +35,3 @@ export default {
   },
   plugins: []
 }
-

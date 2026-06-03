@@ -15,7 +15,7 @@ const ResolveConversationModal = ({ onClose, onResolve }) => {
   const handleClose = () => { if (resolving) return; onClose?.() }
 
   return (
-    <ModalShell onClose={handleClose} title="Resolve Conversation" subtitle="Session Completion" size="sm" scrollable={false}
+    <ModalShell onClose={handleClose} title="Resolve Conversation"  size="sm" scrollable={false}
       icon={<CheckCircle2 className="h-5 w-5" style={{ color: theme.headerText }} />}>
       <div className="p-5 sm:p-6">
         <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.agentBubbleBg, borderColor: theme.agentBubbleBorder }}>

@@ -655,16 +655,17 @@ const verifyUserToken =
   }
 
 /* ========================================
-   PLACEHOLDER
+   AI SETTINGS
 ======================================== */
 
 const loadAISettings =
-  async () => ({
-    success: true,
-
-    message:
-      "AI settings endpoint not yet connected.",
-  })
+  async () =>
+    apiRequest({
+      endpoint:
+        buildApiUrl(
+          API_ENDPOINTS.AI_SETTINGS
+        ),
+    })
 
 /* ========================================
    EXPORT

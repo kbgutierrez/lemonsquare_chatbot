@@ -29,7 +29,7 @@ const AboutHelpDeskModal = ({ onClose }) => {
     <ModalShell
       onClose={onClose}
       title="Chatbot Usage Policy"
-      subtitle="Acceptable Use Guidelines"
+     
       size="md"
       icon={<Bot className="h-5 w-5" style={{ color: theme.headerText }} />}
     >

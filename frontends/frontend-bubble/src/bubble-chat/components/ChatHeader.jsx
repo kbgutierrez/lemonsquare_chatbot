@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatHeader.jsx
 import {
   CheckCircle2,
   Lock,
@@ -29,6 +30,8 @@ const resolvedBadgeClass = `
 `
 
 const ChatHeader = ({
+  aiName = "Cheesecake AI",
+
   resolved = false,
   ticketSubmitted = false,
   onOpenModal,
@@ -41,7 +44,7 @@ const ChatHeader = ({
       ? "Ticket Submitted"
       : resolved
         ? "Resolved Conversation"
-        : "C.C"
+        : aiName
 
   return (
     <header
@@ -63,18 +66,6 @@ const ChatHeader = ({
         color: theme.headerText,
       }}
     >
-
-      {/* SOFT OVERLAY */}
-      <div
-        className="
-          pointer-events-none
-
-          absolute
-          inset-0
-
-          bg-white/[0.04]
-        "
-      />
 
       {/* LEFT */}
       <div
@@ -180,7 +171,7 @@ const ChatHeader = ({
         {/* MENU */}
         <div
           className="
-            rounded-xl
+            rounded-[12px]
 
             border
 

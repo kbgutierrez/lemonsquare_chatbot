@@ -3,6 +3,8 @@ from pydantic import BaseModel, Field
 
 
 class SettingsUpdate(BaseModel):
+    AIName: str = Field(..., min_length=1, max_length=100)
+
     ActiveModel: str = Field(..., min_length=1)
     ReformulatorModel: str = Field(..., min_length=1)
     SystemPrompt: str = Field(..., min_length=1)
@@ -32,6 +34,7 @@ class SettingsUpdate(BaseModel):
 
 class SettingsResponse(BaseModel):
     SettingID: int
+    AIName: str
     ActiveModel: str
     ReformulatorModel: str | None
     SystemPrompt: str

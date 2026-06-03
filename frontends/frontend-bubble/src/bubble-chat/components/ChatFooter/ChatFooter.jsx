@@ -14,7 +14,7 @@ import ChatFooterInput
 import ChatFooterResolved
   from "./ChatFooterResolved.jsx"
 
-const MAX_TEXTAREA_HEIGHT = 160
+const MAX_TEXTAREA_HEIGHT = 96
 
 const ChatFooter = ({
   onSendMessage,
@@ -30,6 +30,11 @@ const ChatFooter = ({
 
   const [message, setMessage] =
     useState("")
+
+  const [
+    expandedEditing,
+    setExpandedEditing,
+  ] = useState(false)
 
   const [
     showQuestions,
@@ -64,6 +69,14 @@ const ChatFooter = ({
       return
     }
 
+    if (!expandedEditing) {
+
+      textarea.style.height =
+        "32px"
+
+      return
+    }
+
     textarea.style.height =
       "auto"
 
@@ -73,7 +86,10 @@ const ChatFooter = ({
         MAX_TEXTAREA_HEIGHT
       )}px`
 
-  }, [message])
+  }, [
+    message,
+    expandedEditing,
+  ])
 
   /* ========================================
      RESET ON LOCK
@@ -239,6 +255,14 @@ const ChatFooter = ({
         <ChatFooterInput
           textareaRef={textareaRef}
 
+          expandedEditing={
+            expandedEditing
+          }
+
+          setExpandedEditing={
+            setExpandedEditing
+          }
+
           message={message}
 
           setMessage={setMessage}
@@ -258,6 +282,31 @@ const ChatFooter = ({
             handleSend
           }
         />
+
+        {!isLocked && (
+          <div
+            className="
+              mt-1
+
+              pl-2
+
+              text-[10px]
+              font-medium
+              leading-none
+            "
+            style={{
+              opacity: 0.7,
+              color:
+                message.length >= 100
+                  ? "#ef4444"
+                  : message.length >= 80
+                    ? "#f59e0b"
+                    : "#64748b",
+            }}
+          >
+            {message.length}/100
+          </div>
+        )}
 
       </div>
 

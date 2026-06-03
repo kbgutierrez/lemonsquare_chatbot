@@ -15,8 +15,7 @@ import {
   Lock,
 } from "lucide-react"
 
-import menuBarBackground
-  from "../../assets/menubar-background.png"
+import { useTheme } from "../context/ThemeContext.jsx"
 
 const MENU_OPTIONS = [
   {
@@ -66,6 +65,8 @@ const ChatMenu = ({
 
   const menuRef =
     useRef(null)
+
+  const { theme } = useTheme()
 
   /* ========================================
      GLOBAL LOCK
@@ -206,6 +207,7 @@ const ChatMenu = ({
 
                 className={`
                   group
+                  relative
                   mb-1
 
                   flex
@@ -226,14 +228,24 @@ const ChatMenu = ({
                   ${
                     isDisabled
                       ? "cursor-not-allowed opacity-60"
-                      : "hover:bg-white/20 active:scale-[0.99]"
+                      : "active:scale-[0.99]"
                   }
                 `}
               >
 
+                {!isDisabled && (
+                  <div
+                    className="absolute inset-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 rounded-xl"
+                    style={{ backgroundColor: theme.menuHoverBg }}
+                  />
+                )}
+
                 {/* ICON */}
                 <div
                   className="
+                    relative
+                    z-10
+
                     flex
                     h-7
                     w-7
@@ -241,30 +253,30 @@ const ChatMenu = ({
                     justify-center
 
                     rounded-lg
-
-                    bg-white/15
                   "
+                  style={{ backgroundColor: theme.menuHoverBg }}
                 >
                   <RenderIcon
                     className="
                       h-3.5
                       w-3.5
-
-                      text-emerald-950
                     "
+                    style={{ color: theme.menuText }}
                   />
                 </div>
 
                 {/* TEXT */}
                 <span
                   className="
+                    relative
+                    z-10
+
                     truncate
 
                     text-[12px]
                     font-medium
-
-                    text-emerald-950
                   "
+                  style={{ color: theme.menuText }}
                 >
                   {finalLabel}
                 </span>
@@ -277,6 +289,7 @@ const ChatMenu = ({
       [
         isLocked,
         ticketSubmitted,
+        theme,
       ]
     )
 
@@ -307,21 +320,20 @@ const ChatMenu = ({
           items-center
           justify-center
 
-          rounded-lg
-
-          text-white
+          rounded-xl
 
           ${menuTransitionClass}
 
-          hover:bg-white/12
+          hover:bg-black/5
           active:scale-95
 
           ${
             open
-              ? "rotate-90 bg-white/14"
+              ? "rotate-90 bg-black/5"
               : ""
           }
         `}
+        style={{ color: theme.menuText }}
       >
         <EllipsisVertical
           className="
@@ -346,12 +358,10 @@ const ChatMenu = ({
 
           overflow-hidden
 
-          rounded-2xl
+          rounded-xl
 
           border
           border-emerald-200/60
-
-          bg-white/12
 
           shadow-[0_18px_40px_rgba(16,24,40,0.18)]
 
@@ -375,61 +385,20 @@ const ChatMenu = ({
               `
           }
         `}
+        style={{ backgroundColor: theme.menuBg }}
       >
 
-        {/* BACKGROUND */}
         <div
           className="
             pointer-events-none
 
             absolute
             inset-0
-
-            overflow-hidden
           "
-        >
-
-          <img
-            src={menuBarBackground}
-            alt=""
-            draggable={false}
-            className="
-              absolute
-              left-1/2
-              top-1/2
-
-              h-[115%]
-              w-[115%]
-
-              -translate-x-1/2
-              -translate-y-1/2
-
-              object-cover
-
-              opacity-[0.85]
-
-              blur-[0.6px]
-            "
-          />
-
-          <div
-            className="
-              absolute
-              inset-0
-
-              rounded-2xl
-
-              bg-gradient-to-b
-              from-white/20
-              via-white/10
-              to-white/25
-
-              ring-1
-              ring-white/15
-            "
-          />
-
-        </div>
+          style={{
+            backgroundColor: theme.menuBg,
+          }}
+        />
 
         {/* HEADER */}
         <div
@@ -451,9 +420,8 @@ const ChatMenu = ({
               uppercase
 
               tracking-[0.18em]
-
-              text-emerald-950
             "
+            style={{ color: theme.menuText }}
           >
             Chat Options
           </p>

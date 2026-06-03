@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/components/ChatFooter/ChatFooterFAQ.jsx
 import {
   ChevronDown,
   Sparkles,
@@ -34,7 +35,7 @@ const animation = {
 const chipClass = `
   shrink-0
 
-  rounded-full
+  rounded-[10px]
 
   border
   border-white/40
@@ -60,7 +61,7 @@ const faqButtonClass = `
   items-center
   gap-1
 
-  rounded-full
+  rounded-[10px]
 
   border
   border-white/60
@@ -96,7 +97,7 @@ const collapseButtonClass = `
   items-center
   justify-center
 
-  rounded-full
+  rounded-[10px]
 
   border
   border-white/60

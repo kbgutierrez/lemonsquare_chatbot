@@ -1,3 +1,4 @@
+// frontends/frontend-bubble/src/bubble-chat/BubbleChat.jsx
 import {
   useEffect,
   useRef,
@@ -63,6 +64,9 @@ const BubbleChatContent =
     const [userData, setUserData] =
       useState(null)
 
+    const [aiName, setAiName] =
+      useState("Cheesecake AI")
+
     const [historyRefreshKey, setHistoryRefreshKey] =
       useState(0)
 
@@ -109,6 +113,42 @@ const BubbleChatContent =
         }
 
       verify()
+
+    }, [])
+
+    /* ========================================
+       LOAD AI SETTINGS
+    ======================================== */
+
+    useEffect(() => {
+
+      const loadSettings =
+        async () => {
+
+          try {
+
+            const settings =
+              await chatbotService.loadAISettings()
+
+            if (
+              settings?.AIName
+            ) {
+
+              setAiName(
+                settings.AIName
+              )
+            }
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_AI_SETTINGS_FAILED",
+              error
+            )
+          }
+        }
+
+      loadSettings()
 
     }, [])
 
@@ -645,9 +685,9 @@ const BubbleChatContent =
         className={cn(
           "lemonsquare-chat-root",
           "pointer-events-none",
-          "fixed bottom-0 left-0",
-          "h-0 w-0",
-          "z-[9999]"
+          "fixed inset-0",
+          "z-[9999]",
+          "flex items-center justify-center"
         )}
       >
 
@@ -726,7 +766,7 @@ const BubbleChatContent =
                 className={cn(
                   "absolute z-10",
                   "overflow-hidden",
-                  "rounded-[28px] sm:rounded-[32px]",
+                  "rounded-[16px]",
                   "backdrop-blur-2xl"
                 )}
 
@@ -770,6 +810,7 @@ const BubbleChatContent =
               >
 
                 <ChatWindow
+                  aiName={aiName}
                   messages={messages}
                   loading={loading}
                   isLoadingConversation={isLoadingConversation}

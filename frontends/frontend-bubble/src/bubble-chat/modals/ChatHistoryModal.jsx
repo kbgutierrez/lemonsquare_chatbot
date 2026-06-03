@@ -1045,7 +1045,7 @@ const ChatHistoryModal = ({
 
         title="Previous Chats"
 
-        subtitle="Conversation History"
+       
 
         size="lg"
 
