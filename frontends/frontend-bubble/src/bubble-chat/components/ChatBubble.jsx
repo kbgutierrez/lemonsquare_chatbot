@@ -133,12 +133,10 @@ const ChatBubble = ({
 
             rounded-full
 
-            bg-violet-500/20
 
             blur-xl
           "
 
-          {...glowAnimation}
         />
 
         {/* ICON */}

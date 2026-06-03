@@ -685,8 +685,6 @@ const BubbleChatContent =
         className={cn(
           "lemonsquare-chat-root",
           "pointer-events-none",
-          "fixed inset-0",
-          "z-[9999]",
           "flex items-center justify-center"
         )}
       >
@@ -804,8 +802,6 @@ const BubbleChatContent =
                   border:
                     `1px solid ${theme.windowBorder}`,
 
-                  boxShadow:
-                    `0 20px 80px ${theme.windowShadow}`,
                 }}
               >
 
