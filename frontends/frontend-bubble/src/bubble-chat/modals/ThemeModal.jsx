@@ -17,6 +17,9 @@ import {
   Moon,
 } from "lucide-react"
 
+import lemonLogo
+  from "../../assets/Lemon_Logo_small.jpg"
+
 import ModalShell from "../components/ModalShell.jsx"
 import { useTheme } from "../context/ThemeContext.jsx"
 
@@ -688,8 +691,8 @@ const ThemeModal = ({
           <div className="grid grid-cols-3 gap-3">
             <ThemeCard
               name="Lemon Square"
-              preview="#6FD27A"
-              icon={Sparkles}
+              preview={lemonLogo}
+              isImage={true}
               active={
                 draftThemeId ===
                 "lemon-square"
