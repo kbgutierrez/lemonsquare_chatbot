@@ -1,11 +1,10 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
-import cssInjectedByJsPlugin from "vite-plugin-css-injected-by-js";
+
 
 export default defineConfig({
   plugins: [
-    react(),
-    cssInjectedByJsPlugin()
+    react()
   ],
 
   base: "/bot/",
@@ -47,10 +46,11 @@ export default defineConfig({
 
         // 🔥 CRITICAL: ensures CSS is included in JS bundle behavior
         assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith(".css")) {
+          if (assetInfo.name?.endsWith(".css")) {
             return "lemonsquare-chat.css";
           }
-          return assetInfo.name;
+
+          return "assets/[name]-[hash][extname]";
         },
       },
     },
