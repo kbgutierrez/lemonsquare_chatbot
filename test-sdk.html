@@ -1,30 +1,49 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Internal Company Portal</title>
 
-  <title>LemonSquare SDK Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 40px;
+            color: #333;
+        }
 
-  <link
-    rel="stylesheet"
-    href="http://localhost:4173/lemonsquare-chatbot.css"
-  />
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+    </style>
 </head>
-
 <body>
 
-  <h1>SDK TEST PAGE</h1>
+    <div class="container">
+        <h1>Welcome to the Internal Portal</h1>
+        <p>This is a sample page to demonstrate the embedded Lemon Square IT Support Chatbot.</p>
+        <p>The chat bubble should automatically appear in the bottom right corner of this screen.</p>
+    </div>
 
-  <script src="http://localhost:4173/lemonsquare-chat.js"></script>
+    <script src="https://lschat.bigefoodcorp.com.ph/bot/static/lemonsquare-chat.js"></script>
 
-  <script>
-    window.LemonSquareChat.mount({
-      config: {
-        apiBaseUrl: "http://localhost:8000/api",
-        userToken: "11318",
-      },
-    })
-  </script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            window.LemonSquareChat.mount({
+                config: {
+                    apiBaseUrl: "https://lschat.bigefoodcorp.com.ph/api",
+                    userToken: "EMP-12345"
+                }
+            });
+        });
+    </script>
 
 </body>
 </html>

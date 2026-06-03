@@ -67,6 +67,7 @@ async def handle_chat(
         raise
 
     except Exception as exc:
+        
         logger.error("Authentication failure: %s", exc)
         raise AuthenticationError("User authentication failed.") from exc
 
