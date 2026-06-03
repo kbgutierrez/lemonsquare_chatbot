@@ -20,6 +20,8 @@ const glowClass = `
 `
 
 const ChatWindow = ({
+  aiName = "Cheesecake AI",
+
   messages = [],
 
   loading = false,
@@ -181,6 +183,8 @@ const ChatWindow = ({
         {/* HEADER */}
         <div className="relative z-[5000]">
           <ChatHeader
+            aiName={aiName}
+
             resolved={
               isLocked
             }

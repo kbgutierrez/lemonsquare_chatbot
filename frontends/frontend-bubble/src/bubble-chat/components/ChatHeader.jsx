@@ -29,6 +29,8 @@ const resolvedBadgeClass = `
 `
 
 const ChatHeader = ({
+  aiName = "Cheesecake AI",
+
   resolved = false,
   ticketSubmitted = false,
   onOpenModal,
@@ -41,7 +43,7 @@ const ChatHeader = ({
       ? "Ticket Submitted"
       : resolved
         ? "Resolved Conversation"
-        : "C.C"
+        : aiName
 
   return (
     <header

@@ -63,6 +63,9 @@ const BubbleChatContent =
     const [userData, setUserData] =
       useState(null)
 
+    const [aiName, setAiName] =
+      useState("Cheesecake AI")
+
     const [historyRefreshKey, setHistoryRefreshKey] =
       useState(0)
 
@@ -109,6 +112,42 @@ const BubbleChatContent =
         }
 
       verify()
+
+    }, [])
+
+    /* ========================================
+       LOAD AI SETTINGS
+    ======================================== */
+
+    useEffect(() => {
+
+      const loadSettings =
+        async () => {
+
+          try {
+
+            const settings =
+              await chatbotService.loadAISettings()
+
+            if (
+              settings?.AIName
+            ) {
+
+              setAiName(
+                settings.AIName
+              )
+            }
+
+          } catch (error) {
+
+            console.error(
+              "LOAD_AI_SETTINGS_FAILED",
+              error
+            )
+          }
+        }
+
+      loadSettings()
 
     }, [])
 
@@ -770,6 +809,7 @@ const BubbleChatContent =
               >
 
                 <ChatWindow
+                  aiName={aiName}
                   messages={messages}
                   loading={loading}
                   isLoadingConversation={isLoadingConversation}

@@ -94,6 +94,8 @@ class AIChatbotSetting(BaseChatbot):
     ConversationResolutionModel = Column(String(100))
     ConversationResolutionPrompt = Column(Text)
 
+    AIName = Column(String(100), nullable=False, default="Cheesecake AI")
+
     BubbleTheme = Column(String(50), default="lemon-square")
     HeaderGradientEnabled = Column(Boolean, default=True)
     CustomHeaderGradientStart = Column(String(7), default="#7BE38E")

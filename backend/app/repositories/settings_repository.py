@@ -69,6 +69,11 @@ class SettingsRepository:
         self.deactivate_all_settings()
 
         new_config = AIChatbotSetting(
+            AIName=overrides.get(
+                "AIName",
+                source.AIName if source else "Cheesecake AI"
+            ),
+
             ActiveModel=overrides.get("ActiveModel", source.ActiveModel if source else "llama-3.3-70b-versatile"),
             ReformulatorModel=overrides.get("ReformulatorModel", source.ReformulatorModel if source else None),
             SystemPrompt=overrides.get("SystemPrompt", source.SystemPrompt if source else "You are an IT Support Agent."),

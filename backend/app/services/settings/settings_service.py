@@ -32,6 +32,9 @@ def update_settings(
         source=None,
         updated_by=updated_by,
         updated_by_username=updated_by_username,
+
+        AIName=new_settings.AIName,
+
         ActiveModel=new_settings.ActiveModel,
         ReformulatorModel=new_settings.ReformulatorModel,
         SystemPrompt=new_settings.SystemPrompt,
@@ -130,6 +133,7 @@ def get_factory_defaults() -> dict:
 
     return {
         "SettingID": 0,
+        "AIName": "Cheesecake AI",
         "ActiveModel": "llama-3.3-70b-versatile",
         "ReformulatorModel": "llama-3.1-8b-instant",
         "SystemPrompt": DEFAULT_SYSTEM_PROMPT,

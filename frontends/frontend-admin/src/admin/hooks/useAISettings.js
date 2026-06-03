@@ -23,6 +23,8 @@ const CACHE_KEY = "ai_settings"
    DEFAULT SETTINGS (STABLE)
 ======================================== */
 const DEFAULT_SETTINGS = Object.freeze({
+  AIName: "Cheesecake AI",
+
   ActiveModel: AI_DEFAULTS.ActiveModel,
   ReformulatorModel: AI_DEFAULTS.ReformulatorModel,
   EmbeddingModel: AI_DEFAULTS.EmbeddingModel,
@@ -70,6 +72,8 @@ const normalizeSettings = (data) => {
       : {}
 
   return {
+    AIName: d.AIName || "Cheesecake AI",
+
     ActiveModel: d.ActiveModel || AI_DEFAULTS.ActiveModel,
     ReformulatorModel: d.ReformulatorModel || AI_DEFAULTS.ReformulatorModel,
     EmbeddingModel: d.EmbeddingModel || AI_DEFAULTS.EmbeddingModel,

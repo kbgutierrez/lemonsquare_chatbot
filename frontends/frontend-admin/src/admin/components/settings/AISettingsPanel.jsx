@@ -165,7 +165,16 @@ const AISettingsPanel = () => {
           description="Manage retrieval, reranking, embeddings, and response behavior."
         />
         <div className="grid gap-5 xl:grid-cols-2">
-          
+
+          <SettingsInput
+            label="AI Name"
+            value={settings.AIName}
+            onChange={(e) =>
+              bind("AIName")(
+                e.target.value
+              )
+            }
+          />
 
           <SettingsSelect
             label="Reformulator Model"

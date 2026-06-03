@@ -15,6 +15,8 @@ const ChatFooterInput = ({
   textareaRef,
   message,
   setMessage,
+  expandedEditing,
+  setExpandedEditing,
   loading,
   resolved,
   sessionTicketSubmitted,
@@ -120,83 +122,166 @@ const ChatFooterInput = ({
         "
       >
 
-        {/* CHARACTER COUNT */}
-        <div
-          className="
-            mb-1
+        {!expandedEditing ? (
 
-            text-[10px]
-            leading-none
-            font-medium
-          "
-          style={{
-            color:
-              message.length >= MAX_MESSAGE_LENGTH
-                ? "#ef4444"
-                : message.length >= 80
-                  ? "#f59e0b"
-                  : theme.inputText,
-            opacity: 0.7,
-          }}
-        >
-          {message.length}/{MAX_MESSAGE_LENGTH}
-        </div>
+          <input
+            ref={textareaRef}
 
-        <textarea
-          ref={textareaRef}
+            type="text"
 
-          rows={1}
+            value={message}
 
-          value={message}
+            disabled={
+              resolved ||
+              sessionTicketSubmitted
+            }
 
-          disabled={resolved || sessionTicketSubmitted}
+            maxLength={
+              MAX_MESSAGE_LENGTH
+            }
 
-          maxLength={MAX_MESSAGE_LENGTH}
+            enterKeyHint="send"
 
-          enterKeyHint="send"
+            aria-label="Chat input"
 
-          aria-label="Chat input"
+            onKeyDown={onKeyDown}
 
-          onKeyDown={onKeyDown}
+            onChange={(event) =>
+              setMessage(
+                event.target.value
+              )
+            }
 
-          onChange={(event) =>
-            setMessage(
-              event.target.value
-            )
-          }
+            onSelect={(event) => {
 
-          className="
-            relative
-            z-10
+              const input =
+                event.target
 
-            flex-1
+              const cursorPosition =
+                input.selectionStart
 
-            max-h-32
-            min-h-[28px]
+              const textLength =
+                input.value.length
 
-            resize-none
+              setExpandedEditing(
+                cursorPosition <
+                textLength
+              )
+            }}
 
-            overflow-y-auto
+            className="
+              relative
+              z-10
 
-            bg-transparent
+              w-full
 
-            pt-[2px]
+              h-[32px]
 
-            text-[13px]
-            leading-[1.45]
+              bg-transparent
 
-            outline-none
+              text-[13px]
+              leading-[1.45]
 
-            [scrollbar-width:none]
-            [&::-webkit-scrollbar]:hidden
+              outline-none
 
-            disabled:cursor-not-allowed
-            disabled:opacity-70
-          "
-          style={{
-            color: theme.inputText,
-          }}
-        />
+              disabled:cursor-not-allowed
+              disabled:opacity-70
+            "
+
+            style={{
+              color:
+                theme.inputText,
+            }}
+          />
+
+        ) : (
+
+          <textarea
+            ref={textareaRef}
+
+            rows={1}
+
+            value={message}
+
+            disabled={
+              resolved ||
+              sessionTicketSubmitted
+            }
+
+            maxLength={
+              MAX_MESSAGE_LENGTH
+            }
+
+            enterKeyHint="send"
+
+            aria-label="Chat input"
+
+            onKeyDown={onKeyDown}
+
+            onChange={(event) =>
+              setMessage(
+                event.target.value
+              )
+            }
+
+            onSelect={(event) => {
+
+              const textarea =
+                event.target
+
+              const cursorPosition =
+                textarea.selectionStart
+
+              const textLength =
+                textarea.value.length
+
+              if (
+                cursorPosition ===
+                textLength
+              ) {
+
+                setExpandedEditing(
+                  false
+                )
+              }
+            }}
+
+            className="
+              relative
+              z-10
+
+              w-full
+
+              max-h-24
+              min-h-[28px]
+
+              resize-none
+
+              overflow-y-auto
+
+              bg-transparent
+
+              pt-[2px]
+
+              text-[13px]
+              leading-[1.45]
+
+              outline-none
+
+              [scrollbar-width:none]
+              [&::-webkit-scrollbar]:hidden
+
+              disabled:cursor-not-allowed
+              disabled:opacity-70
+            "
+
+            style={{
+              color:
+                theme.inputText,
+            }}
+          />
+
+        )}
 
       </div>
 
