@@ -9,12 +9,14 @@ Fixes:
 """
 import asyncio
 import logging
+import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from qdrant_client import QdrantClient
 
 try:
@@ -130,7 +132,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=app_settings.CORS_ORIGINS,
-        allow_credentials=True,
+        allow_credentials=False,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -177,8 +179,20 @@ def create_app() -> FastAPI:
             "status": "ok",
             "ai_available": app.state.ai_available,
         }
+    
+
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if os.path.exists(static_dir):
+        app.mount("/static", StaticFiles(directory=static_dir), name="static")
+        logger.info("Static files mounted from %s", static_dir)
+    else:
+        logger.warning("Static directory not found at %s. SDK will not be served.", static_dir)
 
     return app
+
+
+
+    
 
 
 app = create_app()
