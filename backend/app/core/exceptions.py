@@ -42,6 +42,11 @@ class ExternalServiceError(AppException):
     detail = "An upstream service is temporarily unavailable."
 
 
+class LLMRateLimitError(ExternalServiceError):
+    status_code = 429
+    detail = "Rate limit exceeded. Please try again later."
+
+
 class VectorStoreError(AppException):
     status_code = 500
     detail = "Vector store operation failed."

@@ -6,11 +6,13 @@ Ensures consistent timeout, API key, and model configuration.
 import logging
 import time
 import asyncio
+import re
 from functools import lru_cache
 from random import uniform
 from typing import Any
 from langchain_groq import ChatGroq
 from app.core.config import settings
+from app.core.exceptions import LLMRateLimitError
 from app.services.telemetry_service import TelemetryService
 
 logger = logging.getLogger(__name__)
@@ -105,6 +107,14 @@ async def invoke_llm(
             )
 
             if retries <= 1 or status_code not in retryable_statuses:
+                if status_code == 429:
+                    error_msg = str(exc)
+                    # Try to extract "Please try again in 8m28.896s"
+                    match = re.search(r"try again in ([\w.]+)", error_msg)
+                    wait_time = match.group(1) if match else "a few minutes"
+                    raise LLMRateLimitError(
+                        detail=f"Groq rate limit reached. Please try again in {wait_time}."
+                    ) from exc
                 raise
 
             retries -= 1

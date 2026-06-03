@@ -13,16 +13,9 @@ import useHorizontalDragScroll
   from "../../hooks/useHorizontalDragScroll"
 
 const quickQuestions = [
-  "How do I reset my account?",
-  "Where can I find guides?",
-  "How do I submit a ticket?",
-  "Talk to an agent",
-  "Create new password",
-  "Billing issue",
-  "Update profile",
-  "Network problem",
-  "Forgot credentials",
-  "Account locked",
+  "How do I submit a ticket",
+  "Who are you?",
+
 ]
 
 const animation = {
