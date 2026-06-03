@@ -146,6 +146,7 @@ const apiRequest = async ({
     if (!response.ok) {
 
       throw new Error(
+        data?.error ||
         data?.detail ||
         data?.message ||
         "API request failed."

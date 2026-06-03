@@ -122,6 +122,14 @@ def create_app() -> FastAPI:
         title="IT Support AI",
         version="2.0.0",
         lifespan=lifespan,
+
+        # 1. Listen internally where Nginx sends the traffic:
+        docs_url="/api/docs",
+        openapi_url="/api/openapi.json",
+        redoc_url="/api/redoc",
+
+        # 2. Tell the browser to prepend this when making requests!
+        root_path="/bot"
     )
     
     app.state.limiter = limiter
