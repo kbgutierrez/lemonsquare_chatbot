@@ -802,8 +802,6 @@ const BubbleChatContent =
                   border:
                     `1px solid ${theme.windowBorder}`,
 
-                  boxShadow:
-                    `0 20px 80px ${theme.windowShadow}`,
                 }}
               >
 

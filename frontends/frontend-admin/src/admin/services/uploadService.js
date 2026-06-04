@@ -22,16 +22,22 @@ const validateFile =
 
     const allowedTypes = [
       "application/pdf",
+      "text/csv",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
     ]
 
     if (
       !allowedTypes.includes(
         file.type
       )
+      && !file.name.toLowerCase().endsWith(".csv")
+      && !file.name.toLowerCase().endsWith(".xlsx")
+      && !file.name.toLowerCase().endsWith(".xls")
     ) {
 
       throw new Error(
-        "Only PDF files are allowed."
+        "Only PDF, CSV, and Excel files are allowed."
       )
     }
 
