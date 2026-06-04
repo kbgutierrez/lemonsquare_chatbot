@@ -84,14 +84,27 @@ class TabularProcessor:
         return "General"
 
     def _load_data(self, filepath: str) -> pd.DataFrame:
-        """Load CSV or Excel data using pandas."""
+        """Load CSV or Excel data using pandas with explicit engines."""
         ext = os.path.splitext(filepath)[1].lower()
-        if ext == ".csv":
-            return pd.read_csv(filepath)
-        elif ext in [".xlsx", ".xls"]:
-            return pd.read_excel(filepath)
-        else:
-            raise ValidationError(f"Unsupported file extension: {ext}")
+        try:
+            if ext == ".csv":
+                return pd.read_csv(filepath)
+            elif ext == ".xlsx":
+                return pd.read_excel(filepath, engine="openpyxl")
+            elif ext == ".xls":
+                return pd.read_excel(filepath, engine="xlrd")
+            else:
+                raise ValidationError(f"Unsupported file extension: {ext}")
+        except ImportError as exc:
+            engine_name = "openpyxl" if ext == ".xlsx" else "xlrd"
+            logger.error("Missing dependency for Excel processing: %s", exc)
+            raise ValidationError(
+                f"Missing dependency to read {ext} files. "
+                f"Please ensure '{engine_name}' is installed."
+            ) from exc
+        except Exception as exc:
+            logger.error("Failed to load tabular data from %s: %s", filepath, exc)
+            raise ValidationError(f"Failed to read the uploaded file: {str(exc)}") from exc
 
     def _row_to_text(self, row: pd.Series) -> str:
         """Convert a pandas row to a human-readable text block."""
