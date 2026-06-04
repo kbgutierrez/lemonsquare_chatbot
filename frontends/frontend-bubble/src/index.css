@@ -52,6 +52,16 @@
     grayscale;
 }
 
+/* ========================================
+   HOST WEBSITE BORDER PROTECTION
+======================================== */
+
+.lemonsquare-chat-root .ls-border {
+  border-color:
+    var(--ls-border-color)
+    !important;
+}
+
 /* =========================================
    SAFE RESET
 ========================================= */
