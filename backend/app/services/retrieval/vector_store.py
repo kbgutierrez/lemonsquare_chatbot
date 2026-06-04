@@ -1,6 +1,6 @@
 """
 Vector store service for Qdrant operations.
-Encapsulates all Qdrant interactions — search, upsert, delete.
+Encapsulates all Qdrant interactions — search, upsert, delete. TEST
 Previously embedded directly in the orchestrator and ingestion service.
 """
 import logging
