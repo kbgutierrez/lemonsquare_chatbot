@@ -801,7 +801,10 @@ const BubbleChatContent =
                     theme.windowWrapperBg,
 
                   border:
-                    `1px solid ${theme.windowBorder}`,
+                    "1px solid",
+
+                  borderColor:
+                    "var(--ls-border-color)",
 
                   "--ls-border-color":
                     theme.windowBorder,
