@@ -12,9 +12,7 @@ from app.models.chatbot import ChatSession, ChatMessage
 from app.core.exceptions import NotFoundError, AuthorizationError
 
 logger = logging.getLogger(__name__)
-HISTORY_WINDOW = 6
-
-
+HISTORY_WINDOW = 20  # Number of recent messages to include in context for LLMs
 class ChatRepository:
     """Repository for chat session and message persistence."""
 
