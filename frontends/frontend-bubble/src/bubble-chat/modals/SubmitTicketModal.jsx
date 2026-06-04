@@ -238,7 +238,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
                   disabled={isFrozen}
                   aria-label="Remove image attachment"
                   className={cn(
-                    "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur-sm transition-all duration-200 hover:scale-105",
+                    "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border bg-black/[0.02] transition-all duration-200 hover:scale-105",
                     isFrozen && "cursor-not-allowed opacity-50"
                   )}
                   style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText }}

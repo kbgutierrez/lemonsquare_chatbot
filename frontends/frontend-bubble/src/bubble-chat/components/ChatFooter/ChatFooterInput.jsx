@@ -57,7 +57,7 @@ const ChatFooterInput = ({
 
         shadow-[0_6px_18px_rgba(0,0,0,0.05)]
 
-        backdrop-blur-xl
+        bg-black/[0.02]
 
         transition-all
         duration-300
@@ -104,7 +104,7 @@ const ChatFooterInput = ({
 
               opacity-[0.18]
 
-              blur-lg
+                      
             "
           />
 
@@ -373,7 +373,7 @@ const ChatFooterInput = ({
 
                   opacity-95
 
-                  blur-[2px]
+                          
                 "
               />
 

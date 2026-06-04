@@ -213,7 +213,7 @@ const ConversationCard = ({
           rounded-2xl
           border
           p-4
-          backdrop-blur-md
+          bg-black/[0.03]
           transition-all
           duration-200
           hover:-translate-y-0.5
@@ -490,7 +490,7 @@ const DeleteConfirmModal = ({
         items-center
         justify-center
         bg-black/40
-        backdrop-blur-sm
+        bg-black/[0.02]
         px-4
       `
     )}
@@ -691,7 +691,7 @@ const ClearAllConfirmModal = ({
         items-center
         justify-center
         bg-black/40
-        backdrop-blur-sm
+        bg-black/[0.02]
         px-4
       `
     )}

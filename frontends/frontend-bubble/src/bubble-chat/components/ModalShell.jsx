@@ -23,7 +23,20 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
     <AnimatePresence>
       {open && (
         <motion.div initial="hidden" animate="visible" exit="hidden" variants={backdropVariants} transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-3 sm:p-4">
+          className="
+            fixed
+            inset-0
+            z-[140]
+
+            flex
+            items-center
+            justify-center
+
+            bg-slate-900/20
+
+            p-3
+            sm:p-4
+          ">
           <button type="button" aria-label="Close modal overlay" onClick={onClose} className="absolute inset-0 cursor-default" />
           <motion.div initial="hidden" animate="visible" exit="exit" variants={modalVariants} transition={{ duration: 0.24, ease: "easeOut" }}
             className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border ls-border ${sizeClass}`}

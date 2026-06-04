@@ -178,7 +178,7 @@ const ChatMessage = ({
           px-3
           py-2
 
-          backdrop-blur-md
+          bg-black/[0.03]
 
           transition-all
           duration-150
