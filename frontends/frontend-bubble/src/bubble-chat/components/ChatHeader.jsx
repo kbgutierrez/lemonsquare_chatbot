@@ -25,8 +25,6 @@ const resolvedBadgeClass = `
   uppercase
 
   tracking-[0.06em]
-
-  backdrop-blur-sm
 `
 
 const ChatHeader = ({
@@ -107,7 +105,7 @@ const ChatHeader = ({
               "
               style={{
                 backgroundColor: theme.statusOnline,
-                boxShadow: `0 0 8px ${theme.statusOnline}`,
+                boxShadow: 'none',
               }}
             />
           )}
@@ -121,8 +119,6 @@ const ChatHeader = ({
               font-extrabold
 
               tracking-[0.01em]
-
-              drop-shadow-[0_1px_2px_rgba(0,0,0,0.18)]
             "
             style={{
               color: theme.headerText,
@@ -143,6 +139,8 @@ const ChatHeader = ({
               style={{
                 backgroundColor: theme.headerBadgeBg,
                 color: theme.headerBadgeText,
+                WebkitTextFillColor:
+                  theme.headerBadgeText,
                 borderColor: theme.headerBadgeBorder,
               }}
             >
@@ -182,8 +180,6 @@ const ChatHeader = ({
             border
 
             shadow-sm
-
-            backdrop-blur-md
           "
           style={{
             backgroundColor: theme.menuBg,

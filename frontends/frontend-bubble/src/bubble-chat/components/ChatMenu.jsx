@@ -233,13 +233,6 @@ const ChatMenu = ({
                 `}
               >
 
-                {!isDisabled && (
-                  <div
-                    className="absolute inset-0 opacity-0 transition-opacity duration-150 group-hover:opacity-100 rounded-xl"
-                    style={{ backgroundColor: theme.menuHoverBg }}
-                  />
-                )}
-
                 {/* ICON */}
                 <div
                   className="
@@ -261,7 +254,11 @@ const ChatMenu = ({
                       h-3.5
                       w-3.5
                     "
-                    style={{ color: theme.menuText }}
+                    style={{
+                      color: theme.menuText,
+                      WebkitTextFillColor:
+                        theme.menuText,
+                    }}
                   />
                 </div>
 
@@ -276,7 +273,11 @@ const ChatMenu = ({
                     text-[12px]
                     font-medium
                   "
-                  style={{ color: theme.menuText }}
+                  style={{
+                    color: theme.menuText,
+                    WebkitTextFillColor:
+                      theme.menuText,
+                  }}
                 >
                   {finalLabel}
                 </span>
@@ -333,7 +334,11 @@ const ChatMenu = ({
               : ""
           }
         `}
-        style={{ color: theme.menuText }}
+        style={{
+          color: theme.menuText,
+          WebkitTextFillColor:
+            theme.menuText,
+        }}
       >
         <EllipsisVertical
           className="
@@ -421,7 +426,11 @@ const ChatMenu = ({
 
               tracking-[0.18em]
             "
-            style={{ color: theme.menuText }}
+            style={{
+              color: theme.menuText,
+              WebkitTextFillColor:
+                theme.menuText,
+            }}
           >
             Chat Options
           </p>

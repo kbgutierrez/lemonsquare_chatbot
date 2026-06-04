@@ -16,26 +16,26 @@ const ResolveConversationModal = ({ onClose, onResolve }) => {
 
   return (
     <ModalShell onClose={handleClose} title="Resolve Conversation"  size="sm" scrollable={false}
-      icon={<CheckCircle2 className="h-5 w-5" style={{ color: theme.headerText }} />}>
+      icon={<CheckCircle2 className="h-5 w-5" style={{ color: theme.headerText, WebkitTextFillColor: theme.headerText }} />}>
       <div className="p-5 sm:p-6">
         <div className="rounded-2xl border p-4" style={{ backgroundColor: theme.agentBubbleBg, borderColor: theme.agentBubbleBorder }}>
-          <p className="text-sm leading-relaxed" style={{ color: theme.agentText }}>
+          <p className="text-sm leading-relaxed" style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}>
             Confirm that the current support session has been completed and safely resolve the conversation.
           </p>
-          <span className="mt-3 block text-sm font-medium" style={{ color: theme.accent }}>
+          <span className="mt-3 block text-sm font-medium" style={{ color: theme.accent, WebkitTextFillColor: theme.accent }}>
             The resolved conversation will automatically be learned by the AI and appear in the Admin panel.
           </span>
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <button type="button" disabled={resolving} onClick={handleClose}
             className={cn("rounded-2xl border px-4 py-2 text-sm font-medium transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50")}
-            style={{ borderColor: theme.inputBorder, backgroundColor: theme.windowWrapperBg, color: theme.agentText }}>
+            style={{ borderColor: theme.inputBorder, backgroundColor: theme.windowWrapperBg, color: theme.agentText, WebkitTextFillColor: theme.agentText }}>
             Cancel
           </button>
           <button type="button" disabled={resolving} onClick={handleResolve}
             className={cn("flex items-center justify-center gap-2 rounded-2xl px-5 py-2 text-sm font-medium text-white transition-all hover:scale-[1.02] disabled:cursor-not-allowed disabled:opacity-70")}
-            style={{ background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})` }}>
-            {resolving ? <><Loader2 className="h-4 w-4 animate-spin" /> Resolving...</> : <><CheckCircle2 className="h-4 w-4" /> Resolve</>}
+            style={{ background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})`, WebkitTextFillColor: "#ffffff" }}>
+            {resolving ? <><Loader2 className="h-4 w-4 animate-spin" style={{ WebkitTextFillColor: "#ffffff" }} /> Resolving...</> : <><CheckCircle2 className="h-4 w-4" style={{ WebkitTextFillColor: "#ffffff" }} /> Resolve</>}
           </button>
         </div>
       </div>

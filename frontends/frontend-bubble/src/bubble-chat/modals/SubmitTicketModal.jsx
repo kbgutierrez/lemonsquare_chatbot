@@ -20,8 +20,8 @@ const ActionButton = ({ children, disabled, onClick, variant = "primary", theme 
       className={cn("rounded-2xl text-sm font-medium transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50",
         isPrimary ? "flex w-full items-center justify-center gap-2 px-6 py-3 text-white shadow-lg hover:scale-[1.02] sm:w-auto" : "w-full border px-5 py-3 sm:w-auto")}
       style={isPrimary
-        ? { background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})` }
-        : { borderColor: theme.inputBorder, backgroundColor: theme.windowWrapperBg, color: theme.agentText }}>
+        ? { background: `linear-gradient(135deg, ${theme.headerGradientStart}, ${theme.headerGradientEnd})`, WebkitTextFillColor: "#ffffff" }
+        : { borderColor: theme.inputBorder, backgroundColor: theme.windowWrapperBg, color: theme.agentText, WebkitTextFillColor: theme.agentText }}>
       {children}
     </button>
   )
@@ -73,11 +73,12 @@ const ImageUploadButton = ({ onFileSelect, disabled, theme, hasImage }) => {
           backgroundColor: theme.windowWrapperBg,
           borderColor: theme.inputBorder,
           color: theme.agentText,
+          WebkitTextFillColor: theme.agentText,
         }}
       >
         <ImageIcon
           className="h-3.5 w-3.5"
-          style={{ color: theme.accent }}
+          style={{ color: theme.accent, WebkitTextFillColor: theme.accent }}
         />
 
         {hasImage ? "Replace image" : "Attach image"}
@@ -104,25 +105,25 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
   const isFrozen = success || isMissingInfo
 
   const buttonContent = success ? (
-    <><CheckCircle2 className="h-4 w-4" /> Submitted</>
+    <><CheckCircle2 className="h-4 w-4" style={{ WebkitTextFillColor: "#ffffff" }} /> Submitted</>
   ) : loading ? (
     <><div className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Escalating...</>
   ) : summaryLoading ? (
-    <><LoaderCircle className="h-4 w-4 animate-spin" /> Preparing Summary...</>
+    <><LoaderCircle className="h-4 w-4 animate-spin" style={{ WebkitTextFillColor: "#ffffff" }} /> Preparing Summary...</>
   ) : (
-    <><SendHorizonal className="h-4 w-4" /> Confirm Submit</>
+    <><SendHorizonal className="h-4 w-4" style={{ WebkitTextFillColor: "#ffffff" }} /> Confirm Submit</>
   )
 
   return (
     <ModalShell onClose={onClose} title="Escalate to Human Agent" subtitle="Edit your escalation details below" size="md"
-      icon={<MessageSquareWarning className="h-5 w-5" style={{ color: theme.headerText }} />}>
+      icon={<MessageSquareWarning className="h-5 w-5" style={{ color: theme.headerText, WebkitTextFillColor: theme.headerText }} />}>
       <div className="max-h-[70vh] overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
         {success && (
           <div className="mb-5 flex items-start gap-3 rounded-2xl border p-4" style={{ backgroundColor: theme.resolvedBannerBg, borderColor: theme.resolvedBannerBorder }}>
-            <CheckCircle2 className="mt-0.5 h-5 w-5" style={{ color: theme.accent }} />
+            <CheckCircle2 className="mt-0.5 h-5 w-5" style={{ color: theme.accent, WebkitTextFillColor: theme.accent }} />
             <div>
-              <p className="text-sm font-semibold" style={{ color: theme.resolvedBannerText }}>Escalation submitted successfully.</p>
-              <p className="mt-1 text-xs" style={{ color: theme.resolvedBannerText, opacity: 0.8 }}>Human support agents can now review this conversation.</p>
+              <p className="text-sm font-semibold" style={{ color: theme.resolvedBannerText, WebkitTextFillColor: theme.resolvedBannerText }}>Escalation submitted successfully.</p>
+              <p className="mt-1 text-xs" style={{ color: theme.resolvedBannerText, WebkitTextFillColor: theme.resolvedBannerText, opacity: 0.8 }}>Human support agents can now review this conversation.</p>
             </div>
           </div>
         )}
@@ -138,36 +139,36 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
         )}
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Summary</label>
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Summary</label>
             <input type="text" value={form.summary} onChange={e => update("summary", e.target.value)} placeholder="Brief summary of the issue"
               disabled={isFrozen}
               className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
-              style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
+              style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
           </div>
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Description</label>
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Description</label>
             <textarea value={form.description} onChange={e => update("description", e.target.value)} placeholder="Detailed description..." rows={4}
               disabled={isFrozen}
               className={cn("w-full resize-none rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
-              style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
+              style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Department</label>
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Department</label>
               <select value={form.department_id} onChange={e => update("department_id", e.target.value)}
                 disabled={isFrozen}
                 className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
-                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
                 <option value="">Select Department</option>
                 {taxonomy.map(dept => <option key={dept.department_id} value={dept.department_id}>{dept.department_name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Subcategory</label>
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Subcategory</label>
               <select value={form.subcategory_id} onChange={e => update("subcategory_id", e.target.value)}
                 className={cn("w-full rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus-:ring-4", (!form.department_id || isFrozen) && "cursor-not-allowed opacity-50")}
                 disabled={!form.department_id || isFrozen}
-                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}>
                 <option value="">Select Subcategory</option>
                 {subcategories.map(sub => <option key={sub.id} value={sub.id}>{sub.name}</option>)}
               </select>
@@ -179,7 +180,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
           ======================================== */}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Location</label>
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Location</label>
               <input
                 type="text"
                 value={form.location}
@@ -187,11 +188,11 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
                 placeholder="e.g. Building A, Floor 3"
                 disabled={isFrozen}
                 className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
-                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Equipment</label>
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Equipment</label>
               <input
                 type="text"
                 value={form.equipment}
@@ -199,7 +200,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
                 placeholder="e.g. Laptop, Printer"
                 disabled={isFrozen}
                 className={cn("w-full rounded-xl border px-4 py-2.5 text-sm outline-none transition-all focus:ring-4", isFrozen && "cursor-not-allowed opacity-50")}
-                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
+                style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText, "--tw-ring-color": theme.agentBubbleBorder }}
               />
             </div>
           </div>
@@ -209,7 +210,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
              CONSTRAINT: PNG and JPEG only.
           ======================================== */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp }}>Attachment</label>
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>Attachment</label>
             <div className="flex items-center gap-3">
               <ImageUploadButton
                 onFileSelect={(file) => update("image", file)}
@@ -218,7 +219,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
                 hasImage={Boolean(imageFile)}
               />
               {imageFile && (
-                <span className="max-w-[180px] truncate text-xs" style={{ color: theme.agentTimestamp }}>
+                <span className="max-w-[180px] truncate text-xs" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>
                   {imageFile.name}
                 </span>
               )}
@@ -240,7 +241,7 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
                     "absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full border backdrop-blur-sm transition-all duration-200 hover:scale-105",
                     isFrozen && "cursor-not-allowed opacity-50"
                   )}
-                  style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText }}
+                  style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.inputBorder, color: theme.agentText, WebkitTextFillColor: theme.agentText }}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -254,10 +255,10 @@ const SubmitTicketModal = ({ onClose, onSubmitted, sessionId, requesterId, userD
         </div>
         <div className="mt-6 rounded-2xl border p-3" style={{ backgroundColor: theme.agentBubbleBg, borderColor: theme.agentBubbleBorder }}>
           <div className="flex items-start gap-3">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.accent }} />
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" style={{ color: theme.accent, WebkitTextFillColor: theme.accent }} />
             <div>
-              <p className="text-xs font-semibold" style={{ color: theme.agentText }}>Escalation Preview</p>
-              <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: theme.agentTimestamp }}>
+              <p className="text-xs font-semibold" style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}>Escalation Preview</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed" style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}>
                 The current conversation history and your edited summary will be forwarded to the live support workflow.
               </p>
             </div>
