@@ -286,7 +286,7 @@ class VectorStoreService:
         query_vector: list[float],
         limit: int = 5,
     ) -> list:
-        """Search document-like vectors (PDFs, manual entries, tabular data)."""
+        """Search document-like vectors test (PDFs, manual entries, tabular data)."""
         started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
