@@ -285,10 +285,19 @@ const ColorRow = ({
   previewProps,
 }) => {
 
+  const isHexColor =
+    /^#[0-9A-Fa-f]{6}$/.test(
+      value || ""
+    )
+
   const [
     hexValue,
     setHexValue,
-  ] = useState(value)
+  ] = useState(
+    isHexColor
+      ? value
+      : "#000000"
+  )
 
   const [
     showMobileEditor,
@@ -351,13 +360,17 @@ const ColorRow = ({
 
       <div className="flex items-center gap-2 shrink-0">
         <div className="relative">
-          <input
-            id={`picker-${label.replace(/\s+/g, "-")}`}
-            type="color"
-            value={value}
-            onChange={handlePickerChange}
-            className="sr-only"
-          />
+          {
+            isHexColor && (
+              <input
+                id={`picker-${label.replace(/\s+/g, "-")}`}
+                type="color"
+                value={value}
+                onChange={handlePickerChange}
+                className="sr-only"
+              />
+            )
+          }
 
           <button
             type="button"
@@ -372,6 +385,10 @@ const ColorRow = ({
                 return
               }
 
+              if (!isHexColor) {
+                return
+              }
+
               document
                 .getElementById(
                   `picker-${label.replace(/\s+/g, "-")}`
@@ -380,7 +397,7 @@ const ColorRow = ({
             }}
             className="h-8 w-8 rounded-lg border border-slate-200 shadow-sm overflow-hidden relative shrink-0"
             style={{
-              backgroundColor: value,
+              backgroundColor: isHexColor ? value : "#e2e8f0",
             }}
             aria-label={`Change ${label} color`}
           >
@@ -391,6 +408,11 @@ const ColorRow = ({
                   "inset 0 0 0 1px rgba(0,0,0,0.06)",
               }}
             />
+            {!isHexColor && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-[8px] font-bold text-slate-400">N/A</span>
+              </div>
+            )}
           </button>
         </div>
 
