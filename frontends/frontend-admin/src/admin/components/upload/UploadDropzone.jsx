@@ -69,7 +69,7 @@ const UploadDropzone = ({
       ref={inputRef}
       type="file"
       multiple
-      accept=".pdf"
+      accept=".pdf,.csv,.xlsx,.xls"
       hidden
       disabled={uploading}
       onChange={
@@ -517,7 +517,7 @@ const UploadDropzone = ({
               "var(--text-secondary)",
           }}
         >
-          Drag and drop PDF files
+          Drag and drop PDF, CSV, or Excel files
           here or manually select
           files to extend the AI
           knowledge base.
@@ -600,7 +600,7 @@ const UploadDropzone = ({
               "var(--text-muted)",
           }}
         >
-          Supported format: PDF
+          Supported formats: PDF, CSV, Excel
         </p>
 
         {fileInput}

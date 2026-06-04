@@ -22,10 +22,12 @@ from app.core.metadata_contract import (
     DOC_TYPE_GENERAL_TEXT,
     DOC_TYPE_OFFICIAL_DOCUMENT,
     DOC_TYPE_RESOLVED_CHAT,
+    DOC_TYPE_TABULAR_DATA,
     KNOWLEDGE_TYPE_TICKET,
     KNOWLEDGE_TYPE_CHAT,
     KNOWLEDGE_TYPE_MANUAL,
     KNOWLEDGE_TYPE_PDF,
+    KNOWLEDGE_TYPE_TABULAR,
 )
 
 from app.utils.text_utils import (
@@ -518,5 +520,66 @@ class KnowledgeConsolidator:
             cluster_key,
             point_id,
             raw_text,
+            metadata,
+        )
+
+    def build_tabular_record(
+        self,
+        *,
+        document_id: str,
+        file_name: str,
+        row_text: str,
+        category: str,
+        row_index: int,
+    ) -> CanonicalRecord:
+
+        cluster_key = sha256_hash(
+            f"{document_id}:{file_name}:{category}"
+        )
+
+        point_id = str(
+            uuid.uuid5(
+                uuid.NAMESPACE_DNS,
+                f"{document_id}_row_{row_index}",
+            )
+        )
+
+        metadata = {
+            "doc_type":
+                DOC_TYPE_TABULAR_DATA,
+
+            "knowledge_type":
+                KNOWLEDGE_TYPE_TABULAR,
+
+            "cluster_key":
+                cluster_key,
+
+            "document_id":
+                document_id,
+
+            "source_id":
+                document_id,
+
+            "source_ids": [
+                document_id
+            ],
+
+            "file_name":
+                file_name,
+
+            "category":
+                category,
+
+            "row_index":
+                row_index,
+
+            "frequency":
+                1,
+        }
+
+        return CanonicalRecord(
+            cluster_key,
+            point_id,
+            row_text,
             metadata,
         )
