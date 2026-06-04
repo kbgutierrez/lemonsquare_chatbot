@@ -23,7 +23,7 @@ const ChatFooterResolved = ({
         px-4
         py-3
 
-        backdrop-blur-sm
+        bg-black/[0.02]
       "
       style={{
         backgroundColor: theme.resolvedBannerBg,

@@ -64,7 +64,7 @@ const ResolutionPrompt = ({
       </div>
 
       <div
-        className="max-w-[75%] px-3 py-2 backdrop-blur-md transition-all duration-150 border"
+        className="max-w-[75%] px-3 py-2 bg-black/[0.03] transition-all duration-150 border"
         style={bubbleStyle}
       >
         <p className="whitespace-pre-wrap break-words text-[12px] leading-snug">

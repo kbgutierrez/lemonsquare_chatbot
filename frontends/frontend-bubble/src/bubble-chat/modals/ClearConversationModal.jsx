@@ -136,7 +136,7 @@ const ClearConversationModal = ({
         "flex items-center justify-center",
         "bg-black/30",
         "p-4",
-        "backdrop-blur-[4px]",
+        "        ",
         "transition-all duration-200",
 
         closing

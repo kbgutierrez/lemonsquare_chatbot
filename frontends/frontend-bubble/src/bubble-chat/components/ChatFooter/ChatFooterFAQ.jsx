@@ -42,7 +42,7 @@ const chipClass = `
 
   bg-white/70
 
-  backdrop-blur-md
+  bg-black/[0.03]
 
   shadow-[0_2px_10px_rgba(16,185,129,0.08)]
 
@@ -81,7 +81,7 @@ const faqButtonClass = `
 
   shadow-[0_3px_10px_rgba(34,197,94,0.10)]
 
-  backdrop-blur-md
+  bg-black/[0.03]
 
   transition-all
   duration-200
@@ -106,7 +106,7 @@ const collapseButtonClass = `
 
   text-[#256537]
 
-  backdrop-blur-md
+  bg-black/[0.03]
 
   transition-all
   duration-200

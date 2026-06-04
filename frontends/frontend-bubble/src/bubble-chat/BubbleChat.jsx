@@ -706,8 +706,8 @@ const BubbleChatContent =
               className={cn(
                 "pointer-events-none",
                 "fixed inset-0",
-                "bg-black/[0.02]",
-                "backdrop-blur-[1px]"
+                "bg-black/[0.05]",
+                "  "
               )}
             />
           )}
@@ -765,7 +765,7 @@ const BubbleChatContent =
                   "absolute z-10",
                   "overflow-hidden",
                   "rounded-[16px]",
-                  "backdrop-blur-2xl",
+                  "bg-black/[0.03]",
                   "ls-border"
                 )}
 

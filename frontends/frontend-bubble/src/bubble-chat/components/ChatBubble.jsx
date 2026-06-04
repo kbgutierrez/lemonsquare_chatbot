@@ -134,7 +134,7 @@ const ChatBubble = ({
             rounded-full
 
 
-            blur-xl
+                
           "
 
         />

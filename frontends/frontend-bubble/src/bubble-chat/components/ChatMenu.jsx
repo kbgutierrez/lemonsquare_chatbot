@@ -370,7 +370,7 @@ const ChatMenu = ({
 
           shadow-[0_18px_40px_rgba(16,24,40,0.18)]
 
-          backdrop-blur-md
+          bg-black/[0.03]
 
           ${menuTransitionClass}
 
