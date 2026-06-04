@@ -126,7 +126,10 @@ const ChatHeader = ({
             "
             style={{
               color: theme.headerText,
+              WebkitTextFillColor: theme.headerText,
             }}
+
+
           >
             {title}
           </h2>
