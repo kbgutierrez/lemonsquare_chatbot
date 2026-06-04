@@ -50,6 +50,7 @@ const ChatFooterInput = ({
         rounded-[14px]
 
         border
+        ls-border
 
         px-3
         py-2
@@ -63,7 +64,13 @@ const ChatFooterInput = ({
       "
       style={{
         backgroundColor: theme.inputBg,
-        borderColor: theme.inputBorder,
+
+        border: "1px solid",
+        borderColor:
+          "var(--ls-border-color)",
+
+        "--ls-border-color":
+          theme.inputBorder,
       }}
     >
 
@@ -312,6 +319,7 @@ const ChatFooterInput = ({
           rounded-[14px]
 
           border
+          ls-border
 
           shadow-[0_8px_18px_rgba(0,0,0,0.12)]
 
@@ -327,7 +335,13 @@ const ChatFooterInput = ({
           disabled:hover:scale-100
         "
         style={{
-          borderColor: theme.sendButtonBorder,
+          border: "1px solid",
+
+          borderColor:
+            "var(--ls-border-color)",
+
+          "--ls-border-color":
+            theme.sendButtonBorder,
         }}
       >
 

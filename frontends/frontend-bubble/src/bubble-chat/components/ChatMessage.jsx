@@ -102,7 +102,12 @@ const ChatMessage = ({
   const bubbleStyle = isAgent
     ? {
         backgroundColor: theme.agentBubbleBg,
-        borderColor: theme.agentBubbleBorder,
+
+        border: "1px solid",
+        borderColor:
+          "var(--ls-border-color)",
+
+        color: theme.agentText,
         color: theme.agentText,
         WebkitTextFillColor:
           theme.agentText,
@@ -111,7 +116,12 @@ const ChatMessage = ({
       }
     : {
         backgroundColor: theme.userBubbleBg,
-        borderColor: theme.userBubbleBorder,
+
+        border: "1px solid",
+        borderColor:
+          "var(--ls-border-color)",
+
+        color: theme.userText,
         color: theme.userText,
         WebkitTextFillColor:
           theme.userText,

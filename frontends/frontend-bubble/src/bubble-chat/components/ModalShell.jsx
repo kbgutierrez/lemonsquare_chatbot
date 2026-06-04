@@ -26,8 +26,21 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
           className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <button type="button" aria-label="Close modal overlay" onClick={onClose} className="absolute inset-0 cursor-default" />
           <motion.div initial="hidden" animate="visible" exit="exit" variants={modalVariants} transition={{ duration: 0.24, ease: "easeOut" }}
-            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border ${sizeClass}`}
-            style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.windowBorder, boxShadow: `0 12px 40px rgba(0,0,0,0.12)` }}>
+            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border ls-border ${sizeClass}`}
+            style={{
+              backgroundColor: theme.windowWrapperBg,
+
+              border: "1px solid",
+              borderColor:
+                "var(--ls-border-color)",
+
+              "--ls-border-color":
+                theme.windowBorder,
+
+              boxShadow:
+                `0 12px 40px rgba(0,0,0,0.12)`
+            }}
+            >
             <div className="relative z-10 flex items-start justify-between gap-4 border-b px-4 py-4 sm:px-5"
               style={{ background: theme.headerGradient, borderColor: theme.headerBorder, color: theme.headerText }}>
               <div className="flex min-w-0 items-start gap-3">
