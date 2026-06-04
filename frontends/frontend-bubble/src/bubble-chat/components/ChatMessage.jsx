@@ -174,8 +174,16 @@ const ChatMessage = ({
           duration-150
 
           border
+          ls-border
         "
-        style={bubbleStyle}
+        style={{
+          ...bubbleStyle,
+
+          "--ls-border-color":
+            isAgent
+              ? theme.agentBubbleBorder
+              : theme.userBubbleBorder,
+        }}
       >
 
         {isLoading ? (

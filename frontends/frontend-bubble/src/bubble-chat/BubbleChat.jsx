@@ -765,7 +765,8 @@ const BubbleChatContent =
                   "absolute z-10",
                   "overflow-hidden",
                   "rounded-[16px]",
-                  "backdrop-blur-2xl"
+                  "backdrop-blur-2xl",
+                  "ls-border"
                 )}
 
                 style={{
@@ -802,6 +803,8 @@ const BubbleChatContent =
                   border:
                     `1px solid ${theme.windowBorder}`,
 
+                  "--ls-border-color":
+                    theme.windowBorder,
                 }}
               >
 
