@@ -53,7 +53,7 @@ const ChatFooterInput = ({
         ls-border
 
         px-3
-        py-2
+        py-1
 
         shadow-[0_6px_18px_rgba(0,0,0,0.05)]
 
@@ -74,7 +74,7 @@ const ChatFooterInput = ({
       }}
     >
 
-      {/* BACKGROUND � Lemon Square brand texture only */}
+      {/* BACKGROUND – Lemon Square brand texture only */}
       {theme.id === "lemon-square" && (
         <div
           className="
@@ -130,166 +130,95 @@ const ChatFooterInput = ({
         "
       >
 
-        {!expandedEditing ? (
+        <textarea
+          ref={textareaRef}
 
-          <input
-            ref={textareaRef}
+          rows={1}
 
-            type="text"
+          value={message}
 
-            value={message}
+          disabled={
+            resolved ||
+            sessionTicketSubmitted
+          }
 
-            disabled={
-              resolved ||
-              sessionTicketSubmitted
-            }
+          maxLength={
+            MAX_MESSAGE_LENGTH
+          }
 
-            maxLength={
-              MAX_MESSAGE_LENGTH
-            }
+          enterKeyHint="send"
 
-            enterKeyHint="send"
+          aria-label="Chat input"
 
-            aria-label="Chat input"
+          onKeyDown={onKeyDown}
 
-            onKeyDown={onKeyDown}
+          onChange={(event) =>
+            setMessage(
+              event.target.value
+            )
+          }
 
-            onChange={(event) =>
-              setMessage(
-                event.target.value
-              )
-            }
+          onSelect={(event) => {
 
-            onSelect={(event) => {
+            const textarea =
+              event.target
 
-              const input =
-                event.target
+            const cursorPosition =
+              textarea.selectionStart
 
-              const cursorPosition =
-                input.selectionStart
+            const textLength =
+              textarea.value.length
 
-              const textLength =
-                input.value.length
+            setExpandedEditing(
+              cursorPosition <
+              textLength
+            )
+          }}
 
-              setExpandedEditing(
-                cursorPosition <
-                textLength
-              )
-            }}
+          className="
+            relative
+            z-10
 
-            className="
-              relative
-              z-10
+            w-full
 
-              w-full
+            resize-none
 
-              h-[32px]
+            overflow-hidden
 
-              bg-transparent
+            bg-transparent
 
-              text-[13px]
-              leading-[1.45]
+            text-[13px]
+            leading-[1.45]
 
-              outline-none
+            outline-none
 
-              disabled:cursor-not-allowed
-              disabled:opacity-70
-            "
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
 
-            style={{
-              color:
-                theme.inputText,
-            }}
-          />
+            disabled:cursor-not-allowed
+            disabled:opacity-70
+          "
 
-        ) : (
+          style={{
+            color:
+              theme.inputText,
 
-          <textarea
-            ref={textareaRef}
+            height:
+              expandedEditing
+                ? "72px"
+                : "36px",
 
-            rows={1}
+            paddingTop:
+              expandedEditing
+                ? "2px"
+                : "8px",
 
-            value={message}
-
-            disabled={
-              resolved ||
-              sessionTicketSubmitted
-            }
-
-            maxLength={
-              MAX_MESSAGE_LENGTH
-            }
-
-            enterKeyHint="send"
-
-            aria-label="Chat input"
-
-            onKeyDown={onKeyDown}
-
-            onChange={(event) =>
-              setMessage(
-                event.target.value
-              )
-            }
-
-            onSelect={(event) => {
-
-              const textarea =
-                event.target
-
-              const cursorPosition =
-                textarea.selectionStart
-
-              const textLength =
-                textarea.value.length
-
-              if (
-                cursorPosition ===
-                textLength
-              ) {
-
-                setExpandedEditing(
-                  false
-                )
-              }
-            }}
-
-            className="
-              relative
-              z-10
-
-              w-full
-
-              max-h-24
-              min-h-[28px]
-
-              resize-none
-
-              overflow-y-auto
-
-              bg-transparent
-
-              pt-[2px]
-
-              text-[13px]
-              leading-[1.45]
-
-              outline-none
-
-              [scrollbar-width:none]
-              [&::-webkit-scrollbar]:hidden
-
-              disabled:cursor-not-allowed
-              disabled:opacity-70
-            "
-
-            style={{
-              color:
-                theme.inputText,
-            }}
-          />
-
-        )}
+            paddingBottom:
+              expandedEditing
+                ? "2px"
+                : "0px",
+          }}
+        />
 
       </div>
 
