@@ -87,7 +87,7 @@
    HOST CSS PROTECTION TEST
 ========================================= */
 
-.lemonsquare-chat-root .border {
+.lemonsquare-chat-root .border:not(.ls-border) {
   border-color: inherit !important;
 }
 
