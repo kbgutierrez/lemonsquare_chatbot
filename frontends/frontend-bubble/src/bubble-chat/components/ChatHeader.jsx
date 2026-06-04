@@ -124,6 +124,12 @@ const ChatHeader = ({
 
               drop-shadow-[0_1px_2px_rgba(0,0,0,0.18)]
             "
+            style={{
+              color: theme.headerText,
+              WebkitTextFillColor: theme.headerText,
+            }}
+
+
           >
             {title}
           </h2>
