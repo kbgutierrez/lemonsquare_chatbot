@@ -71,6 +71,14 @@
 }
 
 /* =========================================
+   HOST CSS PROTECTION TEST
+========================================= */
+
+.lemonsquare-chat-root .border {
+  border-color: inherit !important;
+}
+
+/* =========================================
    GLOBAL SCROLLBAR
 ========================================= */
 
@@ -185,10 +193,10 @@
 }
 
 /* =========================================
-   BUBBLE DRAG SYSTEM � MOBILE FIXES
+   BUBBLE DRAG SYSTEM — MOBILE FIXES
    ========================================= */
 
-/* The drag-active body class � applied only during drag */
+/* The drag-active body class — applied only during drag */
 body.bubble-drag-active {
   overscroll-behavior: none;
   touch-action: none;
@@ -234,7 +242,7 @@ body.bubble-drag-active {
    CHAT WINDOW RESPONSIVE SIZING
 ========================================= */
 
-/* Mobile: compact floating card � NOT a full panel */
+/* Mobile: compact floating card — NOT a full panel */
 @media (max-width: 640px) {
   .lemonsquare-chat-root {
     --ls-chat-width:  clamp(290px, 88vw, 360px);
