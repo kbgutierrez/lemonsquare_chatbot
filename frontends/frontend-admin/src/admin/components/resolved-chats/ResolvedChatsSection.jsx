@@ -160,7 +160,7 @@ const ResolvedChatsSection = () => {
             title={lifecycleFilter === "inactive" ? "No inactive chats" : "No resolved chats"}
             message={
               lifecycleFilter === "inactive"
-                ? "Archived AI-learned conversations will appear here."
+                ? "Archived AI-recorded conversations will appear here."
                 : "No active resolved chats are currently available."
             }
           />

@@ -23,7 +23,7 @@ const ResolveConversationModal = ({ onClose, onResolve }) => {
             Confirm that the current support session has been completed and safely resolve the conversation.
           </p>
           <span className="mt-3 block text-sm font-medium" style={{ color: theme.accent, WebkitTextFillColor: theme.accent }}>
-            The resolved conversation will automatically be learned by the AI and appear in the Admin panel.
+            The resolved conversation will be recorded and appear in the Admin panel.
           </span>
         </div>
         <div className="mt-6 flex justify-end gap-3">
