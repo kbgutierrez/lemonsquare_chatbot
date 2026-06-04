@@ -706,7 +706,7 @@ const BubbleChatContent =
               className={cn(
                 "pointer-events-none",
                 "fixed inset-0",
-                "bg-black/[0.05]",
+                "bg-black/[0.30]",
                 "  "
               )}
             />
