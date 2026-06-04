@@ -8,11 +8,11 @@ class DocumentResponse(BaseModel):
     file_name: str
     category: str
     chunk_count: int
-    uploaded_at: datetime
+    uploaded_at: str
     is_active: bool = True
     uploaded_by: int | None = None
     uploaded_by_username: str | None = None
-    updated_at: datetime | None = None
+    updated_at: str | None = None
     updated_by: int | None = None
     updated_by_username: str | None = None
 
@@ -45,8 +45,8 @@ class ManualEntryResponse(BaseModel):
     content: str
     category: str
 
-    created_at: datetime
-    updated_at: datetime
+    created_at: str
+    updated_at: str
 
     is_active: bool | None = None
 

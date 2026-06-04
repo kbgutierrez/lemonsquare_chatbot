@@ -44,7 +44,7 @@ class ChatHistoryResponse(BaseModel):
 class ChatSessionMetaResponse(BaseModel):
     session_id: str
     status: str
-    created_at: datetime | None
+    created_at: str | None
     message_count: int
     user_id: str | None = None
     requester_name: str | None = None

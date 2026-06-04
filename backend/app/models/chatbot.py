@@ -2,7 +2,7 @@
 SQLAlchemy ORM models for the Chatbot (read/write) database.
 """
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -26,7 +26,7 @@ class ChatSession(BaseChatbot):
     RequesterUserID = Column(BigInteger, nullable=False)
     RequesterName = Column(String(150))
     ChatTitle = Column(String(255))
-    StartTime = Column(DateTime, default=datetime.utcnow)
+    StartTime = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     LastActive = Column(DateTime)
     IsActive = Column(Boolean, default=True)
     RelatedTicketID = Column(String(50))
@@ -51,7 +51,7 @@ class ChatMessage(BaseChatbot):
     SenderRole = Column(String(10), nullable=False)
     SenderName = Column(String(150))
     MessageContent = Column(Text, nullable=False)
-    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    CreatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     session = relationship("ChatSession", back_populates="messages")
 
 
@@ -78,7 +78,7 @@ class AIChatbotSetting(BaseChatbot):
         ),
     )
     IsActive = Column(Boolean, default=True)
-    CreatedDate = Column(DateTime, default=datetime.utcnow)
+    CreatedDate = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     UpdatedBy = Column(BigInteger)
     UpdatedByUsername = Column(String(150))
 
@@ -114,7 +114,7 @@ class UserThemePreference(BaseChatbot):
     CustomHeaderGradientEnd = Column(String(7), default="#5dd87a")
     CustomAccent = Column(String(7), default="#22c55e")
     CustomWindowBg = Column(String(7), default="#f6fff7")
-    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    UpdatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     __table_args__ = (
         UniqueConstraint("UserID", name="UQ_UserThemePreferences_UserID"),
@@ -127,10 +127,10 @@ class UploadedDocument(BaseChatbot):
     FileName = Column(String(255), nullable=False, unique=True)
     Category = Column(String(100), nullable=False)
     ChunkCount = Column(Integer, nullable=False)
-    UploadedAt = Column(DateTime, default=datetime.utcnow)
+    UploadedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     UploadedBy = Column(BigInteger)
     UploadedByUsername = Column(String(150))
-    UpdatedAt = Column(DateTime, onupdate=datetime.utcnow)
+    UpdatedAt = Column(DateTime, onupdate=lambda: datetime.now(timezone.utc))
     UpdatedBy = Column(BigInteger)
     UpdatedByUsername = Column(String(150))
     IsActive = Column(Boolean, default=True)
@@ -139,7 +139,7 @@ class UploadedDocument(BaseChatbot):
 class BlacklistedTicket(BaseChatbot):
     __tablename__ = "tbl_blacklisted_tickets"
     TicketNumber = Column(String(15), primary_key=True)
-    BlacklistedAt = Column(DateTime, default=datetime.utcnow)
+    BlacklistedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     BlacklistedBy = Column(BigInteger)
 
 
@@ -149,8 +149,8 @@ class ManualKnowledgeEntry(BaseChatbot):
     Title = Column(String(255), nullable=False)
     Content = Column(Text, nullable=False)
     Category = Column(String(100), nullable=False)
-    CreatedAt = Column(DateTime, default=datetime.utcnow)
-    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    CreatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    UpdatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     CreatedBy = Column(BigInteger)
     CreatedByUsername = Column(String(150))
     UpdatedBy = Column(BigInteger)
@@ -167,8 +167,8 @@ class LearnedChat(BaseChatbot):
     IssueFound = Column(Text)
     RootCause = Column(Text)
     WorkDone = Column(Text)
-    LearnedAt = Column(DateTime, default=datetime.utcnow)
-    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    LearnedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    UpdatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
     IsActive = Column(Boolean, default=True)
 
 
@@ -179,8 +179,8 @@ class KnowledgeClusterMap(BaseChatbot):
     ClusterID = Column(String(64), nullable=False, index=True)
     ClusterKey = Column(String(128), nullable=False, index=True)
     IsActive = Column(Boolean, default=True)
-    CreatedAt = Column(DateTime, default=datetime.utcnow)
-    UpdatedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    CreatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    UpdatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class TicketRoutingLog(BaseChatbot):
@@ -195,7 +195,7 @@ class TicketRoutingLog(BaseChatbot):
     IsHumanOverridden = Column(Boolean, default=False)
     FinalDepartment = Column(String(100))
     FinalSubcategory = Column(String(100))
-    CreatedAt = Column(DateTime, default=datetime.utcnow)
+    CreatedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
 
 class IngestionSyncState(BaseChatbot):
@@ -203,4 +203,4 @@ class IngestionSyncState(BaseChatbot):
     EntityKey = Column(String(256), primary_key=True)
     EntityType = Column(String(50), nullable=False)
     ContentHash = Column(String(64), nullable=False)  # CHAR(64) effectively
-    LastSyncedAt = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    LastSyncedAt = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

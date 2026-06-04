@@ -47,6 +47,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/chat", tags=["Chat"])
 
 
+from app.utils.json_utils import format_utc_iso
+
+
 @router.post("", response_model=ChatResponse)
 @limiter.limit("20/minute")
 async def handle_chat(
@@ -177,11 +180,7 @@ async def get_chat_history(
                 SenderRole=msg.SenderRole,
                 SenderName=getattr(msg, "SenderName", None),
                 MessageContent=msg.MessageContent,
-                CreatedAt=(
-                    msg.CreatedAt.isoformat()
-                    if msg.CreatedAt
-                    else ""
-                ),
+                CreatedAt=format_utc_iso(msg.CreatedAt),
             )
             for msg in messages
         ],
@@ -214,7 +213,7 @@ def get_user_chat_sessions(
         {
             "session_id": sid,
             "status": status or "Active",
-            "created_at": start_time,
+            "created_at": format_utc_iso(start_time),
             "message_count": msg_count,
             "user_id": str(req_id),
         }
@@ -239,7 +238,7 @@ def get_all_chat_sessions(
         {
             "session_id": sid,
             "status": status or "Active",
-            "created_at": start_time,
+            "created_at": format_utc_iso(start_time),
             "message_count": msg_count,
             "user_id": str(req_id),
         }

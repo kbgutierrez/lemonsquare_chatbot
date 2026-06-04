@@ -43,6 +43,7 @@ from app.schemas.documents import (
 from app.services.ingestion.ingestion_service import DocumentIngestionService
 from app.services.rag.support_orchestrator import SupportOrchestrator
 from app.services.maintenance.job_manager import job_manager
+from app.utils.json_utils import format_utc_iso, to_utc_aware
 
 
 logger = logging.getLogger(__name__)
@@ -297,11 +298,11 @@ def get_documents(
             file_name=doc.FileName,
             category=doc.Category,
             chunk_count=doc.ChunkCount,
-            uploaded_at=doc.UploadedAt,
+            uploaded_at=format_utc_iso(doc.UploadedAt),
             is_active=bool(doc.IsActive),
             uploaded_by=doc.UploadedBy,
             uploaded_by_username=doc.UploadedByUsername,
-            updated_at=doc.UpdatedAt,
+            updated_at=format_utc_iso(doc.UpdatedAt),
             updated_by=doc.UpdatedBy,
             updated_by_username=doc.UpdatedByUsername,
         )
@@ -486,11 +487,11 @@ async def update_document_metadata(
             file_name=updated_doc.FileName,
             category=updated_doc.Category,
             chunk_count=updated_doc.ChunkCount,
-            uploaded_at=updated_doc.UploadedAt,
+            uploaded_at=format_utc_iso(updated_doc.UploadedAt),
             is_active=bool(updated_doc.IsActive),
             uploaded_by=updated_doc.UploadedBy,
             uploaded_by_username=updated_doc.UploadedByUsername,
-            updated_at=updated_doc.UpdatedAt,
+            updated_at=format_utc_iso(updated_doc.UpdatedAt),
             updated_by=updated_doc.UpdatedBy,
             updated_by_username=updated_doc.UpdatedByUsername,
         )
@@ -548,8 +549,8 @@ def get_manual_entries(
             title=entry.Title,
             content=entry.Content,
             category=entry.Category,
-            created_at=entry.CreatedAt,
-            updated_at=entry.UpdatedAt,
+            created_at=format_utc_iso(entry.CreatedAt),
+            updated_at=format_utc_iso(entry.UpdatedAt),
             is_active=bool(entry.IsActive),
             created_by=entry.CreatedBy,
             created_by_username=entry.CreatedByUsername,
