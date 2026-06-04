@@ -119,3 +119,24 @@ def clean_llm_json_output(raw_output: str) -> str:
         The extracted JSON snippet ready for parsing.
     """
     return _extract_json_snippet(raw_output)
+
+
+from datetime import datetime, timezone
+
+def to_utc_aware(dt: datetime | None) -> datetime | None:
+    """Ensure a datetime is aware and in UTC."""
+    if dt is None:
+        return None
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def format_utc_iso(dt: datetime | None) -> str:
+    """Format a datetime as a UTC ISO string with 'Z' suffix."""
+    aware_dt = to_utc_aware(dt)
+    if aware_dt is None:
+        return ""
+    # Pydantic 2 serializes aware datetimes with +00:00 or Z.
+    # Manual stringification for consistency where needed.
+    return aware_dt.isoformat().replace("+00:00", "Z")
