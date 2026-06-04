@@ -15,6 +15,14 @@ const FileTableRow = ({
     return new Date(date).toLocaleString()
   }
 
+  const getFileLabel = (fileName) => {
+    const ext = fileName?.split(".").pop()?.toLowerCase()
+    if (ext === "pdf") return "PDF Document"
+    if (ext === "csv") return "CSV Spreadsheet"
+    if (ext === "xlsx" || ext === "xls") return "Excel Spreadsheet"
+    return "Document"
+  }
+
   const cellClass =
     "border-b theme-border px-5 py-3.5"
 
@@ -31,7 +39,7 @@ const FileTableRow = ({
             </p>
 
             <p className="mt-0.5 text-[11px] text-[var(--text-secondary)]">
-              PDF Document
+              {getFileLabel(file.file_name)}
             </p>
 
             {file.created_by_username && (

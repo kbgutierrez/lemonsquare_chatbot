@@ -14,10 +14,12 @@ DOC_TYPE_CANONICAL_TICKET = "canonical_ticket_cluster"
 DOC_TYPE_RESOLVED_CHAT = "resolved_chat"
 DOC_TYPE_OFFICIAL_DOCUMENT = "official_document"
 DOC_TYPE_GENERAL_TEXT = "general_text"
+DOC_TYPE_TABULAR_DATA = "tabular_data"
 
 DOCUMENT_DOC_TYPES = {
     DOC_TYPE_OFFICIAL_DOCUMENT,
     DOC_TYPE_GENERAL_TEXT,
+    DOC_TYPE_TABULAR_DATA,
 }
 
 TICKET_LIKE_DOC_TYPES = {
@@ -33,6 +35,7 @@ KNOWLEDGE_TYPE_TICKET = "ticket"
 KNOWLEDGE_TYPE_CHAT = "chat"
 KNOWLEDGE_TYPE_MANUAL = "manual"
 KNOWLEDGE_TYPE_PDF = "pdf"
+KNOWLEDGE_TYPE_TABULAR = "tabular"
 
 # =========================================================
 # HELPERS
@@ -112,5 +115,21 @@ def build_pdf_metadata(*, cluster_key: str, document_id: str, file_name: str, ca
         "file_name": file_name,
         "category": category,
         "chunk_index": chunk_index,
+        "frequency": 1,
+    })
+
+
+def build_tabular_metadata(*, cluster_key: str, document_id: str, file_name: str, category: str, row_index: int) -> dict:
+    return normalize_metadata({
+        "doc_type": DOC_TYPE_TABULAR_DATA,
+        "knowledge_type": KNOWLEDGE_TYPE_TABULAR,
+        "cluster_key": cluster_key,
+        "document_id": document_id,
+        "source_id": document_id,
+        "source_ids": [document_id],
+        "source": file_name,
+        "file_name": file_name,
+        "category": category,
+        "row_index": row_index,
         "frequency": 1,
     })

@@ -84,6 +84,15 @@ async def upload_document(
         )
 
     filename = file.filename
+    ext = os.path.splitext(filename)[1].lower()
+    is_tabular = ext in [".csv", ".xlsx", ".xls"]
+    is_pdf = ext == ".pdf"
+
+    if not is_pdf and not is_tabular:
+        raise HTTPException(
+            status_code=400,
+            detail="Unsupported file format. Only PDF, CSV, and Excel files are supported."
+        )
 
     existing_doc = db.query(UploadedDocument).filter(UploadedDocument.FileName == filename).first()
     if existing_doc:
@@ -94,7 +103,7 @@ async def upload_document(
 
     job_id = job_manager.create_job(f"upload_{filename}")
 
-    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+    tmp_file = tempfile.NamedTemporaryFile(delete=False, suffix=ext)
     temp_file_path = tmp_file.name
     tmp_file.close()
 
@@ -112,27 +121,38 @@ async def upload_document(
         job_manager.update_job(job_id, status="failed", error=str(e), message="File upload failed")
         raise HTTPException(status_code=500, detail="Failed to save uploaded file.")
 
-    async def process_pdf_in_background():
+    async def process_document_in_background():
         from app.core.database import SessionChatbot
 
         async with _upload_semaphore:
-            job_manager.update_job(job_id, status="running", message="Processing PDF...", progress=10.0)
+            job_manager.update_job(job_id, status="running", message=f"Processing {ext.upper()}...", progress=10.0)
 
             bg_db = SessionChatbot()
 
             try:
                 bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
-                result = await bg_ingestion_service.process_pdf_upload(
-                    file=None,
-                    db=bg_db,
-                    manual_category=category,
-                    job_id=job_id,
-                    file_path=temp_file_path,
-                    original_filename=filename,
-                    acting_user_id=user_id,
-                    acting_username=username
-                )
+                if is_pdf:
+                    result = await bg_ingestion_service.process_pdf_upload(
+                        file=None,
+                        db=bg_db,
+                        manual_category=category,
+                        job_id=job_id,
+                        file_path=temp_file_path,
+                        original_filename=filename,
+                        acting_user_id=user_id,
+                        acting_username=username
+                    )
+                else:
+                    result = await bg_ingestion_service.process_tabular_upload(
+                        db=bg_db,
+                        manual_category=category,
+                        job_id=job_id,
+                        file_path=temp_file_path,
+                        original_filename=filename,
+                        acting_user_id=user_id,
+                        acting_username=username
+                    )
 
                 logger.info(
                     "Background upload completed for %s",
@@ -153,7 +173,7 @@ async def upload_document(
                 bg_db.close()
 
     background_tasks.add_task(
-        process_pdf_in_background
+        process_document_in_background
     )
 
     return DocumentUploadResponse(

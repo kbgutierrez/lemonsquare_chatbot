@@ -647,12 +647,15 @@ export const useFileUpload =
             Array.from(
               files
             ).filter(
-              (f) =>
-                f.name
-                  .toLowerCase()
-                  .endsWith(
-                    ".pdf"
-                  )
+              (f) => {
+                const name = (f.name || "").toLowerCase().trim()
+                return (
+                  name.endsWith(".pdf") ||
+                  name.endsWith(".csv") ||
+                  name.endsWith(".xlsx") ||
+                  name.endsWith(".xls")
+                )
+              }
             )
 
           if (!valid.length) {

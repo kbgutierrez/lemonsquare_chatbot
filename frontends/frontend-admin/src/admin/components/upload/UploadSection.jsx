@@ -98,7 +98,7 @@ const UploadSection = () => {
                 color: "var(--text-secondary)",
               }}
             >
-              Upload PDFs to extend the AI knowledge base in realtime.
+              Upload PDFs, CSVs, or Excel files to extend the AI knowledge base in realtime.
             </p>
           </div>
 

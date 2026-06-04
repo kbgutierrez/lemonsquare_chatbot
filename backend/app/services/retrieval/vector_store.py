@@ -17,6 +17,7 @@ from app.core.metadata_contract import (
     DOC_TYPE_GENERAL_TEXT,
     DOC_TYPE_OFFICIAL_DOCUMENT,
     DOC_TYPE_RESOLVED_CHAT,
+    DOC_TYPE_TABULAR_DATA,
     normalize_metadata,
 )
 
@@ -285,7 +286,7 @@ class VectorStoreService:
         query_vector: list[float],
         limit: int = 5,
     ) -> list:
-        """Search document-like vectors (PDFs, manual entries)."""
+        """Search document-like vectors test (PDFs, manual entries, tabular data)."""
         started = time.perf_counter()
         response = self.qdrant.query_points(
             collection_name=self.collection_name,
@@ -293,6 +294,7 @@ class VectorStoreService:
             query_filter=self._typed_active_filter([
                 DOC_TYPE_OFFICIAL_DOCUMENT,
                 DOC_TYPE_GENERAL_TEXT,
+                DOC_TYPE_TABULAR_DATA,
             ]),
             with_payload=True,
             limit=limit,
