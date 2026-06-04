@@ -113,7 +113,7 @@ async def invoke_llm(
                     match = re.search(r"try again in ([\w.]+)", error_msg)
                     wait_time = match.group(1) if match else "a few minutes"
                     raise LLMRateLimitError(
-                        detail=f"Groq rate limit reached. Please try again in {wait_time}."
+                        detail=f"Please try again in {wait_time}."
                     ) from exc
                 raise
 

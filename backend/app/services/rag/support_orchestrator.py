@@ -103,7 +103,7 @@ class SupportOrchestrator:
             )
         except Exception as exc:
             logger.error("Orchestrator debug pipeline failed: %s", exc, exc_info=True)
-            raise AIProcessingError(f"AI debug pipeline error: {exc}") from exc
+            raise AIProcessingError(f" {exc}") from exc
 
     async def _run_pipeline(
         self,
