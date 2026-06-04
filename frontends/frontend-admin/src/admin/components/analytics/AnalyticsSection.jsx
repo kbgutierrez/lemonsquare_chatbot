@@ -348,7 +348,7 @@ const AnalyticsSection =
           />
 
           <StatCard
-            title="Knowledge PDFs"
+            title="Knowledge Files"
             value={
               knowledge.pdfs || 0
             }

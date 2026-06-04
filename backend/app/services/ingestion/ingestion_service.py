@@ -67,6 +67,24 @@ class DocumentIngestionService:
             acting_username=acting_username,
         )
 
+    # ── Tabular Upload (CSV/Excel) ───────────────────────────
+
+    async def process_tabular_upload(
+        self, db=None, manual_category=None,
+        job_id=None, file_path=None, original_filename=None,
+        acting_user_id: int = 1,
+        acting_username: str = "System",
+    ) -> dict:
+        from app.services.ingestion.tabular_processor import TabularProcessor
+        return await TabularProcessor(db, self.vector_store, self.embeddings).process(
+            file_path=file_path,
+            original_filename=original_filename,
+            manual_category=manual_category,
+            job_id=job_id,
+            acting_user_id=acting_user_id,
+            acting_username=acting_username,
+        )
+
     # ── Manual Entry ───────────────────────────────────────────
 
     async def process_manual_entry(
