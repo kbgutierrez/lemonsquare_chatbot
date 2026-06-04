@@ -366,7 +366,7 @@ const ChatMenu = ({
           rounded-xl
 
           border
-          border-emerald-200/60
+          ls-border
 
           shadow-[0_18px_40px_rgba(16,24,40,0.18)]
 
@@ -390,7 +390,16 @@ const ChatMenu = ({
               `
           }
         `}
-        style={{ backgroundColor: theme.menuBg }}
+        style={{
+          backgroundColor: theme.menuBg,
+
+          border: "1px solid",
+          borderColor:
+            "var(--ls-border-color)",
+
+          "--ls-border-color":
+            theme.headerBadgeBorder,
+        }}
       >
 
         <div
@@ -402,6 +411,13 @@ const ChatMenu = ({
           "
           style={{
             backgroundColor: theme.menuBg,
+
+            border: "1px solid",
+            borderColor:
+              "var(--ls-border-color)",
+
+            "--ls-border-color":
+              theme.headerBadgeBorder,
           }}
         />
 
