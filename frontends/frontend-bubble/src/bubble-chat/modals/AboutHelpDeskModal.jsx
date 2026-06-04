@@ -31,12 +31,12 @@ const AboutHelpDeskModal = ({ onClose }) => {
       title="Chatbot Usage Policy"
      
       size="md"
-      icon={<Bot className="h-5 w-5" style={{ color: theme.headerText }} />}
+      icon={<Bot className="h-5 w-5" style={{ color: theme.headerText, WebkitTextFillColor: theme.headerText }} />}
     >
       <div className="px-4 py-4 sm:px-5 sm:py-5">
         <p
           className="text-sm leading-relaxed"
-          style={{ color: theme.agentText }}
+          style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}
         >
           C.C Helpdesk AI is intended exclusively for IT support and technical
           assistance. Please use the chatbot only for concerns related to
@@ -52,11 +52,11 @@ const AboutHelpDeskModal = ({ onClose }) => {
           <div className="mb-3 flex items-center gap-2">
             <ShieldCheck
               className="h-5 w-5"
-              style={{ color: theme.accent }}
+              style={{ color: theme.accent, WebkitTextFillColor: theme.accent }}
             />
             <h3
               className="text-sm font-semibold"
-              style={{ color: theme.agentText }}
+              style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}
             >
               Allowed Usage
             </h3>
@@ -71,6 +71,7 @@ const AboutHelpDeskModal = ({ onClose }) => {
                   backgroundColor: theme.windowWrapperBg,
                   borderColor: theme.agentBubbleBorder,
                   color: theme.agentText,
+                  WebkitTextFillColor: theme.agentText,
                 }}
               >
                 {item}
@@ -89,11 +90,11 @@ const AboutHelpDeskModal = ({ onClose }) => {
           <div className="mb-3 flex items-center gap-2">
             <AlertTriangle
               className="h-5 w-5"
-              style={{ color: theme.accent }}
+              style={{ color: theme.accent, WebkitTextFillColor: theme.accent }}
             />
             <h3
               className="text-sm font-semibold"
-              style={{ color: theme.agentText }}
+              style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}
             >
               Prohibited Usage
             </h3>
@@ -108,6 +109,7 @@ const AboutHelpDeskModal = ({ onClose }) => {
                   backgroundColor: theme.windowWrapperBg,
                   borderColor: theme.agentBubbleBorder,
                   color: theme.agentText,
+                  WebkitTextFillColor: theme.agentText,
                 }}
               >
                 {item}
@@ -125,14 +127,14 @@ const AboutHelpDeskModal = ({ onClose }) => {
         >
           <p
             className="text-sm font-semibold"
-            style={{ color: theme.agentText }}
+            style={{ color: theme.agentText, WebkitTextFillColor: theme.agentText }}
           >
             Important Notice
           </p>
 
           <p
             className="mt-2 text-xs leading-relaxed"
-            style={{ color: theme.agentTimestamp }}
+            style={{ color: theme.agentTimestamp, WebkitTextFillColor: theme.agentTimestamp }}
           >
             All chatbot interactions may be logged for support, auditing,
             reporting, analytics, and service improvement purposes. Misuse of

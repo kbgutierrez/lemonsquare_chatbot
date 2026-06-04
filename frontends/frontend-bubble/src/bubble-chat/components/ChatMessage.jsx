@@ -23,12 +23,10 @@ const TypingDots = memo(
             h-1.5
             w-1.5
             rounded-full
-
-            animate-bounce
           "
           style={{
             backgroundColor: color,
-            animationDelay: `${delay}s`,
+            opacity: 0.6,
           }}
         />
       ))}
@@ -56,6 +54,7 @@ const Avatar = ({
     style={{
       backgroundColor: bg,
       color: text,
+      WebkitTextFillColor: text,
       boxShadow: `0 0 0 2px ${ring}`,
     }}
   >
@@ -105,6 +104,8 @@ const ChatMessage = ({
         backgroundColor: theme.agentBubbleBg,
         borderColor: theme.agentBubbleBorder,
         color: theme.agentText,
+        WebkitTextFillColor:
+          theme.agentText,
         boxShadow: `0 3px 10px ${theme.agentBubbleShadow}`,
         borderRadius: "12px 12px 12px 4px",
       }
@@ -112,6 +113,8 @@ const ChatMessage = ({
         backgroundColor: theme.userBubbleBg,
         borderColor: theme.userBubbleBorder,
         color: theme.userText,
+        WebkitTextFillColor:
+          theme.userText,
         boxShadow: `0 3px 10px ${theme.userBubbleShadow}`,
         borderRadius: "12px 12px 4px 12px",
       }
@@ -150,8 +153,6 @@ const ChatMessage = ({
 
         cursor-pointer
 
-        animate-[fadeIn_.15s_ease-out]
-
         ${isAgent ? "justify-start" : "justify-end"}
       `}
     >
@@ -179,7 +180,11 @@ const ChatMessage = ({
 
         {isLoading ? (
           <div className="flex items-center gap-2">
-            <LoaderCircle className="h-3.5 w-3.5 animate-spin" style={{ color: theme.typingDot }} />
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin" style={{
+              color: theme.typingDot,
+              WebkitTextFillColor:
+                theme.typingDot,
+            }} />
             <p className="whitespace-pre-wrap break-words text-[12px] leading-snug">
               {text}
             </p>
@@ -213,6 +218,8 @@ const ChatMessage = ({
             "
             style={{
               color: timeColor,
+              WebkitTextFillColor:
+                timeColor,
               opacity: showTime ? 1 : 0,
               height: showTime ? "auto" : 0,
             }}

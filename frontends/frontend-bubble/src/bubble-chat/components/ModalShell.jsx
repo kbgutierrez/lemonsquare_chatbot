@@ -23,30 +23,30 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
     <AnimatePresence>
       {open && (
         <motion.div initial="hidden" animate="visible" exit="hidden" variants={backdropVariants} transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/35 p-3 sm:p-4 backdrop-blur-[6px]">
+          className="fixed inset-0 z-[140] flex items-center justify-center bg-black/40 p-3 sm:p-4">
           <button type="button" aria-label="Close modal overlay" onClick={onClose} className="absolute inset-0 cursor-default" />
           <motion.div initial="hidden" animate="visible" exit="exit" variants={modalVariants} transition={{ duration: 0.24, ease: "easeOut" }}
-            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border backdrop-blur-2xl ${sizeClass}`}
-            style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.windowBorder, boxShadow: `0 30px 90px ${theme.windowShadow}` }}>
+            className={`relative z-10 flex w-full flex-col overflow-hidden rounded-[16px] border ${sizeClass}`}
+            style={{ backgroundColor: theme.windowWrapperBg, borderColor: theme.windowBorder, boxShadow: `0 12px 40px rgba(0,0,0,0.12)` }}>
             <div className="relative z-10 flex items-start justify-between gap-4 border-b px-4 py-4 sm:px-5"
               style={{ background: theme.headerGradient, borderColor: theme.headerBorder, color: theme.headerText }}>
               <div className="flex min-w-0 items-start gap-3">
                 {icon && (
                   <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[12px]"
-                    style={{ backgroundColor: theme.headerBadgeBg, color: theme.headerText }}>
+                    style={{ backgroundColor: theme.headerBadgeBg, color: theme.headerText, WebkitTextFillColor: theme.headerText }}>
                     {icon}
                   </div>
                 )}
                 <div className="min-w-0">
-                  {subtitle && <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.headerText, opacity: 0.7 }}>{subtitle}</p>}
-                  {title && <h2 className="mt-1 truncate text-lg font-semibold sm:text-xl" style={{ color: theme.headerText }}>{title}</h2>}
+                  {subtitle && <p className="text-[10px] font-semibold uppercase tracking-[0.18em]" style={{ color: theme.headerText, WebkitTextFillColor: theme.headerText, opacity: 0.7 }}>{subtitle}</p>}
+                  {title && <h2 className="mt-1 truncate text-lg font-semibold sm:text-xl" style={{ color: theme.headerText, WebkitTextFillColor: theme.headerText }}>{title}</h2>}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 {headerActions}
                 <button type="button" onClick={onClose} aria-label="Close modal"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border transition-all duration-200"
-                  style={{ backgroundColor: theme.headerBadgeBg, borderColor: theme.headerBadgeBorder, color: theme.headerText }}>
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] border transition-colors duration-150"
+                  style={{ backgroundColor: theme.headerBadgeBg, borderColor: theme.headerBadgeBorder, color: theme.headerText, WebkitTextFillColor: theme.headerText }}>
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -62,4 +62,4 @@ const ModalShell = ({ open = true, onClose, children, title, subtitle, icon, hea
   )
 }
 
-export default ModalShell 
+export default ModalShell
