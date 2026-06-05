@@ -17,7 +17,7 @@ export const buildApiUrl = (
   endpoint,
   params = {}
 ) => {
-  let url = endpoint
+  let url = `${API_CONFIG.BASE_URL}${endpoint}`
 
   for (const [key, value] of Object.entries(params)) {
     if (

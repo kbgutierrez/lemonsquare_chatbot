@@ -6,10 +6,10 @@
 
 const ENV = {
   // 🚨 IMPORTANT FIX:  
-  // REMOVE /api from BASE URL to prevent /api/api duplication
+  // Use /bot as base to avoid /api/* collision with other services
   API_BASE_URL:
     import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8000", // ✅ FIXED (NO /api HERE)
+    "/bot", // ✅ FIXED (Production default is /bot)
 
   WS_BASE_URL:
     import.meta.env.VITE_WS_BASE_URL ||
