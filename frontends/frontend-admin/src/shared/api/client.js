@@ -10,19 +10,86 @@ const REQUEST_TIMEOUT =
   API_CONFIG.TIMEOUT || 30000
 
 /* ========================================
-   BUILD URL (SAFE)
+   BUILD URL (IDEMPOTENT)
 ======================================== */
+
+const escapeRegExp = (value) =>
+  value.replace(
+    /[.*+?^${}()|[\]\\]/g,
+    "\\$&"
+  )
+
+const isAbsoluteUrl = (url) =>
+  /^[a-z][a-z\d+\-.]*:\/\//i.test(url) ||
+  url.startsWith("//")
+
+const joinUrl = (
+  baseUrl,
+  endpoint
+) => {
+  if (!baseUrl) {
+    return endpoint
+  }
+
+  if (!endpoint) {
+    return baseUrl
+  }
+
+  return `${baseUrl}${
+    endpoint.startsWith("/")
+      ? endpoint
+      : `/${endpoint}`
+  }`
+}
+
+const collapseDuplicateBase = (
+  url,
+  baseUrl
+) => {
+  if (
+    !baseUrl ||
+    isAbsoluteUrl(url)
+  ) {
+    return url
+  }
+
+  const escapedBase =
+    escapeRegExp(baseUrl)
+
+  return url.replace(
+    new RegExp(
+      `^(${escapedBase})(?:${escapedBase})+(?=/|$)`
+    ),
+    "$1"
+  )
+}
 
 export const buildApiUrl = (
   endpoint,
   params = {}
 ) => {
-  const baseUrl = API_CONFIG.BASE_URL;
-  let url = endpoint;
+  const baseUrl =
+    API_CONFIG.BASE_URL
 
-  if (baseUrl && !endpoint.startsWith(baseUrl)) {
-    url = `${baseUrl}${endpoint}`;
+  let url =
+    endpoint || ""
+
+  if (
+    !isAbsoluteUrl(url) &&
+    baseUrl &&
+    url !== baseUrl &&
+    !url.startsWith(`${baseUrl}/`)
+  ) {
+    url = joinUrl(
+      baseUrl,
+      url
+    )
   }
+
+  url = collapseDuplicateBase(
+    url,
+    baseUrl
+  )
 
   for (const [key, value] of Object.entries(params)) {
     if (
