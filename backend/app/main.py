@@ -122,7 +122,7 @@ def create_app() -> FastAPI:
         title="IT Support AI",
         version="2.0.0",
         lifespan=lifespan,
-        root_path="/bot/api"
+        root_path="/bot/api",
     )
     
     app.state.limiter = limiter

@@ -9,9 +9,10 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 6001,
+    allowedHosts: ["lschat.bigefoodcorp.com.ph"],
 
     proxy: {
-      "/api": {
+      "/bot/api": {
         target: "http://localhost:8000",
         rewrite: (path) => path.replace(/^\/api/, ""),
         changeOrigin: true,
@@ -22,6 +23,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/bot\/api/, ""),
         changeOrigin: true,
         secure: false,
+        rewrite: (path) => path, // Keep the full /bot/api path
       },
 
       "/self_knowledge": {

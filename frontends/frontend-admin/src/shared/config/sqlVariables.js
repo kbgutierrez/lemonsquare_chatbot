@@ -6,7 +6,7 @@
 
 const ENV = {
   // 🚨 IMPORTANT FIX:  
-  // REMOVE /api from BASE URL to prevent /api/api duplication
+  // Use /bot as base to avoid /api/* collision with other services
   API_BASE_URL:
     import.meta.env.VITE_API_BASE_URL ||
     "/bot/api", // ✅ FIXED: use /bot/api so requests route correctly through Nginx to FastAPI port 8000
