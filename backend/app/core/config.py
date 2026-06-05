@@ -38,6 +38,7 @@ class Settings(BaseSettings):
         "https://lsbizportal.lemonsquare.com.ph/helpdesk-dev/api/chatbot/fetch/subcategories"
     )
     BIZPORTAL_TIMEOUT: float = 5.0
+    BIZPORTAL_TICKET_TIMEOUT: float = 60.0
     DB_POOL_SIZE: int = 20
     DB_MAX_OVERFLOW: int = 30
     DB_POOL_TIMEOUT: int = 10

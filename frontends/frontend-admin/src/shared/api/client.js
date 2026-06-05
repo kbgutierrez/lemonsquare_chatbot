@@ -17,7 +17,12 @@ export const buildApiUrl = (
   endpoint,
   params = {}
 ) => {
-  let url = `${API_CONFIG.BASE_URL}${endpoint}`
+  const baseUrl = API_CONFIG.BASE_URL;
+  let url = endpoint;
+
+  if (baseUrl && !endpoint.startsWith(baseUrl)) {
+    url = `${baseUrl}${endpoint}`;
+  }
 
   for (const [key, value] of Object.entries(params)) {
     if (

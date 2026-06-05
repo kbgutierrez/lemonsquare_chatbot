@@ -294,7 +294,7 @@ class EscalationService:
                 data=bizportal_payload, # Use data for multipart form data
                 files=files_to_send,
                 headers=headers,
-                timeout=10.0,
+                timeout=settings.BIZPORTAL_TICKET_TIMEOUT,
             )
             response.raise_for_status()
 

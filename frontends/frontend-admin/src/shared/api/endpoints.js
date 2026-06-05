@@ -67,9 +67,6 @@ export const API_ENDPOINTS = {
     "/knowledge/explore",
   
   KNOWLEDGE_EXPORT_LEARNED_CHATS:
-  "/knowledge/export/learned-chats",  
-
-  KNOWLEDGE_EXPORT_LEARNED_CHATS:
     "/knowledge/export/learned-chats",  
 
   /* ====================================
