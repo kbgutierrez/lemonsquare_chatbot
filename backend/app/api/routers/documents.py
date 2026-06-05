@@ -134,25 +134,31 @@ async def upload_document(
                 bg_ingestion_service = DocumentIngestionService(db=bg_db)
 
                 if is_pdf:
-                    result = await bg_ingestion_service.process_pdf_upload(
-                        file=None,
-                        db=bg_db,
-                        manual_category=category,
-                        job_id=job_id,
-                        file_path=temp_file_path,
-                        original_filename=filename,
-                        acting_user_id=user_id,
-                        acting_username=username
+                    result = await asyncio.wait_for(
+                        bg_ingestion_service.process_pdf_upload(
+                            file=None,
+                            db=bg_db,
+                            manual_category=category,
+                            job_id=job_id,
+                            file_path=temp_file_path,
+                            original_filename=filename,
+                            acting_user_id=user_id,
+                            acting_username=username
+                        ),
+                        timeout=settings.UPLOAD_PROCESS_TIMEOUT_SECONDS,
                     )
                 else:
-                    result = await bg_ingestion_service.process_tabular_upload(
-                        db=bg_db,
-                        manual_category=category,
-                        job_id=job_id,
-                        file_path=temp_file_path,
-                        original_filename=filename,
-                        acting_user_id=user_id,
-                        acting_username=username
+                    result = await asyncio.wait_for(
+                        bg_ingestion_service.process_tabular_upload(
+                            db=bg_db,
+                            manual_category=category,
+                            job_id=job_id,
+                            file_path=temp_file_path,
+                            original_filename=filename,
+                            acting_user_id=user_id,
+                            acting_username=username
+                        ),
+                        timeout=settings.UPLOAD_PROCESS_TIMEOUT_SECONDS,
                     )
 
                 logger.info(
@@ -161,6 +167,19 @@ async def upload_document(
                 )
                 
                 job_manager.update_job(job_id, status="completed", progress=100.0, message="Upload completed", details=result)
+
+            except asyncio.TimeoutError:
+                logger.error(
+                    "Background upload timed out for %s after %s seconds",
+                    filename,
+                    settings.UPLOAD_PROCESS_TIMEOUT_SECONDS,
+                )
+                job_manager.update_job(
+                    job_id,
+                    status="failed",
+                    error="Upload processing timed out.",
+                    message="Upload timed out",
+                )
 
             except Exception as e:
                 logger.error(

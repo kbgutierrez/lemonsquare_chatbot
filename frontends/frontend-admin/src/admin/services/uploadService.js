@@ -144,9 +144,25 @@ export const pollUploadStatus = async (jobId, onStatusChange, intervalMs = 3000,
       // If queued or running, wait and try again
       await new Promise(resolve => setTimeout(resolve, intervalMs))
     } catch (err) {
-      if (err.message && err.message.includes("failed")) {
+      const message =
+        String(err?.message || "")
+
+      const lowerMessage =
+        message.toLowerCase()
+
+      if (
+        lowerMessage.includes("job not found") ||
+        lowerMessage.includes("404")
+      ) {
+        throw new Error(
+          "Upload job status was lost. Please retry after the backend has fully restarted."
+        )
+      }
+
+      if (lowerMessage.includes("failed")) {
         throw err
       }
+
       // Log other errors and retry (could be transient network issues)
       console.warn("Polling error:", err)
       await new Promise(resolve => setTimeout(resolve, intervalMs))
