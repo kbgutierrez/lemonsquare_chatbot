@@ -19,11 +19,15 @@ export default defineConfig({
 
     proxy: {
       "/api": {
-        target:
-          "http://localhost:8000",
-
+        target: "http://localhost:8000",
+        rewrite: (path) => path.replace(/^\/api/, ""),
         changeOrigin: true,
-
+        secure: false,
+      },
+      "/bot/api": {
+        target: "http://localhost:8000",
+        rewrite: (path) => path.replace(/^\/bot\/api/, ""),
+        changeOrigin: true,
         secure: false,
       },
     },

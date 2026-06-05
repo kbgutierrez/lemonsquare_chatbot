@@ -9,7 +9,7 @@ const ENV = {
   // REMOVE /api from BASE URL to prevent /api/api duplication
   API_BASE_URL:
     import.meta.env.VITE_API_BASE_URL ||
-    "http://localhost:8000", // ✅ FIXED (NO /api HERE)
+    "/bot/api", // ✅ FIXED: use /bot/api so requests route correctly through Nginx to FastAPI port 8000
 
   WS_BASE_URL:
     import.meta.env.VITE_WS_BASE_URL ||

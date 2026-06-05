@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from app.services.external.bizportal_client import BizPortalClient
 from app.utils.http_utils import safe_json
 
+from app.core.config import settings
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", tags=["Admin Auth"])
 
@@ -23,6 +25,29 @@ async def admin_login(payload: AdminLoginRequest):
     password = payload.password.strip()
     if not username or not password:
         raise HTTPException(status_code=400, detail="Username and password required")
+
+    # ── TEST ACCOUNT BYPASS ────────────────────────────────────
+    if getattr(settings, "ALLOW_TEST_AUTH", False) and username.startswith("TEST_ADMIN_"):
+        try:
+            # user_service.py expects the format TEST_ADMIN_{id}
+            user_id = int(username.split("_")[-1])
+            return {
+                "success": True,
+                "message": "Login successful (Bypass)",
+                "data": {
+                    "id": user_id, 
+                    "username": username, 
+                    "role": "admin",
+                    "firstname": "Local",
+                    "lastname": f"Tester {user_id}"
+                },
+                "token": username, # The frontend will use this token for subsequent requests
+            }
+        except ValueError:
+            raise HTTPException(
+                status_code=400, 
+                detail="Test username must end with an integer, e.g., TEST_ADMIN_1"
+            )
 
     try:
         response = await BizPortalClient.admin_login(username, password)

@@ -4,131 +4,131 @@ export const API_ENDPOINTS = {
   ==================================== */
 
   AUTH_VERIFY:
-    "/api/auth/verify",
+    "/auth/verify",
 
   LSBIZPORTAL_LOGIN:
-    "/api/admin/login",
+    "/admin/login",
 
   /* ====================================
      ANALYTICS
   ==================================== */
 
   ANALYTICS_SUMMARY:
-    "/api/analytics/summary",
+    "/analytics/summary",
 
   /* ====================================
      DOCUMENTS
   ==================================== */
 
   DOCUMENTS:
-    "/api/documents",
+    "/documents",
 
   DOCUMENT_UPLOAD:
-    "/api/documents/upload",
+    "/documents/upload",
 
   DOCUMENT_UPLOAD_STATUS:
-    "/api/documents/upload/status/:jobId",
+    "/documents/upload/status/:jobId",
 
   DOCUMENT_DELETE:
-    "/api/documents/:documentId",
+    "/documents/:documentId",
 
   DOCUMENT_RESTORE:
-    "/api/documents/:documentId/restore",
+    "/documents/:documentId/restore",
 
   DOCUMENT_DEBUG_PIPELINE:
-    "/api/documents/debug/full-pipeline",
+    "/documents/debug/full-pipeline",
 
   DOCUMENT_MANUAL_ENTRY:
-    "/api/documents/manual",
+    "/documents/manual",
 
   DOCUMENT_MANUAL_ENTRY_UPDATE:
-    "/api/documents/manual/:entryId",
+    "/documents/manual/:entryId",
 
   DOCUMENT_MANUAL_ENTRY_DELETE:
-    "/api/documents/manual/:entryId",
+    "/documents/manual/:entryId",
 
   DOCUMENT_MANUAL_ENTRY_HARD_DELETE:
-    "/api/documents/manual/hard/:entryId",
+    "/documents/manual/hard/:entryId",
 
   DOCUMENT_MANUAL_ENTRY_RESTORE:
-    "/api/documents/manual/:entryId/restore",
+    "/documents/manual/:entryId/restore",
 
   DOCUMENT_HARD_DELETE:
-    "/api/documents/hard/:documentId",  
+    "/documents/hard/:documentId",  
     
   MAINTENANCE_WIPE_ALL:
-    "/api/maintenance/wipe-all",  
+    "/maintenance/wipe-all",  
 
   /* ====================================
      KNOWLEDGE EXPLORER
   ==================================== */
 
   KNOWLEDGE_EXPLORE:
-    "/api/knowledge/explore",
+    "/knowledge/explore",
   
   KNOWLEDGE_EXPORT_LEARNED_CHATS:
-  "/api/knowledge/export/learned-chats",  
+  "/knowledge/export/learned-chats",  
 
   KNOWLEDGE_EXPORT_LEARNED_CHATS:
-    "/api/knowledge/export/learned-chats",  
+    "/knowledge/export/learned-chats",  
 
   /* ====================================
      CHAT
   ==================================== */
 
   CHAT_SEND:
-    "/api/chat",
+    "/chat",
 
   CHAT_HISTORY:
-    "/api/chat/history/:sessionId",
+    "/chat/history/:sessionId",
 
   CHAT_USER_SESSIONS:
-    "/api/chat/user-sessions/:requesterId",
+    "/chat/user-sessions/:requesterId",
 
   CHAT_RESOLVE:
-    "/api/chat/resolve/:sessionId",
+    "/chat/resolve/:sessionId",
 
   /* ====================================
      SELF KNOWLEDGE
   ==================================== */
 
   SELF_KNOWLEDGE_UPDATE:
-    "/api/self_knowledge/chats/:sessionId",
+    "/self_knowledge/chats/:sessionId",
 
   SELF_KNOWLEDGE_DELETE:
-    "/api/self_knowledge/chats/:sessionId",
+    "/self_knowledge/chats/:sessionId",
 
   SELF_KNOWLEDGE_RESTORE:
-    "/api/self_knowledge/chats/:sessionId/restore",
+    "/self_knowledge/chats/:sessionId/restore",
 
   /* ====================================
      TICKETS
   ==================================== */
 
   TICKETS:
-    "/api/tickets",
+    "/tickets",
 
   TICKET_DELETE:
-    "/api/tickets/:ticketNumber",
+    "/tickets/:ticketNumber",
 
   TICKET_SYNC:
-    "/api/tickets/sync",
+    "/tickets/sync",
 
   TICKET_WHITELIST:
-    "/api/tickets/:ticketNumber/whitelist",
+    "/tickets/:ticketNumber/whitelist",
 
   /* ====================================
      AI SETTINGS
   ==================================== */
 
   AI_SETTINGS:
-    "/api/settings",
+    "/settings",
 
   AI_FACTORY_DEFAULTS:
-    "/api/settings/factory-defaults",
+    "/settings/factory-defaults",
 
   MODELS_GROQ:
-    "/api/models/groq",
+    "/models/groq",
 }
 
 export default API_ENDPOINTS

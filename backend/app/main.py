@@ -122,7 +122,7 @@ def create_app() -> FastAPI:
         title="IT Support AI",
         version="2.0.0",
         lifespan=lifespan,
-
+        root_path="/bot/api"
     )
     
     app.state.limiter = limiter
@@ -160,18 +160,18 @@ def create_app() -> FastAPI:
         return response
 
     # Routes
-    app.include_router(chat.router, prefix="/api")
-    app.include_router(documents.router, prefix="/api")
-    app.include_router(tickets.router, prefix="/api")
-    app.include_router(settings.router, prefix="/api")
-    app.include_router(explorer.router, prefix="/api")
-    app.include_router(analytics.router, prefix="/api")
-    app.include_router(maintenance.router, prefix="/api")
-    app.include_router(routing.router, prefix="/api")
-    app.include_router(auth.router, prefix="/api")
-    app.include_router(admin_auth.router, prefix="/api")
-    app.include_router(self_knowledge.router, prefix="/api")
-    app.include_router(models.router, prefix="/api")
+    app.include_router(chat.router)
+    app.include_router(documents.router)
+    app.include_router(tickets.router)
+    app.include_router(settings.router)
+    app.include_router(explorer.router)
+    app.include_router(analytics.router)
+    app.include_router(maintenance.router)
+    app.include_router(routing.router)
+    app.include_router(auth.router)
+    app.include_router(admin_auth.router)
+    app.include_router(self_knowledge.router)
+    app.include_router(models.router)
 
     # Health
     @app.get("/health")

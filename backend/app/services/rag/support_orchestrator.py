@@ -14,6 +14,7 @@ from app.core.exceptions import AIProcessingError
 from app.core.retrieval_models import RetrievalDocument
 from app.repositories.settings_repository import SettingsRepository
 from app.services.rag.query_reformulator import QueryReformulator
+from app.services.chat.query_gatekeeper import GatekeeperDecision, QueryGatekeeper
 from app.services.retrieval.embedding_provider import get_embedding_model
 from app.services.retrieval.vector_store import get_shared_vector_store
 from app.services.retrieval.reranker_service import RerankerService
@@ -63,6 +64,7 @@ class SupportOrchestrator:
         self.reranker = RerankerService(resolved_reranker)
         self.reformulator = QueryReformulator()
         self.answer_generator = AnswerGenerator()
+        self.query_gatekeeper = QueryGatekeeper()
 
         logger.info("AI Orchestrator ready.")
 
@@ -119,6 +121,7 @@ class SupportOrchestrator:
         from app.models.chatbot import ChatSession
         from app.services.chat.escalation_service import EscalationService
 
+        session = None
         if session_id:
             session = await asyncio.to_thread(
                 lambda: db.query(ChatSession)
@@ -141,6 +144,50 @@ class SupportOrchestrator:
                     None,
                 )
 
+        gatekeeper_result = self.query_gatekeeper.evaluate(
+            user_query,
+            session_status=session.SessionStatus if session else None,
+        )
+        gatekeeper_debug = gatekeeper_result.as_debug_dict()
+        logger.info(
+            "gatekeeper.decision=%s reason=%s confidence=%.2f session_id=%s session_status=%s",
+            gatekeeper_result.decision.value,
+            gatekeeper_result.reason,
+            gatekeeper_result.confidence,
+            session_id,
+            session.SessionStatus if session else None,
+        )
+
+        if gatekeeper_result.decision != GatekeeperDecision.CONTINUE_RAG:
+            if debug:
+                return {
+                    "original_query": user_query,
+                    "chat_history": chat_history,
+                    "gatekeeper": gatekeeper_debug,
+                    "reformulated_query": None,
+                    "retrieval_results": [],
+                    "final_answer": gatekeeper_result.response,
+                    "ticket_ids_used": [],
+                }
+
+            return (
+                gatekeeper_result.response or "",
+                gatekeeper_result.action,
+                gatekeeper_result.resolution_message,
+                [],
+                {
+                    "original_query": user_query,
+                    "chat_history": chat_history,
+                    "gatekeeper": gatekeeper_debug,
+                    "reformulated_query": None,
+                    "retrieval_count": 0,
+                    "valid_hit_count": 0,
+                    "retrieved_documents": [],
+                    "final_hits": [],
+                    "final_answer": gatekeeper_result.response,
+                },
+            )
+
         # ── 2. Load Dynamic Settings ──────────────────────────────
         normalized_query = user_query.lower().strip()
         settings_repo = SettingsRepository(db)
@@ -149,6 +196,7 @@ class SupportOrchestrator:
         debug_info: dict[str, Any] = {
             "original_query": user_query,
             "chat_history": chat_history,
+            "gatekeeper": gatekeeper_debug,
             "use_reformulator": bool(config.UseReformulator if config and config.UseReformulator is not None else True),
             "use_reranker": bool(config.UseReranker if config and config.UseReranker is not None else False),
             "top_k": None,
@@ -226,6 +274,7 @@ class SupportOrchestrator:
             if debug:
                 return {
                     "original_query": user_query,
+                    "gatekeeper": gatekeeper_debug,
                     "reformulated_query": search_query,
                     "retrieval_results": [],
                     "final_answer": fallback_msg,
@@ -318,6 +367,7 @@ class SupportOrchestrator:
                 })
             return {
                 "original_query": user_query,
+                "gatekeeper": gatekeeper_debug,
                 "reformulated_query": search_query,
                 "retrieval_results": debug_retrieval,
                 "final_answer": answer,

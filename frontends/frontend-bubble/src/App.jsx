@@ -19,7 +19,7 @@ const DEFAULT_CONFIG = {
   apiBaseUrl:
     import.meta.env
       .VITE_API_BASE_URL ||
-    "/api",
+    "/bot/api",
 
   userToken:
     import.meta.env
