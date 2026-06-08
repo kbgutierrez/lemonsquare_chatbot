@@ -60,19 +60,20 @@ async def handle_chat(
 ) -> ChatResponse:
     try:
         user_data = await fetch_user_details(chat_request.user_token)
-        user_id = int(user_data.get("id"))
+        user_id = str(user_data.get("id"))
         user_name = (
             f"{user_data.get('firstname', 'Guest')} "
             f"{user_data.get('lastname', 'User')}"
         ).strip()
+        logger.info("User authenticated: user_id=%s user_name=%s", user_id, user_name)
 
     except AuthenticationError:
+        logger.warning("Authentication denied: %s", str(auth_err), exc_info=True)
         raise
-
     except Exception as exc:
-        
-        logger.error("Authentication failure: %s", exc)
-        raise AuthenticationError("User authentication failed.") from exc
+        logger.error("Unexpected authentication error: %s", str(exc), exc_info=True)
+        logger.error("Exception type: %s | Full traceback:", type(exc).__name__, exc_info=True)
+        raise AuthenticationError(f"User authentication failed: {str(exc)}") from exc
 
     session_mgr = SessionManager(db)
     msg_svc = MessageService(db)

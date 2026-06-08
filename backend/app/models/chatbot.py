@@ -23,7 +23,7 @@ BaseChatbot = declarative_base()
 class ChatSession(BaseChatbot):
     __tablename__ = "ChatSession"
     SessionID = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    RequesterUserID = Column(BigInteger, nullable=False)
+    RequesterUserID = Column(String(50), nullable=False)
     RequesterName = Column(String(150))
     ChatTitle = Column(String(255))
     StartTime = Column(DateTime, default=lambda: datetime.now(timezone.utc))
@@ -107,7 +107,7 @@ class AIChatbotSetting(BaseChatbot):
 class UserThemePreference(BaseChatbot):
     __tablename__ = "UserThemePreferences"
     PreferenceID = Column(Integer, primary_key=True, autoincrement=True)
-    UserID = Column(BigInteger, nullable=False, unique=True)
+    UserID = Column(String(50), nullable=False, unique=True)
     BubbleTheme = Column(String(50), default="lemon-square")
     HeaderGradientEnabled = Column(Boolean, default=True)
     CustomHeaderGradientStart = Column(String(7), default="#7BE38E")
@@ -161,7 +161,7 @@ class ManualKnowledgeEntry(BaseChatbot):
 class LearnedChat(BaseChatbot):
     __tablename__ = "tbl_learned_chats"
     SessionID = Column(String(36), primary_key=True)
-    UserID = Column(BigInteger)
+    UserID = Column(String)
     RequesterName = Column(String(150))
     IssueReported = Column(Text)
     IssueFound = Column(Text)
