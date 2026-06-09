@@ -86,30 +86,7 @@ const ChatHeader = ({
           "
         >
 
-          {/* STATUS */}
-          {resolved ? (
-            <Lock
-              className="
-                h-3.5
-                w-3.5
-                shrink-0
-              "
-            />
-          ) : (
-            <div
-              className="
-                h-2.5
-                w-2.5
-
-                rounded-full
-              "
-              style={{
-                backgroundColor: theme.statusOnline,
-                boxShadow: 'none',
-              }}
-            />
-          )}
-
+         
           {/* TITLE */}
           <h2
             className="
